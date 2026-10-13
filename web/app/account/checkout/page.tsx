@@ -7,12 +7,26 @@ import PurchasePortal from './PurchasePortal';
 import {offerDisplay} from '../../../lib/billing/offerDisplay';
 import RazorpayCheckout from './RazorpayCheckout';
 import { razorpayCheckoutEnabled } from '../../../lib/payments/core/config';
+import {STAGING_DATABASE,STAGING_SITE} from '../../../lib/accountRelay/config';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Cluera sandbox checkout', robots: { index: false, follow: false } };
 
 /** A private staging enablement gate, never a token/query parameter, enables UI. */
 export default async function CheckoutPage() {
+  // Presentation only: a paused new Cluera rollout must not need old Paddle
+  // credentials merely to explain an unavailable purchase. Financial APIs keep
+  // their original, independent provider/project/credential/tester guards.
+  if(process.env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED!=='true'){
+    if(process.env.SIGMAROUND_ACCOUNTS_ENABLED!=='true'||process.env.SIGMAROUND_ACCOUNT_ORIGIN!==STAGING_SITE
+      ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
+    let offers;try{offers=await readAccountCatalog();}catch{return <main className="account-page"><h1>Buy Cluera credits</h1><p>Test payments are paused. The approved catalog is unavailable. No checkout was started.</p><a href="/account">Return to your account</a></main>;}
+    return <main className="account-page"><h1>Buy Cluera credits</h1><p>Test payments are paused. No payment is enabled in this Cluera workspace. Recurring offers and Stripe are unavailable.</p>
+      <div className="account-purchase-grid">{offers.filter(offer=>offer.enabled).map(offer=><article key={offer.code}>
+        <h2>{offer.name}</h2><p>{offerDisplay(offer).label}</p><p>{offerDisplay(offer).terms}</p>
+        <button className="button" type="button" disabled>Checkout unavailable</button>
+      </article>)}</div><a href="/account">Return to your account</a></main>;
+  }
   let staging = false;
   try { assertCheckoutStaging(process.env); staging = true; } catch { /* Non-staging: no checkout surface. */ }
   if (!staging) notFound();

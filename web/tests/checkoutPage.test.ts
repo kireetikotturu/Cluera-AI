@@ -13,6 +13,19 @@ function staging(){
     SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa'}))vi.stubEnv(key,value);
 }
 describe('disabled staging checkout landing page',()=>{
+  it('renders a paused Cluera page without provisioning Paddle or Razorpay configuration',async()=>{
+    staging();vi.stubEnv('CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','false');
+    for(const name of ['PADDLE_ENVIRONMENT','SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF','RAZORPAY_ENVIRONMENT','RAZORPAY_TEST_KEY_ID','NEXT_PUBLIC_PADDLE_CLIENT_TOKEN'])vi.stubEnv(name,'');
+    vi.mocked(readAccountCatalog).mockResolvedValue(sandboxOffers.map((offer,priority)=>({...offer,enabled:true,priority})));
+    const html=renderToStaticMarkup(await CheckoutPage());expect(html).toContain('Test payments are paused');
+    expect((html.match(/Checkout unavailable/g)||[])).toHaveLength(4);expect((html.match(/disabled=""/g)||[])).toHaveLength(4);
+    expect(html).not.toMatch(/<script|<iframe|<form/);expect(html).toContain('Recurring offers and Stripe are unavailable');
+    expect(readAccountCatalog).toHaveBeenCalledExactlyOnceWith();
+  });
+  it('does not expose even paused presentation on a wrong Account target',async()=>{
+    staging();vi.stubEnv('CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','false');vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://foreign.invalid');
+    await expect(CheckoutPage()).rejects.toThrow('NOT_FOUND');expect(readAccountCatalog).not.toHaveBeenCalled();
+  });
   it('stays disabled even when client token exists and exposes no value or SDK',async()=>{
     staging();vi.stubEnv('NEXT_PUBLIC_PADDLE_CLIENT_TOKEN','test_syntheticneverexpose0123456');
     vi.mocked(readAccountCatalog).mockResolvedValue(sandboxOffers.map((offer,priority)=>({...offer,enabled:true,priority})));
