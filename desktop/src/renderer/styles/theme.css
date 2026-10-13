@@ -1,0 +1,82 @@
+/* Cluera AI: night black, soft stone, and lavender and teal.
+   Dark is the startup default; App resolves the saved System preference too. */
+:root {
+  color-scheme: dark;
+  font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --bg: #090a0c;
+  --bg-raised: #101114;
+  --panel: #16171a;
+  --panel-2: #202125;
+  --panel-3: #2b2c30;
+  --surface: var(--panel);
+  --text: #f5f3ee;
+  --muted: #d0cec8;
+  --faint: #bebfb8;
+  --surface-opacity: .96;
+  /* Continuous glass control with a reading tint: .35 -> .7725, 1 -> 1.
+     Unlike native opacity this never changes text/icon alpha. */
+  --reading-opacity: calc(.65 + .35 * var(--surface-opacity));
+  --glass-bg: rgba(var(--surface-rgb), var(--reading-opacity));
+  --accent: #a78bfa;
+  --accent-hover: #c4b5fd;
+  --accent-text: #cbbdff;
+  --accent-ink: #211632;
+  --accent-rgb: 167, 139, 250;
+  --secondary: #5eead4;
+  --secondary-rgb: 94, 234, 212;
+  --neutral-rgb: 245, 243, 238;
+  --surface-rgb: 9, 10, 12;
+  --action-fill: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 52%, #5eead4 100%);
+  --action-fill-hover: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 52%, #99f6e4 100%);
+  --action-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 3px 10px rgba(94, 234, 212, .08);
+  --page-sheen: radial-gradient(ellipse 70% 260px at 100% 0%, rgba(167, 139, 250, .035), transparent);
+  --shadow-rgb: 0, 0, 0;
+  --info: #91bdf3;
+  --info-rgb: 145, 189, 243;
+  --success: #82d6ac;
+  --success-rgb: 130, 214, 172;
+  --danger: #ff9c98;
+  --danger-rgb: 255, 114, 108;
+  --danger-fill: #ba3d39;
+  --on-danger: #ffffff;
+  --warning: #edc57e;
+  --line: rgba(245, 243, 238, .075);
+  --line-strong: rgba(245, 243, 238, .16);
+  --shadow: 0 16px 36px rgba(0, 0, 0, .32);
+  --soft-shadow: 0 4px 16px rgba(0, 0, 0, .18);
+  /* Compatibility names for established components. */
+  --lime: var(--accent);
+  --lime-2: var(--accent-hover);
+  --lime-ink: var(--accent-ink);
+  --teal: var(--info);
+  --amber: var(--warning);
+}
+
+:root[data-color-scheme='light'] {
+  color-scheme: light;
+  --bg: #eeece7;
+  --bg-raised: #f5f3ee;
+  --panel: #f5f3ee;
+  --panel-2: #e6e3dd;
+  --panel-3: #dad6ce;
+  --text: #20221e;
+  --muted: #3b4038;
+  --faint: #43483f;
+  --accent-text: #53339b;
+  --accent-ink: #211632;
+  --neutral-rgb: 37, 38, 35;
+  --surface-rgb: 238, 236, 231;
+  --shadow-rgb: 58, 49, 29;
+  --page-sheen: radial-gradient(ellipse 70% 260px at 100% 0%, rgba(167, 139, 250, .065), transparent);
+  --info: #315f9b;
+  --info-rgb: 49, 95, 155;
+  --success: #21704c;
+  --success-rgb: 33, 112, 76;
+  --danger: #ad3430;
+  --danger-rgb: 173, 52, 48;
+  --warning: #865705;
+  --line: rgba(58, 49, 29, .07);
+  --line-strong: rgba(58, 49, 29, .17);
+  --shadow: 0 14px 36px rgba(58, 49, 29, .10);
+  --soft-shadow: 0 4px 16px rgba(58, 49, 29, .055);
+}

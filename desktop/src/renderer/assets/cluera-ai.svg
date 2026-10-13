@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="cluera-title">
+  <title id="cluera-title">Cluera AI</title>
+  <defs><linearGradient id="cluera-gradient" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#5eead4"/></linearGradient></defs>
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="#111322" stroke="#46405c"/>
+  <path d="M43 20a17 17 0 1 0 0 24" fill="none" stroke="url(#cluera-gradient)" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="44" cy="32" r="4" fill="#5eead4"/>
+</svg>

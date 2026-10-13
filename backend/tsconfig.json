@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022","DOM"],"strict":true,"esModuleInterop":true,"skipLibCheck":true,"types":["node"],"noEmit":true,"paths":{"@supabase/supabase-js":["./node_modules/@supabase/supabase-js"],"zod":["./node_modules/zod"],"ws":["./node_modules/@types/ws"]}},"include":["main.ts"]}

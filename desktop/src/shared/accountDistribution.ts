@@ -1,0 +1,15 @@
+/** Public, immutable staging destinations and product identity; never credentials. */
+export const ACCOUNT_DISTRIBUTION = Object.freeze({
+  product: 'cluera-ai',
+  packageName: 'cluera-ai-desktop',
+  appId: 'ai.cluera.desktop',
+  productName: 'Cluera AI',
+  profile: 'cluera-ai-desktop-staging',
+  database: 'cluera-ai.sqlite',
+  channel: 'cluera-beta',
+  audience: 'cluera-ai-desktop-test-update',
+  feed: '/api/cluera/update/test',
+  download: '/account/download',
+  apiOrigin: 'https://cluera-ai-staging.vercel.app',
+  relayEndpoint: 'wss://cluera-ai-relay-staging.onrender.com/v1/session',
+} as const);

@@ -1,0 +1,10 @@
+.cluera-site{--accent:#8b7cff;--brand:#8b7cff;--brand-soft:rgba(139,124,255,.12);--gold:#a78bfa;--gold2:#c4b5fd}
+.cluera-site .wordmark>span{display:grid;place-items:center;background:linear-gradient(145deg,#8b7cff,#4ccad0);border-radius:11px;color:#101120;font-weight:800;font-size:22px;width:36px;height:36px}
+.cluera-site .hero{position:relative;overflow:hidden;min-height:510px;background:radial-gradient(ellipse at 85% 15%,rgba(91,79,190,.18),transparent 55%)}
+.cluera-site .hero-copy{max-width:850px}
+.cluera-site .button{border-radius:10px}
+.cluera-site :where(a,button,input,select,textarea):focus-visible{outline:2px solid #aaa1ff;outline-offset:3px}
+.cluera-site .account-panel :where(input,select,textarea){color-scheme:dark}
+.cluera-site .support-grid article{min-width:0}
+.cluera-site .support-email{overflow-wrap:anywhere}
+@media(max-width:600px){.cluera-site .hero{min-height:0}.cluera-site .hero-actions{align-items:stretch}.cluera-site .hero-actions .button{text-align:center}}

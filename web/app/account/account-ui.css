@@ -1,0 +1,74 @@
+/* Account-only design language; no License Edition/Admin selectors. */
+.account-auth, .account-admin-shell {
+  --ink: #edf2fa; --muted: #b4bfd4; --faint: #95a3bd; --line: #35415a;
+  --surface: #171e2d; --gold: #b8a7ef; --gold2: #c8b9ff;
+  color: var(--ink); background: linear-gradient(145deg,#171e2d,#111827); border-color: var(--line);
+}
+.account-auth { padding: clamp(22px,5vw,36px); gap: 16px; border-radius: 22px; box-shadow: 0 18px 60px #060a1455; }
+.account-auth h2 { margin: 0; font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: -.7px; }
+.account-auth-brand { width: 46px; height: 46px; display: grid; place-items: center; color: #171b25; background: #b8a7ef; border-radius: 14px; font-size: 27px; font-weight: 650; }
+.account-ui-kicker { margin: 0; color: #c7b8ef; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+.account-auth .account-auth-description { margin: -4px 0 5px; color: var(--muted); font-size: 13px; }
+.account-auth label { font-size: 12px; color: #c4cee0; }
+.account-auth input { width: 100%; background: #101725; border-color: #45516a; color: #edf2fa; }
+.account-auth .button { width: 100%; justify-content: center; min-height: 44px; border-radius: 10px; }
+.account-auth .button.secondary { color: var(--ink); border: 1px solid #45516a; background: #202a3c; }
+.account-auth-password { display: block; position: relative; }
+.account-auth-password input { padding-right: 62px; }
+.account-auth-password button { position: absolute; right: 6px; top: 6px; bottom: 6px; padding: 0 9px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; font-size: 11px; cursor: pointer; }
+.account-auth .account-actions { justify-content: space-between; font-size: 12px; }
+.account-auth .account-auth-safety { margin: 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 11px; color: var(--faint); }
+.account-auth :is(input,button):focus-visible, .account-admin-shell :is(input,textarea,select,button,a):focus-visible { outline: 2px solid #c8b9ff; outline-offset: 3px; }
+
+.account-page.account-admin-page { max-width: 1200px; margin: 36px auto 72px; padding: 0 clamp(14px,3vw,30px); }
+.account-admin-heading { margin-bottom: 26px; }
+.account-admin-heading > p:first-child { color: #c7b8ef; font-size: 10px; letter-spacing: 1.6px; }
+.account-admin-heading h1 { font-size: clamp(25px,4vw,38px); letter-spacing: -1px; font-weight: 600; }
+.account-admin-heading h1 span { display: inline-block; padding: 5px 9px; border: 1px solid #45516a; border-radius: 7px; color: #b4bfd4; font-size: 10px; letter-spacing: .4px; vertical-align: middle; }
+.account-admin-heading p { color: #a4aec0; font-size: 13px; line-height: 1.6; }
+.account-admin-shell { padding: clamp(16px,3vw,28px); gap: 20px; border-radius: 20px; min-width: 0; }
+.account-admin-shell > * { min-width: 0; }
+.account-admin-shell h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -.5px; }
+.account-admin-shell h3 { margin: 24px 0 10px; font-size: 17px; }
+.account-admin-shell h4 { font-size: 13px; color: #c7b8ef; }
+.account-admin-shell p { color: var(--muted); font-size: 12px; margin-block: 10px; }
+.account-admin-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+.account-admin-top span { color: var(--faint); font-size: 11px; }
+.account-admin-shell .account-admin-status { margin: 0; padding: 12px 14px; border: 1px solid #35415a; border-radius: 10px; background: #101725; }
+.account-admin-nav { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 4px; }
+.account-admin-nav a { padding: 9px 15px; border: 1px solid #45516a; border-radius: 9px; font-size: 12px; color: #c4cee0; text-decoration: none; }
+.account-admin-nav a:hover { color: #c8b9ff; background: #273449; }
+.account-admin-section { padding: clamp(16px,3vw,24px); border: 1px solid var(--line); border-radius: 15px; background: #1a2334; scroll-margin-top: 96px; min-width: 0; }
+.account-admin-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+.account-admin-section .account-ui-kicker { color: #c7b8ef; margin: 0 0 8px; font-size: 10px; }
+.account-admin-shell form { padding: 18px; margin-top: 14px; border: 1px solid #35415a; border-radius: 12px; background: #141d2b; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.account-admin-shell form label { min-width: 0; color: #c4cee0; font-size: 12px; line-height: 1.5; }
+.account-admin-shell form > p, .account-admin-shell form > button { grid-column: 1 / -1; }
+.account-admin-shell :is(input:not([type=checkbox]),textarea,select) { min-width: 0; width: 100%; padding: 11px 12px; border: 1px solid #45516a; border-radius: 9px; color: #edf2fa; background: #101725; font: inherit; font-size: 13px; }
+.account-admin-shell textarea { min-height: 86px; resize: vertical; }
+.account-admin-shell input[type=checkbox] { width: 17px; height: 17px; accent-color: #b8a7ef; }
+.account-admin-shell label:has(input[type=checkbox]) { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.account-admin-shell button { min-height: 38px; width: fit-content; max-width: 100%; padding: 9px 14px; border: 1px solid #45516a; border-radius: 9px; color: #c8b9ff; background: #273449; font-size: 12px; cursor: pointer; overflow-wrap: anywhere; }
+.account-admin-shell button:hover:not(:disabled) { background: #33435d; border-color: #6b7893; }
+.account-admin-shell button.button { color: #171b25; background: #b8a7ef; }
+.account-admin-shell ul { margin: 14px 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.account-admin-shell li { padding: 12px; border: 1px solid #35415a; border-radius: 10px; background: #141d2b; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; min-width: 0; }
+.account-admin-users li { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.account-admin-users li span { color: var(--faint); font-size: 11px; }
+.account-admin-detail { margin-top: 20px; padding-top: 6px; border-top: 1px solid #45516a; }
+.account-admin-shell .account-admin-empty { padding: 14px; border: 1px dashed #45516a; border-radius: 10px; color: var(--faint); }
+.account-admin-audit li { display: grid; grid-template-columns: 155px minmax(110px,.6fr) minmax(0,1fr); gap: 14px; }
+.account-admin-audit time { color: var(--faint); font-size: 11px; }
+.account-admin-shell fieldset { min-width: 0; border: 1px solid #45516a; border-radius: 12px; padding: 16px; }
+.account-admin-shell fieldset:disabled { opacity: .72; }
+.account-admin-shell legend { color: #c8b9ff; font-size: 13px; padding: 0 6px; }
+.account-admin-mfa { max-width: 580px; margin: 12px auto; width: 100%; }
+.account-admin-mfa img { display: block; max-width: 100%; height: auto; margin: 16px auto; padding: 12px; background: #fff; border-radius: 12px; }
+.account-admin-mfa code { display: block; padding: 12px; background: #101725; border-radius: 8px; overflow-wrap: anywhere; }
+.account-admin-shell .account-admin-safety { border-top: 1px solid #35415a; padding-top: 18px; margin: 0; font-size: 11px; }
+@media (max-width: 650px) {
+  .account-admin-shell form { grid-template-columns: minmax(0,1fr); padding: 14px; }
+  .account-admin-audit li { grid-template-columns: minmax(0,1fr); gap: 5px; }
+  .account-admin-nav a { padding: 9px 12px; }
+  .account-admin-shell h2 { font-size: 20px; }
+}

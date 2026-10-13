@@ -1,0 +1,31 @@
+import {createRequire} from 'node:module';
+import {act,createElement} from 'react';
+import {createRoot} from 'react-dom/client';
+import {afterEach,expect,it,vi} from 'vitest';
+import {AccountCreditsSection} from '../src/renderer/components/AccountCreditsSection';
+import {emptyCredits,type CreditsView} from '../src/shared/accountCredits';
+// Reuse the existing web test DOM dependency; no shipped dependency is added.
+const require=createRequire(import.meta.url);
+const {JSDOM}=require('jsdom');
+let root:ReturnType<typeof createRoot>|undefined;
+let dom:any;
+afterEach(()=>{if(root)act(()=>root!.unmount());dom?.window.close();root=undefined;vi.unstubAllGlobals();});
+it('fences a late manual refresh and clears displayed credits when account owner changes',async()=>{
+ dom=new JSDOM('<div id="root"></div>');
+ vi.stubGlobal('window',dom.window);vi.stubGlobal('document',dom.window.document);vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
+ const snapshot=(userId:string):CreditsView=>({...emptyCredits(),state:'ready',snapshot:{userId,displayName:'',serverTime:new Date().toISOString(),availableMilliseconds:3600000,reservedMilliseconds:0,spentMilliseconds:0,buckets:[],plans:[],payments:[],checkoutAvailable:false}});
+ const deferred:((v:CreditsView)=>void)[]=[];
+ const refresh=vi.fn(()=>new Promise<CreditsView>(resolve=>deferred.push(resolve)));
+ dom.window.accountAPI={credits:{refresh,onChange:()=>()=>{}},openWeb:async()=>{}};
+ root=createRoot(dom.window.document.getElementById('root'));
+ await act(async()=>root!.render(createElement(AccountCreditsSection,{userId:'account-A'})));
+ await act(async()=>deferred.shift()!(snapshot('account-A')));
+ expect(dom.window.document.body.textContent).toContain('1h 0m');
+ await act(async()=>dom.window.document.querySelector('[aria-label="Refresh credits"]').click());
+ const oldRefresh=deferred.shift()!;
+ await act(async()=>root!.render(createElement(AccountCreditsSection,{userId:'account-B'})));
+ await act(async()=>oldRefresh(snapshot('account-A')));
+ expect(dom.window.document.body.textContent).not.toContain('1h 0m');
+ await act(async()=>deferred.shift()!(snapshot('account-B')));
+ expect(dom.window.document.body.textContent).toContain('1h 0m');
+});

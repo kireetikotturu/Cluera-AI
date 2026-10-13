@@ -1,0 +1,83 @@
+/* Account-only surfaces. License Edition keeps its existing layout and palette. */
+.account-login {
+  height: 100%; display: flex; flex-direction: column; min-height: 0;
+  color: #e9edf8; background: radial-gradient(ellipse at 15% 0, #26334a 0, transparent 65%), #101522;
+  --text: #e9edf8; --muted: #b4bfd4; --faint: #95a3bd; --line: #35415a;
+}
+.account-login-bar { flex: 0 0 58px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #30384b; -webkit-app-region: drag; }
+.account-login-bar > span { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 650; }
+.account-login-bar b { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: #b8a7ef; color: #171b25; font-size: 18px; }
+.account-login-bar small { padding: 3px 6px; border: 1px solid #45516a; border-radius: 5px; color: #b4bfd4; font-size: 9px; }
+.account-login-bar button { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 9px; color: #b4bfd4; background: transparent; cursor: pointer; -webkit-app-region: no-drag; }
+.account-login-bar button:hover { background: #46282f; color: #fff; }
+.account-login-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 30px 20px; scrollbar-width: thin; scrollbar-color: #45516a transparent; }
+.account-login-card { margin: 0 auto; padding: 30px clamp(20px, 5vw, 38px); background: #171e2d; border-color: #35415a; box-shadow: 0 18px 60px #060a1455; }
+.account-auth-icon { width: 50px; height: 50px; display: grid; place-items: center; margin: 0 auto 18px; border: 1px solid #605487; border-radius: 16px; color: #c8b9ff; background: #8870ef14; }
+.account-login-card .eyebrow { color: #d7bd8e; font-size: 10px; letter-spacing: 1.6px; }
+.account-login-card h1 { font-size: 32px; }
+.account-login-card .activation-copy { font-size: 13px; margin-bottom: 22px; }
+.account-login-card form { display: grid; gap: 16px; }
+.account-login-card .activation-field > span { text-transform: none; letter-spacing: 0; font-size: 12px; color: #c4cee0; }
+.account-login-card .activation-field input { height: 44px; padding: 0 12px; border: 1px solid #45516a; border-radius: 10px; background: #101725; color: #edf2fa; font-family: inherit; letter-spacing: 0; }
+.account-login-card .account-password { position: relative; display: block; }
+.account-password input { padding-right: 46px !important; }
+.account-password button { position: absolute; right: 4px; top: 4px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #b4bfd4; cursor: pointer; }
+.account-login-card .activation-submit { margin: 2px 0 0; min-height: 44px; gap: 9px; }
+.account-login-card .activation-message { margin: 14px 0; min-height: 0; overflow-wrap: anywhere; }
+.account-auth-divider { display: flex; align-items: center; gap: 12px; color: #95a3bd; font-size: 11px; margin: 16px 0; }
+.account-auth-divider::before, .account-auth-divider::after { content: ''; height: 1px; flex: 1; background: #35415a; }
+.account-login-card .account-google { width: 100%; min-height: 42px; justify-content: center; border: 1px solid #45516a; border-radius: 10px; background: #202a3c; color: #edf2fa; }
+.account-auth-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 20px 0 12px; }
+.account-auth-links button, .account-retry { border: 0; padding: 4px 0; font-size: 12px; color: #c8b9ff; background: transparent; cursor: pointer; }
+.account-retry { color: #b4bfd4; }
+.account-auth-note, .account-login-footnote { color: #95a3bd; font-size: 11px; line-height: 1.6; }
+.account-auth-note { margin: 18px 0 0; }
+.account-login-footnote { text-align: center; margin: 18px auto 0; }
+.account-login button:disabled { opacity: .5; cursor: wait; }
+.account-login :is(input,button):focus-visible { outline: 2px solid #c8b9ff; outline-offset: 3px; }
+
+/* The credits strip and live workspace share the available height, not two 100% heights. */
+.account-app .app-body.focus .account-live-content { display: flex; flex-direction: column; min-height: 0; }
+.account-live-content > .account-usage-strip { flex: 0 0 auto; color: var(--muted); border-color: var(--line); }
+.account-live-content > .live-widget { flex: 1; height: auto; min-height: 0; }
+
+.account-session { display: flex; flex-direction: column; background: linear-gradient(145deg, #101522, #171d2c); color: #e9edf8; --text: #e9edf8; --muted: #b4bfd4; --faint: #95a3bd; --panel: #202a3c; --panel-2: #273449; --line: #35415a; }
+.account-session .wizard-header { flex: 0 0 auto; min-height: 58px; background: #151b2b; box-shadow: inset 0 -1px #30384b; }
+.account-session .wizard-back { font-size: 12px; }
+.account-session .wizard-content { flex: 1; min-height: 0; height: auto; width: 100%; margin: 0; padding: 24px clamp(16px, 5vw, 42px); scrollbar-width: thin; scrollbar-color: #45516a transparent; }
+.account-session .wizard-content::-webkit-scrollbar { display: block; width: 7px; }
+.account-session .wizard-content::-webkit-scrollbar-thumb { background: #45516a; border-radius: 8px; }
+.account-session-intro, .account-session .wizard-step, .account-session .session-tutorial-top { max-width: 900px; margin-inline: auto !important; }
+.account-session-intro { margin-bottom: 22px; }
+.account-session-intro p { color: #d7bd8e; font-size: 10px; letter-spacing: 1.4px; margin: 0 0 8px; }
+.account-session-intro h2 { margin: 0 0 8px; font-size: clamp(22px, 3.6vw, 30px); letter-spacing: -.7px; }
+.account-session-intro span { color: #95a3bd; font-size: 12px; line-height: 1.5; }
+.account-session .wizard-fields { background: #1a2334; border: 1px solid #35415a; box-shadow: none; padding: 20px; border-radius: 16px; }
+.account-session .wizard-fields label, .account-session .wizard-fields label > .field-label, .account-session .context-composer-heading > span, .account-session .context-upload strong { font-size: 12px; color: #c4cee0; }
+.account-session .wizard-fields :is(input,select,textarea) { font-size: 13px; background: #101725; box-shadow: inset 0 0 0 1px #45516a; }
+.account-session .wizard-fields :is(input,select) { min-height: 42px; }
+.account-session :is(input,select,textarea,button):focus-visible { outline: 2px solid #c8b9ff; outline-offset: 2px; }
+.account-session .wizard-fields :is(input,select,textarea):focus-visible { outline: 2px solid #c8b9ff; outline-offset: 2px; }
+.account-session .context-upload small, .account-session .context-requirement, .account-session .selected-context-file, .account-session .supporting-files { font-size: 11px; }
+.account-session .context-composer-actions select, .account-session .context-upload-actions select { height: 36px; min-height: 36px; font-size: 11px; }
+.account-session .context-upload-actions > button, .account-session .context-composer-actions > button { min-height: 36px; font-size: 11px; }
+.account-session .preferences-step { margin-top: 22px !important; }
+.account-session .session-section-label { font-size: 12px; }
+.account-session .session-behavior { padding: 12px 16px; border: 1px solid #35415a; border-radius: 14px; background: #1a2334; }
+.account-session .session-behavior label { font-size: 12px; }
+.account-session .session-behavior small { font-size: 11px; line-height: 1.5; }
+.account-session .wizard-actions { position: static; flex: 0 0 auto; margin: 0; padding: 14px clamp(16px, 5vw, 42px) 18px; border-top: 1px solid #35415a; background: #151b2b; gap: 16px; }
+.account-session .wizard-actions > div { min-width: 0; display: grid; gap: 4px; font-size: 12px; }
+.account-session .wizard-actions small { color: #95a3bd; font-size: 10px; line-height: 1.4; }
+.account-session .wizard-actions .dashboard-create { min-height: 42px; font-size: 12px; flex-shrink: 0; margin-left: auto; }
+.account-session-error { flex: 0 0 auto; margin: 0; padding: 10px 20px; max-height: 80px; overflow: auto; border-radius: 0; font-size: 12px; }
+.account-session button:disabled { opacity: .5; cursor: wait; }
+@media (max-width: 600px) {
+  .account-session .wizard-header { grid-template-columns: auto minmax(0,1fr) auto; padding-inline: 8px; gap: 6px; }
+  .account-session .session-create-title { font-size: 14px; }
+  .account-session .wizard-fields { grid-template-columns: minmax(0,1fr); padding: 14px; }
+  .account-session .wizard-actions > div { font-size: 11px; }
+  .account-session .wizard-actions small { display: none; }
+  .account-session .wizard-actions { padding: 12px 16px 18px; }
+}
+@media (max-height: 600px) { .account-login-scroll { padding-block: 18px; } .account-login-card { padding-block: 22px; } }

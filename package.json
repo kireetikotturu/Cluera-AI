@@ -1,0 +1,15 @@
+{
+  "name": "cluera-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:preparation": "node --test tests/*.test.cjs",
+    "test:desktop": "npm --prefix desktop test",
+    "test:web": "npm --prefix web test",
+    "typecheck": "npm --prefix desktop run typecheck && npm --prefix web run typecheck",
+    "build:desktop": "npm --prefix desktop run build:code",
+    "build:web": "npm --prefix web run build",
+    "build:backend": "npm --prefix backend run build",
+    "verify:source": "node scripts/verify-cluera-source.cjs"
+  }
+}

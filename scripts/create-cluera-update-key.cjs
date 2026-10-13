@@ -1,0 +1,13 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const root=path.resolve(__dirname,'..'),privateDir=path.join(root,'.local-secrets'),privateFile=path.join(privateDir,'cluera-release-private.pem'),publicFile=path.join(root,'desktop/resources/cluera-public-key.pem');
+if(fs.existsSync(privateFile)||fs.existsSync(publicFile))throw new Error('Cluera signing material already exists; refuse overwrite/rotation.');
+fs.mkdirSync(privateDir,{recursive:true});
+const {privateKey,publicKey}=crypto.generateKeyPairSync('ed25519');
+fs.writeFileSync(privateFile,privateKey.export({format:'pem',type:'pkcs8'}),{flag:'wx',mode:0o600});
+fs.writeFileSync(publicFile,publicKey.export({format:'pem',type:'spki'}),{flag:'wx'});
+const challenge=Buffer.from('cluera-distribution-key-check');
+if(!crypto.verify(null,challenge,publicKey,crypto.sign(null,challenge,privateKey)))throw Error('Key verification failed.');
+const fingerprint=crypto.createHash('sha256').update(publicKey.export({format:'der',type:'spki'})).digest('hex');
+if(fingerprint==='f04909dec7e00d7609f48e9b79b10dc6d9b8a82b8c5deb0b03aabd1cb768909a')throw Error('Cluera must not reuse old Account trust.');
+console.log(JSON.stringify({algorithm:'Ed25519',roundTrip:true,publicFingerprint:fingerprint,privateValueDisplayed:false}));
