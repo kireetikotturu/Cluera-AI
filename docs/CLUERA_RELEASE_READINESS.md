@@ -2,6 +2,8 @@
 
 October 13, 2026. No production readiness or commercial release approval.
 
+Reviewed source473ef8d / READY dpl_EJyo5Fg9Tm6EBM7kxenph3YQSfDP and stable Cluera alias verified; Render same-SHA dep-db6tplqjnfac73ebj2s0 remains update_failed/configuration_unavailable. Full web687/22 skipped, root17/17, typechecks/builds/scans and4 isolated real-browser synthetic layout cases pass. Neither READY nor those tests accept the blocked real Auth/vault/provider/Windows journeys.
+
 - Infrastructure: missing Cluera service-role/rate settings; Render not live/healthy. Owner Not ready yet. No secret format/ownership success inferred from metadata presence.
 - Auth: actual hosted signup/verification/resend/Google/recovery/refresh/logout/account switching and normal Windows encrypted store remain unaccepted. Missing service-role key is the confirmed deployed 503 cause; it is not bypassed in source.
 - Provider vault: proposed schema **unapplied**, keyring unprovisioned, gates not enabled. See [vault bootstrap](CLUERA_AI_PROVIDER_VAULT.md). Fresh-MFA/cryptographic/SQL/UI tests are synthetic, not actual owner acceptance. Telemetry, actual cost reconciliation, managed KMS custody and rotation/restore need completion.

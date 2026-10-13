@@ -3,6 +3,8 @@ Only new Cluera resources. Do not modify old Account or License services.
 
 ## October 13 current owner boundary — infrastructure not ready
 
+Complete reviewed source **473ef8d373f30f2354763524136828531a5fa7cd** is deployed as **READY dpl_EJyo5Fg9Tm6EBM7kxenph3YQSfDP**, stable Cluera alias/exact new project verified. New Render same-SHA auto-build still fails configuration validation. No environment setting was changed in this phase. Vault mode is not operational; do not submit provider keys until its separate bootstrap/schema approval is complete.
+
 The owner saved the four Cluera cookie/rate/signing settings and added callbacks, but explicitly answered **Not ready yet** for the missing infrastructure settings. Fresh Vercel metadata still lacks `SUPABASE_SERVICE_ROLE_KEY`; current Auth/Admin/credits/release 503 responses fail at that actual configuration boundary. Do not repeat the four completed values or callbacks, decrypt old-service settings, or use dummy keys.
 
 The new [Admin provider vault](CLUERA_AI_PROVIDER_VAULT.md) is source/test-covered only; its [schema proposal](proposals/cluera-provider-vault.sql) is unapplied and requires separate explicit approval. No credential migration, root keyring provisioning or feature enablement has occurred. Keep `CLUERA_PROVIDER_VAULT_ENABLED` absent/false until approved bootstrap. No Live/OpenAI/Claude/fallback activation.
