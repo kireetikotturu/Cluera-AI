@@ -7,7 +7,16 @@ import { normalizeScreenAnalysis } from '../src/main/screen/GeminiScreenAnalyzer
 import { isAutomaticMicrophoneAlias, selectAutomaticMicrophone, selectAutomaticSystemAudioSource } from '../src/renderer/services/audioCapture';
 import { useAppStore } from '../src/renderer/stores/appStore';
 
+// Git's Windows checkout may use CRLF. Preserve content/indentation while
+// making source-text assertions independent of line-ending representation.
+const sourceLineEndings=(text:string)=>text.replace(/\r\n/g,'\n');
+
 describe('desktop and provider contracts', () => {
+  it('canonicalizes CRLF only, preserving source content, indentation and standalone CR',()=>{
+    expect(sourceLineEndings('          Send\r\n        </button>')).toBe('          Send\n        </button>');
+    expect(sourceLineEndings('          Send\n        </button>')).toBe('          Send\n        </button>');
+    expect(sourceLineEndings('draft\rcontent')).toBe('draft\rcontent');
+  });
   it('keeps the sandbox preload self-contained and exposes the bridge handshake', () => { const source=fs.readFileSync('src/preload/preload.ts','utf8'); expect(source).toContain("contextBridge.exposeInMainWorld('electronAPI'"); expect(source).toContain("bridgeVersion: '2.0.0'"); expect(source).toContain('setSessionWindowMode:'); expect(source).toContain('setLiveCollapsed:'); expect(source).toContain('moveLiveCollapsed:'); expect(source).toContain('resizeLiveWindow:'); expect(source).toContain('focusLiveTranscript:'); expect(source).toContain('captureCurrentScreen:'); expect(source).not.toMatch(/import \{ IPC \}/); });
   it('attaches explicit source metadata to Deepgram transcript events', () => { const source:AudioSourceDescriptor={id:'system-1',kind:'system',role:'remote_interviewer',label:'Direct audio',canTriggerAnswers:true}; expect(createTranscriptEvent(source,'Question?',true,.9,1)).toMatchObject({sourceId:'system-1',sourceKind:'system',sourceRole:'remote_interviewer',canTriggerAnswers:true,isFinal:true}); });
   it('supports a non-triggering candidate microphone source', () => { const source:AudioSourceDescriptor={id:'candidate-microphone',kind:'microphone',role:'local_candidate',label:'Candidate microphone',canTriggerAnswers:false}; expect(createTranscriptEvent(source,'My response',true,.9,1)).toMatchObject({sourceKind:'microphone',sourceRole:'local_candidate',canTriggerAnswers:false}); });
@@ -565,7 +574,7 @@ describe('desktop and provider contracts', () => {
     expect(home).toContain('aria-label="Close Cluera AI"');
   });
   it('keeps the shared transcript single-line and preserves an intentionally empty edit', () => {
-    const page=fs.readFileSync('src/renderer/pages/CopilotPage.tsx','utf8');
+    const page=sourceLineEndings(fs.readFileSync('src/renderer/pages/CopilotPage.tsx','utf8'));
     const ipc=fs.readFileSync('src/main/ipc/registerIpc.ts','utf8');
     const css=fs.readFileSync('src/renderer/styles/app.css','utf8');
     const appStore=fs.readFileSync('src/renderer/stores/appStore.ts','utf8');
