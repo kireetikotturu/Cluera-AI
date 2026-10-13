@@ -2,9 +2,10 @@ import WebSocket from 'ws';
 import { DEEPGRAM_MODEL, GEMINI_MODEL, secretFilter, type Generate } from './protocol';
 
 export type Guard = { signal: AbortSignal; assertActive(): void };
-export type ProviderSecrets = { geminiKey: string; deepgramKey: string; serviceKey: string; rateKey: string };
+export type ProviderSecrets = { geminiKey?: string; deepgramKey?: string; serviceKey: string; rateKey: string };
 export type AudioConnection = { write(bytes: Buffer): void; forceEndTurn(): void; close(): void };
 export type Providers = {
+  prepare?(kind:'gemini'|'deepgram',input?:Generate):Promise<void>;
   generate(input: Generate, guard: Guard, emit: (text: string) => void): Promise<void>;
   audio(guard: Guard, emit: (value: { event: string; transcript: string }) => void, failed: () => void,
     ready?: () => void): AudioConnection;
@@ -20,10 +21,11 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
 } = {}): Providers {
   const request = dependencies.fetch ?? fetch;
   const connect = dependencies.connect ?? ((url, options) => new WebSocket(url, options));
-  const privateValues = [secrets.geminiKey, secrets.deepgramKey, secrets.serviceKey, secrets.rateKey];
+  const privateValues = [secrets.geminiKey, secrets.deepgramKey, secrets.serviceKey, secrets.rateKey].filter((v):v is string=>Boolean(v));
   return {
     async generate(input, guard, emit) {
       guard.assertActive();
+      if(!secrets.geminiKey)throw unavailable();
       const selectedModel = dependencies.resolveModel ? await dependencies.resolveModel(input) : GEMINI_MODEL;
       if (!dependencies.resolveModel && input.modelId && input.modelId !== GEMINI_MODEL) throw unavailable();
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/.test(selectedModel)) throw unavailable();
@@ -90,6 +92,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
     },
     audio(guard, emit, failed, ready = () => {}) {
       guard.assertActive();
+      if(!secrets.deepgramKey)throw unavailable();
       let ended = false, upstream: WebSocket | undefined;
       let queue: Buffer[] = [], queued = 0, allowance = 96000, previous = performance.now();
       let idle: ReturnType<typeof setTimeout>;

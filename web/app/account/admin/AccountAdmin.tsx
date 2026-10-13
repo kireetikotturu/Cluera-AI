@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {usageDuration} from '../../../lib/usage/display';
 import {ProviderStatus} from './ProviderStatus';
+import {AiProviders} from './AiProviders';
 import {ModelPolicyEditor,type ModelPolicy} from './ModelPolicyEditor';
 import {AccountReleases} from './AccountReleases';
 import {adminReadError} from '../../../lib/accounts/adminReadErrors';
@@ -124,7 +125,7 @@ export function AccountAdmin(){
    <label>Display name<input name="name" defaultValue={offer.name} required minLength={2} maxLength={80}/></label><label><input type="checkbox" name="enabled" defaultChecked={offer.enabled}/> Available</label><label>Priority<input name="priority" type="number" defaultValue={offer.priority} min={0} max={1000} required/></label><label>Audit reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Save catalog policy</button></form>)}
   </fieldset></section>
   <section id="account-admin-models" className="account-admin-section"><ModelPolicyEditor models={state.models??[]} disabled={locked} onSave={(policy,reason)=>mutate('MODEL',policy,reason,null)}/></section>
-  <section id="account-admin-providers" className="account-admin-section"><ProviderStatus/></section>
+  <section id="account-admin-providers" className="account-admin-section"><AiProviders disabled={locked}/><details><summary>Legacy relay bootstrap status (not the vault)</summary><ProviderStatus/></details></section>
   <section id="account-admin-releases" className="account-admin-section"><AccountReleases/></section>
   <section id="account-admin-audit" className="account-admin-section"><p className="account-ui-kicker">READ-ONLY HISTORY</p><h2>Immutable account audit</h2><label>Filter displayed audit entries<input type="search" value={auditQuery} onChange={event=>setAuditQuery(event.target.value)} placeholder="Action or reason" maxLength={100}/></label><ul className="account-admin-audit">{state.audit?.filter(entry=>`${entry.action} ${entry.reason}`.toLowerCase().includes(auditQuery.toLowerCase())).map(entry=><li key={entry.id}><time>{new Date(entry.createdAt).toLocaleString()}</time><strong>{entry.action}</strong><span>{entry.reason}</span></li>)}</ul>
   {!state.audit?.some(entry=>`${entry.action} ${entry.reason}`.toLowerCase().includes(auditQuery.toLowerCase()))?<p className="account-admin-empty">No matching entries in the current audit snapshot.</p>:null}</section>

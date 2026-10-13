@@ -1,5 +1,6 @@
 export const STAGING_DATABASE = 'https://dwqltsqumiwsxtkzdoaa.supabase.co';
 export const STAGING_SITE = 'https://cluera-ai-staging.vercel.app';
+import {vaultKeyring} from '../aiProviders/vault';
 
 /** Server process only; explicit staging gate. Never imported by a client page. */
 export function relayConfig(env = process.env) {
@@ -15,10 +16,16 @@ export function relayConfig(env = process.env) {
   if (Buffer.from(rateKey, 'base64').length !== 32 || Buffer.from(rateKey, 'base64').toString('base64') !== rateKey) fail();
   const port = Number(env.PORT || 8080);
   if (!Number.isInteger(port) || port < 1 || port > 65535) fail();
+  const providerMode=env.CLUERA_AI_BOOTSTRAP_MODE??'legacy-environment';
+  if(!['legacy-environment','auth-only','admin-vault'].includes(providerMode))fail();
+  if(providerMode==='admin-vault')vaultKeyring(env);
+  // Explicit auth-only bootstrap still requires EVERY infrastructure guard.
+  // No fabricated provider key or automatic legacy credential migration.
   return { port, database: STAGING_DATABASE, site: STAGING_SITE, rateKey,
     serviceKey: secret('SUPABASE_SERVICE_ROLE_KEY'),
-    geminiKey: secret('SIGMAROUND_MANAGED_GEMINI_API_KEY'),
-    deepgramKey: secret('SIGMAROUND_MANAGED_DEEPGRAM_API_KEY'),
+    providerMode,
+    geminiKey: providerMode==='legacy-environment'?secret('SIGMAROUND_MANAGED_GEMINI_API_KEY'):undefined,
+    deepgramKey: providerMode==='legacy-environment'?secret('SIGMAROUND_MANAGED_DEEPGRAM_API_KEY'):undefined,
   };
 }
 export type RelayConfig = ReturnType<typeof relayConfig>;

@@ -1,6 +1,16 @@
 # Cluera staging private setup
 Only new Cluera resources. Do not modify old Account or License services.
 
+## October 13 current owner boundary — infrastructure not ready
+
+The owner saved the four Cluera cookie/rate/signing settings and added callbacks, but explicitly answered **Not ready yet** for the missing infrastructure settings. Fresh Vercel metadata still lacks `SUPABASE_SERVICE_ROLE_KEY`; current Auth/Admin/credits/release 503 responses fail at that actual configuration boundary. Do not repeat the four completed values or callbacks, decrypt old-service settings, or use dummy keys.
+
+The new [Admin provider vault](CLUERA_AI_PROVIDER_VAULT.md) is source/test-covered only; its [schema proposal](proposals/cluera-provider-vault.sql) is unapplied and requires separate explicit approval. No credential migration, root keyring provisioning or feature enablement has occurred. Keep `CLUERA_PROVIDER_VAULT_ENABLED` absent/false until approved bootstrap. No Live/OpenAI/Claude/fallback activation.
+
+**Next owner action:** privately save retained `SUPABASE_SERVICE_ROLE_KEY` in **new** Cluera Vercel as Sensitive/Production-only, and save it plus the **same new Cluera rate secret** in **new** Render; set `/healthz`. After reviewed source deployment, select `CLUERA_AI_BOOTSTRAP_MODE=auth-only` in this new relay and redeploy. This mode validates real infrastructure, denies AI/provider START without inventing credentials, and does not require Gemini/Deepgram environment keys. Say only **Cluera infrastructure saved privately**. Do not pay or send keys.
+
+This supersedes the legacy Gemini/Deepgram environment-key instruction below for the requested new vault workflow. Existing explicit `legacy-environment` source remains compatible; no old-service key/settings change is authorized. The earlier instruction to apply the Cluera release registry automatically is also superseded: **any schema application now needs separate approval**, including the unapplied release registry.
+
 ## Vercel
 Project **prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B / cluera-ai-staging**, team team_AksnPXhi2VBXI5UsY2xBIakc, private kireetikotturu/Cluera-AI. Complete repository; web root; Node24; npm ci; npm run build; source outside root allowed within this repository. No files-only diagnostic/redeployment source. Production means ONLY this new staging project's named environment.
 

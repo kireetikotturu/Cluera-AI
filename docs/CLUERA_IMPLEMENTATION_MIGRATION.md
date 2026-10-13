@@ -1,6 +1,16 @@
 # Cluera AI — implementation and migration
 Updated October 13, 2026. Staging only; unsigned TEST, not commercial readiness.
 
+## October 13 — Admin AI provider vault foundation; infrastructure hold
+
+The owner requested central Admin-managed Gemini/Deepgram/OpenAI/Claude credentials and answered **Not ready yet** for private infrastructure. Source now includes a premium four-provider write-only console, Auth/live SQL AAL2 + fresh existing TOTP per mutation, AES-GCM envelope storage with dedicated keyring, fixed-host metadata discovery, revision/operation fencing and ciphertext-only server retrieval/cache. Existing Gemini/Flux transports and shared ledger remain; auth-only bootstrap denies provider work before any usage START. OpenAI/Claude generation, automatic fallback, usage/cost telemetry and key rewrap/managed KMS remain unavailable. [Architecture/bootstrap/limitations](CLUERA_AI_PROVIDER_VAULT.md); [release blockers](CLUERA_RELEASE_READINESS.md).
+
+The independent schema proposal is tested locally only: private RLS/no direct CRUD, bounded service-only empty-search-path RPCs, atomic metadata audit/replay, stale-revision/reauth denial, ALWAYS immutable audit and rollback on audit failure. It is **not a remotely applied migration**. No old table/function rewrite, role/MFA change, credential import, secret retrieval or financial mutation. Fresh intended Admin aggregates confirm one verified/allowlisted identity and one verified TOTP factor, not an inspected live browser session.
+
+Final complete web **687 passed /22 opt-in skipped**, 88 files; root preparation/security **17/17**. Both desktop, web and relay typechecks pass; final production web/relay builds and local **101-file** artifact scan pass. Web/backend full and production-only dependency audits report zero advisories. Desktop fresh audit remains13 package findings (5 moderate/8 high), production3 moderate, from the previously recorded two advisories; no dependency/lock/installer change. The first preparation run failed only on restricted OS temp; the unchanged workspace-temp rerun passes. No ACL/security/assertion/deadline relaxation.
+
+Fresh read-only financial counts/state match **06:53:23–07:18:31 UTC**: accounts/trials4, grants/packs/terms0, old releases1, Paddle intents5/recoveries3/receipts9/jobs7, one BOUND Razorpay intent and receipts/applications/diagnostics0. This bounded aggregate comparison does not prove all historical rows; a separate full-row digest baseline is retained for final publication read-back. Cluera1.0.0, Account1.0.10/1.0.11 and License1.0.8 installer sizes/hashes were freshly confirmed unchanged; no EXE rebuilt/run/uploaded/approved. Source publication, complete READY deployment and final read-back are recorded after execution.
+
 ## Implemented product
 Cluera is the renamed Account product with independent source, packages, Windows identity, release trust, repository and deployment targets. The owner explicitly approved reusing Account Supabase **dwqltsqumiwsxtkzdoaa / Cluera AI-staging / Mumbai**, not creating another customer population. Cluera and old Account share cloud identities, trials, balances, context and administration; this is NOT database isolation.
 

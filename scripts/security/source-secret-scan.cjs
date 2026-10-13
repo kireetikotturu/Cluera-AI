@@ -12,6 +12,7 @@ secretNames.add('SIGMAROUND_BILLING_WORKER_SECRET');
 secretNames.add('CLUERA_RELEASE_PRIVATE_KEY_BASE64');
 secretNames.add('RAZORPAY_TEST_KEY_SECRET');
 secretNames.add('RAZORPAY_TEST_WEBHOOK_SECRET');
+secretNames.add('CLUERA_PROVIDER_VAULT_KEYRING_BASE64');
 
 function loadKnownSecrets(root, env = process.env) {
   const secrets = [];
@@ -21,6 +22,14 @@ function loadKnownSecrets(root, env = process.env) {
     }
   };
   for (const name of secretNames) add(name, env[name]);
+  // Scan both the sealed-settings representation and each root key without
+  // ever returning their bytes or JSON parse errors to the caller.
+  try {
+    const ring=JSON.parse(Buffer.from(env.CLUERA_PROVIDER_VAULT_KEYRING_BASE64??'','base64').toString('utf8'));
+    for(const value of Object.values(ring.keys??{}))if(typeof value==='string'&&Buffer.from(value,'base64').length===32){
+      secrets.push({type:'provider vault root key',value});
+    }
+  }catch{/* Absent/malformed root configuration is checked by the actual vault guard. */}
   for (const file of ['.env', 'web/.env.local', 'web/.env.production', '.local-secrets/cluera-owner-settings.private.txt', '.local-secrets/cluera-vercel-settings.private.txt']) {
     const location = path.join(root, file);
     if (!fs.existsSync(location)) continue;

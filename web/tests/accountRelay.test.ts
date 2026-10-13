@@ -15,6 +15,11 @@ const environment = () => ({ SIGMAROUND_ACCOUNTS_ENABLED: 'true', SIGMAROUND_ACC
   SUPABASE_SERVICE_ROLE_KEY: secrets.serviceKey, SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64: secrets.rateKey,
   SIGMAROUND_MANAGED_GEMINI_API_KEY: secrets.geminiKey, SIGMAROUND_MANAGED_DEEPGRAM_API_KEY: secrets.deepgramKey });
 const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+it('rejects provider bootstrap unavailability before any usage START or upstream operation',async()=>{
+ const prepare=vi.fn(async()=>{throw Error('Provider unavailable.');});
+ const h=harness({prepare});await h.login();h.peer.input({type:'generate',id:'bootstrap-check',prompt:'synthetic'});await tick();
+ expect(prepare).toHaveBeenCalledOnce();expect(h.command).not.toHaveBeenCalled();expect(h.providers.generate).not.toHaveBeenCalled();expect(h.peer.readyState).toBe(WebSocket.CLOSED);
+});
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 class Peer extends EventEmitter {
   readyState = WebSocket.OPEN as number; bufferedAmount = 0; sent: any[] = [];

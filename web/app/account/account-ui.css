@@ -72,3 +72,12 @@
   .account-admin-nav a { padding: 9px 12px; }
   .account-admin-shell h2 { font-size: 20px; }
 }
+.ai-provider-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin-block: 20px; }
+.ai-provider-card { padding: 18px; border: 1px solid #45516a; border-radius: 16px; background: linear-gradient(145deg,#172135,#111b2c); min-width: 0; overflow-wrap: anywhere; }
+.ai-provider-card header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.ai-provider-card header h3 { margin: 0; }
+.ai-provider-card header span { border: 1px solid #45516a; border-radius: 20px; padding: 6px 10px; color: #9ed8cf; font-size: 11px; }
+.ai-provider-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.account-admin-shell .ai-provider-card form { display: block; padding: 0; border: 0; background: transparent; }
+.ai-provider-card fieldset { display: grid; gap: 14px; }
+@media (max-width: 900px) { .ai-provider-grid { grid-template-columns: minmax(0,1fr); } }

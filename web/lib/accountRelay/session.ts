@@ -144,6 +144,7 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
         opening.add(command.channel);
         void (async () => {
           try {
+            await dependencies.providers.prepare?.('deepgram');
             await ensureStarted();
             const audio = dependencies.providers.audio(run!, value => send({ type: 'transcript', channel: command.channel, ...value }),
               () => end('provider_failed'), () => {
@@ -164,6 +165,7 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
       const abort = new AbortController(); generation = abort;
       void (async () => {
         try {
+          await dependencies.providers.prepare?.('gemini',command);
           await ensureStarted(); touch();
           if (abort.signal.aborted) return;
           const signal = AbortSignal.any([run!.signal, abort.signal]);
