@@ -61,15 +61,15 @@ it('disabled or wrong-target Razorpay cannot claim events when no valid provider
   expect(payment).not.toHaveBeenCalled();expect(reconcile).not.toHaveBeenCalled();expect(rpc).not.toHaveBeenCalled();
  }
 });
-it('Razorpay-first Account pricing never advertises Paddle or operational recurring/payment methods',()=>{
- vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','razorpay');const html=renderToStaticMarkup(AccountPricing());
- expect(html).toContain('Razorpay Test Mode');expect(html).not.toContain('Paddle');
- expect((html.match(/Razorpay recurring checkout is not operational yet/g)||[])).toHaveLength(3);
- expect(html).toContain('No card, UPI or QR method is claimed accepted yet');expect(html).toContain('₹549');
- expect(html).toContain('₹5,499');expect(html).toContain('₹19,549');expect(html).not.toMatch(/<script|<iframe|<form/);
-});
-it('legacy Paddle pricing wording and canonical prices stay intact when Razorpay is not selected',()=>{
- vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','paddle');const html=renderToStaticMarkup(AccountPricing());
- expect(html).toContain('Paddle Sandbox');expect(html).toContain('supported by Paddle');expect(html).not.toContain('Razorpay');
+it('Cluera target pricing is explicitly unavailable and never loads a payment SDK',()=>{
+ const html=renderToStaticMarkup(AccountPricing());
+ for(const price of ['₹549','₹5,499','₹9,599','₹19,549'])expect(html).toContain(price);
+ expect(html).toContain('100 hours per month');expect(html).toContain('not active payment offers');
+ expect(html).toContain('No card, UPI or QR method is claimed accepted yet');
+ expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
  expect((html.match(/href="\/account\/checkout"/g)||[])).toHaveLength(4);
+});
+it('Cluera presentation is independent of old provider selection and does not alter financial policies',()=>{
+ vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','razorpay');const first=renderToStaticMarkup(AccountPricing());
+ vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','paddle');expect(renderToStaticMarkup(AccountPricing())).toBe(first);
 });

@@ -8,6 +8,7 @@ import {offerDisplay} from '../../../lib/billing/offerDisplay';
 import RazorpayCheckout from './RazorpayCheckout';
 import { razorpayCheckoutEnabled } from '../../../lib/payments/core/config';
 import {STAGING_DATABASE,STAGING_SITE} from '../../../lib/accountRelay/config';
+import {clueraTargetPlans} from '../../../lib/cluera/targetPlans';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Cluera sandbox checkout', robots: { index: false, follow: false } };
@@ -20,9 +21,9 @@ export default async function CheckoutPage() {
   if(process.env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED!=='true'){
     if(process.env.SIGMAROUND_ACCOUNTS_ENABLED!=='true'||process.env.SIGMAROUND_ACCOUNT_ORIGIN!==STAGING_SITE
       ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
-    let offers;try{offers=await readAccountCatalog();}catch{return <main className="account-page"><h1>Buy Cluera credits</h1><p>Test payments are paused. The approved catalog is unavailable. No checkout was started.</p><a href="/account">Return to your account</a></main>;}
     return <main className="account-page"><h1>Buy Cluera credits</h1><p>Test payments are paused. No payment is enabled in this Cluera workspace. Recurring offers and Stripe are unavailable.</p>
-      <div className="account-purchase-grid">{offers.filter(offer=>offer.enabled).map(offer=><article key={offer.code}>
+      <p>Owner-confirmed planned pricing only; these are not active catalog offers. Existing payment history and allowances are unchanged.</p>
+      <div className="account-purchase-grid">{clueraTargetPlans.map(offer=><article key={offer.id}>
         <h2>{offer.name}</h2><p>{offerDisplay(offer).label}</p><p>{offerDisplay(offer).terms}</p>
         <button className="button" type="button" disabled>Checkout unavailable</button>
       </article>)}</div><a href="/account">Return to your account</a></main>;

@@ -16,7 +16,7 @@ function makeAuth() {
     setSession: vi.fn(async () => ({ data: { session }, error: null })),
     refreshSession: vi.fn(async () => ({ data: { session }, error: null })),
     exchangeCodeForSession: vi.fn(async () => ({ data: { session }, error: null })),
-    signUp: vi.fn(async () => ({ error: null })), resetPasswordForEmail: vi.fn(async () => ({ error: null })),
+    signUp: vi.fn(async () => ({ error: null })), resend:vi.fn(async()=>({error:null})), resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     updateUser: vi.fn(async () => ({ error: null })),
     signInWithOAuth: vi.fn(async () => ({ data: { url: 'https://dwqltsqumiwsxtkzdoaa.supabase.co/auth/v1/authorize?provider=google' }, error: null })) };
 }
@@ -42,6 +42,26 @@ function cookiePair(kind: 'access' | 'refresh' | 'recovery' | 'flow', value: unk
 }
 const login = () => handleAccount(request('login', { email: user.email, password: 'synthetic-password' }), 'login');
 describe('customer BFF authentication', () => {
+  it('resends only signup verification with sealed fresh PKCE, no account grant or token DTO',async()=>{
+    const response=await handleAccount(request('resend-verification',{email:user.email}),'resend-verification');
+    expect(response.status).toBe(200);expect(auth.resend).toHaveBeenCalledExactlyOnceWith({type:'signup',email:user.email,options:{emailRedirectTo:'https://cluera-ai-staging.vercel.app/api/account/callback'}});
+    expect(response.headers.get('set-cookie')).toContain('__Host-sr-account-flow=');expect(response.headers.get('set-cookie')).toContain('HttpOnly');
+    const body=await response.text();expect(body).toContain('If this request is eligible');expect(body).not.toContain('synthetic-pkce-only');
+    expect(rpc.mock.calls.every(([name])=>name==='customer_auth_rate_limit')).toBe(true);expect(auth.signUp).not.toHaveBeenCalled();expect(auth.updateUser).not.toHaveBeenCalled();
+  });
+  it('does not enumerate verification eligibility, and distinguishes transport failure',async()=>{
+    auth.resend.mockResolvedValueOnce({error:{status:400,message:'private-user-status'}} as never);
+    const rejected=await handleAccount(request('resend-verification',{email:user.email}),'resend-verification');
+    expect(rejected.status).toBe(200);expect(await rejected.text()).not.toContain('private-user-status');
+    auth.resend.mockResolvedValueOnce({error:{status:503,message:'private-provider-status'}} as never);
+    const failed=await handleAccount(request('resend-verification',{email:user.email}),'resend-verification');expect(failed.status).toBe(503);expect(await failed.text()).not.toContain('private-provider-status');
+  });
+  it('rejects foreign-origin, malformed and throttled resend before sending mail',async()=>{
+    expect((await handleAccount(request('resend-verification',{email:user.email},'','POST','https://foreign.invalid'),'resend-verification')).status).toBe(403);
+    expect((await handleAccount(request('resend-verification',{email:user.email,password:'must-not-accept'}),'resend-verification')).status).toBe(400);
+    rpc.mockResolvedValue({data:false,error:null});expect((await handleAccount(request('resend-verification',{email:user.email}),'resend-verification')).status).toBe(429);
+    expect(auth.resend).not.toHaveBeenCalled();
+  });
   it('exposes only the verified account balance and never exposes public spending operations', async () => {
     vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://cluera-ai-staging.vercel.app');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://dwqltsqumiwsxtkzdoaa.supabase.co');

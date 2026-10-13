@@ -1,7 +1,5 @@
-import type {SandboxOffer} from './sandboxCatalog';
-
 /** Reviewed integer paise/seconds only; display is not payment authority. */
-export function offerDisplay(offer:Pick<SandboxOffer,'amount'|'seconds'|'interval'>){
+export function offerDisplay(offer:Readonly<{amount:string;seconds:number;interval:'month'|'week'|null}>){
  const price=`₹${new Intl.NumberFormat('en-IN',{maximumFractionDigits:2}).format(Number(offer.amount)/100)}`;
  const hours=offer.seconds/3600;
  const period=offer.interval==='month'?'month':offer.interval==='week'?'week':null;

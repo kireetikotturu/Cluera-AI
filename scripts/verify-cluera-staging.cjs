@@ -15,7 +15,7 @@ async function boundedText(response){if(!response.body)return '';const reader=re
 function inspect(check,response,body,known=[]){
  const [name,,,expected]=check,page=['home','pricing','checkout-page'].includes(name);
  const noSecrets=detectSecrets(Buffer.from(body),known).length===0;
- const pricing=!['home','pricing'].includes(name)||['SigmaPro 3 Hours','SigmaPro 40 Hours','SigmaEnterprise Weekly','SigmaEnterprise Monthly','₹549','₹5,499','₹19,549','no expiry','do not roll over'].every(t=>body.includes(t));
+ const pricing=!['home','pricing'].includes(name)||['Cluera 3 Hours','Cluera Pro 40 Hours','Cluera Pro 100 Hours','Cluera Enterprise 200 Hours','₹549','₹5,499','₹9,599','₹19,549','100 hours per month','not active payment offers','no expiry','do not roll over'].every(t=>body.includes(t));
  const paused=name!=='checkout-page'||body.includes('Test payments are paused')&&body.includes('Checkout unavailable');
  const noSdk=!page||!/<script[^>]+src=["'][^"']*(?:paddle[.]com|razorpay[.]com)/i.test(body);
  const pass=response.status===expected&&response.headers.get('cache-control')?.includes('no-store')&&response.headers.get('x-content-type-options')==='nosniff'&&!response.headers.get('location')&&noSecrets&&pricing&&paused&&noSdk;

@@ -1,0 +1,8 @@
+{
+  "name": "http-cache-semantics",
+  "version": "4.3.0-cluera.1",
+  "description": "Cluera-local security patch of pinned http-cache-semantics 4.3.0",
+  "main": "index.js",
+  "license": "BSD-2-Clause",
+  "private": true
+}

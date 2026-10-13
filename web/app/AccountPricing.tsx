@@ -1,19 +1,17 @@
 import Link from 'next/link';
-import {paymentOffers} from '../lib/payments/core/catalog';
+import {clueraTargetPlans} from '../lib/cluera/targetPlans';
 import {offerDisplay} from '../lib/billing/offerDisplay';
 
 export function AccountPricing(){
- const razorpay=process.env.SIGMAROUND_PAYMENT_PROVIDER==='razorpay';
- return <section id="pricing" className="section" aria-label="Account Sandbox pricing">
-  <div className="section-heading"><p className="kicker">{razorpay?'Razorpay Test Mode · no Live payments':'Paddle Sandbox · TEST only'}</p><h2>Time for your shared account.</h2>
-   <p>One lifetime 15-minute trial. The amounts below are reviewed INR catalog prices; this site is not collecting live payments. Sandbox payment testing is temporarily limited. Sign in to check your availability; purchases link to your account automatically.</p></div>
-  <div className="account-purchase-grid">{paymentOffers.map(offer=>{const display=offerDisplay(offer);return <article key={offer.code}>
-   <p className="kicker">{offer.interval?'Recurring plan':'No-expiry pack'}</p><h3>{offer.name}</h3><p>{display.label}</p><p>{display.terms}</p>
-   <p>Managed Gemini answers, Deepgram transcription, selected context and screenshots. Concurrent sessions/devices share and consume the same server-side balance.</p>
-   {razorpay&&offer.interval?<p>Razorpay recurring checkout is not operational yet. Plan and mandate acceptance are pending.</p>:null}
-   <Link className="button secondary" href="/account/checkout">{razorpay?'View Test availability':'View Sandbox availability'}</Link>
+ return <section id="pricing" className="section" aria-label="Cluera planned pricing">
+  <div className="section-heading"><p className="kicker">Cluera staging — payments unavailable</p><h2>Time for your shared account.</h2>
+   <p>One lifetime 15-minute trial. These are the owner-confirmed planned INR prices, not active payment offers. Billing integration and payment acceptance are pending.</p></div>
+  <div className="account-purchase-grid">{clueraTargetPlans.map(plan=>{const display=offerDisplay(plan);return <article key={plan.id}>
+   <p className="kicker">{plan.interval?'Planned monthly allowance':'Planned no-expiry pack'}</p><h3>{plan.name}</h3><p>{display.label}</p><p>{display.terms}</p>
+   <p>Managed answers, transcription, selected context and screenshots are awaiting secure provider activation and end-to-end acceptance. Concurrent devices share one server-side balance.</p>
+   <p>Checkout unavailable. No card, UPI or QR method is claimed accepted yet.</p>
+   <Link className="button secondary" href="/account/checkout">View availability</Link>
   </article>;})}</div>
-  <p>Eligible recurring allowance is consumed before packs. Same-tier periods queue. Enterprise pauses the exact unused Pro remainder and stops future Pro renewal; it resumes only after Enterprise ends. {razorpay?'These recurring entitlement rules are retained; Razorpay recurring fulfillment is not enabled. Payment methods require merchant-specific Test acceptance.':'Taxes and supported payment methods are determined by Paddle checkout.'} Remote Desktop and Mobile are not included in this test version.</p>
-  <p>{razorpay?'No card, UPI or QR method is claimed accepted yet.':'QR/mobile payments are offered only where supported by Paddle for the currency, country and plan.'} A scan or checkout return is not proof of payment.</p>
+  <p>Eligible recurring allowance is consumed before packs. Recurring integration and Stripe are unavailable. Existing balances and historical payment policies are unchanged. Remote Desktop and Mobile are not included in this staging version.</p>
  </section>;
 }

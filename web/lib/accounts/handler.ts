@@ -188,9 +188,9 @@ export async function handleAccount(request: Request, action: string): Promise<R
       if (signedOut.error) throw new AccountError('UNAVAILABLE', 503);
       return cookies.apply(json({ ok: true, message: 'Password updated. Sign in again.' }));
     }
-    if (!['login', 'signup', 'forgot-password', 'google'].includes(action)) return cookies.apply(json({ error: 'Not found.' }, 404));
+    if (!['login', 'signup', 'forgot-password', 'resend-verification', 'google'].includes(action)) return cookies.apply(json({ error: 'Not found.' }, 404));
     const raw = await readJsonBody(request, 4096);
-    const input = action === 'google' ? z.object({}).strict().parse(raw) : action === 'forgot-password'
+    const input = action === 'google' ? z.object({}).strict().parse(raw) : ['forgot-password','resend-verification'].includes(action)
       ? z.object({ email: emailSchema }).strict().parse(raw)
       : z.object({ email: emailSchema, password: action === 'signup' ? passwordSchema : z.string().min(1).max(128) }).strict().parse(raw);
     const email = 'email' in input ? input.email as string : undefined;
@@ -212,10 +212,14 @@ export async function handleAccount(request: Request, action: string): Promise<R
     }
     const result = action === 'signup'
       ? await clients.auth.auth.signUp({ ...(input as { email: string; password: string }), options: { emailRedirectTo: callback } })
+      : action === 'resend-verification'
+      ? await clients.auth.auth.resend({type:'signup',email:email!,options:{emailRedirectTo:callback}})
       : await clients.auth.auth.resetPasswordForEmail(email!, { redirectTo: callback });
     // Avoid account enumeration; delivery/account-existence responses never reach the browser.
     // Service failures are distinct from account-specific rejections.
     if (result.error && (!result.error.status || result.error.status >= 500)) throw new AccountError('UNAVAILABLE', 503);
+    // The installed SDK creates a NEW PKCE verifier for resend. Export that
+    // request-local slot; the owner must open the latest link in this browser.
     cookies.set('flow', clients.flow(), 3600);
     return cookies.apply(json({ message: 'If this request is eligible, check your email. Open the link in this browser.' }));
   } catch (error) {

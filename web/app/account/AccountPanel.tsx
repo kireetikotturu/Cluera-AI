@@ -4,7 +4,7 @@ import { AccountWorkspace } from './AccountWorkspace';
 import {authFailure,emailNotice,publicLoginSchema,publicSessionSchema,safeGoogleRedirect,type PublicAccount} from '../../lib/accounts/publicAuth';
 import './account-ui.css';
 
-type FormMode = 'login' | 'signup' | 'forgot-password';
+type FormMode = 'login' | 'signup' | 'forgot-password' | 'resend-verification';
 export function AccountPanel() {
   const [account, setAccount] = useState<PublicAccount | null>(null);
   const [mode, setMode] = useState<FormMode>('login');
@@ -16,6 +16,7 @@ export function AccountPanel() {
   const inFlight = useRef(false);
   const alive = useRef(true);
   const writeController = useRef<AbortController | null>(null);
+  const emailOnly=mode==='forgot-password'||mode==='resend-verification';
   function chooseMode(value:FormMode){
     window.history.replaceState(null,'',`${window.location.pathname}${window.location.search}#${value}`);
     setMode(value);setMessage('');setVisible(false);
@@ -27,6 +28,7 @@ export function AccountPanel() {
       const hash = window.location.hash;
       if (hash === '#signup') setMode('signup');
       else if (hash === '#forgot-password') setMode('forgot-password');
+      else if (hash === '#resend-verification') setMode('resend-verification');
       else if (hash === '#login' || !hash) setMode('login');
       setVisible(false);
     };
@@ -85,24 +87,25 @@ export function AccountPanel() {
       <button className="button secondary" type="button" disabled={busy} onClick={() => void submit('logout')}>Sign out of this browser</button>
     </> : <>
       <div className="account-auth-brand" aria-hidden="true">C</div><p className="account-ui-kicker">CLUERA AI · TEST WORKSPACE</p>
-      <h2>{mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create an account' : 'Reset your password'}</h2>
-      <p className="account-auth-description">{mode === 'signup' ? 'One account for your desktop workspace and shared credits.' : mode === 'forgot-password' ? 'We’ll send a recovery link to your verified email.' : 'Welcome back. Continue to your workspace securely.'}</p>
+      <h2>{mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create an account' : mode==='resend-verification'?'Resend verification':'Reset your password'}</h2>
+      <p className="account-auth-description">{mode === 'signup' ? 'One account for your desktop workspace and shared credits.' : mode === 'forgot-password' ? 'We’ll send a recovery link to your verified email.' : mode==='resend-verification'?'Request a new verification link for your pending signup.':'Welcome back. Continue to your workspace securely.'}</p>
       <form onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
-        const values={email:String(data.get('email')??''),...(mode!=='forgot-password'?{password:String(data.get('password')??'')}:{})};
+        const values={email:String(data.get('email')??''),...(!emailOnly?{password:String(data.get('password')??'')}:{})};
         const password=form.elements.namedItem('password');if(password instanceof HTMLInputElement)password.value='';
         void submit(mode,values);
       }}>
         <label>Email<input name="email" type="email" maxLength={254} autoComplete="email" required disabled={busy}/></label>
-        {mode !== 'forgot-password' ? <label>Password<span className="account-auth-password"><input key={mode} name="password" type={visible ? 'text' : 'password'} minLength={mode === 'signup' ? 12 : 1} maxLength={128}
+        {!emailOnly ? <label>Password<span className="account-auth-password"><input key={mode} name="password" type={visible ? 'text' : 'password'} minLength={mode === 'signup' ? 12 : 1} maxLength={128}
           autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} required disabled={busy}/><button type="button" disabled={busy} aria-pressed={visible} aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(value => !value)}>{visible ? 'Hide' : 'Show'}</button></span></label> : null}
         {mode === 'signup' ? <p>Use at least 12 characters. Verify your email before signing in.</p> : null}
-        <button className="button" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Send verification email' : 'Send reset email'}</button>
+        <button className="button" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'signup'||mode==='resend-verification' ? 'Send verification email' : 'Send reset email'}</button>
       </form>
       <button className="button secondary" type="button" disabled={busy} onClick={() => void submit('google')}>Continue with Google</button>
-      <div className="account-actions">{(['login', 'signup', 'forgot-password'] as const).filter(value => value !== mode).map(value =>
+      {mode==='resend-verification'?<p>Open the latest verification link in this same browser. This does not reset your password.</p>:null}
+      <div className="account-actions">{(['login', 'signup', 'forgot-password','resend-verification'] as const).filter(value => value !== mode).map(value =>
         <button type="button" disabled={busy} key={value} onClick={() => chooseMode(value)}>
-          {value === 'login' ? 'Back to sign in' : value === 'signup' ? 'Create account' : 'Forgot password?'}</button>)}</div>
+          {value === 'login' ? 'Back to sign in' : value === 'signup' ? 'Create account' : value==='resend-verification'?'Resend verification':'Forgot password?'}</button>)}</div>
       <p className="account-auth-safety">Verify your email before desktop sign-in. Provider credentials remain server-side; this is isolated staging, not a production release.</p>
     </>}
   </section>;

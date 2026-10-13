@@ -20,7 +20,8 @@ describe('disabled staging checkout landing page',()=>{
     const html=renderToStaticMarkup(await CheckoutPage());expect(html).toContain('Test payments are paused');
     expect((html.match(/Checkout unavailable/g)||[])).toHaveLength(4);expect((html.match(/disabled=""/g)||[])).toHaveLength(4);
     expect(html).not.toMatch(/<script|<iframe|<form/);expect(html).toContain('Recurring offers and Stripe are unavailable');
-    expect(readAccountCatalog).toHaveBeenCalledExactlyOnceWith();
+    expect(html).toContain('not active catalog offers');expect(html).toContain('100 hours per month');
+    expect(readAccountCatalog).not.toHaveBeenCalled();
   });
   it('does not expose even paused presentation on a wrong Account target',async()=>{
     staging();vi.stubEnv('CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','false');vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://foreign.invalid');

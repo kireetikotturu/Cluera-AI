@@ -16,6 +16,7 @@ describe('desktop support', () => {
   });
 
   it('builds only fixed Gmail compose and mailto destinations without a message body or private data', () => {
+    expect(SUPPORT_EMAIL).toBe('clueraaisupport@gmail.com');
     const gmail = new URL(supportExternalUrl('supportGmail'));
     expect(gmail.origin).toBe('https://mail.google.com');
     expect(gmail.pathname).toBe('/mail/');

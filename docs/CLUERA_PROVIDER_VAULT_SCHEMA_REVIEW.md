@@ -37,4 +37,6 @@ Keep **CLUERA_PROVIDER_VAULT_ENABLED=false/absent** and Render **auth-only** whi
 
 ## Specific schema approval required
 
+Frozen proposal SHA-256: **72e1fdf4b02924ffc35af19fe3392749b024e9d948e5d00c7ca13f104f294cf9**. Byte-reviewed Git blob **2cd2d6415ccd79fc9bf02bf7c72c0be24b5531d0**, included in reviewed Cluera implementation acc6357 and unchanged in final abe7b8b. Existing data/identity read-back and runtime verification are in the latest implementation results. No hosted migration acceptance is claimed.
+
 Approve **only the frozen provider-vault proposal** for **dwqltsqumiwsxtkzdoaa**, creating the two tables, five functions, primary indexes, immutable trigger and grants above via a new CLI-generated additive migration after fresh preservation checks. This approval must explicitly exclude key import/rotation, provider activation, grants/payments, the separate unapplied Cluera release registry and changes to old services. The final handoff records the exact proposal SHA-256. Any source change after approval needs renewed review; failed validation stops application. No rollback drops/data deletion are authorized.

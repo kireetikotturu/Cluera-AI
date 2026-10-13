@@ -17,7 +17,7 @@ it('explains separate installation, Windows secure storage and opt-in local hist
 });
 it('offers bounded safe support without a promised response SLA or private data in links',()=>{
  const html=renderToStaticMarkup(createElement(Support));
- expect(html).toContain('sigmaroundsupport@gmail.com');expect(html).toContain('Cluera%20Support');
+ expect(html).toContain('clueraaisupport@gmail.com');expect(html).toContain('Cluera%20Support');expect(html).toContain('/account#resend-verification');
  expect(html).toContain('Never send passwords, API keys, tokens, payment details or private interview content');
  expect(html).toContain('Support cannot bypass verification or MFA');
  expect(html).not.toMatch(/15 minutes during active support|body=|license_key=|token=/);

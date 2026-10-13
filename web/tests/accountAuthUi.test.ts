@@ -44,3 +44,9 @@ it('rejects malformed account snapshots rather than entering the workspace',asyn
  expect(host.textContent).not.toContain('Signed in as');expect(host.textContent).not.toContain('PRIVATE_UPSTREAM_DETAILS');
  expect(host.textContent).toContain('Account service is unavailable.');
 });
+it('offers explicit email-only verification resend with no automatic request',async()=>{
+ history.replaceState(null,'','/account#resend-verification');const fetcher=vi.fn(async(_url:any,init?:RequestInit)=>init?.method==='POST'?Response.json({message:emailNotice}):Response.json({},{status:401}));vi.stubGlobal('fetch',fetcher);
+ await act(async()=>root.render(createElement(AccountPanel)));expect(host.querySelector('h2')?.textContent).toBe('Resend verification');expect(host.querySelector('input[name="password"]')).toBeNull();expect(fetcher).toHaveBeenCalledOnce();
+ (host.querySelector('input[name="email"]') as HTMLInputElement).value='fixture@example.invalid';await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ const post=fetcher.mock.calls.find(([,init])=>init?.method==='POST')!;expect(post[0]).toBe('/api/account/resend-verification');expect(JSON.parse(post[1]!.body as string)).toEqual({email:'fixture@example.invalid'});expect(host.textContent).toContain(emailNotice);
+});

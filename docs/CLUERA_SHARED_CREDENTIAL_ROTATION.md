@@ -1,6 +1,8 @@
 # Shared Supabase credential incident — approval-required plan
 
-October 13, 2026. **Plan only: no key created, replaced, revoked or rotated.**
+October 13, 2026. **Replacement configuration scope approved; owner saving Not ready yet. No key created, replaced, revoked or rotated by the agent.**
+
+Latest launch request authorizes inventory and coordinated private replacement in the two new Cluera and two confirmed original Account services, plus configuration-only reload of pinned reviewed source. The owner answered **Not ready yet** to the private four-key checkpoint (`cluera-web`, `cluera-relay`, `account-web`, `account-relay`). Do not repeat or assume completion of that step. Legacy API deactivation and JWT-secret rotation remain separately unapproved. This supersedes the pending-replacement-approval wording below; inventory gaps and retirement prerequisites remain.
 
 The owner reports that the retained project's service-role credential was exposed in chat. Treat it as compromised. Deleting a message, deploying again, creating a replacement or obtaining a clean source scan does not revoke the exposed credential. Table RLS is not a complete defense against privileged server credentials. No evidence here establishes that the key was or was not abused.
 

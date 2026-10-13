@@ -17,6 +17,7 @@ async (page) => {
    uploadLibraryFile:async kind=>({libraryFileId:'synthetic-file',name:'Synthetic resume.txt',text:'Synthetic resume content',sizeBytes:24,category:kind}),
    saveSession:async input=>{window.__fixtureCalls.push('save');const now=new Date().toISOString(),session={...input,id:'synthetic-session',createdAt:now,updatedAt:now};sessions=[session];detail={session,documents:[],conversation:[],questions:[],answers:[],rounds:[]};return session;},
    addTextDocument:async()=>({id:'synthetic-document'}),addExtractedDocument:async()=>({id:'synthetic-file'}),deleteSession:async()=>{},removeDocument:async()=>{},
+   startInterview:async()=>{window.__fixtureCalls.push('blocked-synthetic-start');throw new Error('Synthetic preview: AI START unavailable.');},
    setAutoAnswer:async value=>value,setInterviewInteractionEnabled:async value=>value,stopInterview:async()=>{},setSessionWindowMode:async()=>{},setLiveCollapsed:async()=>{},adjustZoom:async()=>1,closeWindow:async()=>{},openExternal:async()=>{},getSelectedScreenSource:async()=>null,listDesktopCaptureSources:async()=>[],getRoundHistory:async()=>({items:[],page:0,total:0})};
  });
  const assert=(ok,name,detail)=>{if(!ok)throw Error(name+' '+JSON.stringify(detail));checks.push(name);};
@@ -40,6 +41,8 @@ async (page) => {
   await p.getByRole('button',{name:'Upload resume',exact:true}).click();await p.getByPlaceholder('Paste or type the job description...').fill('Synthetic description');await p.getByLabel('Supporting context text').fill('Synthetic supporting notes');
   await p.getByRole('button',{name:'Create Session',exact:true}).click();await p.locator('.copilot-page, .copilot').first().waitFor({state:'visible',timeout:5000}).catch(()=>{});
   assert((await p.evaluate(()=>window.__fixtureCalls.filter(x=>x==='save').length))===1,'exactly one synthetic session save');assert((await geometry()).doc<=800,'live workspace no horizontal clipping');
+  await p.getByText('Synthetic preview: AI START unavailable.',{exact:true}).waitFor();
+  assert((await p.evaluate(()=>window.__fixtureCalls.filter(x=>x==='blocked-synthetic-start').length))===1,'synthetic AI START explicitly blocked, not a missing bridge method');
   await p.screenshot({path:'C:/Users/kiree/Downloads/sigmaroundAI Copies/products/cluera-ai/.test-output/cluera-desktop-live-800.png'});
   assert(errors.length===0,'desktop renderer no page errors',errors);assert(requests.every(r=>r.method==='GET'),'desktop synthetic preview zero HTTP writes');
   return {synthetic:true,checks,requests:requests.length,pageErrors:errors,providerRequests:requests.filter(r=>!r.url.startsWith('http://127.0.0.1:43690/')).length};

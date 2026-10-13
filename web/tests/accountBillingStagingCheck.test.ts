@@ -2,7 +2,7 @@ import {createRequire} from 'node:module';
 import {it,expect,vi} from 'vitest';
 const {ORIGIN,checks,inspect,run}=createRequire(import.meta.url)('../../scripts/verify-cluera-staging.cjs');
 const headers={'cache-control':'no-store','x-content-type-options':'nosniff'};
-const pricing='SigmaPro 3 Hours SigmaPro 40 Hours SigmaEnterprise Weekly SigmaEnterprise Monthly ₹549 ₹5,499 ₹19,549 no expiry do not roll over';
+const pricing='Cluera 3 Hours Cluera Pro 40 Hours Cluera Pro 100 Hours Cluera Enterprise 200 Hours ₹549 ₹5,499 ₹9,599 ₹19,549 100 hours per month not active payment offers no expiry do not roll over';
 it('requires exact reviewed pricing, paused controls and no third-party SDK',()=>{
  const response=new Response(null,{status:200,headers});
  expect(inspect(checks[1],response,pricing).pass).toBe(true);

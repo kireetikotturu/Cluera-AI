@@ -1,4 +1,4 @@
-export const SUPPORT_EMAIL = 'sigmaroundsupport@gmail.com';
+export const SUPPORT_EMAIL = 'clueraaisupport@gmail.com';
 export const SUPPORT_SUBJECT = 'Cluera Support Request';
 
 export type SupportDestination = 'supportGmail' | 'supportMail';

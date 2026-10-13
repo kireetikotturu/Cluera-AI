@@ -1,7 +1,15 @@
 # Cluera staging private setup
 Only new Cluera resources. Do not modify old Account or License services.
 
+## Current launch checkpoint — replacement saving Not ready yet
+
+Initial infrastructure/callback setup is complete. The owner authorized coordinated private replacement/configuration-only reload in confirmed Cluera/Account dependencies, but answered **Not ready yet** to saving the four modern server keys. No rotation, revocation, schema apply, key import or provider/payment enablement occurred. This narrowly approved old-Account credential configuration scope supersedes the blanket setup restriction above; no old source/features/history are in scope. Follow [launch steps](CLUERA_LAUNCH_STEPS.md), [exact vault review](CLUERA_PROVIDER_VAULT_SCHEMA_REVIEW.md) and [credential plan](CLUERA_SHARED_CREDENTIAL_ROTATION.md). Do not repeat old infrastructure or Gemini/Deepgram environment-key instructions below.
+
+Email resend is an explicit owner action at `/account#resend-verification`, using the latest link in the same browser and sealed PKCE flow. Positive email/Google/Admin MFA/normal Windows acceptance is still unrun. The support inbox is `clueraaisupport@gmail.com`, not a new privileged role. Cluera presentation policy v2 uses the four newly confirmed prices without modifying old financial policies. All payment flags false/auth-only remain mandatory until separate accepted approvals.
+
 ## October 13 latest — infrastructure supplied; credential incident open
+
+**Final repair rollout verified:** Cluera **READY dpl_4Xkj23XmgsTMzDnDcdjAuGo5P4Ym** and Render **LIVE dep-db70ac7avr4c73btfjd0**, reviewed runtime **abe7b8b26b5330b4208e8abca1c58916c7b22fb2**. Actual health/revision and stable alias agree. Protected GET check authenticates the saved database key and matched relay rate secret, with signed auth-only/disabled-provider evidence and zero mutations/provider requests. All18 environment entries remain unchanged; vault absent and all four payment flagsfalse. Complete web700/22 skipped, root17/17, typechecks/builds/scans, hosted10+8 checks and20 empty-context public browser layouts pass. [Exact evidence and remaining gaps](CLUERA_IMPLEMENTATION_MIGRATION.md). Earlier owner reload IDs below are superseded by this repair, not additional setup instructions.
 
 This supersedes the **Not ready yet / infrastructure missing** instructions below. Owner-provisioned Render **dep-db6vk5ou01pc73bp0ipg**, source **8595a9daed3a6f3db9ecb0e111dbbccb6d30c495**, is LIVE; actual `/healthz` returns200/{ok:true}/no-store and the same X-Cluera-Revision. Health-check path is `/healthz`. Owner-reloaded Cluera Vercel **READY dpl_6K1gTnn9NtqgkmFu3XbsVC7FqhVG**, source **473ef8d373f30f2354763524136828531a5fa7cd**, stable alias/exact new project match. Those revisions differ in result guides only. Session/Admin/vault endpoints now return the expected unauthenticated401 instead of missing-configuration503. Metadata confirms service/cookie/rate entries Sensitive/Production-only; all four Cluera payment flags remain false. No secret values retrieved.
 
