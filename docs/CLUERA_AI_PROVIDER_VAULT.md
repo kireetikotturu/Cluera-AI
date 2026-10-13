@@ -4,6 +4,8 @@ October 13, 2026. Cluera only. Source/test-covered, **not operational or product
 
 ## Architecture and authority
 
+Latest October13: required infrastructure is now owner-provisioned and new Render is LIVE in auth-only mode. No repeated private setup is needed. The exposed shared server credential remains an open incident: [replacement/revocation plan](CLUERA_SHARED_CREDENTIAL_ROTATION.md). Complete [schema object/policy review](CLUERA_PROVIDER_VAULT_SCHEMA_REVIEW.md), proposal SHA-256 **72e1fdf4b02924ffc35af19fe3392749b024e9d948e5d00c7ca13f104f294cf9**. No schema, root keyring or provider activation is authorized/applied. This supersedes bootstrap step1's earlier Not ready yet status below.
+
 Admin → existing Auth-verified user/session + SQL allowlist + token/live AAL2 → fresh existing TOTP challenge per change → ciphertext-only service RPC → new Cluera-private provider registry and immutable metadata audit.
 
 Render → fixed retained Supabase over TLS, service-role authenticated ciphertext RPC → server-memory envelope decryption → existing Gemini/Flux adapters → existing server-authoritative reservation/settlement ledger. No credential API proxy, plaintext database column, browser read-back or customer BYOK. Provider configuration cannot change customer grants, prices, usage balances or payment switches.

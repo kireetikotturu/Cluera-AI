@@ -2,6 +2,10 @@
 
 October 13, 2026. No production readiness or commercial release approval.
 
+Latest: owner infrastructure is supplied; actual new Render health200/revision8595a9d and Vercel READY dpl_6K1gTnn9NtqgkmFu3XbsVC7FqhVG/source473ef8d are verified. New unauthenticated session/Admin/vault boundaries correctly401, not missing-setting503. Earlier infrastructure-failure evidence below is historical. Confirmed auth UI hash/strict-response/error-reflection fixes, truthful auth-only provider metadata and proposal NULL defenses are locally covered by complete web **698 passed/22 skipped**, root17/17, typechecks/builds/scans. Final publication/read-back is in the implementation guide.
+
+**Open security incident:** owner reports exposed shared Supabase service-role credential. [Coordinated rotation/revocation plan](CLUERA_SHARED_CREDENTIAL_ROTATION.md) requires approval including every dependent service; no key has been rotated/revoked. Complete-row financial digest matches are preservation evidence, not proof of no credential abuse. Vault provision/AI activation should wait for incident resolution. Actual support-inbox signup/password/verification/Google/session/logout and private Admin MFA remain owner-interactive/unaccepted; no Admin role grant or login bypass. AI stays auth-only, payments disabled.
+
 Reviewed source473ef8d / READY dpl_EJyo5Fg9Tm6EBM7kxenph3YQSfDP and stable Cluera alias verified; Render same-SHA dep-db6tplqjnfac73ebj2s0 remains update_failed/configuration_unavailable. Full web687/22 skipped, root17/17, typechecks/builds/scans and4 isolated real-browser synthetic layout cases pass. Neither READY nor those tests accept the blocked real Auth/vault/provider/Windows journeys.
 
 - Infrastructure: missing Cluera service-role/rate settings; Render not live/healthy. Owner Not ready yet. No secret format/ownership success inferred from metadata presence.

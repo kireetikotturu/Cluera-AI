@@ -10,7 +10,7 @@ const scope='cluera:staging:provider-status:v1';
 const provider=z.object({provider:z.enum(['gemini','deepgram']),configured:z.boolean(),enabled:z.boolean(),
  fingerprint:z.string().regex(/^[a-f0-9]{16}$/).nullable(),lastRotatedAt:z.null(),health:z.literal('UNVERIFIED'),
  rotationAvailable:z.literal(false)}).strict();
-export const providerStatusSchema=z.object({observedAt:z.string().datetime(),providers:z.array(provider).length(2)}).strict()
+export const providerStatusSchema=z.object({observedAt:z.string().datetime(),bootstrapMode:z.enum(['legacy-environment','auth-only','admin-vault']).optional(),providers:z.array(provider).length(2)}).strict()
  .refine(value=>value.providers[0].provider==='gemini'&&value.providers[1].provider==='deepgram');
 export type ProviderStatus=z.infer<typeof providerStatusSchema>;
 function mac(key:Buffer,purpose:string,value:string){return createHmac('sha256',key).update(`${scope}\n${purpose}\n${value}`).digest('hex');}
@@ -28,11 +28,11 @@ export function providerStatusResponse(config:RelayConfig,nonce:string,now=Date.
  const key=Buffer.from(config.rateKey,'base64');
  const providers=(['gemini','deepgram'] as const).map(provider=>{
   const credential=provider==='gemini'?config.geminiKey:config.deepgramKey;
-  return {provider,configured:Boolean(credential),enabled:true,
+  return {provider,configured:Boolean(credential),enabled:(config.providerMode??'legacy-environment')==='legacy-environment'&&Boolean(credential),
    fingerprint:credential?mac(key,'fingerprint',`${provider}\n${credential}`).slice(0,16):null,
    lastRotatedAt:null,health:'UNVERIFIED' as const,rotationAvailable:false as const};
  });
- const body=JSON.stringify({observedAt:new Date(now).toISOString(),providers});
+ const body=JSON.stringify({observedAt:new Date(now).toISOString(),bootstrapMode:config.providerMode??'legacy-environment',providers});
  return {body,signature:mac(key,'response',`${nonce}\n${body}`)};
 }
 export function verifyProviderStatusResponse(key:Buffer,nonce:string,body:string,signature:string,now=Date.now()):ProviderStatus{

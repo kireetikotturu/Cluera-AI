@@ -24,6 +24,16 @@ it('atomically stores encrypted disabled credentials and immutable metadata-only
  const meta=(await db.query<any>('select public.cluera_provider_admin_read($1,$2) value',[actor,sid])).rows[0].value;
  expect(meta.providers[0].enabled).toBe(false);expect(JSON.stringify(meta)).not.toContain('sealed');
 });
+it('rejects NULL operation discriminators explicitly without altering credentials or audits',async()=>{
+ const before=(await db.query<any>('select revision from cluera_private.ai_providers')).rows;
+ const count=(await db.query<any>('select count(*)::int n from cluera_private.ai_provider_audit')).rows[0].n;
+ for(const [provider,action] of [[null,'REPLACE'],['gemini',null]]){
+  const value=(await db.query<any>('select public.cluera_provider_mutate($1,$2,$3,$4,$5,1,$6,now(),$7) value',[actor,sid,randomUUID(),provider,action,'a'.repeat(64),replacement()])).rows[0].value;
+  expect(value.code).toBe('INVALID');
+ }
+ expect((await db.query<any>('select revision from cluera_private.ai_providers')).rows).toEqual(before);
+ expect((await db.query<any>('select count(*)::int n from cluera_private.ai_provider_audit')).rows[0].n).toBe(count);
+});
 it('requires fresh complete compatible probe before enable, fences stale revisions, and resets on replacement',async()=>{
  expect((await change('CONFIGURE',1,{enabled:true,defaultModel:'gemini-3.5-flash'})).code).toBe('INVALID');
  expect((await change('TEST',1,{status:'VERIFIED',models:[{id:'gemini-3.5-flash',runtimeCompatible:true}],complete:true})).code).toBe('APPLIED');

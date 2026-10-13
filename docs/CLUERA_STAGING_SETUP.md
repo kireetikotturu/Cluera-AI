@@ -1,6 +1,18 @@
 # Cluera staging private setup
 Only new Cluera resources. Do not modify old Account or License services.
 
+## October 13 latest — infrastructure supplied; credential incident open
+
+This supersedes the **Not ready yet / infrastructure missing** instructions below. Owner-provisioned Render **dep-db6vk5ou01pc73bp0ipg**, source **8595a9daed3a6f3db9ecb0e111dbbccb6d30c495**, is LIVE; actual `/healthz` returns200/{ok:true}/no-store and the same X-Cluera-Revision. Health-check path is `/healthz`. Owner-reloaded Cluera Vercel **READY dpl_6K1gTnn9NtqgkmFu3XbsVC7FqhVG**, source **473ef8d373f30f2354763524136828531a5fa7cd**, stable alias/exact new project match. Those revisions differ in result guides only. Session/Admin/vault endpoints now return the expected unauthenticated401 instead of missing-configuration503. Metadata confirms service/cookie/rate entries Sensitive/Production-only; all four Cluera payment flags remain false. No secret values retrieved.
+
+Do not repeat saved infrastructure/callback setup. Render remains **auth-only**; AI START stays denied before usage reservation. Vault schema/keyring remain unprovisioned and gate absent/false. Current authenticated server/private checks and final repair rollout are recorded in [implementation results](CLUERA_IMPLEMENTATION_MIGRATION.md).
+
+**Priority next approval:** the owner reports exposing the shared service-role key. Review [coordinated credential replacement and revocation](CLUERA_SHARED_CREDENTIAL_ROTATION.md) before adding provider credentials or broadening acceptance. No rotation has occurred. Do not resend keys in chat. This plan needs explicitly scoped old-Account configuration authority because its backend uses the same retained database; no old source/payment/history change is authorized now.
+
+The owner supplied `clueraaisupport@gmail.com` for testing; read-only Auth lookup finds no existing user/Admin profile for it. It is a real support inbox, not a disposable account guessed by the agent, and does not replace the existing intended Admin. After the incident scope is resolved, the owner privately chooses a password and performs signup, opens the latest verification link **in the same browser**, signs in, reloads/restores the session, signs out, then completes Google consent and existing Admin MFA. Never send passwords, links, codes, cookies or tokens. The connector cannot attach to the owner's private session; positive hosted Auth remains unaccepted until that handoff.
+
+Review [every proposed vault object/policy and encryption bootstrap](CLUERA_PROVIDER_VAULT_SCHEMA_REVIEW.md). **No migration is applied automatically**, including the separate Cluera release registry. Schema permission, key bootstrap/provider activation and credential retirement are separate approvals.
+
 ## October 13 current owner boundary — infrastructure not ready
 
 Complete reviewed source **473ef8d373f30f2354763524136828531a5fa7cd** is deployed as **READY dpl_EJyo5Fg9Tm6EBM7kxenph3YQSfDP**, stable Cluera alias/exact new project verified. New Render same-SHA auto-build still fails configuration validation. No environment setting was changed in this phase. Vault mode is not operational; do not submit provider keys until its separate bootstrap/schema approval is complete.
@@ -33,5 +45,5 @@ Add only https://cluera-ai-staging.vercel.app/api/account/callback and the nativ
 
 Prepare reviewed Cluera email display/template branding, preserve anti-enumeration, use the supplied RedirectTo/confirmation URL rather than forcing old SiteURL. SMTP/provider consent/configuration remains owner-only; no remote template edit has occurred.
 
-Tell the agent only: **Cluera private staging settings and callback additions saved**. It will inspect metadata/private categorical checks, re-deploy complete reviewed source, verify hosted boundaries/relay and apply only the additive Cluera release registry after fresh preservation checks. Do not sign in/pay merely to bypass an engineering failure. No release upload/approval or Test payment now.
+Historical setup handoff is complete. The earlier automatic release-registry application instruction is withdrawn: all schema application requires separate explicit approval. No release upload/approval, provider key import or Test payment now.
 

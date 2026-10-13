@@ -37,6 +37,11 @@ it('rejects modified, stale, mismatched nonce and wrong-key metadata responses',
  expect(()=>verifyProviderStatusResponse(key,proof.nonce,response.body,response.signature,now+30001)).toThrow();
  expect(()=>verifyProviderStatusResponse(Buffer.alloc(32,8),proof.nonce,response.body,response.signature,now)).toThrow();
 });
+it.each(['auth-only','admin-vault'])('reports %s bootstrap providers disabled, even if stale legacy keys are supplied',providerMode=>{
+ const proof=providerStatusRequest(key,now),response=providerStatusResponse({...config,providerMode},proof.nonce,now);
+ const value=verifyProviderStatusResponse(key,proof.nonce,response.body,response.signature,now);
+ expect(value.bootstrapMode).toBe(providerMode);expect(value.providers.every(p=>p.enabled===false)).toBe(true);
+});
 it('uses only the fixed staging TLS endpoint, rejects redirects, limits time and forwards no browser or provider credentials',async()=>{
  const request=vi.fn(async(url:any,init:any)=>{
   expect(url).toBe(`${STAGING_RELAY_ORIGIN}${PROVIDER_METADATA_PATH}`);expect(init.redirect).toBe('error');expect(init.signal).toBeInstanceOf(AbortSignal);

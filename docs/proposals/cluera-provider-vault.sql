@@ -49,7 +49,7 @@ end$$;
 create function public.cluera_provider_read(p_provider text) returns jsonb
 language plpgsql security definer set search_path='' set statement_timeout='5s' as $$
 begin
- if p_provider not in ('gemini','deepgram','openai','anthropic') then return null;end if;
+ if p_provider is null or p_provider not in ('gemini','deepgram','openai','anthropic') then return null;end if;
  return (select to_jsonb(r) from cluera_private.ai_providers r where provider=p_provider);
 end$$;
 
@@ -60,7 +60,7 @@ declare r cluera_private.ai_providers;prior cluera_private.ai_provider_audit;bef
 begin
  if public.account_admin_check(p_actor,p_session,true) is not true or p_reauthenticated_at is null
  or p_reauthenticated_at<now()-interval '2 minutes' or p_reauthenticated_at>now()+interval '5 seconds' then return jsonb_build_object('code','FORBIDDEN');end if;
- if p_operation is null or p_provider not in ('gemini','deepgram','openai','anthropic') or p_action not in ('REPLACE','TEST','CONFIGURE')
+ if p_operation is null or p_provider is null or p_action is null or p_provider not in ('gemini','deepgram','openai','anthropic') or p_action not in ('REPLACE','TEST','CONFIGURE')
  or p_revision is null or p_revision<0 or p_digest is null or p_digest!~'^[a-f0-9]{64}$' or p_input is null or jsonb_typeof(p_input)!='object' then return jsonb_build_object('code','INVALID');end if;
  perform pg_catalog.pg_advisory_xact_lock(862103,pg_catalog.hashtext(p_provider));
  select * into prior from cluera_private.ai_provider_audit where operation_id=p_operation;
@@ -87,7 +87,7 @@ begin
   if r.provider is null or p_input-'enabled'-'defaultModel'!='{}'::jsonb or jsonb_typeof(p_input->'enabled') is distinct from 'boolean'
    or not(p_input?'defaultModel') then return jsonb_build_object('code','INVALID');end if;
   if (p_input->>'enabled')::boolean and (p_provider not in ('gemini','deepgram') or r.probe_status!='VERIFIED' or not r.complete
-   or r.probe_at<now()-interval '15 minutes' or p_input->>'defaultModel' is null
+   or r.probe_at is null or r.probe_at<now()-interval '15 minutes' or p_input->>'defaultModel' is null
    or not exists(select 1 from jsonb_array_elements(r.models) m where m->>'id'=p_input->>'defaultModel' and m->'runtimeCompatible'='true')) then return jsonb_build_object('code','INVALID');end if;
   update cluera_private.ai_providers set revision=revision+1,enabled=(p_input->>'enabled')::boolean,default_model=p_input->>'defaultModel',updated_at=now() where provider=p_provider;
  end if;
