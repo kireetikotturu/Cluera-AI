@@ -1,0 +1,16 @@
+/* Cluera Admin navigation only; no customer, desktop or License selectors. */
+.account-admin-shell .account-admin-navigation { padding:clamp(16px,3vw,24px);border:1px solid var(--line);border-radius:15px;background:linear-gradient(135deg,#202a40,#151e30); }
+.account-admin-shell .account-admin-navigation-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap; }
+.account-admin-shell .account-admin-navigation-heading > span { padding:6px 10px;border:1px solid #45516a;border-radius:20px;color:var(--muted);font-size:11px; }
+.account-admin-shell .account-admin-navigation-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px;padding:0; }
+.account-admin-shell .account-admin-navigation-grid a { display:flex;flex-direction:column;gap:5px;min-width:0;min-height:76px;padding:13px 14px;background:#172135;overflow-wrap:anywhere; }
+.account-admin-shell .account-admin-navigation-grid a strong { color:var(--ink);font-size:13px;font-weight:600; }
+.account-admin-shell .account-admin-navigation-grid a span { color:var(--muted);font-size:11px;line-height:1.5; }
+.account-admin-shell .account-admin-lock-summary { padding:14px;border:1px solid #7967a4;border-radius:10px;background:#282238;line-height:1.7; }
+.account-admin-shell .account-admin-help { padding:18px;border:1px solid var(--line);border-radius:12px;background:#101725;overflow-wrap:anywhere; }
+.account-admin-shell .account-admin-help h2 { font-size:17px; }
+.account-admin-shell .account-admin-help a { color:#c8b9ff; }
+.account-admin-shell .account-admin-help summary { width:fit-content;max-width:100%;padding:8px 0;color:#c8b9ff;font-size:12px;cursor:pointer; }
+.account-admin-shell .account-admin-help summary:focus-visible { outline:2px solid #c8b9ff;outline-offset:3px; }
+@media (max-width:900px) { .account-admin-shell .account-admin-navigation-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:480px) { .account-admin-shell .account-admin-navigation-grid { grid-template-columns:minmax(0,1fr); }.account-admin-shell .account-admin-navigation-grid a { min-height:68px; } }

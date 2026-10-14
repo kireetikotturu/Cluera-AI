@@ -4,12 +4,14 @@ const {run,paymentFlags}=createRequire(import.meta.url)('../../scripts/verify-cl
 function fixture(){
  const listUsers=vi.fn(async()=>({error:null,data:{users:[{secret:'synthetic-private-response'}]}}));
  const readProviderStatus=vi.fn(async()=>({bootstrapMode:'auth-only',providers:[{enabled:false,configured:false,fingerprint:null},{enabled:false,configured:false,fingerprint:null}]}));
- return {listUsers,readProviderStatus,accountConfig:vi.fn(()=>({})),accountClients:vi.fn(()=>({service:{auth:{admin:{listUsers}}}}))};
+ const readRelayInfrastructureStatus=vi.fn(async()=>({databaseAuthenticated:true}));
+ return {listUsers,readProviderStatus,readRelayInfrastructureStatus,accountConfig:vi.fn(()=>({})),accountClients:vi.fn(()=>({service:{auth:{admin:{listUsers}}}}))};
 }
 const env=Object.fromEntries(paymentFlags.map((name:string)=>[name,'false']));
 it('reads only server configuration, one bounded SDK listing and authenticated metadata with safe output',async()=>{
  const f=fixture(),value=await run(f,env);expect(f.listUsers).toHaveBeenCalledExactlyOnceWith({page:1,perPage:1});
- expect(value).toMatchObject({serviceKeyAuthenticated:true,relayAuthenticated:true,authOnly:true,providersDisabled:true,providerRequests:0,mutations:0});
+ expect(value).toMatchObject({serviceKeyAuthenticated:true,relayAuthenticated:true,relayDatabaseAuthenticated:true,authOnly:true,providersDisabled:true,providerRequests:0,mutations:0});
+ expect(f.readRelayInfrastructureStatus).toHaveBeenCalledOnce();
  expect(JSON.stringify(value)).not.toContain('synthetic-private-response');
 });
 it('stops before network on missing configuration, unsafe payment flags or a provisioned vault',async()=>{
@@ -23,4 +25,11 @@ it('fails closed on authentication errors and does not mislabel legacy or enable
  const failed=await run(f,env);expect(failed.serviceKeyAuthenticated).toBe(false);expect(f.readProviderStatus).not.toHaveBeenCalled();expect(JSON.stringify(failed)).not.toContain('synthetic-private-error');
  const g=fixture();g.readProviderStatus.mockResolvedValue({providers:[{enabled:true,configured:true,fingerprint:'synthetic'},{enabled:true,configured:true,fingerprint:'synthetic'}]} as any);
  const old=await run(g,env);expect(old.authOnly).toBe(false);expect(old.providersDisabled).toBe(false);
+ expect(g.readRelayInfrastructureStatus).not.toHaveBeenCalled();
+});
+it('does not confuse signed relay health with its own database authentication',async()=>{
+ const f=fixture();f.readRelayInfrastructureStatus.mockResolvedValue({databaseAuthenticated:false});
+ const value=await run(f,env);expect(value.relayAuthenticated).toBe(true);expect(value.relayDatabaseAuthenticated).toBe(false);
+ f.readRelayInfrastructureStatus.mockRejectedValue(Error('synthetic-private-error'));
+ const failed=await run(f,env);expect(failed.relayDatabaseAuthenticated).toBe(false);expect(JSON.stringify(failed)).not.toContain('synthetic-private-error');
 });

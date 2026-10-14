@@ -5,15 +5,36 @@ import { MAX_FRAME_BYTES } from './protocol';
 import { attachRelaySession } from './session';
 import type {RelayConfig} from './config';
 import {PROVIDER_METADATA_PATH,providerStatusResponse,verifyProviderStatusRequest} from './providerMetadata';
+import {INFRASTRUCTURE_STATUS_PATH,infrastructureStatusResponse,verifyInfrastructureStatusRequest} from './infrastructureMetadata';
 
 /** Persistent Node server, NOT a Next/Vercel function. TLS must terminate at the
  * private container ingress. No access logging of paths/headers/bodies/tokens. */
-export function createRelayServer(dependencies: Parameters<typeof attachRelaySession>[1],revision?:string,metadata?:RelayConfig) {
+export function createRelayServer(dependencies: Parameters<typeof attachRelaySession>[1],revision?:string,metadata?:RelayConfig,databaseCheck?:()=>Promise<boolean>) {
   let statusAttempts=0,statusWindow=performance.now();
+  let infrastructureAttempts=0,infrastructureWindow=performance.now(),infrastructureBusy=false;
+  const infrastructureNonces=new Map<string,number>();
   const server = createServer((request, response) => {
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Content-Type', 'application/json');
+    if(metadata&&databaseCheck&&request.url===INFRASTRUCTURE_STATUS_PATH){
+      const now=Date.now(),elapsed=performance.now();
+      if(elapsed-infrastructureWindow>=60000){infrastructureWindow=elapsed;infrastructureAttempts=0;}
+      for(const [nonce,expiry] of infrastructureNonces)if(expiry<now)infrastructureNonces.delete(nonce);
+      const header=(name:string)=>typeof request.headers[name]==='string'?request.headers[name] as string:'';
+      const nonce=header('x-cluera-nonce'),key=Buffer.from(metadata.rateKey,'base64');
+      const valid=request.method==='GET'&&!request.headers.origin&&!request.headers.cookie&&!request.headers.authorization
+        &&!request.headers['transfer-encoding']&&(!request.headers['content-length']||request.headers['content-length']==='0')
+        &&verifyInfrastructureStatusRequest(key,{timestamp:header('x-cluera-time'),nonce,signature:header('x-cluera-proof')},now);
+      if(!valid||infrastructureNonces.has(nonce)||infrastructureBusy||++infrastructureAttempts>12){response.writeHead(403);response.end('{"error":"Unavailable."}');return;}
+      infrastructureNonces.set(nonce,now+60000);infrastructureBusy=true;
+      void Promise.resolve().then(databaseCheck).catch(()=>false).then(authenticated=>{
+        if(response.destroyed)return;
+        const result=infrastructureStatusResponse(key,nonce,authenticated===true);
+        response.setHeader('X-Cluera-Proof',result.signature);response.writeHead(200);response.end(result.body);
+      }).finally(()=>{infrastructureBusy=false;});
+      return;
+    }
     if(metadata&&request.url===PROVIDER_METADATA_PATH){
       const now=performance.now();if(now-statusWindow>=60000){statusWindow=now;statusAttempts=0;}
       const header=(name:string)=>typeof request.headers[name]==='string'?request.headers[name] as string:'';

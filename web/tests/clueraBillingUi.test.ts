@@ -30,8 +30,8 @@ const makeBound = (row = catalog[0]) => ({ payment: { code: 'BOUND', kind: row.k
 const bound = (row=catalog[0]) => {const result=makeBound(row);createdBinding=result.payment;return result;};
 const buttons = () => [...host.querySelectorAll('button')];
 const button = (text: string) => buttons().find(item => item.textContent === text)!;
-const buy = () => buttons().find(item => item.textContent?.startsWith('Pay ₹549 '))!;
-const subscribe = () => buttons().find(item => item.textContent?.startsWith('Subscribe for ₹5,499 '))!;
+const buy = () => host.querySelector<HTMLButtonElement>('button[data-offer-code="cluera_pack_3h_v2"]')!;
+const subscribe = () => host.querySelector<HTMLButtonElement>('button[data-offer-code="cluera_monthly_40h_v2"]')!;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -58,7 +58,7 @@ it('shows all four approved presentations while migration is unavailable, with n
   vi.stubGlobal('fetch', request); await renderCheckout(false);
   expect(host.querySelectorAll('.account-plan-card')).toHaveLength(4);
   for (const price of ['₹549', '₹5,499', '₹9,599', '₹19,549']) expect(host.textContent).toContain(price);
-  expect(host.textContent).toContain('PRESENTATION ONLY'); expect(host.textContent).toContain('Checkout is disabled');
+  expect(host.textContent).toContain('Presentation only'); expect(host.textContent).toContain('Checkout is disabled');
   expect(host.textContent).not.toContain('synthetic-private-diagnostic');
   const unavailable=buttons().filter(item=>item.textContent==='Checkout unavailable');
   expect(unavailable).toHaveLength(4);expect(unavailable.every(item=>item.disabled)).toBe(true);

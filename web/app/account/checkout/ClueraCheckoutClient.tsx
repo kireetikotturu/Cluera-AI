@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import styles from '../../cluera-commerce.module.css';
 import { z } from 'zod';
 import { usageDuration } from '../../../lib/usage/display';
 import {offerDisplay} from '../../../lib/billing/offerDisplay';
@@ -41,6 +42,7 @@ async function loadSdk(signal: AbortSignal): Promise<void> {
 export default function ClueraCheckoutClient({ enabled, offers = [] }: {
   enabled: boolean; offers?: ClueraPublicRevision[];
 }) {
+  const statusId = useId();
   const [catalog, setCatalog] = useState<ClueraPublicRevision[]>(offers);
   const [credits, setCredits] = useState<Credits | null>(null);
   const [selection,setSelection]=useState<CheckoutSelection|null>(null);
@@ -234,37 +236,62 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
   };
 
   const rows = catalog.length ? catalog : null;
-  return <section className="account-checkout-console" aria-label="Cluera billing" aria-busy={busy}>
-    <p className="account-ui-kicker">CLUERA BILLING · RAZORPAY TEST</p>
-    <h2>Time for your next session</h2>
-    <p>Server-owned account, price revision and payment evidence. No customer account-ID entry.</p>
-    <p role="status" aria-live="polite">{message}</p>
+  return <section className={`account-checkout-console ${styles.checkout}`} aria-label="Cluera billing" aria-busy={busy}>
+    <header className={styles.checkoutHeader}>
+      <p className={styles.eyebrow}>Cluera billing · Razorpay Test</p>
+      <h2>Time for your next session</h2>
+      <p>Server-owned account, price revision and payment evidence. No customer account-ID entry.</p>
+    </header>
+    <div className={styles.status} id={statusId} role="status" aria-live="polite"><p>{message}</p></div>
     {selection?<aside className="cluera-plan-handoff" aria-label="Selected Cluera plan"><p>Selected plan: <strong>{checkoutSelectionName(selection)}</strong></p>
       <p>Your selection is not a purchase. Only a fresh verified account, current catalog revision and separately approved availability can enable checkout.</p></aside>:null}
-    {credits ? <p>Signed in as {credits.displayName?.trim() || 'verified customer'} · Available time: {usageDuration(credits.availableMilliseconds)}</p>
-      : <a href={selection?checkoutSelectionHref(selection,true):'/account#login'}>Sign in to Cluera AI</a>}
-    <button type="button" disabled={busy} onClick={() => void refresh()}>Refresh billing status</button>
-    <div className="account-pricing-grid">{rows ? rows.map(revision => <article key={revision.revisionId} className={`account-plan-card${selection?.offerCode===revision.offerCode?' cluera-plan-selected':''}`}>
-      {selection?.offerCode===revision.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
-      <p className="account-ui-kicker">{revision.kind === 'PACK' ? 'ONE-TIME PACK' : 'MONTHLY SUBSCRIPTION'}</p>
-      <h3>{revision.name}</h3><p>{clueraPrice(revision.amountPaise)}{revision.kind === 'RECURRING' ? ' / month' : ''}</p>
-      <p>{clueraAllowance(revision.allowanceSeconds)} · {revision.kind === 'PACK' ? 'no expiry; packs stack' : `no rollover; up to ${revision.totalCount} monthly charges`}</p>
-      <p>Revision {revision.version} · {revision.enabled ? 'Catalog enabled' : 'Catalog disabled'}</p>
-      {revision.kind === 'RECURRING' && !revision.testPlanValidated ? <p>Test plan and lifecycle acceptance pending. Not available.</p> : null}
-      <button type="button" disabled={!enabled || !eligible || busy || !revision.enabled || !revision.testPlanValidated}
-        onClick={() => void buy(revision)}>{revision.kind === 'PACK' ? `Pay ${clueraPrice(revision.amountPaise)} in Test Mode` : `Subscribe for ${clueraPrice(revision.amountPaise)} in Test Mode`}</button>
-    </article>) : clueraTargetPlans.map(plan => <article key={plan.id} className={`account-plan-card${selection?.offerCode===plan.offerCode?' cluera-plan-selected':''}`}>
-      {selection?.offerCode===plan.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
-      <p className="account-ui-kicker">PRESENTATION ONLY · NOT YET PURCHASABLE</p>
-      <h3>{plan.name}</h3><p>{offerDisplay(plan).label}</p>
-      <p>{offerDisplay(plan).terms}</p>
-      <button type="button" disabled>Checkout unavailable</button>
-    </article>)}</div>
-    <p>Recurring Test setup is not production acceptance. Payment-method availability must be verified; no ₹19,549 UPI mandate is promised. Stripe and customer BYOK are unavailable.</p>
-    <h3>Preserved server-confirmed history</h3>
-    <p>Existing Account and Paddle financial history remains intact. Old drafts are not resumed, canceled or retried here.</p>
-    {credits?.payments.length ? <ul>{credits.payments.map((payment, index) => <li key={`${payment.createdAt}:${index}`}>
-      {payment.offerCode} · {payment.state} · <time dateTime={payment.createdAt}>{payment.createdAt}</time>
-    </li>)}</ul> : <p>No historical entries are displayed in this snapshot.</p>}
+    <div className={styles.accountSummary}>
+      {credits ? <dl><div><dt>Signed in as</dt><dd>{credits.displayName?.trim() || 'verified customer'}</dd></div><div><dt>Available time</dt><dd>{usageDuration(credits.availableMilliseconds)}</dd></div></dl>
+        : <a className={styles.signIn} href={selection?checkoutSelectionHref(selection,true):'/account#login'}>Sign in to Cluera AI</a>}
+      <button className={styles.refresh} type="button" disabled={busy} onClick={() => void refresh()}>Refresh billing status</button>
+    </div>
+    <div className={`account-pricing-grid ${styles.grid}`}>{rows ? rows.map(revision => {
+      const canPurchase = enabled && eligible && !busy && revision.enabled && revision.testPlanValidated;
+      const action = canPurchase ? revision.kind === 'PACK' ? 'Buy Now' : 'Subscribe Now' : 'Checkout unavailable';
+      return <article key={revision.revisionId} aria-label={revision.name} className={`account-plan-card ${styles.card}${selection?.offerCode===revision.offerCode?' cluera-plan-selected':''}`}>
+        {selection?.offerCode===revision.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
+        <div className={styles.cardTop}><p className={styles.eyebrow}>{revision.kind === 'PACK' ? 'One-time pack' : 'Monthly subscription'}</p><span className={styles.badge}>Test Mode only</span></div>
+        <h3>{revision.name}</h3>
+        <p className={styles.price}>{clueraPrice(revision.amountPaise)}<span>{revision.kind === 'RECURRING' ? ' / month' : ' one time'}</span></p>
+        <p className={styles.allowance}>{clueraAllowance(revision.allowanceSeconds)}{revision.kind === 'RECURRING' ? ' per month' : ''}</p>
+        <ul className={styles.features}>
+          <li><span aria-hidden="true">✓</span>{revision.kind === 'PACK' ? 'No expiry; packs stack' : 'Monthly hours do not roll over'}</li>
+          <li><span aria-hidden="true">✓</span>One shared account balance</li>
+          <li><span aria-hidden="true">✓</span>{revision.kind === 'PACK' ? 'One-time purchase' : `No rollover; up to ${revision.totalCount} monthly charges`}</li>
+        </ul>
+        <p className={styles.revision}>Revision {revision.version} · {revision.enabled ? 'Catalog enabled' : 'Catalog disabled'}</p>
+        {revision.kind === 'RECURRING' && !revision.testPlanValidated ? <p className={styles.availability}>Test plan and lifecycle acceptance pending. Not available.</p> : null}
+        <button className={styles.action} data-offer-code={revision.offerCode} type="button" disabled={!canPurchase} aria-label={`${action}: ${revision.name}`} aria-describedby={statusId}
+          onClick={() => void buy(revision)}>{action}</button>
+      </article>;
+    }) : clueraTargetPlans.map(plan => {
+      const display = offerDisplay(plan);
+      return <article key={plan.id} aria-label={plan.name} className={`account-plan-card ${styles.card}${selection?.offerCode===plan.offerCode?' cluera-plan-selected':''}`}>
+        {selection?.offerCode===plan.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
+        <div className={styles.cardTop}><p className={styles.eyebrow}>Presentation only</p><span className={styles.badge}>Not yet purchasable</span></div>
+        <h3>{plan.name}</h3>
+        <p className={styles.price}>{clueraPrice(Number(plan.amount))}<span>{plan.interval ? ' / month' : ' one time'}</span></p>
+        <p className={styles.allowance}>{display.hours} hours{plan.interval ? ' per month' : ''}</p>
+        <ul className={styles.features}>
+          <li><span aria-hidden="true">✓</span>{plan.interval ? 'Monthly hours do not roll over' : 'No expiry; verified packs stack'}</li>
+          <li><span aria-hidden="true">✓</span>One shared account balance</li>
+        </ul>
+        <p className={styles.terms}>{display.terms}</p>
+        <button className={styles.action} data-offer-code={plan.offerCode} type="button" disabled aria-label={`Checkout unavailable: ${plan.name}`} aria-describedby={statusId}>Checkout unavailable</button>
+      </article>;
+    })}</div>
+    <div className={styles.safetyNote}><p><strong>Server verification protects your balance.</strong> Browser callbacks never grant time. Recurring Test setup is not production acceptance. Payment-method availability must be verified; no high-value UPI mandate is promised. Stripe and customer BYOK are unavailable.</p></div>
+    <section className={styles.history} aria-label="Preserved server-confirmed history">
+      <h3>Preserved server-confirmed history</h3>
+      <p>Existing Account and Paddle financial history remains intact. Old drafts are not resumed, canceled or retried here.</p>
+      {credits?.payments.length ? <ul>{credits.payments.map((payment, index) => <li key={`${payment.createdAt}:${index}`}>
+        <span>{payment.offerCode}</span><span className={styles.badge}>{payment.state}</span><time dateTime={payment.createdAt}>{payment.createdAt}</time>
+      </li>)}</ul> : <p>No historical entries are displayed in this snapshot.</p>}
+    </section>
   </section>;
 }

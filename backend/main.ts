@@ -2,6 +2,7 @@ import { relayConfig } from '../web/lib/accountRelay/config';
 import { authorizeRelay } from '../web/lib/accountRelay/authorization';
 import { approvedProviders } from '../web/lib/accountRelay/approvedProviders';
 import { createRelayServer } from '../web/lib/accountRelay/server';
+import { relayDatabaseAuthenticated } from '../web/lib/accountRelay/infrastructureCheck';
 
 // Deliberately no dotenv/file discovery: inject rotated staging secrets at runtime.
 try {
@@ -9,7 +10,7 @@ try {
   const relay = createRelayServer({ authorize: token => authorizeRelay(token, config),
     providers: approvedProviders(config),
     observe: event => console.info(JSON.stringify({ component: 'account-relay', event })),
-  },process.env.RENDER_GIT_COMMIT,config);
+  },process.env.RENDER_GIT_COMMIT,config,()=>relayDatabaseAuthenticated(config));
   relay.server.on('error', () => { console.error('{"component":"account-relay","event":"listener_failed"}'); process.exitCode = 1; });
   relay.server.listen(config.port, '0.0.0.0');
   let stopping = false;
