@@ -10,6 +10,16 @@ Unknown/duplicate/legacy offer codes and malformed/duplicate desktop hints are r
 
 The React review retained single-flight reads, abort/owner fences, click-only SDK loading and explicit Auth controls. No dependency, SQL proposal, financial API, provider guard or desktop feature was changed for this web-only work.
 
+## Completed current verification and deployment
+
+Reviewed staging runtime **3661c7ed0da5364298f4a00317d13473f2840689** is **READY dpl_Rx8VkfPbg9S6xfn1QK6R5USp8VTD**, with independent stable-alias and complete597-blob source/lock read-back. Render auto-deploy **LIVE dep-db7pk0ugekts73e7oo0g** and /healthz200 match that SHA; backend remains unchanged/auth-only, not accepted private relay DB-key authentication. Hosted CI run38586139704 and both jobs pass.
+
+Final complete web **1,046 passed/22 opt-in skipped**, desktop **366 passed/1 opt-in skipped**, preparation **23/23**, focused journey **72/72**; all typechecks/production code builds pass. Full and production-only dependency audits for web/desktop/backend report zero advisories. Source597/artifact102 and hosted18-file scans are bounded, not full-history or arbitrary-secret assurance. Existing TEST installer bytes remain unchanged.
+
+Post-READY HTTP boundaries **22/22** and isolated public browser **16/16** pass. The browser exercises exact pricing selection through disabled checkout/sign-in/signup at320/390/768/1280, zero writes/SDK requests/page errors/form submissions; screenshots reviewed. This is not actual private email/Google/MFA or Windows/provider/payment acceptance. No targetable native Cluera window was found.
+
+All23 preservation snapshots match14:00:35.153811-15:22:10.118467UTC, and all18 environment entries match exactly. At15:24:02.924435UTC both schemas remain absent/new billing RPCs0 and the original scheduler remains active/hash unchanged. [Exact rollout, failures and evidence limits](CLUERA_IMPLEMENTATION_MIGRATION.md). The next approval below is unchanged; no renewed Phase A approval is requested.
+
 ## Priority-by-priority release map
 
 | Priority | Actual state | Still required |

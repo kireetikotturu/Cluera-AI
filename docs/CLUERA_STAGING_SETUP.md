@@ -7,6 +7,8 @@ Phase A is approved conditionally, not awaiting repeat approval. Legacy JWT form
 
 Selected-offer navigation/Auth continuation never starts payment. Same-browser hints are bounded and cleared on logout/recovery. Web-only rollout uses complete reviewed staging Git source, original lock, npm ci/production build. Existing installers, billing owner and provider mode remain untouched; real private Auth/Windows/provider/payment acceptance is still open.
 
+Current reviewed runtime **3661c7ed0da5364298f4a00317d13473f2840689**, READY **dpl_Rx8VkfPbg9S6xfn1QK6R5USp8VTD**, stable alias and complete597-blob tree/manifest/lock agree. Render LIVE dep-db7pk0ugekts73e7oo0g and /healthz200/no-store/exact revision agree; no Render setting/provider/startup guard changed. All18 Cluera environment entries remain exactly unchanged, all four payment flags false/pause true/V2 absent-fail-closed. Full tests/typechecks/builds/audits/CI and fresh HTTP22/browser16 pass within the limits in [deployment evidence](CLUERA_IMPLEMENTATION_MIGRATION.md). These results supersede all older repeat-Phase-A/setup instructions below. **Next action: approve or decline only the temporary old website credential bridge/pinned reload**, not private saving or revocation now.
+
 ## New billing preparation - do not save or activate blindly
 
 [Cluera billing cutover](CLUERA_BILLING_CUTOVER.md) defines separate passive-schema, receiver, owner/scheduler and purchase approvals. Prepared new endpoints require `CLUERA_BILLING_V2_ENABLED`, which defaults false; it is a schema-selection gate, not a duplicate Account flag or payment authorization. The canonical `SIGMAROUND_ACCOUNTS_ENABLED` remains unchanged.
