@@ -23,7 +23,8 @@ const creditsSchema:z.ZodType<AccountCredits>=z.object({userId:z.string().uuid()
   reservedMilliseconds:millis,availableMilliseconds:millis}).strict()).max(5),
  plans:z.array(z.object({tier:z.enum(['PRO','ENTERPRISE']),state:z.enum(['ACTIVE','QUEUED','PAUSED','ENDED','REFUNDED']),
   paymentState:z.enum(['ACTIVE','PAST_DUE','CANCELED','PAUSED']),endsAt:z.string().datetime({offset:true}).nullable(),cancelFuture:z.boolean()}).strict()).max(30),
- payments:z.array(z.object({offerCode:z.enum(['pro_3_hours','pro_40_hours','enterprise_weekly','enterprise_monthly']),
+ payments:z.array(z.object({offerCode:z.enum(['pro_3_hours','pro_40_hours','enterprise_weekly','enterprise_monthly',
+  'cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2']),
   state:z.enum(['CREATING','BOUND','UNCERTAIN','REJECTED','VERIFIED','REFUNDED']),createdAt:z.string().datetime({offset:true})}).strict()).max(10),
 }).strict();
 type AccountDiagnostic = { operation: AccountAction; cause: 'request_or_response_failed'|'response_schema_invalid'; status: 503 };

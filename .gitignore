@@ -25,6 +25,8 @@ release-*/
 coverage/
 .cache/
 .build-cache/
+**/tests/.generated-billing-*/
+**/tests/.cluera-billing-*/
 .vercel/
 supabase/.temp/
 supabase/.branches/
@@ -33,3 +35,6 @@ supabase/.branches/
 **/dist/
 **/release-cluera-staging/
 !desktop/resources/cluera-public-key.pem
+# Only this manifest-pinned private dependency runtime is reviewed source, not generated application output.
+!desktop/vendor/global-agent/dist/
+!desktop/vendor/global-agent/dist/**

@@ -5,6 +5,7 @@ import {ProviderStatus} from './ProviderStatus';
 import {AiProviders} from './AiProviders';
 import {ModelPolicyEditor,type ModelPolicy} from './ModelPolicyEditor';
 import {AccountReleases} from './AccountReleases';
+import {BillingCatalog} from './BillingCatalog';
 import {adminReadError} from '../../../lib/accounts/adminReadErrors';
 import '../account-ui.css';
 type Factor={id:string;status:string};
@@ -97,7 +98,7 @@ export function AccountAdmin(){
   {(enrollment||factors.find(f=>f.id===factorId)?.status==='unverified')?<button disabled={busy} onClick={()=>void action({action:'MFA_CANCEL',factorId:enrollment?.id??factorId})}>Cancel unfinished setup</button>:null}
   <p>Setup keys exist only in this page’s memory. Refresh never creates another factor; cancel unfinished setup explicitly before enrolling again.</p>
  </div>:state?<>
-  <nav className="account-admin-nav" aria-label="Admin sections"><a href="#account-admin-users">Users</a><a href="#account-admin-catalog">Catalog</a><a href="#account-admin-models">Models</a><a href="#account-admin-providers">Providers</a><a href="#account-admin-releases">Releases</a><a href="#account-admin-audit">Audit</a></nav>
+  <nav className="account-admin-nav" aria-label="Admin sections"><a href="#account-admin-users">Users</a><a href="#account-admin-billing">Cluera billing</a><a href="#account-admin-catalog">Historical catalog</a><a href="#account-admin-models">Models</a><a href="#account-admin-providers">Providers</a><a href="#account-admin-releases">Releases</a><a href="#account-admin-audit">Audit</a></nav>
   <section id="account-admin-users" className="account-admin-section"><div className="account-admin-section-heading"><div><p className="account-ui-kicker">CUSTOMER DIRECTORY</p><h2>Users</h2></div><button disabled={busy||Boolean(pendingMutation)} onClick={()=>select('')}>All recent accounts</button></div>
   <form onSubmit={event=>{event.preventDefault();if(!running.current&&!pendingOperation.current)void load('',query);}}><label>Exact email or account UUID<input value={query} onChange={event=>setQuery(event.target.value)} maxLength={254} disabled={locked}/></label><button disabled={locked}>Search accounts</button></form>
   <ul className="account-admin-users">{state.users?.map(user=><li key={user.userId}><button disabled={busy||Boolean(pendingMutation)} onClick={()=>select(user.userId)}>{user.email}</button><span>{user.state} · {user.emailVerified?'Email verified':'Verification unavailable'}</span></li>)}</ul>
@@ -118,6 +119,7 @@ export function AccountAdmin(){
    {grant.kind!=='TRIAL'&&['ACTIVE','PAUSED'].includes(grant.state)?<form onSubmit={event=>{event.preventDefault();const v=new FormData(event.currentTarget);mutate('REMOVE_MINUTES',{grantId:grant.id,minutes:Number(v.get('minutes'))},String(v.get('reason')));}}><label>Unused minutes to remove<input name="minutes" type="number" required min={1} max={60000}/></label><label>Adjustment reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Remove unused minutes</button></form>:null}
    {grant.testGrant&&grant.state==='ACTIVE'?<form onSubmit={event=>{event.preventDefault();mutate('REVOKE_TEST',{grantId:grant.id},String(new FormData(event.currentTarget).get('reason')));}}><label>Revocation reason<input name="reason" minLength={10} maxLength={500} required disabled={busy}/></label><button disabled={busy}>Revoke unused test access</button></form>:null}</div>)}</div>:null}
   </fieldset></section>
+  <section id="account-admin-billing" className="account-admin-section"><BillingCatalog disabled={locked}/></section>
   <section id="account-admin-catalog" className="account-admin-section"><fieldset disabled={locked} style={{border:0,padding:0,margin:0,minWidth:0}}>
   <p className="account-ui-kicker">APPROVED OFFER POLICIES</p><h2>Plan catalog</h2><p>These controls change display, order and catalog eligibility only. The selected Test gateway, tester restriction and checkout switches still apply. Prices, provider mappings and purchased allowances remain locked; recurring checkout is unavailable.</p>
   {state.catalog?.map(offer=><form key={`${offer.code}:${offer.name}:${offer.enabled}:${offer.priority}`} onSubmit={event=>{event.preventDefault();const v=new FormData(event.currentTarget);mutate('CATALOG',{code:offer.code,name:String(v.get('name')),enabled:v.get('enabled')==='on',priority:Number(v.get('priority'))},String(v.get('reason')),null);}}>

@@ -101,11 +101,13 @@ it('does not treat a malformed success response or timed-out mutation as confirm
 it('provides anchored navigation and local audit filtering without extra requests or writes',async()=>{
  const fetcher=vi.fn(async()=>Response.json({...view(),audit:[{id:'one',action:'CATALOG',reason:'Synthetic catalog update',createdAt:'2026-10-12T00:00:00Z'},{id:'two',action:'SUSPEND',reason:'Synthetic suspension reason',createdAt:'2026-10-12T00:00:01Z'}]}));
  vi.stubGlobal('fetch',fetcher);await render();
- const links=host.querySelectorAll('nav[aria-label="Admin sections"] a');expect(links).toHaveLength(6);
+ const links=host.querySelectorAll('nav[aria-label="Admin sections"] a');expect(links).toHaveLength(7);
+ expect([...links].some(link=>link.getAttribute('href')==='#account-admin-billing')).toBe(true);
  for(const link of links)expect(host.querySelector(link.getAttribute('href')!)).not.toBeNull();
  const filter=host.querySelector('input[type="search"]') as HTMLInputElement;
  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
  await act(async()=>{setter.call(filter,'catalog');filter.dispatchEvent(new Event('input',{bubbles:true}));});
  expect(host.querySelector('.account-admin-audit')?.textContent).toContain('CATALOG');expect(host.querySelector('.account-admin-audit')?.textContent).not.toContain('SUSPEND');
  expect(fetcher).toHaveBeenCalledTimes(1);expect(host.textContent).toContain('recurring checkout is unavailable');
+ expect(host.querySelector('#account-admin-billing')?.textContent).toContain('Future');
 });

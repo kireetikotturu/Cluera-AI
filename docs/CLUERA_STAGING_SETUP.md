@@ -1,7 +1,27 @@
 # Cluera staging private setup
 Only new Cluera resources. Do not modify old Account or License services.
 
-## Current launch checkpoint — replacement saving Not ready yet
+## New billing preparation - do not save or activate blindly
+
+[Cluera billing cutover](CLUERA_BILLING_CUTOVER.md) defines separate passive-schema, receiver, owner/scheduler and purchase approvals. Prepared new endpoints require `CLUERA_BILLING_V2_ENABLED`, which defaults false; it is a schema-selection gate, not a duplicate Account flag or payment authorization. The canonical `SIGMAROUND_ACCOUNTS_ENABLED` remains unchanged.
+
+Cluera currently has no four Razorpay Test credential entries, sole-tester entry or worker secret. Future approved private provisioning uses the SAME verified Test merchant/key ID and signer and existing designated tester, Sensitive/Production-only in this isolated project. No provider key is copied to NEXT_PUBLIC, desktop, Git or chat. The separately sealed worker key is not the exposed Supabase credential; future queueing uses short-lived HMAC proofs. Keep rollout/checkout/intake/Paddle flags false and pause true during preparation. Vault/release proposals and provider START remain separately gated/auth-only.
+
+Do not change Razorpay's current destination or the live database scheduler now. Existing old Account signed intake and worker stay operational pending verified acceptance and approved handoff. New Cluera service-key replacements do not resolve legacy revocation/unknown consumers; follow the incident plan.
+
+## October 14 current - two-product dependency review
+
+Only **License Edition** (untouched) and **Cluera AI**, the renamed Account product, are maintained. Old Account endpoints are temporary compatibility/billing dependencies, not a third product. Do not repeat the earlier four-service saving instructions below: owner saved separate modern keys in new Cluera Vercel/Render; legacy revocation remains pending.
+
+New Cluera **READY dpl_66ESSjyF48sDeduXGs6jjPAU3XNf / LIVE dep-db7dhf8473hc73d00n9g**, reviewed **3d813f8f88cb3adacffe9afb889efa8ce07476bc**, stable alias and actual health/no-store/revision pass after owner reload. Protected complete-source diagnostic **dpl_6oGjDyYgQopsVgT9iqQd6A4HLsr7** authenticates the new website's saved key and matched relay proof; auth-only/providers-disabled/vault-disabled/payments-disabled pass, zero provider requests/mutations. It deliberately exits1/no website promotion. Health/signed metadata do not prove the relay's own privileged DB-key authentication.
+
+All18 Cluera Vercel entries are Production-only with no branch overrides; service entry is Sensitive and updated October14. Four Cluera payment flags remain false and pause true. No secret value, migration, provider setting, old service, License, installer or updater changed. Actual active shared scheduler and its retained old-Account HTTP200 response prevent blind retirement. Full inventory/exit criteria: [two-product retirement plan](CLUERA_TWO_PRODUCT_RETIREMENT.md).
+
+**Single next owner action:** approve or decline the proposed temporary credential-only bridge for the confirmed-active old Account website, not new third-product maintenance. Old relay saving stays on hold pending evidence or explicit retention choice. Do not configure old services, disable them or revoke keys yet. Other consumers/installed old clients are owner-confirmed unknown. All historical setup/Not-ready/result sections below are dated earlier evidence, not instructions to repeat setup.
+
+## Earlier October 13 launch checkpoint — saving instruction superseded
+
+Final application/test follow-up **3d813f8**, READY **dpl_CLTwRP26Kt3F4xCqeLm5jyeCFV89**, LIVE **dep-db71qodbedkc73bmf3og**, stable alias and actual health revision pass. All18 existing Vercel entries remain unchanged. Protected GET-only checks confirm saved infrastructure works/auth-only; no replacement key is saved by the agent. Resend negatives/public layout/preservation checks pass, but real email/Google/Admin MFA/installed Windows remain unaccepted. CI's remaining block is10 moderate desktop dependency entries. [Completed evidence](CLUERA_IMPLEMENTATION_MIGRATION.md). This newest result edit is local-only documentation, not another deployed SHA.
 
 Initial infrastructure/callback setup is complete. The owner authorized coordinated private replacement/configuration-only reload in confirmed Cluera/Account dependencies, but answered **Not ready yet** to saving the four modern server keys. No rotation, revocation, schema apply, key import or provider/payment enablement occurred. This narrowly approved old-Account credential configuration scope supersedes the blanket setup restriction above; no old source/features/history are in scope. Follow [launch steps](CLUERA_LAUNCH_STEPS.md), [exact vault review](CLUERA_PROVIDER_VAULT_SCHEMA_REVIEW.md) and [credential plan](CLUERA_SHARED_CREDENTIAL_ROTATION.md). Do not repeat old infrastructure or Gemini/Deepgram environment-key instructions below.
 

@@ -3,6 +3,7 @@ import {handleNativeAccount} from '../lib/accounts/native';
 import {creditsRequest,readCredits} from '../lib/accounts/credits';
 import {accountConfig} from '../lib/accounts/config';
 import {seal} from '../lib/accounts/cookies';
+import {paymentTestEnvironment} from './helpers/paymentTestMode';
 const mocks=vi.hoisted(()=>({clients:vi.fn()}));vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 const origin='https://cluera-ai-staging.vercel.app',uid='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002';
 const token=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid})).toString('base64url')}.synthetic`;
@@ -90,5 +91,23 @@ it('full-history denial, malformed data and raw credential fields fail closed',a
  for(const [data,status] of [[{code:'UNAUTHENTICATED'},401],[{code:'SUSPENDED'},403],[{code:'NOT_FOUND',accessToken:'synthetic-private-field'},503],[{code:'BOUND',intentId:sid,offerCode:'pro_3_hours',transactionId:'bad'},503]] as const){
   const read=vi.fn(async(name:string)=>({data:name==='customer_credits_read'?value:data,error:null}));
   await expect(readCredits(read,{userId:uid,sessionId:sid})).rejects.toMatchObject({status});
+ }
+});
+it('Cluera v2 credits preserve the strict desktop DTO and historical rows without a financial writer',async()=>{
+ vi.stubEnv('CLUERA_BILLING_V2_ENABLED','true');
+ const payments=[{offerCode:'cluera_pack_3h_v2',state:'VERIFIED',createdAt:value.serverTime},
+  {offerCode:'enterprise_weekly',state:'REJECTED',createdAt:value.serverTime}];
+ const read=vi.fn(async()=>({data:{...value,availableMilliseconds:11700000,payments},error:null}));
+ const result=await readCredits(read,{userId:uid,sessionId:sid});
+ expect(result).toEqual({...value,availableMilliseconds:11700000,payments,checkoutAvailable:false});
+ expect(read).toHaveBeenCalledExactlyOnceWith('cluera_credits_read',{p_user:uid,p_session:sid});
+ expect(result).not.toHaveProperty('intentId');expect(result).not.toHaveProperty('providerKey');
+});
+it('Cluera v2 checkout availability uses full canonical pending status, never ten displayed rows',async()=>{
+ for(const [key,setting] of Object.entries({...paymentTestEnvironment,CLUERA_BILLING_V2_ENABLED:'true',SIGMAROUND_PAYMENT_TESTER_IDS:uid}))vi.stubEnv(key,setting);
+ for(const pending of [null,{intentId:sid,state:'BOUND',kind:'PACK',revisionId:null,offerCode:'pro_3_hours',orderId:'order_syntheticold01',subscriptionId:null,legacy:true}]){
+  const read=vi.fn(async(name:string)=>({data:name==='cluera_credits_read'?value:{userId:uid,code:pending?'PENDING':'AVAILABLE',pending,resolvedOrderIds:[],resolvedSubscriptionIds:[]},error:null}));
+  expect((await readCredits(read,{userId:uid,sessionId:sid})).checkoutAvailable).toBe(pending===null);
+  expect(read.mock.calls.map(c=>c[0])).toEqual(['cluera_credits_read','cluera_billing_status']);
  }
 });

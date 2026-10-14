@@ -1,12 +1,22 @@
-# Cluera launch steps — October 13, 2026
+# Cluera launch steps — October 14, 2026
 
 Target promotion: October 15. **Commercial launch is NO-GO today.** A deadline does not certify safety or remove approval boundaries. Preserve all existing features; no zero-bug promise.
 
-## 1. Contain the shared credential incident
+## Billing migration now being prepared
 
-Replacement/configuration-only scope is approved, but the owner answered **Not ready yet** to private saving. No replacement or revocation has occurred. The next actual owner action is the four separately named modern keys described in [the rotation plan](CLUERA_SHARED_CREDENTIAL_ROTATION.md). Confirm additional License/CI/local/external dependencies privately. No values in chat.
+Cluera is the only Account/subscription product. [The exact billing handoff](CLUERA_BILLING_CUTOVER.md) supersedes the previous bridge-only next action: approve or decline **Phase A passive preparation only**, after reviewing frozen proposal bytes and incident prerequisites. It does not permit changing webhook URL, owner/scheduler authority, activating checkout, creating an order, granting credits or revoking a key. Those later phases need separate approvals. Existing Account infrastructure remains temporary compatibility while draining; database/users/balances/history stay in place.
 
-After saving, reload pinned reviewed source in all confirmed services, verify protected database reads, original payment/release behavior and exact preservation snapshots. Creating modern keys does not revoke a compromised legacy service-role JWT. Legacy API deactivation needs a complete anon/desktop/server compatibility inventory and separate explicit approval. JWT signing-secret rotation is not included.
+New price revisions and billing paths are safe-engineering work, not accepted recurring payments or commercial readiness. AI stays auth-only; provider vault, Windows, restore/capacity/telemetry/signing/legal and actual financial acceptance gates below remain. No advertisement or paid-ready claim is authorized.
+
+## 1. Preserve exactly two products and contain the credential incident
+
+Exactly two products: unchanged **SigmaRoundAI License Edition** and **Cluera AI**, the renamed Account Edition. The owner has privately saved separate modern server keys in new Cluera Vercel/Render and reloaded reviewed source. The new website's protected database authentication and signed auth-only relay metadata pass. No legacy credential has been revoked; the relay's own privileged DB authentication is not independently proven by health/metadata.
+
+Do not repeat the old four-key setup request. Read-only inspection confirms an active shared Supabase billing scheduler still dispatches to old Account, with a retained HTTP200 response. Old installers pin the old API/relay/feed/trust. Those resources are temporary compatibility dependencies, not a third product, and cannot yet be deleted/disabled. Old relay/customer traffic and other exact-key consumers remain unknown; the owner answered **unknown**. See the [complete DB/deployment/environment inventory and safe retirement plan](CLUERA_TWO_PRODUCT_RETIREMENT.md).
+
+**Single next owner action:** approve or decline only the confirmed-active old Account **website-only credential bridge** while its dependencies drain. Old relay saving stays on hold pending usage evidence or explicit retention choice. No old source, payment flag, worker destination, provider setting, installer or License change is included. Do not configure old services now; exact private replacement saving follows only that approved scope. Deletion, financial cutover and legacy revocation need separate later approval.
+
+After any approved temporary saving, reload only pinned complete reviewed source and verify bounded protected reads, original payment/release behavior and identical-input preservation snapshots. Creating modern keys does not revoke a compromised legacy service-role JWT. Legacy API deactivation needs a complete anon/desktop/server compatibility inventory and separate explicit approval. JWT signing-secret rotation is not included.
 
 ## 2. Accept private Auth before providers
 
@@ -32,7 +42,7 @@ The approved new Cluera **presentation** prices are ₹549/3h/no expiry, ₹5,49
 
 ## 6. Resolve production operations and legal gates
 
-The pinned read-only CI workflow runs tests/typechecks/builds/audits without private keys, deployments or migrations. A workflow file does not create branch protection; owner repository rules and actual hosted job results require verification. Remaining desktop advisories are blockers, not waived via `continue-on-error`, thresholds or downgrades.
+The pinned read-only CI workflow runs tests/typechecks/builds/audits without private keys, deployments or migrations. A workflow file does not create branch protection; owner repository rules and actual hosted job results require verification. Current local desktop remediation passes full/production audits0,362 tests/1 opt-in skipped, typechecks/build and23 root safety cases, with independently reviewed pinned proxy/parser fixes. It is not yet published/deployed: older hosted desktop audit remains blocked until an exact reviewed publication and new hosted result. No `continue-on-error`, threshold waiver, downgrade or TLS relaxation is allowed.
 
 Before any paid infrastructure action obtain an actual workspace quote and budget approval. Render free services idle after 15 minutes and may take about a minute to wake; they are not a production streaming reliability claim ([Render free limitations](https://render.com/docs/free)). Vercel Hobby is non-commercial; the current Pro platform fee is $20/month plus usage/extra seats/taxes ([Hobby](https://vercel.com/docs/plans/hobby), [Pro](https://vercel.com/docs/plans/pro-plan)). Supabase Pro starts at $25/month with seven-day daily backups; current plan/restore entitlement must be verified, not assumed ([pricing](https://supabase.com/pricing), [backups](https://supabase.com/docs/guides/platform/backups)). No plan upgrade is authorized by these figures.
 
@@ -47,4 +57,4 @@ Use a clearly labelled staging/demo or coming-soon announcement, not a paid-read
 - 30-second concept: authorized practice/coaching use → selectable context/audio roles → shared balance explanation → support contact `clueraaisupport@gmail.com`. No fake testimonials, metrics or provider/payment acceptance.
 - Do not publish ads, enable analytics/cookies or start purchases automatically. Final claims must match accepted evidence, with owner approval for public promotion.
 
-The next owner action is still **private credential replacement saving**, not another infrastructure bootstrap, payment, provider key or launch approval.
+The next owner action is **the narrowly scoped temporary bridge approval in step1**, not four-service setup, deletion, revocation, a payment/provider key or commercial launch approval.

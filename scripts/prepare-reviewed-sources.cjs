@@ -55,7 +55,7 @@ function gitHash(bytes) {
     .update(bytes)
     .digest("hex");
 }
-function sourcePath(file) {
+function sourcePath(file, reviewedGeneratedPaths = new Set()) {
   assert(
     typeof file === "string" &&
       file.length > 0 &&
@@ -77,10 +77,8 @@ function sourcePath(file) {
   );
   assert(
     !parts.some((p) =>
-      /^(?:\.git|node_modules|\.next|\.local-secrets|secrets|dist(?:-.*)?|release(?:-.*)?)$/i.test(
-        p,
-      ),
-    ),
+      /^(?:\.git|node_modules|\.next|\.local-secrets|secrets|release(?:-.*)?)$/i.test(p),
+    ) && (!parts.some((p) => /^dist(?:-.*)?$/i.test(p)) || reviewedGeneratedPaths.has(file)),
     "GENERATED_OR_PRIVATE_SOURCE",
   );
   assert(
@@ -155,13 +153,13 @@ function sensitiveKinds(bytes, known = []) {
       kinds.push("known-secret");
   return [...new Set(kinds)];
 }
-function validateEntries(tree) {
+function validateEntries(tree, reviewedGeneratedPaths = new Set()) {
   assert(Array.isArray(tree) && tree.length > 0, "TREE_SHAPE");
   const seen = new Set();
   return tree
     .filter((e) => e.type === "blob")
     .map((e) => {
-      sourcePath(e.path);
+      sourcePath(e.path, reviewedGeneratedPaths);
       assert(
         e.mode === "100644" &&
           /^[a-f0-9]{40}$/.test(e.sha) &&
@@ -176,12 +174,16 @@ function validateEntries(tree) {
       return e;
     });
 }
-function verifyTree(tree, expectedRoot) {
-  validateEntries(tree);
+function verifyTree(tree, expectedRoot, reviewedGeneratedPaths = new Set()) {
+  // Default remains deny-all generated/private paths for historical reference
+  // clones. The Cluera deploy preparer alone supplies exact manifest-verified
+  // runtime paths and their known parent directories, never a prefix wildcard.
+  assert(reviewedGeneratedPaths instanceof Set, "REVIEWED_PATHS_SHAPE");
+  validateEntries(tree, reviewedGeneratedPaths);
   const entries = new Map(),
     children = new Map();
   for (const e of tree) {
-    sourcePath(e.path);
+    sourcePath(e.path, reviewedGeneratedPaths);
     assert(
       e.type === "blob" ||
         (e.type === "tree" &&

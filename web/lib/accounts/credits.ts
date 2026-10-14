@@ -10,13 +10,16 @@ import {activeSession,rateLimit} from './handler';
 import {json,apiError} from '../http';
 import {razorpayCheckoutAllowed} from '../payments/core/config';
 import {paymentStatus} from '../payments/checkout/service';
+import {clueraBillingStatus} from '../payments/cluera/checkout';
+import {clueraCheckoutAllowed} from '../payments/cluera/config';
 const ms=z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const schema=z.object({userId:z.uuid(),serverTime:z.iso.datetime({offset:true}),displayName:z.string().max(80),
  availableMilliseconds:ms,reservedMilliseconds:ms,spentMilliseconds:ms,
  buckets:z.array(z.object({kind:z.enum(['TRIAL','RECURRING','PACK','TEST','MANUAL']),grantedMilliseconds:ms,spentMilliseconds:ms,reservedMilliseconds:ms,availableMilliseconds:ms}).strict()).max(5),
  plans:z.array(z.object({tier:z.enum(['PRO','ENTERPRISE']),state:z.enum(['ACTIVE','QUEUED','PAUSED','ENDED','REFUNDED']),
   paymentState:z.enum(['ACTIVE','PAST_DUE','CANCELED','PAUSED']),endsAt:z.iso.datetime({offset:true}).nullable(),cancelFuture:z.boolean()}).strict()).max(30),
- payments:z.array(z.object({offerCode:z.enum(['pro_3_hours','pro_40_hours','enterprise_weekly','enterprise_monthly']),
+ payments:z.array(z.object({offerCode:z.enum(['pro_3_hours','pro_40_hours','enterprise_weekly','enterprise_monthly',
+  'cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2']),
   state:z.enum(['CREATING','BOUND','UNCERTAIN','REJECTED','VERIFIED','REFUNDED']),createdAt:z.iso.datetime({offset:true})}).strict()).max(10),
 }).strict();
 // Internal read capability only; identifiers and transaction IDs never enter
@@ -28,13 +31,19 @@ const lockSchema=z.union([
 ]);
 type Rpc=(name:string,args:Record<string,unknown>)=>PromiseLike<{data:unknown;error:unknown;status?:number}>;
 export async function readCredits(rpc:Rpc,account:{userId:string;sessionId:string}):Promise<AccountCredits>{
- const {data,error,status}=await rpc('customer_credits_read',{p_user:account.userId,p_session:account.sessionId});
+ const clueraV2=process.env.CLUERA_BILLING_V2_ENABLED==='true';
+ const {data,error,status}=await rpc(clueraV2?'cluera_credits_read':'customer_credits_read',{p_user:account.userId,p_session:account.sessionId});
  if(error)throw new SupabaseOperationError('account.usage',error,status);
  const code=(data as {code?:string}|null)?.code;
  if(code==='UNAUTHENTICATED')throw new AccountError('UNAUTHENTICATED',401);
  if(code==='SUSPENDED'||code==='FORBIDDEN')throw new AccountError('FORBIDDEN',403);
  const parsed=schema.safeParse(data);
  if(!parsed.success||parsed.data.userId!==account.userId)throw new AccountError('UNAVAILABLE',503);
+ if(clueraV2){
+  const eligible=clueraCheckoutAllowed(account.userId);
+  const payment=eligible?await clueraBillingStatus(rpc,account):null;
+  return {...parsed.data,checkoutAvailable:eligible&&payment?.code==='AVAILABLE'};
+ }
  if(process.env.SIGMAROUND_PAYMENT_PROVIDER==='razorpay'){
   const eligible=razorpayCheckoutAllowed(account.userId);
   // Legacy Paddle history is preserved, but its disabled adapter cannot be

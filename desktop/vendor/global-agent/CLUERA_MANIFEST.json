@@ -1,0 +1,464 @@
+{
+  "schemaVersion": 1,
+  "packageVersion": "4.1.3-cluera.1",
+  "upstreamCommit": "e9138f654826f9a82e0ac4f3abdb9541ac988286",
+  "registryIntegrity": "sha512-KUJEViiuFT3I97t+GYMikLPJS2Lfo/S2F+DQuBWzuzaMPnvt5yyZePzArx36fBzpGTxZjIpDbXLeySLgh+k76g==",
+  "files": [
+    {
+      "path": ".babelrc",
+      "size": 304,
+      "sha256": "95d548202037bcbee3af1626c9a07e2833a7f8f9b04c280f5da2cdc3fb8240f8",
+      "gitSha": "08b21d97fd8ed3c30a2b8ca270b6fb45722f6a43"
+    },
+    {
+      "path": ".editorconfig",
+      "size": 147,
+      "sha256": "0785fa0a8a7f4c327d6c57a2cc787cfdfd51671802ad35296c45ca694b900776",
+      "gitSha": "0f1786729b408ab2c4473567fcb202acfeb10bd5"
+    },
+    {
+      "path": "bootstrap.js",
+      "size": 37,
+      "sha256": "48fa5c10caca02a5dbea1996b9c79bda5fe0eacbb530f06aec15d73c957a1099",
+      "gitSha": "0204420c24f90a83d0f584a72fd3557e1e809de6"
+    },
+    {
+      "path": "CLUERA_PATCH.md",
+      "size": 2465,
+      "sha256": "58e44da9c4494263ed859c6661a4f05b7da3b5141ca40e1db5071da434e7b63a",
+      "gitSha": "04fa590eec791e789eeb97614e3b298a2612e86b"
+    },
+    {
+      "path": "dist/classes/Agent.d.ts",
+      "size": 2030,
+      "sha256": "8b4469709ca2b1eb3148dc8df312c04eb2e48e8e9f76b80160f56a2bbb926fe9",
+      "gitSha": "12fa949373860ff7c14b5772c516302aef4f6adc"
+    },
+    {
+      "path": "dist/classes/Agent.js",
+      "size": 9665,
+      "sha256": "5ac3af0d8469da10e2c923827c5676097d066bac05493bad0dac5bac9ea8a376",
+      "gitSha": "b0d819804c867f268d1b412984315a3ac6d0928d"
+    },
+    {
+      "path": "dist/classes/HttpProxyAgent.d.ts",
+      "size": 627,
+      "sha256": "c41ee32bb9bf15b5cd2bd9ef3425d8729fa2355f7a15f9d674c37c08b1b2af00",
+      "gitSha": "8096417f6c9a349a7c6ae428a45401f5624f9b72"
+    },
+    {
+      "path": "dist/classes/HttpProxyAgent.js",
+      "size": 976,
+      "sha256": "9b55856078609223a8639a04709ec8df179ba1cc067cd8caf4b52746b84e56bb",
+      "gitSha": "0caf7a96b624d0d8b52335de12167f61b7618f77"
+    },
+    {
+      "path": "dist/classes/HttpsProxyAgent.d.ts",
+      "size": 629,
+      "sha256": "a2f1401ba0ffeb96ca3b3e8211f5df53fa6f2359e9ae78dda893b8ad6779659b",
+      "gitSha": "86f193d36637165b79624a6a615ad268fda02c5f"
+    },
+    {
+      "path": "dist/classes/HttpsProxyAgent.js",
+      "size": 2442,
+      "sha256": "81d726b90298b0025023a4a2f254a14d5ab6ac8ba45cb80396231f30712e1f47",
+      "gitSha": "180cbc2b9365d7d0ac025764deb588b8686c0682"
+    },
+    {
+      "path": "dist/classes/index.d.ts",
+      "size": 173,
+      "sha256": "2f603d71e1cc6a10d085bfe34d00c44b886d3be15abfbeaf16d1a602ffba6aa9",
+      "gitSha": "e589ecf01c1f375eef2b2d241871c8df0d191fff"
+    },
+    {
+      "path": "dist/classes/index.js",
+      "size": 847,
+      "sha256": "f556cccb72bcd9d8f196822eb5e9bd99a56fa7914faeb545004ff0991fbd73bb",
+      "gitSha": "f0a8788b86ad6be7b1e6b7e22b0694eda9543c0e"
+    },
+    {
+      "path": "dist/errors.d.ts",
+      "size": 127,
+      "sha256": "ed18254717213a026483497221019565911cf88ca7ad89ed5a575ea694f59134",
+      "gitSha": "1778a86f5685a59192998fa8ba2423bc752b9dd8"
+    },
+    {
+      "path": "dist/errors.js",
+      "size": 330,
+      "sha256": "fa33374b96627d4fbc0081bdbe5ab306693183b4fd8fe9b5d22023b147e8a132",
+      "gitSha": "c315ed8ce17278a75513ee892b66892fc46e8270"
+    },
+    {
+      "path": "dist/factories/createGlobalProxyAgent.d.ts",
+      "size": 271,
+      "sha256": "7b4750d29dc6b69935296b88fb7c369ba8611c801225cf995a908bc16e5e7312",
+      "gitSha": "da00e0e3b3d9924c27d90476674f5d3ee0bac5a0"
+    },
+    {
+      "path": "dist/factories/createGlobalProxyAgent.js",
+      "size": 6725,
+      "sha256": "97239b85e5b6822b36d2cd13eda6cba8a434f6bd053ef48f0decb78524c74f5d",
+      "gitSha": "4dd5d89218956c8e16b22553a46aac10b202516a"
+    },
+    {
+      "path": "dist/factories/createGlobalProxyAgent.test.d.ts",
+      "size": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "gitSha": "cb0ff5c3b541f646105198ee23ac0fc3d805023e"
+    },
+    {
+      "path": "dist/factories/createGlobalProxyAgent.test.js",
+      "size": 25472,
+      "sha256": "0dacb0ad5529e3f7db1d9d58f1ef2168ad494670e08c6cece1dc64e1eac0ffd6",
+      "gitSha": "daa7cb7071d3e5fd5ecb6782dcd3dd91cb0918be"
+    },
+    {
+      "path": "dist/factories/createProxyController.d.ts",
+      "size": 192,
+      "sha256": "61d7e3797efdd7fef7543536386da0ed9a2ea65a60bf88edf341effc810b5b05",
+      "gitSha": "985dc7364fcd9f244b4988c553722b8407ea53ee"
+    },
+    {
+      "path": "dist/factories/createProxyController.js",
+      "size": 1141,
+      "sha256": "b960f18101f666ffef274553c426181457e7fb7bcc24e13d4cf79fadf3baad10",
+      "gitSha": "34a29e9a3761427fcdab5a95179fa8245bf1d5be"
+    },
+    {
+      "path": "dist/factories/createProxyController.test.d.ts",
+      "size": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "gitSha": "cb0ff5c3b541f646105198ee23ac0fc3d805023e"
+    },
+    {
+      "path": "dist/factories/createProxyController.test.js",
+      "size": 1404,
+      "sha256": "1519df0762b0a98cbe2d25db8b2c6bdc07b23696d9d4457765eece6acc068240",
+      "gitSha": "fd16a26d5a2e4117706c47b539e0a441dbd342c4"
+    },
+    {
+      "path": "dist/factories/index.d.ts",
+      "size": 156,
+      "sha256": "65d9d544dceb4bcef8f33e6e1e0d774b164a0042a4694b47f2adce38ca22a8f7",
+      "gitSha": "2f0222f13fb367cacd727e5e6c1074161dbd526d"
+    },
+    {
+      "path": "dist/factories/index.js",
+      "size": 741,
+      "sha256": "b3b931b4191e3679b5be745dc221930d3096195ebf830001bd4864e8acbef8cb",
+      "gitSha": "4cd3ba0908247c206489242dbb1a0937ff1e8ec5"
+    },
+    {
+      "path": "dist/index.d.ts",
+      "size": 137,
+      "sha256": "eefb513172a63c0f63713d3e01fcd5a135bc1f6878099b6966b81f8d10efbf0d",
+      "gitSha": "db1bb5de1edb7bf7c1bd8857c3f65789f54c5217"
+    },
+    {
+      "path": "dist/index.js",
+      "size": 483,
+      "sha256": "b44ab942ac28e127928742d951635720a0b20406fbda8cc8fd060dee9d7b3d1e",
+      "gitSha": "78c95248c25351f0a79f6d598f87334a03f7435c"
+    },
+    {
+      "path": "dist/Logger.d.ts",
+      "size": 350,
+      "sha256": "d99d8b8dd6da5561c640f005c1859cd038c3b14707f18a2754ee49e48dbd43c0",
+      "gitSha": "f9fba62cbe5528ff99b4c45d9108d198fe63f280"
+    },
+    {
+      "path": "dist/Logger.js",
+      "size": 1651,
+      "sha256": "de37105fd1e3aafe1a6217af7c1d351c643700852aa2fdfa03a04ed3a9f5365c",
+      "gitSha": "366009e7b48ef7088b71a6402d036f1b6839d42c"
+    },
+    {
+      "path": "dist/routines/bootstrap.d.ts",
+      "size": 183,
+      "sha256": "79a0580de6537a293ffb75cbbd021a6c52aa40b747e4d42de91b06b2ade86ca9",
+      "gitSha": "9ff728e736d5de767f55f943c8b7b649dc4a06ef"
+    },
+    {
+      "path": "dist/routines/bootstrap.js",
+      "size": 800,
+      "sha256": "4e34dd260f9d9df8bdec4726b5c298d5e775a25de351a46979a071a4fee430d7",
+      "gitSha": "da69bdd9bc46cbc79be9a66aa80bd0d7b3c4a67e"
+    },
+    {
+      "path": "dist/routines/index.d.ts",
+      "size": 53,
+      "sha256": "97d3e8186fbe8748bd08beb4f038417b5ef9b309ad31ad73b8f1af7927591fb2",
+      "gitSha": "45501248d3199a97be1e542b31bf46348d74975d"
+    },
+    {
+      "path": "dist/routines/index.js",
+      "size": 420,
+      "sha256": "c8b2398f40bbaf305364bb912bb7674861bce18fa0d2d82fdefbf3be56cc2092",
+      "gitSha": "6f4cdf9fe6c25b3bf462e278a8b98ec18211536e"
+    },
+    {
+      "path": "dist/types.d.ts",
+      "size": 1836,
+      "sha256": "cce6bf83460607e7b8d2bec9bac0e928fb6307295d5dc150af165f7d1e1ccacd",
+      "gitSha": "8faeb87bfd1d05510c876eeda9164db4269a06be"
+    },
+    {
+      "path": "dist/types.js",
+      "size": 77,
+      "sha256": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230",
+      "gitSha": "c8ad2e549bdc6801e0d1c80b0308d4b9bd4985ce"
+    },
+    {
+      "path": "dist/utilities/bindHttpMethod.d.ts",
+      "size": 306,
+      "sha256": "27c17c31f20471dbf305476f9f388c8930e13e45ddf9d03f2a4b359f1fa276be",
+      "gitSha": "239e85bf8491ac966e8452074c086a64b1f0dbaa"
+    },
+    {
+      "path": "dist/utilities/bindHttpMethod.js",
+      "size": 1506,
+      "sha256": "2fa19fcfe3f8e79370fa5efa78e0594c7bd27e263e7976e46384fcd413edf857",
+      "gitSha": "4210b184ea02a351a6dd87e646e872fc417ed7a3"
+    },
+    {
+      "path": "dist/utilities/index.d.ts",
+      "size": 199,
+      "sha256": "ffd9e8463e203d07c88c18d9447dc3934df23907d66534d26748128ca01da254",
+      "gitSha": "f8cc3058907ff56a58616d4c7a58157d6ea5f5bc"
+    },
+    {
+      "path": "dist/utilities/index.js",
+      "size": 912,
+      "sha256": "5632b718ab581c55bc4a6f1393cdacefb8b07c1b7a6999df3672b1754954f073",
+      "gitSha": "cae8c58197da7785c8861cd7a2179ed6cfe7a4e9"
+    },
+    {
+      "path": "dist/utilities/isUrlMatchingNoProxy.d.ts",
+      "size": 99,
+      "sha256": "c6f4d17a44c08fb816bed6f57b69e36954e8c674cf21e20be478ed17a19a62d5",
+      "gitSha": "5917cddba6a5e6ccf2a5f588ef7ff47ceaefdd62"
+    },
+    {
+      "path": "dist/utilities/isUrlMatchingNoProxy.js",
+      "size": 1288,
+      "sha256": "ba454f5fbac7a8d547588c50f0b5a7acca9a941da570a6d2c28e22891e46a554",
+      "gitSha": "aa12b457de0ed9268b86cb30c0d191b26119b592"
+    },
+    {
+      "path": "dist/utilities/isUrlMatchingNoProxy.test.d.ts",
+      "size": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "gitSha": "cb0ff5c3b541f646105198ee23ac0fc3d805023e"
+    },
+    {
+      "path": "dist/utilities/isUrlMatchingNoProxy.test.js",
+      "size": 3971,
+      "sha256": "676ac311067e4a3b845da4c29f5d6236e3830230989c4997a4afcf7f7620d5de",
+      "gitSha": "97e585d9b53c7a0c444818b380ba73ad42a526bd"
+    },
+    {
+      "path": "dist/utilities/parseBoolean.d.ts",
+      "size": 60,
+      "sha256": "4fbf84f8e7bcac79e6b3fa7f8cc2d24073de7f2f4edd80612e7986aa40d08429",
+      "gitSha": "06505abe561fab1414bd6e05abd0f26f34575a6c"
+    },
+    {
+      "path": "dist/utilities/parseBoolean.js",
+      "size": 559,
+      "sha256": "25406dc4249b583d3af97fce45c999ac89843457cde2aaaa6cc41d3c1f1da112",
+      "gitSha": "9df19307f10d3df2336fe307e35963a58d3e566f"
+    },
+    {
+      "path": "dist/utilities/parseProxyUrl.d.ts",
+      "size": 145,
+      "sha256": "717e51070df3acf48d4a23bf96a49f4199edf2068a7cba4c38d97179036f5c5d",
+      "gitSha": "0ab8835de7d263371bd5e3549c27ab38d29b0a9b"
+    },
+    {
+      "path": "dist/utilities/parseProxyUrl.js",
+      "size": 1166,
+      "sha256": "1760d31def5234b8f09f56747bbf206f95522105b6e358e4a9a69b49076b432a",
+      "gitSha": "d8769c0ff29b76ee58763d92b13be3499aa7d61d"
+    },
+    {
+      "path": "dist/utilities/parseProxyUrl.test.d.ts",
+      "size": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "gitSha": "cb0ff5c3b541f646105198ee23ac0fc3d805023e"
+    },
+    {
+      "path": "dist/utilities/parseProxyUrl.test.js",
+      "size": 1610,
+      "sha256": "7b0f86156fbc2a7a6558d66c9c6e1c91142e83d9781360529848ec7d3d4f6038",
+      "gitSha": "0f528187ab5853059059f77af6cc69827be81277"
+    },
+    {
+      "path": "LICENSE",
+      "size": 1531,
+      "sha256": "2aabdab5d0ce03a7314def8222988c2da4ba593ae82ae312439e5e306001dbae",
+      "gitSha": "674b247f0cb2c96d0834644dff239d699fd6b853"
+    },
+    {
+      "path": "package.json",
+      "size": 721,
+      "sha256": "f632a030a92e21c66233367899de155c17c763095c1dd25eeed26d502ee8ecc8",
+      "gitSha": "5cf2bf64ff4dc18f924b9cdd12e01c645fbb9311"
+    },
+    {
+      "path": "README.md",
+      "size": 12030,
+      "sha256": "915fddeafaf63f4e7c922ac242c4faca90259b4bbfc570cc2238f54a5dfc5df9",
+      "gitSha": "8d8e4bd2b5b7349e8bd52f6dacec5ba43b33737c"
+    },
+    {
+      "path": "src/classes/Agent.ts",
+      "size": 9367,
+      "sha256": "8bcc643df022b73e5a672924dc5b3296bcea51e1c79d2b966d7678b27621faf1",
+      "gitSha": "35af40f0a60be21780be8a7cb0ada86d3edf3a4a"
+    },
+    {
+      "path": "src/classes/HttpProxyAgent.ts",
+      "size": 1141,
+      "sha256": "9e920121eecbe6967f9942f2a7150e2a0f1b771d2d4875d63adccfed7db55f03",
+      "gitSha": "482c9327b6d50390c8a534305a365a1b8bc807d6"
+    },
+    {
+      "path": "src/classes/HttpsProxyAgent.ts",
+      "size": 2367,
+      "sha256": "349ad358c38156615b2740f5dfc2cc633bd02f7ac2aecbe1c9848ee91d8786bf",
+      "gitSha": "56f0cc984f482d0c0863fb77f9dff16027463843"
+    },
+    {
+      "path": "src/classes/index.ts",
+      "size": 179,
+      "sha256": "d4d8ddb2df2d88a25203a577572a4a60d71b23d3b4e2575332b534ac73e85744",
+      "gitSha": "d6af468f370f18a6c27cebd2f03283edd3fbed78"
+    },
+    {
+      "path": "src/errors.ts",
+      "size": 205,
+      "sha256": "f1a2cffdefaf57673abf88eee5ab28bf835586f0c4b443117ffe52a36f9594d8",
+      "gitSha": "235bcf431ea17438d2c9fba4de3c89e2d2751af9"
+    },
+    {
+      "path": "src/factories/createGlobalProxyAgent.test.ts",
+      "size": 23129,
+      "sha256": "88bce9952e6c4329c7414fd780aac9993f86265ded168ee80cabd734c7e25375",
+      "gitSha": "c0d397e13492bd141ff8e292f25b46acb93f82e8"
+    },
+    {
+      "path": "src/factories/createGlobalProxyAgent.ts",
+      "size": 6077,
+      "sha256": "181d16b27bb153b06427d4448d66928ae1d14ea6b845c66dd5f612aad5a2c76d",
+      "gitSha": "11debb19f296a33a5cd88becb1a46e7e6663fcc3"
+    },
+    {
+      "path": "src/factories/createProxyController.test.ts",
+      "size": 979,
+      "sha256": "369beba39d5da97a660cb6294b5184f245c129d08f62434b3a7347b62bf1f74b",
+      "gitSha": "002f4b3af719b7374532b78cb812b044ac400f1d"
+    },
+    {
+      "path": "src/factories/createProxyController.ts",
+      "size": 1041,
+      "sha256": "f61287f3e2866c484722723ff983e1c3c017aa9c8ae8d080f55bb3322cac1f0c",
+      "gitSha": "241da8f97643018bfecd06d23de4519e03c611e2"
+    },
+    {
+      "path": "src/factories/index.ts",
+      "size": 160,
+      "sha256": "fcabd23496551f614c05e67900898f6002e05d0f7d7aba66a19d7ce98d5dae75",
+      "gitSha": "f3fbcf88503d81bcfc808264d00aa9f91727374d"
+    },
+    {
+      "path": "src/index.ts",
+      "size": 143,
+      "sha256": "f9ad7b94ec942f8356e8b822dad9966f17caeb0ca7f7969e785d1c176bc6dc5d",
+      "gitSha": "871b1c2a54380ac449e3502fc60b264f728a73b6"
+    },
+    {
+      "path": "src/Logger.ts",
+      "size": 1642,
+      "sha256": "6a77d3f7140bd94c9b6fee4aca639e8fd0675b8e14df1c2c2ef9c7dccbccc49e",
+      "gitSha": "55a4f9bb724850f4b7a6216f8c062480eddabdc6"
+    },
+    {
+      "path": "src/routines/bootstrap.ts",
+      "size": 647,
+      "sha256": "c6013dc6cfd33f547157f31aaf50689f8dc8e53586c366b16b3d561fc68229ad",
+      "gitSha": "1993e9e481eee801969ef6b39e19ec7379896645"
+    },
+    {
+      "path": "src/routines/index.ts",
+      "size": 55,
+      "sha256": "9b71b2d6b9dac5ce4f8ba01df275d92cb202abbda242f87c268f25a6f3d7f0c0",
+      "gitSha": "98ceeadfe4bc534691135ded5e8ff4ad48b4e645"
+    },
+    {
+      "path": "src/types.ts",
+      "size": 1670,
+      "sha256": "48eeac26a48580daa7d206b2812cbbae016e1d4773240cf2cb14ef3bf5ebd572",
+      "gitSha": "8fd1b077c574ea6ea91465ef836f59db0f9f2405"
+    },
+    {
+      "path": "src/utilities/bindHttpMethod.ts",
+      "size": 1069,
+      "sha256": "af8059aef568f7c009ae0cc34aaa99fce99d4f8fffd110aa7ce12d4e119d71a3",
+      "gitSha": "56187f1a0682da53018e7cdef85c8b6d9de82aae"
+    },
+    {
+      "path": "src/utilities/index.ts",
+      "size": 205,
+      "sha256": "ba310becfde87e6756c3d97cdd95ff89caf4b8296e72f0391bfb1e6d381b7c54",
+      "gitSha": "c8ef390e8d7e28ed8ec41972b2c73d2e8db11b5e"
+    },
+    {
+      "path": "src/utilities/isUrlMatchingNoProxy.test.ts",
+      "size": 2947,
+      "sha256": "0286cb8812228fc4bee909c6476c86bbba125964628ed2aec1f80ff69dbe8895",
+      "gitSha": "a83c636b4ae411e0e936c60f46e1ab87ce8c5757"
+    },
+    {
+      "path": "src/utilities/isUrlMatchingNoProxy.ts",
+      "size": 983,
+      "sha256": "549508e76afd97ab921fbdf861a68542c86b60526eed3087ce4677e37efc23e5",
+      "gitSha": "5a13464974028746b94be54e01e5e79b54d95924"
+    },
+    {
+      "path": "src/utilities/parseBoolean.ts",
+      "size": 411,
+      "sha256": "22df493b657e8a3f55bee08e76bdbe15093dbc9a23d9f89c8d4a2ba4827d3a38",
+      "gitSha": "6058e9fcbdf553f4598c95d8f1172f287c4b23c7"
+    },
+    {
+      "path": "src/utilities/parseProxyUrl.test.ts",
+      "size": 1097,
+      "sha256": "42bbc7138620be22f67719dbd2a25253aae620d85deb6c2c73d533206485d800",
+      "gitSha": "b266efceb23f2791e6c97a9cb7e5b8cdb6448b67"
+    },
+    {
+      "path": "src/utilities/parseProxyUrl.ts",
+      "size": 1018,
+      "sha256": "b38ff4904d436f22e6510599c37a9fce6a0320f3ff7438f2f648aefbe447bcc4",
+      "gitSha": "a95fe5c14bd5558b05746d5041f0eb51b0b27be2"
+    },
+    {
+      "path": "tsconfig.json",
+      "size": 505,
+      "sha256": "d31efd0c4bf5bce6333a152270e6a9a6721d9b3ac35e1187681e226d183aa47e",
+      "gitSha": "eca6631e92bba16368de1509932f8799ff0f06dc"
+    },
+    {
+      "path": "UPSTREAM_PACKAGE.json",
+      "size": 1947,
+      "sha256": "8a70d38095b284e1383b0a2076934798edc1fb6a1cdccd4d24b1aa104ede22b6",
+      "gitSha": "29b34e61f49542ccf285e4b0dd4ada5236417579"
+    },
+    {
+      "path": "vitest.config.ts",
+      "size": 197,
+      "sha256": "8873287a37b73813fb0d59f22dbdfe848a621284de3e8d119b3d0293d803a0ba",
+      "gitSha": "4b7b93dbac5c373af16fdde807525b99e62ec4c6"
+    }
+  ]
+}

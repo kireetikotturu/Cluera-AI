@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import {approvedAccountRelease} from '@/lib/accounts/releases';
 import {AccountPricing} from './AccountPricing';
+import type {ClueraPublicRevision} from '../lib/payments/cluera/publicCatalog';
 
 /** Account-only server pages. Separate Cluera pages; old product services remain outside this source. */
-export function AccountHome(){
+export function AccountHome({catalog=null}:{catalog?:ClueraPublicRevision[]|null}={}){
  return <main>
   <section className="hero"><div className="hero-copy"><p className="kicker">Cluera AI · Windows TEST</p><h1>Your interview workspace.<br/><span>One Cluera account.</span></h1>
    <p className="lede">Sign in for managed AI answers and live transcription. Your active sessions share one server-managed time balance; no personal provider credentials are needed.</p>
@@ -20,7 +21,7 @@ export function AccountHome(){
    <li><span>2</span><div><b>Install the approved Cluera TEST build</b><p>The download appears only after separate Cluera release approval. Keep your existing edition installed separately.</p></div></li>
    <li><span>3</span><div><b>Prepare and start a session</b><p>Select your model and context, check audio, and monitor your shared time balance.</p></div></li>
   </ol></section>
-  <AccountPricing/>
+  <AccountPricing catalog={catalog}/>
   <section className="final-cta"><p className="kicker">Staging only</p><h2>A separate Cluera TEST build.</h2><p>Unsigned test software; Windows, AI, payment and update acceptance is still in progress. Not commercially approved.</p><Link className="button" href="/download">View Cluera download</Link></section>
  </main>;
 }

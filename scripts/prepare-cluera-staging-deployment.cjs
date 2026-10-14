@@ -1,7 +1,9 @@
 'use strict';
 // Request preparation only: no credentials, network, Git mutation or deployment side effect.
 const {createHash}=require('node:crypto');
+const path=require('node:path');
 const {verifyTree}=require('./prepare-reviewed-sources.cjs');
+const {verifyProxyFork,PREFIX}=require('./verify-cluera-proxy-fork.cjs');
 const TARGET={teamId:'team_AksnPXhi2VBXI5UsY2xBIakc',project:'cluera-ai-staging',
  name:'cluera-ai-staging',branch:'staging',repoId:'1416291494'};
 const requiredFiles=['web/package.json','web/package-lock.json','web/next.config.ts','web/tsconfig.json',
@@ -13,7 +15,28 @@ function prepare(input){
  if(branch!==TARGET.branch||! /^[a-f0-9]{40}$/.test(commitSha??'')||tree?.sha!==commitTreeSha
   ||! /^[a-f0-9]{40}$/.test(commitTreeSha??'')||tree.truncated!==false||!Array.isArray(tree.tree)
   ||'files' in input||'deploymentId' in input||typeof diagnostic!=='boolean')throw Error('Unreviewed or incomplete deployment source.');
- verifyTree(tree.tree,commitTreeSha);
+ const reviewedGeneratedPaths=new Set();
+ const vendorRows=tree.tree.filter(row=>row.path===PREFIX.slice(0,-1)||row.path.startsWith(PREFIX));
+ if(vendorRows.length){
+  // The locally reverified, fixed-digest manifest is the authority, not caller
+  // blob pins or a permissive dist allowlist. Every fork source/runtime file
+  // must be present and exactly match its reviewed Git hash AND byte length.
+  const pins=verifyProxyFork(),parents=new Set();
+  for(const file of pins.keys()){
+   let parent=path.posix.dirname(file);
+   while(parent!=='.'){parents.add(parent);parent=path.posix.dirname(parent);}
+   if(file.startsWith(PREFIX+'dist/'))reviewedGeneratedPaths.add(file);
+  }
+  for(const parent of parents)if(parent===PREFIX+'dist'||parent.startsWith(PREFIX+'dist/'))reviewedGeneratedPaths.add(parent);
+  for(const row of vendorRows){
+   if(row.type==='blob'){
+    const pin=pins.get(row.path);
+    if(!pin||row.mode!=='100644'||row.sha!==pin.gitSha||row.size!==pin.size)throw Error('Reviewed vendor source mismatch.');
+   }else if(row.type!=='tree'||!parents.has(row.path))throw Error('Unreviewed vendor source directory.');
+  }
+  for(const file of pins.keys())if(!vendorRows.some(row=>row.path===file&&row.type==='blob'))throw Error('Complete reviewed vendor source required.');
+ }
+ verifyTree(tree.tree,commitTreeSha,reviewedGeneratedPaths);
  const blobs=new Map();
  for(const row of tree.tree){if(blobs.has(row.path))throw Error('Duplicate source path.');blobs.set(row.path,row);}
  const required=diagnostic?[...requiredFiles,'scripts/payments/audit-razorpay-test.cjs']:requiredFiles;

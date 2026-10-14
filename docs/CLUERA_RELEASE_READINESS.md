@@ -1,8 +1,22 @@
 # Cluera release blockers
 
-October 13, 2026. No production readiness or commercial release approval.
+October 14, 2026. No production readiness or commercial release approval.
 
-## Latest launch request — NO-GO; private replacement saving Not ready yet
+## New billing migration gate
+
+[Cluera billing cutover plan](CLUERA_BILLING_CUTOVER.md) is prepared for the owner's sole Account/subscription product. Local server/UI/SQL-fixture tests do not authorize or establish an actual Test purchase. Unapplied billing/scheduler schema, credential containment, exact merchant/destination read-back, single-owner handoff, genuine signed receipt/capture/pack/monthly invoices, hosted contention and installed desktop synchronization remain explicit gates. All Cluera financial flags remain disabled and old compatibility processing/history is retained. Proposed finite monthly charges and future Admin revisions require review; no commercial/no-bug claim is made.
+
+## Current two-product boundary
+
+Maintain only unchanged License Edition and renamed Account **Cluera AI**. New Cluera server replacements are owner-saved/reloaded; protected web authentication, signed auth-only relay metadata and actual health/revision pass. The exposed credential remains unrevoked, its exact type/consumer inventory must not be assumed, and relay's own privileged DB-key authentication remains unaccepted. Old Account has an active shared scheduler/installed-client trust dependency, so it is a temporary bridge, not safely obsolete or a third product.
+
+[Full database/deployment/environment inventory and proposed retirement](CLUERA_TWO_PRODUCT_RETIREMENT.md). The earlier four-key/Not-ready instructions below are historical. Next owner action is only the confirmed-active old website's temporary credential-bridge approval; old relay saving stays on hold pending evidence or explicit retention choice. No deletion, financial cutover, legacy/JWT revocation, License change, provider activation or migration is authorized. Owner inventory of other consumers/old installed clients is unknown. Commercial launch stays NO-GO.
+
+Current **local** supply-chain remediation passes: fresh desktop install/full and production-only audits0, complete desktop362/1 opt-in skipped, actual consumer/cache6/6, both typechecks/code build, root23/23 and560-file source/export/101-file artifact checks. The licensed one-condition proxy fork and narrow exact-pin runtime export guard are independently reviewed. No waiver/TLS relaxation; an upstream trusted-CA regression was caught before acceptance. This patch is unpublished/undeployed; hosted CI still reflects older3d813f8 and no existing TEST installer is claimed to contain it. See exact dated results in the implementation guide.
+
+## Earlier October 13 launch checkpoint — saving instruction superseded
+
+Final reviewed runtime **3d813f8 / READY dpl_CLTwRP26Kt3F4xCqeLm5jyeCFV89 / LIVE dep-db71qodbedkc73bmf3og**, stable alias/health revision and all18 unchanged env entries verified. Final desktop359/1skipped; web707/22, root18, typechecks/builds,20 synthetic desktop/28 public browser cases,10+5 hosted boundaries and nine preservation snapshots pass. **CI is not green:** Linux web/relay succeeds; Windows tests/typechecks/build now succeed after a CRLF test-reader fix, then dependency audit blocks on10 moderate entries. No threshold waiver. New1.0.1 is unsigned TEST only,121923993 bytes/SHA25653f48c71a9734c7191f45efeecd07ba539ac4cd4bc0ee78d5567aec791718234, not installed/uploaded/approved. Exact dated evidence: [implementation guide](CLUERA_IMPLEMENTATION_MIGRATION.md). This result record is local-only; no further deploy is implied.
 
 Follow [ordered launch steps](CLUERA_LAUNCH_STEPS.md). Infrastructure is already working; the open owner action is **four separately named replacement server keys**, not the previous infrastructure/bootstrap setup. Replacement/configuration-only reload authority is now granted for confirmed Cluera/Account services, but the owner explicitly answered **Not ready yet** to saving. No key replacement, revocation, legacy deactivation or JWT rotation has occurred.
 

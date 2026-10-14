@@ -55,4 +55,11 @@ describe('Account credit reporting ownership and scheduling',()=>{
   expect(request.mock.calls[0][1]).toMatchObject({method:'GET',credentials:'omit',redirect:'error',cache:'no-store'});
   request.mockResolvedValueOnce(Response.json({...snapshot,secret:'synthetic-forbidden'}));await expect(api.credits('access',new AbortController().signal)).rejects.toMatchObject({status:503});
  });
+ it.each(['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2'])('accepts only the additive Cluera financial offer enum %s',async offerCode=>{
+  const value={...snapshot,payments:[{offerCode,state:'VERIFIED' as const,createdAt:snapshot.serverTime}]};
+  const api=new AccountApi(vi.fn(async()=>Response.json(value)) as any,()=>undefined);
+  expect(await api.credits('synthetic-access',new AbortController().signal)).toEqual(value);
+  const bad=new AccountApi(vi.fn(async()=>Response.json({...value,payments:[{...value.payments[0],offerCode:'unreviewed_plan'}]})) as any,()=>undefined);
+  await expect(bad.credits('synthetic-access',new AbortController().signal)).rejects.toMatchObject({status:503});
+ });
 });
