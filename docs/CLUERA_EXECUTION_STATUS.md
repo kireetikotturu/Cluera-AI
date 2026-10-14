@@ -1,5 +1,15 @@
 # Cluera execution status - October 14, 2026
 
+## Latest verified results and pending private mapping
+
+Published reviewed staging **effe866d035265abb92678c55ebb03960b3d4689**, exact14 hash-matched files/complete726-entry597-blob tree; hosted **CI38596766413** passes both jobs, including full web **1055/22-skipped** and desktop **366/1-skipped**, typechecks/builds/audits. Local failed scheduler runs remain dated failures, not relabelled passes. Root preparation23/23 and source597 scan pass; four EXE hashes remain unchanged.
+
+**UI rollout PAUSED:** later read found only Cluera's service-entry updatedAt changed to15:45:47.008UTC /21:15:47IST; old website metadata remains unchanged. Current Cluera stable alias is READY **dpl_6ri1jbdoj8Htoho1omPXGdnRH1Zg**, prior reviewed3661 runtime, created15:45:11.667/READY15:45:41.536UTC before that key update. Agent did not create it or edit the keys. It neither contains the new Admin fix nor independently verifies the latest saved Cluera credential. No cause/actor or wrong-project conclusion is assumed; metadata discrepancy must be reconciled privately. Old website modern-key/read/unchanged-source proofs remain valid, but named per-component key ownership remains owner-confirmed rather than independently matched.
+
+Fresh current website public boundaries22/22 pass and all23 snapshots match15:44:32.030249-16:26:12.853523UTC. No business writer, payment, schema/owner/webhook/scheduler change, key revocation, installer action or License mutation.
+
+**ONE next owner action:** privately confirm account_web is saved only in **sigmaround-account-staging**, with the separate Cluera-web key in **cluera-ai-staging**. Confirm correct or identify which project needs correction; no values, resaving, revocation or other changes now. This supersedes the relay-approval next-action wording below. Only after mapping is resolved should verified new Cluera rollout continue; relay-only compatibility approval remains a subsequent boundary.
+
 **Commercial release: NO-GO.** Exactly two products: unchanged SigmaRoundAI License Edition and Cluera AI. Old Account hosts are temporary compatibility/billing infrastructure. A broad engineering request does not authorize missing financial, schema, key-revocation, privileged-role, signing or paid-plan actions.
 
 ## Latest stage - approved website bridge completed; Admin coordination fixed

@@ -1,5 +1,7 @@
 # Cluera customer and Admin guide
 
+Current next checkpoint is **private website key mapping confirmation**, superseding relay-approval/saving instructions below: only Cluera's service-entry metadata timestamp changed, while old website metadata stayed unchanged. Old modern-key/read proofs pass, but new Cluera Admin UI rollout is paused; current website still runs3661 source. Reviewed effe866d/hosted CI38596766413 passes web1055/22-skipped and desktop366/1-skipped. Confirm account_web only on sigmaround-account-staging and the distinct Cluera-web key on cluera-ai-staging, without values or changes now. See [current execution status](CLUERA_EXECUTION_STATUS.md). Phase A and commercial release remain held; old relay/License/financial ownership are unchanged.
+
 Private staging, not public sales. Support: **clueraaisupport@gmail.com**.
 
 October14 scoped safety fix: Users/Release controls fence each other's pending/unknown mutations, including before a React render commits. Other controls lock while that release is unresolved, but **Verify/retry same release operation** retains its exact UUID/body and remains available. Parent reads cannot invalidate it; stale child reads are aborted/discarded. A first definitely rejected write permits correction; a later rejection after uncertainty cannot erase the original operation. Confirmed application restores controls and refreshes release rows. This is not an Admin authorization/MFA bypass or universal mutex across other independent panels. No real release action was used for tests.

@@ -1,5 +1,13 @@
 # Cluera AI current handoff
 
+## Latest verified results and pending private mapping
+
+Reviewed **effe866d035265abb92678c55ebb03960b3d4689** is published on private staging only, exact14 reviewed files/complete597 blob pins. Hosted CI38596766413 passes full web1055/22-skipped and desktop366/1-skipped plus typechecks/builds/audits. Local full1053/2 deadline failures/22skipped and isolated3/3failures remain honest separate results. Existing EXE bytes/features unchanged.
+
+New Admin UI deployment is PAUSED: Cluera service-entry timestamp changed15:45:47.008UTC, old website metadata did not. Discovered current Cluera READYdpl_6ri1jbdoj8Htoho1omPXGdnRH1Zg is previous3661 runtime and became READY before that key update; agent did not create it/edit keys. No new UI or newest-key reload is claimed. Current HTTP22/22 and all23 preservation snapshots still match.
+
+**ONE next action:** privately confirm account_web only in sigmaround-account-staging and separate Cluera-web key in cluera-ai-staging; say correct or which project needs correction. No values, resaving, revocation or other changes now. Supersedes the relay-approval handoff below; payments/AI remain disabled and commercial launch NO-GO.
+
 October14,2026. **Commercial launch NO-GO.** Exactly two products: Cluera AI and preserved SigmaRoundAI License Edition. This guide belongs to Cluera; the original SigmaRound guide/services/installers are untouched.
 
 Selected-plan pricing/Auth continuation is implemented without automatic SDK/order/payment/grant. Email/Google return remembers only a bounded safe navigation hint; logout/recovery clears it. All payment flags remain false; AI stays auth-only. Actual private Auth/MFA/Windows/provider/financial/operations/signing journeys remain acceptance gates.

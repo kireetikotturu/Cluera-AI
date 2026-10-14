@@ -1,4 +1,8 @@
 # Cluera AI
+
+## Latest verified results and pending private mapping
+
+Latest checkpoint: published Cluera Admin fix effe866d035265abb92678c55ebb03960b3d4689 passes hosted CI run38596766413 (web1055/22-skipped; desktop366/1-skipped). New UI deployment is PAUSED on private named-key mapping: Cluera service-entry timestamp changed15:45:47.008UTC, old website metadata did not. Current Cluera READYdpl_6ri1jbdoj8Htoho1omPXGdnRH1Zg remains previous3661 runtime and became READY six seconds before that key update; it is not verified to load the newly saved entry. Agent did not create that intervening deployment or edit either key. Old website technical reload/modern-key/positive-read proofs still pass; exact named-key mapping needs owner confirmation. ONE next action: privately confirm account_web belongs only to sigmaround-account-staging and the separate Cluera-web key remains in cluera-ai-staging. No values, resaving, revocation or other changes now. After mapping, relay-only retention/credential approval remains a later checkpoint.
 Independent Account-managed Windows workspace, customer SaaS and MFA Admin. Private staging; unsigned TEST only.
 
 See [implementation and migration](docs/CLUERA_IMPLEMENTATION_MIGRATION.md), [architecture/security](docs/CLUERA_ARCHITECTURE_SECURITY.md) and [private deployment setup](docs/CLUERA_STAGING_SETUP.md).

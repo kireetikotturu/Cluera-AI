@@ -1,4 +1,12 @@
 # Cluera AI — implementation and migration
+
+## Latest verified results and pending private mapping
+
+Final reviewed publication **effe866d035265abb92678c55ebb03960b3d4689**, treea9eda6ec6ce87c095affa005d220fcd98b1683c9, exactly14 individually scanned/hash-matched source/test/guide files, expected-head non-forced fast-forward from96b58df; complete726 entries/597 local/remote blob hashes and sizes match. Hosted **CI38596766413** independently passes web-relay and desktop jobs: full web1055/22-skipped, desktop366/1-skipped, tests/typechecks/code builds/source verification/audits. Fresh preparation23/23 and source597 scan pass. Local full/isolated scheduler deadline failures remain explicit; no deadline/assertion was weakened.
+
+**Further deployment paused for private mapping:** only Cluera SUPABASE_SERVICE_ROLE_KEY metadata updatedAt changed to15:45:47.008UTC; old website metadata stayed unchanged. Discovered stable Cluera **READYdpl_6ri1jbdoj8Htoho1omPXGdnRH1Zg** uses prior reviewed3661 SHA, created15:45:11.667/READY15:45:41.536UTC before that entry update. Agent did not create this intervening deployment or edit keys; persistent Cluera settings/link remain unchanged. New Admin fix is NOT deployed; no freshly loaded newest Cluera-key claim. Old website modern-key category and positive SDK/signature read remain accepted technical proofs, not independent named-key equality. No cause/actor or wrong-target conclusion is inferred.
+
+Current public Cluera boundaries22/22 pass. All23 identical-input snapshots match15:44:32.030249-16:26:12.853523UTC. No new schema/financial/provider/installer/License action. **Single next owner action:** private mapping confirmation (account_web only on old website; distinct Cluera-web key on Cluera), with no values or changes now. This supersedes next-relay-approval instructions below; that remains later separate authority after mapping and rollout acceptance.
 Updated October 14, 2026. Staging only; unsigned TEST, not commercial readiness.
 
 ## Latest October 14 - approved temporary website bridge and scoped Admin fix

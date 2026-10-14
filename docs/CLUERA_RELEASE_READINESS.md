@@ -1,5 +1,7 @@
 # Cluera release blockers
 
+Current next checkpoint is **private website key mapping confirmation**, superseding relay-approval/saving instructions below: only Cluera's service-entry metadata timestamp changed, while old website metadata stayed unchanged. Old modern-key/read proofs pass, but new Cluera Admin UI rollout is paused; current website still runs3661 source. Reviewed effe866d/hosted CI38596766413 passes web1055/22-skipped and desktop366/1-skipped. Confirm account_web only on sigmaround-account-staging and the distinct Cluera-web key on cluera-ai-staging, without values or changes now. See [current execution status](CLUERA_EXECUTION_STATUS.md). Phase A and commercial release remain held; old relay/License/financial ownership are unchanged.
+
 October 14, 2026. No production readiness or commercial release approval.
 
 ## Latest security/verification checkpoint

@@ -1,5 +1,9 @@
 # Shared Supabase credential incident — approval-required plan
 
+## Latest verified results and pending private mapping
+
+Current owner checkpoint supersedes relay-approval instructions below: Cluera's service-entry metadata updated15:45:47.008UTC while old website metadata stayed unchanged. Its intervening READYdpl_6ri1jbdoj8Htoho1omPXGdnRH1Zg uses old3661 source and became READY before that entry update; agent did not create it/edit keys. Old website modern-key guarded reload/positive SDK read pass, but exact per-component named-key mapping is not independently matched. Privately confirm account_web only in sigmaround-account-staging and distinct Cluera-web key in cluera-ai-staging; report mapping only, no values or changes. New Cluera UI deployment remains paused. This does not infer a wrong-project save or waive legacy containment.
+
 ## Latest completed component - old website only
 
 Owner approved the website-only bridge in the new attachment and confirmed private account_web saving. Exact unchanged0a5ae015 full source/713 tree entries/581 blob pins/original manifest-lock reloaded **READY dpl_BaQwgcafWd1HofC6LovQkTDDPxX6**, stable alias verified. Protected pre-build modern-key check passes; fresh signed Account1.0.8 feed proves configured protected SDK read and7/7 read-only boundaries pass. Key value was never decrypted/copied/logged. Vercel metadata still reports the old timestamp after two post-save reads, so it does NOT independently establish the value change; all33 metadata entries and persistent project settings remain unchanged. No exact-one-value-change claim.

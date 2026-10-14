@@ -1,5 +1,7 @@
 # Architecture and security
 
+Current next checkpoint is **private website key mapping confirmation**, superseding relay-approval/saving instructions below: only Cluera's service-entry metadata timestamp changed, while old website metadata stayed unchanged. Old modern-key/read proofs pass, but new Cluera Admin UI rollout is paused; current website still runs3661 source. Reviewed effe866d/hosted CI38596766413 passes web1055/22-skipped and desktop366/1-skipped. Confirm account_web only on sigmaround-account-staging and the distinct Cluera-web key on cluera-ai-staging, without values or changes now. See [current execution status](CLUERA_EXECUTION_STATUS.md). Phase A and commercial release remain held; old relay/License/financial ownership are unchanged.
+
 Latest October14: the owner-approved old website-only bridge is verified READYdpl_BaQwgcafWd1HofC6LovQkTDDPxX6/unchanged0a5ae015. Protected modern-key build preflight and current positive signed-feed SDK read pass; protected metadata stays unchanged/stale, not independent saved-value proof. No old source/payment/scheduler/relay/License change or legacy revocation. All23 preservation snapshots match; Phase A remains held. Cluera Users/Release UI now fences two-way uncertainty and same-event admission while preserving exact retries and server MFA. [Current security boundary and next relay-only approval](CLUERA_EXECUTION_STATUS.md). Health/public UI/synthetic tests are not full containment, private Auth or financial acceptance.
 
 ## October 14 navigation/security boundary
