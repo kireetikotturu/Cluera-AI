@@ -10,6 +10,20 @@ it('requires exact reviewed pricing, paused controls and no third-party SDK',()=
  expect(inspect(checks[2],response,'Test payments are paused Checkout unavailable').pass).toBe(true);
  expect(inspect(checks[2],response,'Test payments are paused Checkout unavailable<script src="https://checkout.razorpay.com/v1/checkout.js"></script>').pass).toBe(false);
 });
+it('accepts separated visible price/allowance markup and case-styled expiry without changing policy',()=>{
+ const response=new Response(null,{status:200,headers});
+ const split=pricing.replace('100 hours per month','<span>100</span> hours<!-- --> per month').replace('no expiry','No expiry');
+ expect(inspect(checks[1],response,split).pass).toBe(true);
+ expect(inspect(checks[1],response,split.replace('\u20b9549','\u20b9550')).pass).toBe(false);
+});
+it('never accepts plan evidence hidden only in script, style or comments',()=>{
+ const response=new Response(null,{status:200,headers});
+ for(const hidden of [`<script>${pricing}</script>`,`<style>${pricing}</style>`,`<!--${pricing}-->`])expect(inspect(checks[1],response,hidden).pass).toBe(false);
+});
+it('checks the raw response for secrets even when they are in excluded markup',()=>{
+ const response=new Response(null,{status:200,headers});
+ expect(inspect(checks[1],response,pricing+'<script>synthetic-secret</script>',[{type:'synthetic',value:'synthetic-secret'}]).pass).toBe(false);
+});
 it('fails closed on redirect, wrong status, cacheable response or known secret',()=>{
  expect(inspect(checks[3],new Response(null,{status:404,headers}),'{}').pass).toBe(true);
  expect(inspect(checks[3],new Response(null,{status:200,headers}),'{}').pass).toBe(false);
