@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { afterEach, expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
-const { auditCutover, invocation } = require('../../scripts/payments/audit-cluera-cutover.cjs');
+const { auditCutover, invocation, auditLogLines } = require('../../scripts/payments/audit-cluera-cutover.cjs');
 const webhookId = 'TmqOkUNGtvEPLz', orderId = 'order_synthetic0001';
 const intentId = '00000000-0000-4000-8000-000000000821';
 const accountId = 'acc_synthetic123456';
@@ -164,6 +164,43 @@ it('reports duplicate identifiers as a boolean/count only even when the first re
   expect(report.payments.validation.paymentIdUnique).toBe(false);expect(report.payments.validationFailures.paymentIdUnique).toBe(1);
   expect(report.payments.reportedStatuses.CAPTURED).toBe(2);expect(report.payments.statuses.CAPTURED).toBe(0);
   expect(report.stopped).toBe('OWNED_PAYMENT_EVIDENCE');expect(JSON.stringify(report)).not.toContain(first.id);
+});
+it('emits three separately parseable, correlated safe sections below 1800 bytes for the worst bounded invalid collection',async()=>{
+  const records=Array.from({length:100},(_,index)=>({id:'synthetic-private-invalid-id-'+index,status:'synthetic-private-state',email:'synthetic-private-email',error:{description:'synthetic-private-provider-error'}}));
+  const request=fake({order:{...order(),status:'attempted',attempts:1},payments:records}),report=await auditCutover(env(),request,options);
+  expect(report.requests).toBe(4);expect(report.stopped).toBe('OWNED_PAYMENT_EVIDENCE');
+  const lines=auditLogLines(report);
+  expect(lines.map((line:string)=>line.slice(0,line.indexOf(' ')))).toEqual(['CLUERA_SAFE_CUTOVER_AUDIT','CLUERA_SAFE_CUTOVER_AUDIT_WEBHOOK','CLUERA_SAFE_CUTOVER_AUDIT_PAYMENTS']);
+  const sections=lines.map((line:string)=>{expect(Buffer.byteLength(line,'utf8')).toBeLessThan(1800);return JSON.parse(line.slice(line.indexOf(' ')+1));});
+  for(const section of sections)expect(section).toMatchObject({component:report.component,phase:'account',completedAt:report.completedAt});
+  expect(sections[0]).toMatchObject({requests:4,mutations:0,stopped:'OWNED_PAYMENT_EVIDENCE',order:{status:'ATTEMPTED'}});expect(sections[0].financialState).toBeUndefined();
+  expect(sections[1]).toMatchObject({webhookListing:{complete:true,total:1},directWebhook:{active:true,exactEvents:true}});
+  expect(sections[2].payments).toEqual(report.payments);expect(sections[2].payments.reportedStatuses.UNKNOWN).toBe(100);
+  const maximumCounts={...report,payments:{...report.payments,
+    statuses:Object.fromEntries(Object.keys(report.payments.statuses).map(key=>[key,100])),
+    reportedStatuses:Object.fromEntries(Object.keys(report.payments.reportedStatuses).map(key=>[key,100])),
+    validation:Object.fromEntries(Object.keys(report.payments.validation).map(key=>[key,false])),
+    validationFailures:Object.fromEntries(Object.keys(report.payments.validationFailures).map(key=>[key,100])),
+    shape:Object.fromEntries(Object.keys(report.payments.shape).map(key=>[key,false]))}};
+  for(const line of auditLogLines(maximumCounts)){expect(Buffer.byteLength(line,'utf8')).toBeLessThan(1800);expect(()=>JSON.parse(line.slice(line.indexOf(' ')+1))).not.toThrow();}
+  for(const value of ['synthetic-private-invalid-id','synthetic-private-state','synthetic-private-email','synthetic-private-provider-error',orderId,intentId,webhookId,accountId,...Object.values(env()).filter((value:string)=>value.includes('secret'))])expect(lines.join('\n')).not.toContain(value);
+  expect(request).toHaveBeenCalledTimes(4);
+});
+it('log construction ignores arbitrary fields, oversized strings, secrets and invalid value types',()=>{
+  const privateValue='synthetic-private-secret-'+'x'.repeat(3000),source={component:privateValue,phase:privateValue,completedAt:privateValue,stopped:privateValue,
+    requests:privateValue,mutations:99,financialState:'CAPTURED',rawProvider:privateValue,configuration:{exactTarget:privateValue,formats:{testKeyId:true,privateValue}},
+    order:{status:privateValue,canonicalBinding:privateValue},payments:{count:100,canonicalEvidence:false,statuses:{CAPTURED:100,extra:privateValue},
+      reportedStatuses:{UNKNOWN:100},validation:{knownStatus:false,extra:privateValue},validationFailures:{knownStatus:100,extra:privateValue},shape:{invoiceFieldPresent:false,extra:privateValue}}};
+  const lines=auditLogLines(source),sections=lines.map((line:string)=>{expect(Buffer.byteLength(line,'utf8')).toBeLessThan(1800);return JSON.parse(line.slice(line.indexOf(' ')+1));});
+  expect(sections[0]).toMatchObject({component:'cluera-billing-cutover-get-only',phase:'unknown',stopped:'UNAVAILABLE',mutations:0});
+  expect(sections[0].financialState).toBeUndefined();expect(lines.join('\n')).not.toContain('synthetic-private');expect(lines.join('\n')).not.toContain('rawProvider');
+  for(const section of sections)expect(section.completedAt).toBe(sections[0].completedAt);
+});
+it('logs valid completed financial evidence only in the base section while keeping the payment verifier unchanged',async()=>{
+  const report=await auditCutover(env(),fake({order:{...order(),status:'paid',amount_paid:54900,amount_due:0,attempts:1},payments:[payment()]}),options);
+  const sections=auditLogLines(report).map((line:string)=>JSON.parse(line.slice(line.indexOf(' ')+1)));
+  expect(sections[0]).toMatchObject({stopped:'COMPLETE',financialState:'CAPTURED',requests:4,mutations:0});
+  expect(sections[2].payments).toEqual(report.payments);expect(sections[1].payments).toBeUndefined();
 });
 it('does not reveal raw provider authentication errors', async () => {
   const request = vi.fn(async () => Response.json({ error: 'synthetic-private-key-value' }, { status: 401 }));

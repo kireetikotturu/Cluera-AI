@@ -177,9 +177,56 @@ async function auditCutover(env = process.env, request = fetch, options = {}) {
 function invocation(args) {
   return args.length === 4 ? { phase: args[0], expectedWebhookId: args[1], canonicalOrderId: args[2], canonicalIntentId: args[3] } : {};
 }
+function auditLogLines(report = {}) {
+  // Explicit allowlists make every log independently bounded and parseable.
+  // Do not serialize arbitrary report extensions or provider objects here.
+  const bool = value => typeof value === 'boolean' ? value : undefined;
+  const count = maximum => value => Number.isInteger(value) && value >= 0 && value <= maximum ? value : undefined;
+  const enumeration = values => value => values.includes(value) ? value : undefined;
+  const pick = (source, fields) => !source || typeof source !== 'object' || Array.isArray(source) ? undefined
+    : Object.fromEntries(Object.entries(fields).map(([key, sanitize]) => [key, sanitize(source[key])]).filter(([, value]) => value !== undefined));
+  const flags = fields => Object.fromEntries(fields.map(key => [key, bool]));
+  const counts = (fields, maximum) => Object.fromEntries(fields.map(key => [key, count(maximum)]));
+  const paymentStates = ['CREATED', 'AUTHORIZED', 'CAPTURED', 'REFUNDED', 'FAILED'];
+  const validationFields = ['knownStatus', 'paymentIdValid', 'paymentIdUnique', 'paymentEntity', 'canonicalOrder', 'approvedAmount',
+    'currencyINR', 'invoiceNull', 'domesticFalse', 'capturedBoolean', 'refundAmountBounded', 'refundStatusKnown', 'stateConsistent'];
+  const shapeFields = ['invoiceFieldPresent', 'internationalFieldPresent', 'capturedFieldPresent', 'amountRefundedFieldPresent', 'refundStatusFieldPresent'];
+  const stopped = enumeration(['INPUT', 'CONFIGURATION', 'WEBHOOK_READ', 'WEBHOOK_IDENTITY', 'OWNED_ORDER_READ',
+    'OWNED_ORDER_IDENTITY', 'OWNED_PAYMENTS_READ', 'OWNED_PAYMENT_EVIDENCE', 'COMPLETE', 'UNAVAILABLE'])(report?.stopped) ?? 'UNAVAILABLE';
+  const completedAt = typeof report?.completedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(report.completedAt)
+    && Number.isFinite(Date.parse(report.completedAt)) ? report.completedAt : new Date().toISOString();
+  const correlation = { component: 'cluera-billing-cutover-get-only', phase: enumeration(['account', 'cluera'])(report?.phase) ?? 'unknown', completedAt };
+  const configuration = pick(report?.configuration, flags(['exactTarget', 'switchesMatch']));
+  if (configuration) configuration.formats = pick(report.configuration.formats, flags(['testKeyId', 'apiSecret', 'webhookSecret', 'merchantId']));
+  const base = { ...correlation, stopped, requests: count(13)(report?.requests), mutations: 0, signerMatch: 'UNVERIFIED', configuration,
+    testAuthentication: bool(report?.testAuthentication), merchantIdentityVerified: bool(report?.merchantIdentityVerified),
+    order: pick(report?.order, { ...flags(['canonicalBinding', 'approvedAmount']), status: enumeration(['CREATED', 'ATTEMPTED', 'PAID', 'UNKNOWN']) }) };
+  // A rejected evidence collection can never gain a financial label merely
+  // through serialization; only the completed strict audit may report one.
+  if (stopped === 'COMPLETE') base.financialState = enumeration(['CAPTURED', 'REFUNDED', 'UNPAID', 'REVIEW'])(report?.financialState);
+  const webhookFields = { ...flags(['idMatches', 'destinationMatches', 'testService', 'merchantOwner', 'merchantMatches',
+    'active', 'activeIsBoolean', 'exactEvents', 'signerPresent']), eventCount: count(100000), signerMatch: enumeration(['UNVERIFIED']) };
+  const webhook = { ...correlation,
+    webhookListing: pick(report?.webhookListing, { ...flags(['complete', 'exactIdFound']), ...counts(['pages'], 10), ...counts(['total', 'exactDestinationCount'], 1000) }),
+    listedWebhook: pick(report?.listedWebhook, webhookFields), directWebhook: pick(report?.directWebhook, webhookFields) };
+  const payments = pick(report?.payments, { count: count(100), canonicalEvidence: bool });
+  if (payments) {
+    payments.statuses = pick(report.payments.statuses, counts(paymentStates, 100));
+    payments.reportedStatuses = pick(report.payments.reportedStatuses, counts([...paymentStates, 'UNKNOWN'], 100));
+    payments.validation = pick(report.payments.validation, flags(validationFields));
+    payments.validationFailures = pick(report.payments.validationFailures, counts(validationFields, 100));
+    payments.shape = pick(report.payments.shape, flags(shapeFields));
+  }
+  return [['CLUERA_SAFE_CUTOVER_AUDIT', base], ['CLUERA_SAFE_CUTOVER_AUDIT_WEBHOOK', webhook],
+    ['CLUERA_SAFE_CUTOVER_AUDIT_PAYMENTS', { ...correlation, payments }]].map(([prefix, section]) => {
+      const line = prefix + ' ' + JSON.stringify(section);
+      if (Buffer.byteLength(line, 'utf8') >= 1800) throw Error('Safe report unavailable.');
+      return line;
+    });
+}
 if (require.main === module) {
   auditCutover(process.env, fetch, invocation(process.argv.slice(2)))
-    .then(report => { console.log('CLUERA_SAFE_CUTOVER_AUDIT ' + JSON.stringify(report)); process.exitCode = 1; })
-    .catch(() => { console.log('CLUERA_SAFE_CUTOVER_AUDIT ' + JSON.stringify({ component: 'cluera-billing-cutover-get-only', stopped: 'UNAVAILABLE', mutations: 0 })); process.exitCode = 1; });
+    .then(report => { for (const line of auditLogLines(report)) console.log(line); process.exitCode = 1; })
+    .catch(() => { for (const line of auditLogLines({ stopped: 'UNAVAILABLE', requests: 0 })) console.log(line); process.exitCode = 1; });
 }
-module.exports = { auditCutover, invocation };
+module.exports = { auditCutover, invocation, auditLogLines };
