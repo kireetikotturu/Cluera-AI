@@ -8,6 +8,8 @@ Cluera is the only Account/subscription product. [The exact billing handoff](CLU
 
 New price revisions and billing paths are safe-engineering work, not accepted recurring payments or commercial readiness. AI stays auth-only; provider vault, Windows, restore/capacity/telemetry/signing/legal and actual financial acceptance gates below remain. No advertisement or paid-ready claim is authorized.
 
+The complete disabled application1ff315 is now READY on Cluera staging. Full web1,000/22-skipped, desktop366/1-skipped, typechecks/builds/current audits, hosted CI,22 public boundaries and16 responsive public cases pass. These do not accept actual payments, Admin MFA, private Auth, Windows or providers. The old unpaid Paddle BOUND draft and unresolved Razorpay attempt must not be retried or discarded. [Exact evidence/remaining approvals](CLUERA_IMPLEMENTATION_MIGRATION.md). The older website-bridge-only action in section1 is historical and superseded by Phase A approval above.
+
 ## 1. Preserve exactly two products and contain the credential incident
 
 Exactly two products: unchanged **SigmaRoundAI License Edition** and **Cluera AI**, the renamed Account Edition. The owner has privately saved separate modern server keys in new Cluera Vercel/Render and reloaded reviewed source. The new website's protected database authentication and signed auth-only relay metadata pass. No legacy credential has been revoked; the relay's own privileged DB authentication is not independently proven by health/metadata.

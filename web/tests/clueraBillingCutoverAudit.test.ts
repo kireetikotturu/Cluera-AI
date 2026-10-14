@@ -14,6 +14,10 @@ const env = () => ({ VERCEL_PROJECT_ID: 'prj_VuG3xCUQqKmPhT0LIAmLuyUwBXg6', VERC
   SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED: 'false', SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED: 'false',
   RAZORPAY_TEST_KEY_ID: 'rzp_test_synthetic123456', RAZORPAY_TEST_KEY_SECRET: 'synthetic-api-secret-not-a-real-key',
   RAZORPAY_TEST_WEBHOOK_SECRET: 'synthetic-webhook-secret-not-a-real-secret-1234', RAZORPAY_TEST_ACCOUNT_ID: accountId });
+const intakeEnv=()=>({...env(),VERCEL_PROJECT_ID:'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
+  SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:'false',SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED:'true',SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'true',
+  CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',CLUERA_BILLING_V2_ENABLED:'true'});
+const intakeUrl='https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook';
 const webhook = () => ({ id: webhookId, url: 'https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook',
   owner_type: 'merchant', owner_id: accountId.slice(4), service: 'beta-api-test', active: true, disabled_at: 123,
   secret_exists: true, events: { 'payment.captured': 1, 'order.paid': 1, 'refund.processed': 1, 'payment.failed': 0 } });
@@ -67,6 +71,37 @@ it('supports only the fixed disabled Cluera pre-cutover phase without changing t
   expect(report.stopped).toBe('COMPLETE'); expect(report.configuration.switchesMatch).toBe(true);
   const active = await auditCutover({ ...source, CLUERA_BILLING_V2_ENABLED: 'true' }, request, { ...options, phase: 'cluera' });
   expect(active.stopped).toBe('CONFIGURATION'); expect(active.requests).toBe(0);
+});
+it('supports only exact new Cluera intake-on/checkout-off post-handoff flags and literal destination, using the same four GET reads',async()=>{
+  const source=intakeEnv(),before={...source},request=fake({webhook:{...webhook(),url:intakeUrl}}),pins={...options,phase:'cluera-intake'};
+  expect(invocation(['cluera-intake',webhookId,orderId,intentId])).toEqual(pins);
+  const report=await auditCutover(source,request,pins);
+  expect(report).toMatchObject({phase:'cluera-intake',stopped:'COMPLETE',requests:4,mutations:0,
+    configuration:{exactTarget:true,switchesMatch:true},directWebhook:{destinationMatches:true,active:true,exactEvents:true}});
+  expect(source).toEqual(before);expect(request).toHaveBeenCalledTimes(4);
+  const lines=auditLogLines(report);
+  for(const line of lines){expect(Buffer.byteLength(line,'utf8')).toBeLessThan(1800);expect(JSON.parse(line.slice(line.indexOf(' ')+1))).toMatchObject({phase:'cluera-intake',completedAt:report.completedAt});}
+  expect(lines.join('\n')).not.toContain(intakeUrl);expect(lines.join('\n')).not.toContain(orderId);
+});
+it('new Cluera URL cannot pass old Account or disabled Cluera preflight, and old URL cannot pass new intake handoff',async()=>{
+  const moved=fake({webhook:{...webhook(),url:intakeUrl}}),old=fake();
+  expect((await auditCutover(env(),moved,options)).stopped).toBe('WEBHOOK_IDENTITY');
+  const pre={...intakeEnv(),SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED:'false',CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'false',CLUERA_BILLING_V2_ENABLED:'false'};
+  expect((await auditCutover(pre,moved,{...options,phase:'cluera'})).stopped).toBe('WEBHOOK_IDENTITY');
+  const report=await auditCutover(intakeEnv(),old,{...options,phase:'cluera-intake'});
+  expect(report.stopped).toBe('WEBHOOK_IDENTITY');expect(report.requests).toBe(1);expect(old.mock.calls.some(([url])=>url.includes('/orders/'))).toBe(false);
+});
+it.each([
+  {VERCEL_PROJECT_ID:'prj_VuG3xCUQqKmPhT0LIAmLuyUwBXg6'},{VERCEL_ENV:'preview'},
+  {SIGMAROUND_ACCOUNT_ORIGIN:'https://sigmaround-account-staging.vercel.app'},{NEXT_PUBLIC_SUPABASE_URL:'https://foreign.supabase.co'},
+  {SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:'true'},{SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED:'false'},
+  {SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'false'},{SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'true'},
+  {CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'false'},{CLUERA_BILLING_V2_ENABLED:'false'},{CLUERA_BILLING_V2_ENABLED:undefined},
+  {RAZORPAY_ENVIRONMENT:'live'},{RAZORPAY_TEST_KEY_ID:'rzp_live_synthetic123456'},
+])('new intake mode refuses wrong target/flags or Live policy before any GET: %j',async change=>{
+  const request=fake({webhook:{...webhook(),url:intakeUrl}});
+  const report=await auditCutover({...intakeEnv(),...change},request,{...options,phase:'cluera-intake'});
+  expect(report.stopped).toBe('CONFIGURATION');expect(report.requests).toBe(0);expect(request).not.toHaveBeenCalled();
 });
 it.each([
   { expectedWebhookId: 'differentId0001' }, { canonicalOrderId: 'order_synthetic0001?extra=1' }, { canonicalIntentId: 'invalid' },
@@ -182,7 +217,7 @@ it('emits three separately parseable, correlated safe sections below 1800 bytes 
     validation:Object.fromEntries(Object.keys(report.payments.validation).map(key=>[key,false])),
     validationFailures:Object.fromEntries(Object.keys(report.payments.validationFailures).map(key=>[key,100])),
     shape:Object.fromEntries(Object.keys(report.payments.shape).map(key=>[key,false]))}};
-  for(const line of auditLogLines(maximumCounts)){expect(Buffer.byteLength(line,'utf8')).toBeLessThan(1800);expect(()=>JSON.parse(line.slice(line.indexOf(' ')+1))).not.toThrow();}
+  for(const phase of ['account','cluera','cluera-intake'])for(const line of auditLogLines({...maximumCounts,phase})){expect(Buffer.byteLength(line,'utf8')).toBeLessThan(1800);expect(()=>JSON.parse(line.slice(line.indexOf(' ')+1))).not.toThrow();}
   for(const value of ['synthetic-private-invalid-id','synthetic-private-state','synthetic-private-email','synthetic-private-provider-error',orderId,intentId,webhookId,accountId,...Object.values(env()).filter((value:string)=>value.includes('secret'))])expect(lines.join('\n')).not.toContain(value);
   expect(request).toHaveBeenCalledTimes(4);
 });

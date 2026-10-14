@@ -6,7 +6,9 @@ October 14, 2026. No production readiness or commercial release approval.
 
 [Cluera billing cutover plan](CLUERA_BILLING_CUTOVER.md) is prepared for the owner's sole Account/subscription product. Local server/UI/SQL-fixture tests do not authorize or establish an actual Test purchase. Unapplied billing/scheduler schema, credential containment, exact merchant/destination read-back, single-owner handoff, genuine signed receipt/capture/pack/monthly invoices, hosted contention and installed desktop synchronization remain explicit gates. All Cluera financial flags remain disabled and old compatibility processing/history is retained. Proposed finite monthly charges and future Admin revisions require review; no commercial/no-bug claim is made.
 
-## Current two-product boundary
+Complete reviewed Cluera1ff315 is now READY at the stable staging alias, with current full regression/typecheck/build/audit and real hosted CI success. Public boundaries22/22 and isolated public layouts16/16 pass; source592/artifact102 scans and retained installer hashes pass. The new release registry remains unapplied: feed/download503 is a fixed no-fallback hold, not accepted distribution. Exact Test merchant/webhook identity passes private GET, but actual signed delivery/payment evidence remains unaccepted. Supersedes the older unpublished/bridge-only checkpoint below. **Next owner action: Phase A passive plan approval only.** [Dated results and limits](CLUERA_IMPLEMENTATION_MIGRATION.md).
+
+## Earlier two-product boundary - superseded bridge-only handoff
 
 Maintain only unchanged License Edition and renamed Account **Cluera AI**. New Cluera server replacements are owner-saved/reloaded; protected web authentication, signed auth-only relay metadata and actual health/revision pass. The exposed credential remains unrevoked, its exact type/consumer inventory must not be assumed, and relay's own privileged DB-key authentication remains unaccepted. Old Account has an active shared scheduler/installed-client trust dependency, so it is a temporary bridge, not safely obsolete or a third product.
 

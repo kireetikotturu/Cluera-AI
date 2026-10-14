@@ -6,6 +6,8 @@ Cluera is the only Account/subscription product. The owner requests safe billing
 
 Do not apply expanded privileged financial RPCs while the exposed credential remains an uncontrolled usable authority. New Cluera modern keys are owner-saved; they do not revoke the old credential. Passive schema approval, temporary bridge saving, complete consumer migration/approved stop, exact legacy-key retirement and financial cutover are distinct checkpoints. Nothing in billing engineering authorizes JWT signing-secret rotation, disabling installed clients or revocation. No secret value is transferred through chat or publication.
 
+Disabled Cluera billing source is now reviewed/published and READY; the old active scheduler still dispatches only to Account. All Cluera/old Account/License environment metadata and23 customer/financial preservation digests match across deployment and GET-only diagnostics. No old credential was replaced, removed or revoked. The next single owner decision is **Phase A passive preparation approval**, including a specifically scoped temporary website bridge if required, not another permanent product. Application remains blocked on incident prerequisites; unknown old relay/installed/License/CI/local/external consumers are not assumed absent. [Dated deployment/provider evidence](CLUERA_IMPLEMENTATION_MIGRATION.md).
+
 ## Earlier October 14 boundary - exactly two products
 
 The owner privately replaced only the **new Cluera web/relay** service keys with separate modern keys and reloaded reviewed3d813f8. Protected Cluera web authentication and signed relay/auth-only evidence pass; the relay's own positive privileged database read remains unaccepted. No replacement value was retrieved or printed. No exposed key has been revoked.

@@ -6,8 +6,10 @@ const { createHash, timingSafeEqual } = require('node:crypto');
 const targets = Object.freeze({
   account: Object.freeze({ project: 'prj_VuG3xCUQqKmPhT0LIAmLuyUwBXg6', origin: 'https://sigmaround-account-staging.vercel.app' }),
   cluera: Object.freeze({ project: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', origin: 'https://cluera-ai-staging.vercel.app' }),
+  'cluera-intake': Object.freeze({ project: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', origin: 'https://cluera-ai-staging.vercel.app' }),
 });
 const endpoint = 'https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook';
+const clueraEndpoint = 'https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook';
 const webhookId = 'TmqOkUNGtvEPLz';
 const requiredEvents = ['payment.captured', 'order.paid', 'refund.processed'];
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -22,9 +24,9 @@ function selection(value) {
   const rows = Object.entries(value); if (rows.some(([, active]) => flag(active) === null)) return null;
   return rows.filter(([, active]) => flag(active) === true).map(([name]) => name);
 }
-function webhookSummary(row, account, expected) {
+function webhookSummary(row, account, expected, destination) {
   const events = selection(row?.events);
-  return { idMatches: row?.id === expected, destinationMatches: row?.url === endpoint,
+  return { idMatches: row?.id === expected, destinationMatches: row?.url === destination,
     testService: ['beta-api-test', 'api-test'].includes(row?.service), merchantOwner: row?.owner_type === 'merchant',
     merchantMatches: equal(row?.owner_id, account) || equal(row?.owner_id, account.slice(4)),
     // raw boolean current flag only; a historical disabled_at marker must not override it.
@@ -42,6 +44,10 @@ function configuration(env, options) {
   const switches = env.SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED === 'false' && (options.phase === 'account'
     ? env.SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED === 'true' && env.SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED === 'true'
       && env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED === 'false'
+    : options.phase === 'cluera-intake'
+      ? env.SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED === 'false' && env.SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED === 'true'
+        && env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED === 'true' && env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED === 'true'
+        && env.CLUERA_BILLING_V2_ENABLED === 'true'
     : env.SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED === 'false' && env.SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED === 'false'
       && env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED === 'true' && env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED === 'false'
       && (env.CLUERA_BILLING_V2_ENABLED === undefined || env.CLUERA_BILLING_V2_ENABLED === 'false'));
@@ -63,6 +69,9 @@ async function auditCutover(env = process.env, request = fetch, options = {}) {
   report.configuration = configuration(env, options);
   if (!report.configuration.exactTarget || !report.configuration.switchesMatch
     || Object.values(report.configuration.formats).some(value => value !== true)) return finish('CONFIGURATION');
+  // Mode chooses between two fixed literal destinations; the caller cannot
+  // override a URL, project or flag to skip the approved handoff boundary.
+  const destination = options.phase === 'cluera-intake' ? clueraEndpoint : endpoint;
   const headers = { Authorization: 'Basic ' + Buffer.from(env.RAZORPAY_TEST_KEY_ID + ':' + env.RAZORPAY_TEST_KEY_SECRET).toString('base64'), Accept: 'application/json' };
   const allowed = path => path === '/v1/webhooks/' + webhookId
     || path === '/v1/orders/' + options.canonicalOrderId || path === '/v1/orders/' + options.canonicalOrderId + '/payments'
@@ -101,17 +110,17 @@ async function auditCutover(env = process.env, request = fetch, options = {}) {
       for (const row of rows) {
         if (typeof row?.id !== 'string' || ids.has(row.id)) throw Error('Invalid collection.'); ids.add(row.id);
         if (row.id === webhookId) listed = row;
-        if (row.url === endpoint) matches++;
+        if (row.url === destination) matches++;
       }
       if (rows.length < 100) { complete = true; break; }
     }
     report.webhookListing = { complete, pages, total, exactDestinationCount: matches, exactIdFound: Boolean(listed) };
     if (!complete || matches !== 1 || !listed) return finish('WEBHOOK_IDENTITY');
-    report.listedWebhook = webhookSummary(listed, env.RAZORPAY_TEST_ACCOUNT_ID, webhookId);
+    report.listedWebhook = webhookSummary(listed, env.RAZORPAY_TEST_ACCOUNT_ID, webhookId, destination);
     const accepted = row => ['idMatches', 'destinationMatches', 'testService', 'merchantOwner', 'merchantMatches', 'active', 'activeIsBoolean', 'exactEvents', 'signerPresent'].every(key => row[key] === true);
     if (!accepted(report.listedWebhook)) return finish('WEBHOOK_IDENTITY');
     const direct = await get('/v1/webhooks/' + webhookId);
-    report.directWebhook = webhookSummary(direct, env.RAZORPAY_TEST_ACCOUNT_ID, webhookId);
+    report.directWebhook = webhookSummary(direct, env.RAZORPAY_TEST_ACCOUNT_ID, webhookId, destination);
     if (!accepted(report.directWebhook)) return finish('WEBHOOK_IDENTITY');
     report.testAuthentication = true; report.merchantIdentityVerified = true;
     stage = 'OWNED_ORDER_READ';
@@ -195,7 +204,7 @@ function auditLogLines(report = {}) {
     'OWNED_ORDER_IDENTITY', 'OWNED_PAYMENTS_READ', 'OWNED_PAYMENT_EVIDENCE', 'COMPLETE', 'UNAVAILABLE'])(report?.stopped) ?? 'UNAVAILABLE';
   const completedAt = typeof report?.completedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(report.completedAt)
     && Number.isFinite(Date.parse(report.completedAt)) ? report.completedAt : new Date().toISOString();
-  const correlation = { component: 'cluera-billing-cutover-get-only', phase: enumeration(['account', 'cluera'])(report?.phase) ?? 'unknown', completedAt };
+  const correlation = { component: 'cluera-billing-cutover-get-only', phase: enumeration(['account', 'cluera', 'cluera-intake'])(report?.phase) ?? 'unknown', completedAt };
   const configuration = pick(report?.configuration, flags(['exactTarget', 'switchesMatch']));
   if (configuration) configuration.formats = pick(report.configuration.formats, flags(['testKeyId', 'apiSecret', 'webhookSecret', 'merchantId']));
   const base = { ...correlation, stopped, requests: count(13)(report?.requests), mutations: 0, signerMatch: 'UNVERIFIED', configuration,

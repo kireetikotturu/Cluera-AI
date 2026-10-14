@@ -9,7 +9,11 @@ Cluera currently has no four Razorpay Test credential entries, sole-tester entry
 
 Do not change Razorpay's current destination or the live database scheduler now. Existing old Account signed intake and worker stay operational pending verified acceptance and approved handoff. New Cluera service-key replacements do not resolve legacy revocation/unknown consumers; follow the incident plan.
 
-## October 14 current - two-product dependency review
+Reviewed Cluera application1ff315 is READYdpl_2aBjSmmaGz6hrAwKR85Trfx6N7Am at the stable staging alias. No environment entry was added or changed; all18 entries and false payment flags/pause=true are preserved. Schema/proposal/diagnostic follow-ups are not website redeployments. [Completed checks and remaining gaps](CLUERA_IMPLEMENTATION_MIGRATION.md). **Next action is Phase A plan approval only**, superseding the older bridge-only instructions below.
+
+After separate private-provisioning approval, the exact missing names are **RAZORPAY_TEST_KEY_ID**, **RAZORPAY_TEST_KEY_SECRET**, **RAZORPAY_TEST_WEBHOOK_SECRET**, **RAZORPAY_TEST_ACCOUNT_ID**, **SIGMAROUND_PAYMENT_TESTER_IDS** (existing sole verified tester only), and **SIGMAROUND_BILLING_WORKER_SECRET** (same separately sealed scheduler key). Save only as Sensitive/Production-only on Cluera; preserve exact existing merchant/key-ID/signer binding. Do not provide values through chat/tool arguments or configure them now. `CLUERA_BILLING_V2_ENABLED` defaults false and may become true only after approved schema verification; all financial switches remain independently controlled.
+
+## Earlier October 14 - two-product dependency review
 
 Only **License Edition** (untouched) and **Cluera AI**, the renamed Account product, are maintained. Old Account endpoints are temporary compatibility/billing dependencies, not a third product. Do not repeat the earlier four-service saving instructions below: owner saved separate modern keys in new Cluera Vercel/Render; legacy revocation remains pending.
 
