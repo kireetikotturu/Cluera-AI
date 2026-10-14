@@ -1,6 +1,14 @@
 # Cluera release blockers
 
-Current next checkpoint is **private website key mapping confirmation**, superseding relay-approval/saving instructions below: only Cluera's service-entry metadata timestamp changed, while old website metadata stayed unchanged. Old modern-key/read proofs pass, but new Cluera Admin UI rollout is paused; current website still runs3661 source. Reviewed effe866d/hosted CI38596766413 passes web1055/22-skipped and desktop366/1-skipped. Confirm account_web only on sigmaround-account-staging and the distinct Cluera-web key on cluera-ai-staging, without values or changes now. See [current execution status](CLUERA_EXECUTION_STATUS.md). Phase A and commercial release remain held; old relay/License/financial ownership are unchanged.
+## Current result - mapping confirmed and Cluera rollout verified
+
+The owner confirmed **Mapping is correct**: account_web remains on the temporary old website and Cluera keeps its separate web key. Named-key equality is owner-confirmed, not remotely decrypted. This resolves the previous private-mapping hold; do not repeat saving or mapping instructions.
+
+Cluera staging is **READY dpl_Ede7hJL3SzUQs914MtbZ67XweTm2**, complete reviewed **14654289a2c714b49af00c94d7e7cfba3aaab3ca** /726 entries/597 hash-and-size-matched blobs, stable https://cluera-ai-staging.vercel.app. Hosted CI38598609149 passes web **1055/22 skipped** and desktop **366/1 skipped** plus typechecks/builds/audits. Fresh focused Admin/release **53/53**, web typecheck and preparation **23/23** pass. Public HTTP **22/22** and isolated selected-plan browser **16/16** pass with no browser writes, SDK requests, page errors or form submissions. These are not real private Auth/MFA, installed Windows, provider or financial acceptance.
+
+Protected GET-only diagnostic **dpl_FWL6ibm6wpHsfoZujNFEK22ws8e6** authenticates Cluera's web service key and signed relay status: auth-only, providers/vault/payments disabled, provider requests0/mutations0. It intentionally exits1 with no website artifact or alias promotion. Relay health200 matches1465428; the relay's own positive database-key authentication remains unaccepted. All18 protected environment metadata entries and23 identical-input preservation snapshots match across the rollout. No secret value, schema, financial row, webhook URL, scheduler ownership, old relay, License feature or installer was changed.
+
+**Single next owner action:** approve or decline temporary old Account relay retention for installed-client compatibility, replacement of **only its service credential** with a separate modern key, and reload of its exact reviewed current source. No private saving yet, provider/source/payment/License change, shutdown or revocation. This is temporary compatibility, not a third product. Phase A stays conditionally approved/unapplied on containment hold; commercial launch remains **NO-GO**. This current result supersedes older next-action and pending-rollout statements below.
 
 October 14, 2026. No production readiness or commercial release approval.
 

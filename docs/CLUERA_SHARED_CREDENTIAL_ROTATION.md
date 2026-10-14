@@ -1,8 +1,15 @@
 # Shared Supabase credential incident — approval-required plan
 
-## Latest verified results and pending private mapping
+## Current result - mapping confirmed and Cluera rollout verified
 
-Current owner checkpoint supersedes relay-approval instructions below: Cluera's service-entry metadata updated15:45:47.008UTC while old website metadata stayed unchanged. Its intervening READYdpl_6ri1jbdoj8Htoho1omPXGdnRH1Zg uses old3661 source and became READY before that entry update; agent did not create it/edit keys. Old website modern-key guarded reload/positive SDK read pass, but exact per-component named-key mapping is not independently matched. Privately confirm account_web only in sigmaround-account-staging and distinct Cluera-web key in cluera-ai-staging; report mapping only, no values or changes. New Cluera UI deployment remains paused. This does not infer a wrong-project save or waive legacy containment.
+The owner confirmed **Mapping is correct**: account_web remains on the temporary old website and Cluera keeps its separate web key. Named-key equality is owner-confirmed, not remotely decrypted. This resolves the previous private-mapping hold; do not repeat saving or mapping instructions.
+
+Cluera staging is **READY dpl_Ede7hJL3SzUQs914MtbZ67XweTm2**, complete reviewed **14654289a2c714b49af00c94d7e7cfba3aaab3ca** /726 entries/597 hash-and-size-matched blobs, stable https://cluera-ai-staging.vercel.app. Hosted CI38598609149 passes web **1055/22 skipped** and desktop **366/1 skipped** plus typechecks/builds/audits. Fresh focused Admin/release **53/53**, web typecheck and preparation **23/23** pass. Public HTTP **22/22** and isolated selected-plan browser **16/16** pass with no browser writes, SDK requests, page errors or form submissions. These are not real private Auth/MFA, installed Windows, provider or financial acceptance.
+
+Protected GET-only diagnostic **dpl_FWL6ibm6wpHsfoZujNFEK22ws8e6** authenticates Cluera's web service key and signed relay status: auth-only, providers/vault/payments disabled, provider requests0/mutations0. It intentionally exits1 with no website artifact or alias promotion. Relay health200 matches1465428; the relay's own positive database-key authentication remains unaccepted. All18 protected environment metadata entries and23 identical-input preservation snapshots match across the rollout. No secret value, schema, financial row, webhook URL, scheduler ownership, old relay, License feature or installer was changed.
+
+**Single next owner action:** approve or decline temporary old Account relay retention for installed-client compatibility, replacement of **only its service credential** with a separate modern key, and reload of its exact reviewed current source. No private saving yet, provider/source/payment/License change, shutdown or revocation. This is temporary compatibility, not a third product. Phase A stays conditionally approved/unapplied on containment hold; commercial launch remains **NO-GO**. This current result supersedes older next-action and pending-rollout statements below.
+
 
 ## Latest completed component - old website only
 
