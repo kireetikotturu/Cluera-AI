@@ -8,7 +8,6 @@ import {offerDisplay} from '../../../lib/billing/offerDisplay';
 import RazorpayCheckout from './RazorpayCheckout';
 import { razorpayCheckoutEnabled } from '../../../lib/payments/core/config';
 import {STAGING_DATABASE,STAGING_SITE} from '../../../lib/accountRelay/config';
-import {clueraTargetPlans} from '../../../lib/cluera/targetPlans';
 import ClueraCheckoutClient from './ClueraCheckoutClient';
 import {clueraCheckoutEnabled} from '../../../lib/payments/cluera/config';
 
@@ -33,10 +32,7 @@ export default async function CheckoutPage() {
       ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
     return <main className="account-page"><h1>Buy Cluera credits</h1><p>Test payments are paused. No payment is enabled in this Cluera workspace. Recurring offers and Stripe are unavailable.</p>
       <p>Owner-confirmed planned pricing only; these are not active catalog offers. Existing payment history and allowances are unchanged.</p>
-      <div className="account-purchase-grid">{clueraTargetPlans.map(offer=><article key={offer.id}>
-        <h2>{offer.name}</h2><p>{offerDisplay(offer).label}</p><p>{offerDisplay(offer).terms}</p>
-        <button className="button" type="button" disabled>Checkout unavailable</button>
-      </article>)}</div><a href="/account">Return to your account</a></main>;
+      <ClueraCheckoutClient enabled={false}/><a href="/account">Return to your account</a></main>;
   }
   let staging = false;
   try { assertCheckoutStaging(process.env); staging = true; } catch { /* Non-staging: no checkout surface. */ }

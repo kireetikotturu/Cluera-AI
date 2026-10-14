@@ -1,12 +1,28 @@
 # Shared Supabase credential incident — approval-required plan
 
-## October 14 billing handoff - incident gate retained
+## Latest owner reply - legacy JWT format; validity remains unknown
+
+Owner confirms legacy service-role JWT format/project, separate new Cluera sb_secret_ saving, unknown active/dummy status and no revocation authority. Do not repeat the type question or assume a dummy. A private in-memory check of only five supplied request attachments found no unique project/service-role candidate: zero authorization requests/mutations/value output/extra copies. The actual exposed value was not tested. Replacements do not retire a legacy key.
+
+Phase A remains conditional/unapplied while independent web work continues. Next necessary **component-specific approval**: temporary old website-only replacement/pinned reload, preserving all other old configuration/source/payment settings. Its active scheduler makes it a confirmed compatibility consumer, not a third product. Private saving occurs only after this approval; unknown additional consumers, legacy-wide compatibility and separately approved retirement remain outstanding. [Current status/preservation evidence](CLUERA_EXECUTION_STATUS.md).
+
+## Earlier October 14 - Phase A approved conditionally; key identity/status required
+
+The owner approved only frozen Cluera billing schema and passive scheduler preparation **after** sufficient containment and passing prerequisites. The condition remains unmet: no exact exposed-key retirement or enforced independent isolation has been verified. No migration, environment change, replacement/revocation, JWT rotation, provider action or financial write was performed.
+
+Protected metadata retains the Cluera replacement entry and unchanged old website entry. Public-key metadata shows legacy anon and modern publishable enabled; it cannot identify or establish revocation of the exposed server key. Available tools lack private-key inventory/revocation. Old relay, License key equality and external consumers remain unknown. Do not infer clearance from new keys, disabled checkout, RLS, READY/health or unchanged financial digests.
+
+Frozen hashes match. The core adds service_role-executable SECURITY DEFINER billing APIs; valid legacy and modern server keys reach the same role. Direct table grants correctly deny CRUD, but new callable APIs still expand privileged authority. Schema remains absent/RPC count0; old scheduler retains its exact definition/destination. Fresh23-table digests match13:26:38.991609-13:29:28.414945UTC, not proof of non-abuse. [Phase A hold evidence](CLUERA_BILLING_CUTOVER.md).
+
+**Single next owner action:** privately check retained project `dwqltsqumiwsxtkzdoaa` -> Settings -> API Keys; report only **legacy service_role** or **named modern sb_secret_**, and **active/revoked status** (non-secret name/ID only if modern). No key value, setting change, old-service saving or revocation now. This replaces repeat-approval/bridge-only handoffs. The appropriate containment mutation needs separate authorization; legacy-wide deactivation requires client compatibility, and JWT signing-key rotation remains excluded. These are local result-guide updates only.
+
+## Earlier October 14 billing handoff - incident gate retained
 
 Cluera is the only Account/subscription product. The owner requests safe billing migration engineering, not immediate webhook/worker/payment activation. [Billing cutover plan](CLUERA_BILLING_CUTOVER.md) supersedes the earlier bridge-only next-action handoff below. Old website credential bridging is a temporary containment measure during the approved drain, never permanent third-product setup. Old relay dependency saving remains on hold; License exact-key equality and other consumers remain unknown.
 
 Do not apply expanded privileged financial RPCs while the exposed credential remains an uncontrolled usable authority. New Cluera modern keys are owner-saved; they do not revoke the old credential. Passive schema approval, temporary bridge saving, complete consumer migration/approved stop, exact legacy-key retirement and financial cutover are distinct checkpoints. Nothing in billing engineering authorizes JWT signing-secret rotation, disabling installed clients or revocation. No secret value is transferred through chat or publication.
 
-Disabled Cluera billing source is now reviewed/published and READY; the old active scheduler still dispatches only to Account. All Cluera/old Account/License environment metadata and23 customer/financial preservation digests match across deployment and GET-only diagnostics. No old credential was replaced, removed or revoked. The next single owner decision is **Phase A passive preparation approval**, including a specifically scoped temporary website bridge if required, not another permanent product. Application remains blocked on incident prerequisites; unknown old relay/installed/License/CI/local/external consumers are not assumed absent. [Dated deployment/provider evidence](CLUERA_IMPLEMENTATION_MIGRATION.md).
+Disabled Cluera billing source is reviewed/published and READY; the old active scheduler still dispatches only to Account. Cluera/old Account/License metadata and23 preservation digests matched across deployment and GET-only diagnostics. No old credential was replaced, removed or revoked. **Phase A is now approved conditionally**; execution remains blocked on incident prerequisites. The latest key identity/status action supersedes the former repeat-approval instruction. Unknown old relay/installed/License/CI/local/external consumers are not assumed absent. [Dated deployment/provider evidence](CLUERA_IMPLEMENTATION_MIGRATION.md).
 
 ## Earlier October 14 boundary - exactly two products
 

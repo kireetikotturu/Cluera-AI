@@ -67,7 +67,9 @@ it('Cluera target pricing is explicitly unavailable and never loads a payment SD
  expect(html).toContain('100 hours per month');expect(html).toContain('not active payment offers');
  expect(html).toContain('No card, UPI or QR method is claimed accepted yet');
  expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
- expect((html.match(/href="\/account\/checkout"/g)||[])).toHaveLength(4);
+ for(const code of ['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2']){
+  expect(html).toContain(`href="/account/checkout?offer=${code}"`);
+ }
 });
 it('Cluera presentation is independent of old provider selection and does not alter financial policies',()=>{
  vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','razorpay');const first=renderToStaticMarkup(AccountPricing());

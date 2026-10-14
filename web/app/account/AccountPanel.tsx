@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccountWorkspace } from './AccountWorkspace';
 import {authFailure,emailNotice,publicLoginSchema,publicSessionSchema,safeGoogleRedirect,type PublicAccount} from '../../lib/accounts/publicAuth';
+import {resolveCheckoutSelection,selectionFromSearch,clearCheckoutSelection,checkoutSelectionHref,checkoutSelectionName,type CheckoutSelection} from '../../lib/cluera/checkoutJourney';
 import './account-ui.css';
 
 type FormMode = 'login' | 'signup' | 'forgot-password' | 'resend-verification';
@@ -13,6 +14,7 @@ export function AccountPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [visible, setVisible] = useState(false);
+  const [selection,setSelection]=useState<CheckoutSelection|null>(null);
   const inFlight = useRef(false);
   const alive = useRef(true);
   const writeController = useRef<AbortController | null>(null);
@@ -23,6 +25,8 @@ export function AccountPanel() {
   }
   useEffect(() => {
     alive.current = true;
+    try{setSelection(resolveCheckoutSelection(window.location.search,window.sessionStorage));}
+    catch{setSelection(selectionFromSearch(window.location.search));}
     const selectMode = () => {
       if (inFlight.current) return;
       const hash = window.location.hash;
@@ -61,7 +65,9 @@ export function AccountPanel() {
       if(action==='login'){const result=publicLoginSchema.parse(data);setAccount(result.account);setRecovery(false);return;}
       if (action === 'logout' || action === 'reset-password') {
         if(data?.ok!==true||Object.keys(data).some(k=>!['ok','message'].includes(k)))throw new Error('Invalid response.');
-        setAccount(null);setRecovery(false);chooseMode('login');
+        try{clearCheckoutSelection(window.sessionStorage);}catch{/* Auth works without browser storage. */}
+        window.history.replaceState(null,'',window.location.pathname);
+        setSelection(null);setAccount(null);setRecovery(false);chooseMode('login');
         setMessage(action==='reset-password'?'Password updated. Sign in again.':'');return;
       }
       if(Object.keys(data).length!==1||data.message!==emailNotice)throw new Error('Invalid response.');
@@ -72,6 +78,11 @@ export function AccountPanel() {
   if (loading) return <p role="status">Checking your account…</p>;
   return <section className={`account-card${!account ? ' account-auth' : ''}`} aria-busy={busy}>
     {message ? <p role="status">{message}</p> : null}
+    {selection&&!recovery?<aside className="cluera-plan-handoff" aria-label="Selected Cluera plan">
+      <p>Selected plan: <strong>{checkoutSelectionName(selection)}</strong></p>
+      <p>Prices and availability are checked again on the server. Sign-in never starts a payment.</p>
+      {account?<a className="button secondary" href={checkoutSelectionHref(selection)}>Continue to selected plan</a>:null}
+    </aside>:null}
     {account ? <>
       <p>Signed in as <strong>{account.email}</strong></p>
       <p>Your one-time 15-minute trial is registered. This is the isolated account staging environment.</p>

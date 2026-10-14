@@ -7,4 +7,9 @@
 .cluera-site .account-panel :where(input,select,textarea){color-scheme:dark}
 .cluera-site .support-grid article{min-width:0}
 .cluera-site .support-email{overflow-wrap:anywhere}
+.cluera-plan-handoff{min-width:0;padding:16px 18px;margin-block:16px;border:1px solid #6256a5;border-radius:14px;background:linear-gradient(135deg,#211d38,#17202f);overflow-wrap:anywhere}
+.cluera-plan-handoff p{margin:0 0 8px;line-height:1.6;font-size:13px;color:#cbd4e6}
+.cluera-plan-handoff .button{display:inline-flex;max-width:100%;white-space:normal}
+.cluera-site .cluera-plan-selected{border-color:#a99aff;box-shadow:0 0 0 1px #a99aff}
+.cluera-selection-badge{display:inline-block;padding:4px 9px;border-radius:20px;color:#dcd5ff;background:#372d59;font-size:11px;font-weight:600}
 @media(max-width:600px){.cluera-site .hero{min-height:0}.cluera-site .hero-actions{align-items:stretch}.cluera-site .hero-actions .button{text-align:center}}

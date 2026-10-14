@@ -37,6 +37,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   history.replaceState(null, '', '/account/checkout');
+  sessionStorage.clear();
   createdBinding=null;
 });
 afterEach(async () => {
@@ -59,9 +60,27 @@ it('shows all four approved presentations while migration is unavailable, with n
   for (const price of ['₹549', '₹5,499', '₹9,599', '₹19,549']) expect(host.textContent).toContain(price);
   expect(host.textContent).toContain('PRESENTATION ONLY'); expect(host.textContent).toContain('Checkout is disabled');
   expect(host.textContent).not.toContain('synthetic-private-diagnostic');
-  expect(buttons().filter(item => item.textContent?.includes('Checkout awaiting')).every(item => item.disabled)).toBe(true);
+  const unavailable=buttons().filter(item=>item.textContent==='Checkout unavailable');
+  expect(unavailable).toHaveLength(4);expect(unavailable.every(item=>item.disabled)).toBe(true);
   expect(request.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
   expect(document.querySelector('script[src*="razorpay"]')).toBeNull(); expect(host.querySelector('input')).toBeNull();
+});
+it('a pricing selection highlights one planned offer and preserves sign-in without bypassing disabled checkout',async()=>{
+ history.replaceState(null,'',`/account/checkout?offer=cluera_monthly_100h_v2&desktopAccount=${userId}`);
+ const request=vi.fn(async()=>new Response(null,{status:401}));vi.stubGlobal('fetch',request);
+ await renderCheckout(false);
+ expect(host.querySelectorAll('.cluera-plan-selected')).toHaveLength(1);
+ expect(host.querySelector('.cluera-plan-selected')!.textContent).toContain('Cluera Pro 100 Hours');
+ expect(host.querySelector<HTMLAnchorElement>('a')!.getAttribute('href')).toBe(`/account?offer=cluera_monthly_100h_v2&desktopAccount=${userId}#login`);
+ expect(request.mock.calls.every(([,init])=>!(init as RequestInit|undefined)?.method)).toBe(true);
+ expect(document.querySelector('script')).toBeNull();expect(buttons().filter(b=>b.textContent==='Checkout unavailable').every(b=>b.disabled)).toBe(true);
+});
+it('duplicate desktop owner hints fail closed before any account/catalog reads',async()=>{
+ history.replaceState(null,'',`/account/checkout?desktopAccount=${userId}&desktopAccount=${factorId}`);
+ const request=vi.fn();vi.stubGlobal('fetch',request);await renderCheckout(true);
+ expect(request).not.toHaveBeenCalled();expect(host.textContent).not.toContain('Signed in as');
+ expect(host.querySelectorAll('.account-plan-card button')).toHaveLength(4);
+ expect([...host.querySelectorAll<HTMLButtonElement>('.account-plan-card button')].every(b=>b.disabled)).toBe(true);
 });
 
 it('retains historical Paddle rows without using them as a new binding or automatically opening checkout', async () => {

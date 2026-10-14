@@ -1,4 +1,11 @@
 # Architecture and security
+
+## October 14 navigation/security boundary
+
+Plan navigation is a hint, never a server price/revision/identity/permission. Four allowlisted Cluera codes and an optional desktop UUID survive into fixed local account/checkout links. Duplicate/invalid hints, hostile return URLs and unexpected stored fields cannot enable checkout. Same-browser state expires after30 minutes; logout/reset clear it and recovery cannot continue. No password/token/provider resource is stored; no automatic SDK/order/payment. Server live-session/owner/tester/catalog and raw-signature/provider-evidence checks remain authoritative.
+
+Owner confirms suspected legacy service-role JWT format, not dummy/retired status. Five supplied attachments contained no unique candidate; no authorization check was attempted. Conditional Phase A cannot expand privileged billing APIs before containment. Replacement keys, disabled buttons, RLS and unchanged digests are not retirement proof. [Execution/approval map](CLUERA_EXECUTION_STATUS.md). No old service, License, key trust, financial row or frozen SQL was changed.
+
 Cluera web/browser → dedicated Vercel BFF → retained Supabase Auth/live sessions/RLS/service-only RPCs.
 Cluera Electron renderer → narrow preload → main-memory access credentials + OS-encrypted refresh state → dedicated Render WSS → same retained server usage reservations → server-only Gemini and Flux.
 Local history/files stay in the new UUID-isolated profile; selected extracted cloud context uses the retained backend. No automatic original-file backup or cross-product token transfer.
@@ -9,7 +16,7 @@ Release approval uses a new Cluera registry/RPC/product lock and existing explic
 
 NEXT_PUBLIC key validation rejects service-role/secret keys before bundling. Provider metadata is HMAC-bound to X-Cluera proof headers/nonces and a dedicated scope. Logs retain categorical operation/stage/status, never credentials or provider payloads. Production secrets belong only in the selected new service/project; private local preparation and binaries are ignored.
 
-Compatibility exceptions: account/customer/billing SQL/API names and SIGMAROUND_* configuration names are intentional, separately scoped in new resources. Approved SigmaPro/SigmaEnterprise prices and provider IDs remain financial policy, not branding strings. Historical migrations/audits and old source/profile/EXE names stay unchanged. Support remains sigmaroundsupport@gmail.com. Some isolated audio preference keys retain their old prefix; they live solely inside the new profile. AppConfig's internal licensing property describes release trust only, not License authorization.
+Compatibility exceptions: account/customer/billing SQL/API names and SIGMAROUND_* configuration names are intentional, separately scoped in new resources. Historical SigmaPro/SigmaEnterprise prices/provider IDs remain untouched; new Cluera v2 revisions do not alias them. Historical migrations/audits and old source/profile/EXE names stay unchanged. Cluera support is clueraaisupport@gmail.com; old product support is not redirected by this work. Some isolated audio preference keys retain their old prefix solely inside the new profile. AppConfig's internal licensing property describes release trust only, not License authorization.
 
 Do not run historical migrations, SQL grants, release publication, role/MFA changes, customer/provider spend or payment recovery as a smoke test. New native callback uses43822 rather than old43821. All-device logout affects all clients of the same retained Auth identity by design. Keep old callbacks and rollback clients.
 

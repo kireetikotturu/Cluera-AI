@@ -4,8 +4,10 @@ import {createRoot} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {AccountPanel} from '../app/account/AccountPanel';
 import {emailNotice} from '../lib/accounts/publicAuth';
+import {resolveCheckoutSelection} from '../lib/cluera/checkoutJourney';
+vi.mock('../app/account/AccountWorkspace',()=>({AccountWorkspace:()=>createElement('p',{},'Synthetic account workspace')}));
 let host:HTMLDivElement,root:ReturnType<typeof createRoot>;
-beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);host=document.createElement('div');document.body.append(host);root=createRoot(host);history.replaceState(null,'','/account');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({},{status:401})));});
+beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);sessionStorage.clear();host=document.createElement('div');document.body.append(host);root=createRoot(host);history.replaceState(null,'','/account');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({},{status:401})));});
 afterEach(()=>{act(()=>root.unmount());host.remove();vi.unstubAllGlobals();});
 it.each([['#signup','Create an account'],['#forgot-password','Reset your password'],['#unknown','Sign in']])('honors only allowlisted non-secret browser handoff %s',async(hash,title)=>{
  history.replaceState(null,'',`/account${hash}`);await act(async()=>root.render(createElement(AccountPanel)));
@@ -49,4 +51,30 @@ it('offers explicit email-only verification resend with no automatic request',as
  await act(async()=>root.render(createElement(AccountPanel)));expect(host.querySelector('h2')?.textContent).toBe('Resend verification');expect(host.querySelector('input[name="password"]')).toBeNull();expect(fetcher).toHaveBeenCalledOnce();
  (host.querySelector('input[name="email"]') as HTMLInputElement).value='fixture@example.invalid';await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
  const post=fetcher.mock.calls.find(([,init])=>init?.method==='POST')!;expect(post[0]).toBe('/api/account/resend-verification');expect(JSON.parse(post[1]!.body as string)).toEqual({email:'fixture@example.invalid'});expect(host.textContent).toContain(emailNotice);
+});
+it('retains the selected plan through signup and email/Google return without requesting payment',async()=>{
+ history.replaceState(null,'','/account?offer=cluera_monthly_100h_v2#signup');
+ await act(async()=>root.render(createElement(AccountPanel)));
+ expect(host.textContent).toContain('Selected plan: Cluera Pro 100 Hours');
+ expect(sessionStorage.getItem('cluera.checkout-selection.v1')).toContain('cluera_monthly_100h_v2');
+ expect(vi.mocked(fetch).mock.calls.every(([url,init])=>url==='/api/account/session'&&!init?.method)).toBe(true);
+ await act(async()=>Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Back to sign in')!.click());
+ expect(location.search).toBe('?offer=cluera_monthly_100h_v2');
+});
+const syntheticAccount={userId:'00000000-0000-4000-8000-000000000801',email:'fixture@example.invalid',trialSecondsGranted:900,remoteDesktop:false};
+it('a restored verified session offers the remembered plan but never automatically navigates or starts checkout',async()=>{
+ resolveCheckoutSelection('?offer=cluera_monthly_40h_v2',sessionStorage);
+ const request=vi.fn(async()=>Response.json({account:syntheticAccount,passwordRecovery:false}));vi.stubGlobal('fetch',request);
+ await act(async()=>root.render(createElement(AccountPanel)));
+ const link=host.querySelector<HTMLAnchorElement>('a[href*="checkout"]')!;
+ expect(link.textContent).toBe('Continue to selected plan');expect(link.getAttribute('href')).toBe('/account/checkout?offer=cluera_monthly_40h_v2');
+ expect(location.pathname).toBe('/account');expect(request).toHaveBeenCalledOnce();expect(host.querySelector('script')).toBeNull();
+});
+it('password recovery cannot expose the plan continuation and logout clears both selection storage and query',async()=>{
+ history.replaceState(null,'','/account?offer=cluera_pack_3h_v2');
+ const request=vi.fn(async(_url:unknown,init?:RequestInit)=>init?.method==='POST'?Response.json({ok:true}):Response.json({account:syntheticAccount,passwordRecovery:true}));vi.stubGlobal('fetch',request);
+ await act(async()=>root.render(createElement(AccountPanel)));
+ expect(host.querySelector('a[href*="checkout"]')).toBeNull();
+ await act(async()=>Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Sign out of this browser')!.click());
+ expect(sessionStorage.getItem('cluera.checkout-selection.v1')).toBeNull();expect(location.search).toBe('');expect(host.textContent).not.toContain('Selected plan');
 });

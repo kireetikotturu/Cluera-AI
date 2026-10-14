@@ -12,7 +12,9 @@ it('shows four reviewed prices/hours, honest terms and no payment SDK or promise
  for(const offer of clueraTargetPlans){const display=offerDisplay(offer);expect(html).toContain(offer.name);expect(html).toContain(display.label);expect(html).toContain(display.terms);}
  expect(html).toContain('do not roll over');expect(html).toContain('before packs');expect(html).toContain('not active payment offers');
  expect(html).toContain('Remote Desktop and Mobile are not included');expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
- expect((html.match(/href="\/account\/checkout"/g)||[])).toHaveLength(4);
+ for(const code of ['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2']){
+  expect(html).toContain(`href="/account/checkout?offer=${code}"`);
+ }
  expect(html).toContain('Checkout unavailable');expect(html).toContain('100 hours per month');
 });
 it('always presents Cluera pricing without enabling a financial route',()=>{

@@ -2,6 +2,12 @@
 
 October 14, 2026. No production readiness or commercial release approval.
 
+## Current safe-flow progress
+
+[Execution status](CLUERA_EXECUTION_STATUS.md) tracks all nine priorities. Selected-plan customer/Auth navigation is implemented; actual verification/deployment results are recorded after completion. Existing desktop features/TEST bytes remain untouched. Fixtures/public checks do not accept private email/Google/MFA, installed Windows, provider/credit or commercial journeys.
+
+Phase A is already approved conditionally. Legacy JWT format is confirmed; validity/dummy status is unknown and no candidate was available in five supplied attachments for a private authorization test. Schemas remain unapplied, old scheduler operational, Cluera payment flags false and AI auth-only. Next approval is temporary old website-only containment bridge/pinned reload, not another Phase A vote, third product, purchase or revocation. Customer invoices/subscription controls, provider generation/cost telemetry and operations/legal/signing are not claimed finished.
+
 ## New billing migration gate
 
 [Cluera billing cutover plan](CLUERA_BILLING_CUTOVER.md) is prepared for the owner's sole Account/subscription product. Local server/UI/SQL-fixture tests do not authorize or establish an actual Test purchase. Unapplied billing/scheduler schema, credential containment, exact merchant/destination read-back, single-owner handoff, genuine signed receipt/capture/pack/monthly invoices, hosted contention and installed desktop synchronization remain explicit gates. All Cluera financial flags remain disabled and old compatibility processing/history is retained. Proposed finite monthly charges and future Admin revisions require review; no commercial/no-bug claim is made.

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { usageDuration } from '../../../lib/usage/display';
+import {offerDisplay} from '../../../lib/billing/offerDisplay';
 import { clueraTargetPlans } from '../../../lib/cluera/targetPlans';
+import {selectionFromSearch,checkoutSelectionHref,checkoutSelectionName,type CheckoutSelection} from '../../../lib/cluera/checkoutJourney';
 import { clueraBoundCheckout, clueraCatalogResponse, clueraCheckoutStatus,
   clueraAllowance, clueraPrice, type ClueraPublicRevision, type ClueraBoundCheckout,
 } from '../../../lib/payments/cluera/publicCatalog';
@@ -41,6 +43,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
 }) {
   const [catalog, setCatalog] = useState<ClueraPublicRevision[]>(offers);
   const [credits, setCredits] = useState<Credits | null>(null);
+  const [selection,setSelection]=useState<CheckoutSelection|null>(null);
   const [busy, setBusy] = useState(false), [eligible, setEligible] = useState(false);
   const [message, setMessage] = useState('Checking your verified Cluera account…');
   const alive = useRef(false), epoch = useRef(0), owner = useRef<string | null>(null);
@@ -83,7 +86,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
       const freshCatalog = clueraCatalogResponse.parse(await catalogResponse.json()).catalog;
       if (!current()) return; setCatalog(freshCatalog);
       if (!enabledRef.current) {
-        setMessage('Cluera billing migration is awaiting approval. Checkout is disabled; no payment is requested.'); return;
+        setMessage('Cluera payment acceptance is pending. Checkout is disabled; no payment is requested.'); return;
       }
       const response = await fetch(`${endpoint}/checkout?expectedAccountId=${encodeURIComponent(account.userId)}`,
         { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
@@ -111,7 +114,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
             : 'Your verified account may begin one explicitly approved Razorpay Test checkout.');
     } catch {
       if (current()) { setEligible(false); setMessage(!enabledRef.current
-        ? 'Cluera billing migration is awaiting approval. Checkout is disabled; no payment is requested.'
+        ? 'Cluera payment acceptance is pending. Checkout is disabled; no payment is requested.'
         : 'Account or payment verification is unavailable. Refresh status only; do not retry a payment.'); }
     } finally {
       if (read.current === controller) read.current = null;
@@ -122,8 +125,9 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
 
   useEffect(() => {
     alive.current = true;
-    const hint = new URLSearchParams(location.search).get('desktopAccount');
-    invalidHint.current = hint !== null && !z.uuid().safeParse(hint).success;
+    setSelection(selectionFromSearch(location.search));
+    const query=new URLSearchParams(location.search),hint=query.get('desktopAccount');
+    invalidHint.current = query.getAll('desktopAccount').length>1||(hint !== null && !z.uuid().safeParse(hint).success);
     desktopOwner.current = invalidHint.current ? null : hint;
     void refresh();
     const focus = () => { if (Date.now() - lastFocus.current < 5_000) return; lastFocus.current = Date.now(); void refresh(); };
@@ -138,7 +142,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
   useEffect(() => {
     if (!enabled) {
       setEligible(false); write.current?.abort(); overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
-      setMessage('Cluera billing migration is awaiting approval. Checkout is disabled; no payment is requested.');
+      setMessage('Cluera payment acceptance is pending. Checkout is disabled; no payment is requested.');
     }
   }, [enabled]);
 
@@ -235,10 +239,13 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
     <h2>Time for your next session</h2>
     <p>Server-owned account, price revision and payment evidence. No customer account-ID entry.</p>
     <p role="status" aria-live="polite">{message}</p>
+    {selection?<aside className="cluera-plan-handoff" aria-label="Selected Cluera plan"><p>Selected plan: <strong>{checkoutSelectionName(selection)}</strong></p>
+      <p>Your selection is not a purchase. Only a fresh verified account, current catalog revision and separately approved availability can enable checkout.</p></aside>:null}
     {credits ? <p>Signed in as {credits.displayName?.trim() || 'verified customer'} · Available time: {usageDuration(credits.availableMilliseconds)}</p>
-      : <a href="/account">Sign in to Cluera AI</a>}
+      : <a href={selection?checkoutSelectionHref(selection,true):'/account#login'}>Sign in to Cluera AI</a>}
     <button type="button" disabled={busy} onClick={() => void refresh()}>Refresh billing status</button>
-    <div className="account-pricing-grid">{rows ? rows.map(revision => <article key={revision.revisionId} className="account-plan-card">
+    <div className="account-pricing-grid">{rows ? rows.map(revision => <article key={revision.revisionId} className={`account-plan-card${selection?.offerCode===revision.offerCode?' cluera-plan-selected':''}`}>
+      {selection?.offerCode===revision.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
       <p className="account-ui-kicker">{revision.kind === 'PACK' ? 'ONE-TIME PACK' : 'MONTHLY SUBSCRIPTION'}</p>
       <h3>{revision.name}</h3><p>{clueraPrice(revision.amountPaise)}{revision.kind === 'RECURRING' ? ' / month' : ''}</p>
       <p>{clueraAllowance(revision.allowanceSeconds)} · {revision.kind === 'PACK' ? 'no expiry; packs stack' : `no rollover; up to ${revision.totalCount} monthly charges`}</p>
@@ -246,11 +253,12 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
       {revision.kind === 'RECURRING' && !revision.testPlanValidated ? <p>Test plan and lifecycle acceptance pending. Not available.</p> : null}
       <button type="button" disabled={!enabled || !eligible || busy || !revision.enabled || !revision.testPlanValidated}
         onClick={() => void buy(revision)}>{revision.kind === 'PACK' ? `Pay ${clueraPrice(revision.amountPaise)} in Test Mode` : `Subscribe for ${clueraPrice(revision.amountPaise)} in Test Mode`}</button>
-    </article>) : clueraTargetPlans.map(plan => <article key={plan.id} className="account-plan-card">
+    </article>) : clueraTargetPlans.map(plan => <article key={plan.id} className={`account-plan-card${selection?.offerCode===plan.offerCode?' cluera-plan-selected':''}`}>
+      {selection?.offerCode===plan.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
       <p className="account-ui-kicker">PRESENTATION ONLY · NOT YET PURCHASABLE</p>
-      <h3>{plan.name}</h3><p>{clueraPrice(Number(plan.amount))}{plan.interval ? ' / month' : ''}</p>
-      <p>{clueraAllowance(plan.seconds)} · {plan.interval ? 'no rollover' : 'no expiry; packs stack'}</p>
-      <button type="button" disabled>Checkout awaiting migration approval</button>
+      <h3>{plan.name}</h3><p>{offerDisplay(plan).label}</p>
+      <p>{offerDisplay(plan).terms}</p>
+      <button type="button" disabled>Checkout unavailable</button>
     </article>)}</div>
     <p>Recurring Test setup is not production acceptance. Payment-method availability must be verified; no ₹19,549 UPI mandate is promised. Stripe and customer BYOK are unavailable.</p>
     <h3>Preserved server-confirmed history</h3>

@@ -1,6 +1,12 @@
 # Cluera staging private setup
 Only new Cluera resources. Do not modify old Account or License services.
 
+## Current October 14 execution
+
+Phase A is approved conditionally, not awaiting repeat approval. Legacy JWT format is owner-confirmed; validity/retirement remains unverified. Frozen proposals are unapplied. [Current execution](CLUERA_EXECUTION_STATUS.md) and [containment checkpoint](CLUERA_SHARED_CREDENTIAL_ROTATION.md) replace older saving/approval instructions. No Cluera setting, payment credential, tester, worker or provider key was changed.
+
+Selected-offer navigation/Auth continuation never starts payment. Same-browser hints are bounded and cleared on logout/recovery. Web-only rollout uses complete reviewed staging Git source, original lock, npm ci/production build. Existing installers, billing owner and provider mode remain untouched; real private Auth/Windows/provider/payment acceptance is still open.
+
 ## New billing preparation - do not save or activate blindly
 
 [Cluera billing cutover](CLUERA_BILLING_CUTOVER.md) defines separate passive-schema, receiver, owner/scheduler and purchase approvals. Prepared new endpoints require `CLUERA_BILLING_V2_ENABLED`, which defaults false; it is a schema-selection gate, not a duplicate Account flag or payment authorization. The canonical `SIGMAROUND_ACCOUNTS_ENABLED` remains unchanged.
