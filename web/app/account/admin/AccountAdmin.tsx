@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import {usageDuration} from '../../../lib/usage/display';
 import {ProviderStatus} from './ProviderStatus';
 import {AiProviders} from './AiProviders';
@@ -28,7 +28,10 @@ export function AccountAdmin(){
  const running=useRef(false),alive=useRef(true),reading=useRef<AbortController|null>(null),readVersion=useRef(0);
  const pendingOperation=useRef<object|null>(null);
  const pendingUncertain=useRef(false);
+ const releaseLock=useRef(false),[releaseLocked,setReleaseLocked]=useState(false);
+ const releaseLockChanged=useCallback((value:boolean)=>{releaseLock.current=value;if(alive.current)setReleaseLocked(value);},[]);
  async function load(id=subject,search=query,cursor?:{createdAt:string;userId:string}){
+  if(releaseLock.current)return;
   reading.current?.abort();
   const controller=new AbortController(),version=++readVersion.current;
   reading.current=controller;setLoading(true);setMessage('');
@@ -50,7 +53,7 @@ export function AccountAdmin(){
  }
  useEffect(()=>{alive.current=true;void load('');return()=>{alive.current=false;++readVersion.current;reading.current?.abort();reading.current=null;};},[]);
  async function action(body:object){
-  if(running.current||reading.current||(pendingOperation.current&&pendingOperation.current!==body))return;
+  if(releaseLock.current||running.current||reading.current||(pendingOperation.current&&pendingOperation.current!==body))return;
   running.current=true;setBusy(true);setMessage('');
   try{
    const response=await fetch('/api/account/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
@@ -77,15 +80,15 @@ export function AccountAdmin(){
   finally{running.current=false;if(alive.current)setBusy(false);}
  }
  const mutate=(kind:string,input:object,reason:string,id:string|null=subject||null)=>{
-  if(pendingOperation.current||running.current||reading.current)return;
+  if(releaseLock.current||pendingOperation.current||running.current||reading.current)return;
   const body={action:kind,operationId:crypto.randomUUID(),subjectId:id,reason,input};
   pendingOperation.current=body;pendingUncertain.current=false;setPendingMutation(body);void action(body);
  };
  const factors=state?.factors??[];
  // SVG is rendered as an image data URL, never executable inline HTML.
  const qr=enrollment?.qr.startsWith('<svg')?`data:image/svg+xml;charset=utf-8,${encodeURIComponent(enrollment.qr)}`:enrollment?.qr.startsWith('data:image/svg+xml')?enrollment.qr:undefined;
- const locked=busy||loading||Boolean(pendingMutation);
- const select=(id:string)=>{if(!running.current&&!pendingOperation.current)void load(id);};
+ const parentLocked=busy||loading||Boolean(pendingMutation),locked=parentLocked||releaseLocked;
+ const select=(id:string)=>{if(!releaseLock.current&&!running.current&&!pendingOperation.current)void load(id);};
  return <section className="account-card account-admin-shell" aria-busy={busy||loading}>
  <div className="account-admin-top"><a href="/account">← Your account</a><span>Private Admin · MFA required</span></div>
  <p role="status" className="account-admin-status">{loading?'Loading verified account details…':message|| (observedAt?`Last verified read ${observedAt}. Refresh is explicit; this page does not poll.`:'Preparing secure administration…')}</p>
@@ -99,9 +102,9 @@ export function AccountAdmin(){
   <p>Setup keys exist only in this page’s memory. Refresh never creates another factor; cancel unfinished setup explicitly before enrolling again.</p>
  </div>:state?<>
   <nav className="account-admin-nav" aria-label="Admin sections"><a href="#account-admin-users">Users</a><a href="#account-admin-billing">Cluera billing</a><a href="#account-admin-catalog">Historical catalog</a><a href="#account-admin-models">Models</a><a href="#account-admin-providers">Providers</a><a href="#account-admin-releases">Releases</a><a href="#account-admin-audit">Audit</a></nav>
-  <section id="account-admin-users" className="account-admin-section"><div className="account-admin-section-heading"><div><p className="account-ui-kicker">CUSTOMER DIRECTORY</p><h2>Users</h2></div><button disabled={busy||Boolean(pendingMutation)} onClick={()=>select('')}>All recent accounts</button></div>
+  <section id="account-admin-users" className="account-admin-section"><div className="account-admin-section-heading"><div><p className="account-ui-kicker">CUSTOMER DIRECTORY</p><h2>Users</h2></div><button disabled={busy||Boolean(pendingMutation)||releaseLocked} onClick={()=>select('')}>All recent accounts</button></div>
   <form onSubmit={event=>{event.preventDefault();if(!running.current&&!pendingOperation.current)void load('',query);}}><label>Exact email or account UUID<input value={query} onChange={event=>setQuery(event.target.value)} maxLength={254} disabled={locked}/></label><button disabled={locked}>Search accounts</button></form>
-  <ul className="account-admin-users">{state.users?.map(user=><li key={user.userId}><button disabled={busy||Boolean(pendingMutation)} onClick={()=>select(user.userId)}>{user.email}</button><span>{user.state} · {user.emailVerified?'Email verified':'Verification unavailable'}</span></li>)}</ul>
+  <ul className="account-admin-users">{state.users?.map(user=><li key={user.userId}><button disabled={busy||Boolean(pendingMutation)||releaseLocked} onClick={()=>select(user.userId)}>{user.email}</button><span>{user.state} · {user.emailVerified?'Email verified':'Verification unavailable'}</span></li>)}</ul>
   {!state.users?.length?<p className="account-admin-empty">No matching accounts in this result. Search an exact email or account ID, or return to recent accounts.</p>:null}
   {!subject&&state.users?.length===50&&state.users[49].createdAt?<button disabled={locked} onClick={()=>void load('',query,{createdAt:state.users![49].createdAt!,userId:state.users![49].userId})}>Next accounts</button>:null}
   <fieldset disabled={locked} style={{border:0,padding:0,margin:0}}>
@@ -128,7 +131,7 @@ export function AccountAdmin(){
   </fieldset></section>
   <section id="account-admin-models" className="account-admin-section"><ModelPolicyEditor models={state.models??[]} disabled={locked} onSave={(policy,reason)=>mutate('MODEL',policy,reason,null)}/></section>
   <section id="account-admin-providers" className="account-admin-section"><AiProviders disabled={locked}/><details><summary>Legacy relay bootstrap status (not the vault)</summary><ProviderStatus/></details></section>
-  <section id="account-admin-releases" className="account-admin-section"><AccountReleases/></section>
+  <section id="account-admin-releases" className="account-admin-section"><AccountReleases disabled={parentLocked} canAct={()=>!running.current&&!reading.current&&!pendingOperation.current} onMutationLockChange={releaseLockChanged}/></section>
   <section id="account-admin-audit" className="account-admin-section"><p className="account-ui-kicker">READ-ONLY HISTORY</p><h2>Immutable account audit</h2><label>Filter displayed audit entries<input type="search" value={auditQuery} onChange={event=>setAuditQuery(event.target.value)} placeholder="Action or reason" maxLength={100}/></label><ul className="account-admin-audit">{state.audit?.filter(entry=>`${entry.action} ${entry.reason}`.toLowerCase().includes(auditQuery.toLowerCase())).map(entry=><li key={entry.id}><time>{new Date(entry.createdAt).toLocaleString()}</time><strong>{entry.action}</strong><span>{entry.reason}</span></li>)}</ul>
   {!state.audit?.some(entry=>`${entry.action} ${entry.reason}`.toLowerCase().includes(auditQuery.toLowerCase()))?<p className="account-admin-empty">No matching entries in the current audit snapshot.</p>:null}</section>
   <p className="account-admin-safety">No payment initiation, checkout retry or manual paid grant is available here. Test/manual adjustments are explicitly labelled, not purchases. Production and License Edition releases remain separate.</p>

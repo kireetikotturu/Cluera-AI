@@ -1,5 +1,7 @@
 # Architecture and security
 
+Latest October14: the owner-approved old website-only bridge is verified READYdpl_BaQwgcafWd1HofC6LovQkTDDPxX6/unchanged0a5ae015. Protected modern-key build preflight and current positive signed-feed SDK read pass; protected metadata stays unchanged/stale, not independent saved-value proof. No old source/payment/scheduler/relay/License change or legacy revocation. All23 preservation snapshots match; Phase A remains held. Cluera Users/Release UI now fences two-way uncertainty and same-event admission while preserving exact retries and server MFA. [Current security boundary and next relay-only approval](CLUERA_EXECUTION_STATUS.md). Health/public UI/synthetic tests are not full containment, private Auth or financial acceptance.
+
 ## October 14 navigation/security boundary
 
 Plan navigation is a hint, never a server price/revision/identity/permission. Four allowlisted Cluera codes and an optional desktop UUID survive into fixed local account/checkout links. Duplicate/invalid hints, hostile return URLs and unexpected stored fields cannot enable checkout. Same-browser state expires after30 minutes; logout/reset clear it and recovery cannot continue. No password/token/provider resource is stored; no automatic SDK/order/payment. Server live-session/owner/tester/catalog and raw-signature/provider-evidence checks remain authoritative.

@@ -1,7 +1,13 @@
 # Cluera staging private setup
 Only new Cluera resources. Do not modify old Account or License services.
 
-## Current October 14 execution
+## Latest completed website bridge
+
+Website-only approval/private saving are complete. Old Account is READYdpl_BaQwgcafWd1HofC6LovQkTDDPxX6 at exact unchanged0a5ae015/full713-entry source/original lock/stable alias. Protected modern-key preflight and current positive signed-feed read pass;33 protected environment metadata entries remain unchanged/stale and do not independently certify the saved value. No old source, financial flag/destination/scheduler/installer or persistent build-setting change. [Current component evidence](CLUERA_EXECUTION_STATUS.md). Do not repeat website saving/approval or click its Redeploy button.
+
+Cluera settings remain18/all payment switches false/pause true/auth-only. Both schemas stay unapplied and Phase A remains on containment hold. Next component approval is only temporary old-relay compatibility retention/credential bridging/pinned reload; no relay saving, License change, revocation or financial handoff now. Current Admin fix and hosted verification/deployment results are recorded after execution, not assumed.
+
+## Earlier October 14 execution
 
 Phase A is approved conditionally, not awaiting repeat approval. Legacy JWT format is owner-confirmed; validity/retirement remains unverified. Frozen proposals are unapplied. [Current execution](CLUERA_EXECUTION_STATUS.md) and [containment checkpoint](CLUERA_SHARED_CREDENTIAL_ROTATION.md) replace older saving/approval instructions. No Cluera setting, payment credential, tester, worker or provider key was changed.
 

@@ -2,7 +2,13 @@
 
 October 14, 2026. No production readiness or commercial release approval.
 
-## Current safe-flow progress
+## Latest security/verification checkpoint
+
+Approved old website credential bridge is READYdpl_BaQwgcafWd1HofC6LovQkTDDPxX6 at unchanged0a5ae015/stable alias; protected modern-key preflight and7/7 current read-only checks pass. Metadata is unchanged/stale, not independent saved-value proof. All23 preservation digests match and old scheduler remains active/unchanged. No legacy revocation, financial migration or old relay/License/installer change.
+
+Scoped Cluera Admin Users/Release uncertainty/race fix has53/53 focused tests, typecheck/production build/102-file scan/current zero-advisory audits. Fresh local full1053/2 scheduler-deadline failures/22skipped and isolated3/3deadline failures are NOT passes; deadlines/security/assertions are not relaxed. Hosted full CI/new UI rollout must be verified before claiming those results. Existing EXEs freshly rehash unchanged; actual installed-Windows assertions remain0 for this stage. Full launch still NO-GO: incident closure and true Auth/provider/financial/operations/legal/signing acceptance are outstanding. **Next approval: temporary old-relay compatibility/credential bridge only.** [Evidence](CLUERA_IMPLEMENTATION_MIGRATION.md).
+
+## Earlier safe-flow progress
 
 [Execution status](CLUERA_EXECUTION_STATUS.md) tracks all nine priorities. Selected-plan customer/Auth navigation is implemented; actual verification/deployment results are recorded after completion. Existing desktop features/TEST bytes remain untouched. Fixtures/public checks do not accept private email/Google/MFA, installed Windows, provider/credit or commercial journeys.
 

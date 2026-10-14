@@ -2,7 +2,13 @@
 
 October 14, 2026. **Engineering preparation, not an executed financial migration.** Cluera is the sole Account/subscription product. SigmaRoundAI License Edition is unchanged. The old Account services are temporary compatibility infrastructure.
 
-## Latest owner clarification - legacy JWT format, no validity/dummy clearance
+## Latest completed security component - website bridge, not financial cutover
+
+The explicitly approved old website-only modern-key bridge is verified **READY dpl_BaQwgcafWd1HofC6LovQkTDDPxX6**, unchanged reviewed0a5ae015/full713-entry source/581 blob pins. Owner confirmed private saving; protected build modern-key category and7/7 current positive-release/negative-Auth reads pass. Protected environment metadata remains unchanged/stale, so the value change is not inferred from timestamps. Persistent project settings, old source and financial flags/destinations/processing remain unchanged. [Exact evidence](CLUERA_EXECUTION_STATUS.md).
+
+All23 preservation snapshots match15:44:32.030249-16:00:17.292363UTC and the unchanged active scheduler's ordinary15:58UTC dispatch returns200/no timeout/error. No new event, replay, order, credit or worker wake. Both frozen proposals remain unapplied/exact; Phase A approval is consumed only after its containment prerequisites pass, not by this bridge. Local scheduler fixtures currently hit unrelaxed5s deadlines; hosted full verification remains a separate result. **Next approval is temporary old-relay compatibility/credential bridging only**, never financial URL/owner/scheduler/purchase activation. Legacy authority and unknown consumers remain unresolved.
+
+## Earlier owner clarification - legacy JWT format, no validity/dummy clearance
 
 The owner confirms legacy service-role JWT format for `dwqltsqumiwsxtkzdoaa`; active/dummy status remains unknown and revocation remains unapproved. The type question is answered. A private in-memory check of only five supplied request attachments found no unique matching project/service-role candidate: zero authorization requests/mutations. The actual exposed value was not tested; neither dummy status nor retirement may be claimed.
 

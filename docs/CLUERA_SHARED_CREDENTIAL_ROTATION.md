@@ -1,6 +1,14 @@
 # Shared Supabase credential incident — approval-required plan
 
-## Latest owner reply - legacy JWT format; validity remains unknown
+## Latest completed component - old website only
+
+Owner approved the website-only bridge in the new attachment and confirmed private account_web saving. Exact unchanged0a5ae015 full source/713 tree entries/581 blob pins/original manifest-lock reloaded **READY dpl_BaQwgcafWd1HofC6LovQkTDDPxX6**, stable alias verified. Protected pre-build modern-key check passes; fresh signed Account1.0.8 feed proves configured protected SDK read and7/7 read-only boundaries pass. Key value was never decrypted/copied/logged. Vercel metadata still reports the old timestamp after two post-save reads, so it does NOT independently establish the value change; all33 metadata entries and persistent project settings remain unchanged. No exact-one-value-change claim.
+
+All23 preservation snapshots match15:44:32.030249-16:00:17.292363UTC; old sealed scheduling remains active/unchanged and observed automatic dispatch returns200. Old relay/License/source/payment/settings other than owner's scoped key replacement remain untouched. Modern prefix/current authentication do not revoke or test the exact exposed JWT; Phase A stays held and no migrations are applied.
+
+**Single next approval:** temporarily retain the old relay for unknown installed-client compatibility, replace only its backend credential with a separate modern key, and reload the exact reviewed current source. No source/provider/payment/License changes, retirement, revocation or key saving yet. This resolves the prior retention-choice hold, not a third product. After approval, require private saving and a bounded protected positive DB read; relay health alone is insufficient. License public URL is also protected as a Secret and the available read returned no usable value; do not ask for an impossible Secret reveal or retrieve its service key. Exact License/external/CI/local compatibility remains unresolved.
+
+## Earlier owner reply - legacy JWT format; validity remains unknown
 
 Owner confirms legacy service-role JWT format/project, separate new Cluera sb_secret_ saving, unknown active/dummy status and no revocation authority. Do not repeat the type question or assume a dummy. A private in-memory check of only five supplied request attachments found no unique project/service-role candidate: zero authorization requests/mutations/value output/extra copies. The actual exposed value was not tested. Replacements do not retire a legacy key.
 

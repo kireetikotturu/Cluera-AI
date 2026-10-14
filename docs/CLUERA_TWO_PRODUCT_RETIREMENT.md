@@ -2,6 +2,8 @@
 
 Updated October 14, 2026. Read-only dependency review; retirement is NOT executed.
 
+Latest approved exception: only the old website credential bridge/pinned reload is completed, READYdpl_BaQwgcafWd1HofC6LovQkTDDPxX6 at unchanged0a5ae015. Owner privately saved account_web; protected modern-key preflight/current positive feed read and7/7 GET boundaries pass. Metadata remains unchanged/stale, not independent value-change proof; no other old source/payment/scheduler/installer or persistent build-setting change. All23 financial/customer digests match. Old relay/License are untouched and legacy revocation remains unapproved. **Single next owner choice:** approve temporary old-relay compatibility retention/credential replacement/pinned reload only; no private saving yet. This supersedes older website-approval instructions below without claiming a third product or sufficient containment. [Current evidence](CLUERA_EXECUTION_STATUS.md).
+
 ## Product boundary
 
 ### New billing ownership request - migration prepared, not cut over

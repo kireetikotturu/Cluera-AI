@@ -2,6 +2,8 @@
 
 Private staging, not public sales. Support: **clueraaisupport@gmail.com**.
 
+October14 scoped safety fix: Users/Release controls fence each other's pending/unknown mutations, including before a React render commits. Other controls lock while that release is unresolved, but **Verify/retry same release operation** retains its exact UUID/body and remains available. Parent reads cannot invalidate it; stale child reads are aborted/discarded. A first definitely rejected write permits correction; a later rejection after uncertainty cannot erase the original operation. Confirmed application restores controls and refreshes release rows. This is not an Admin authorization/MFA bypass or universal mutex across other independent panels. No real release action was used for tests.
+
 ## Customer navigation
 
 1. `/pricing` lists the four planned Cluera offers, or current immutable revisions after approved schema selection. **View availability** carries only the chosen offer; it is not a purchase.

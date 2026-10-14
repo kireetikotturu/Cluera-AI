@@ -3,6 +3,7 @@ import {act,createElement,StrictMode} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {AccountAdmin} from '../app/account/admin/AccountAdmin';
+import {AccountReleases} from '../app/account/admin/AccountReleases';
 
 const a='00000000-0000-4000-8000-000000000001',b='00000000-0000-4000-8000-000000000002';
 const users=[{userId:a,email:'a@example.invalid',state:'ACTIVE'},{userId:b,email:'b@example.invalid',state:'ACTIVE'}];
@@ -110,4 +111,81 @@ it('provides anchored navigation and local audit filtering without extra request
  expect(host.querySelector('.account-admin-audit')?.textContent).toContain('CATALOG');expect(host.querySelector('.account-admin-audit')?.textContent).not.toContain('SUSPEND');
  expect(fetcher).toHaveBeenCalledTimes(1);expect(host.textContent).toContain('recurring checkout is unavailable');
  expect(host.querySelector('#account-admin-billing')?.textContent).toContain('Future');
+});
+
+it('includes releases in the parent uncertain-operation lock without allocating another mutation',async()=>{
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({},{status:503}):Response.json(view(url.includes(a)?a:undefined)));
+ vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
+ await act(async()=>submit());const releaseForm=host.querySelector('#account-admin-releases form')!;
+ expect(releaseForm.closest('fieldset')?.disabled).toBe(true);expect(button('Refresh Cluera releases').disabled).toBe(true);
+ const before=fetcher.mock.calls.length;await act(async()=>releaseForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(fetcher).toHaveBeenCalledTimes(before);await act(async()=>button('Verify/retry the same operation').click());
+ const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(2);expect(posts[1][1]?.body).toBe(posts[0][1]?.body);
+});
+
+it('fences a release submission in the same event turn before the parent lock has rerendered',async()=>{
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({},{status:503}):Response.json(view(url.includes(a)?a:undefined)));
+ vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());const releaseForm=host.querySelector('#account-admin-releases form')!;
+ await act(async()=>{submit();releaseForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+ const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(1);expect(JSON.parse(String(posts[0][1]?.body)).action).toBe('SUSPEND');
+});
+
+it('blocks release submissions while a parent Admin read is awaiting authorization',async()=>{
+ const read=pending();const fetcher=vi.fn((url:string,init?:RequestInit)=>init?.method==='POST'?Promise.resolve(Response.json({})):url.includes(a)?read.promise:Promise.resolve(Response.json(view())));
+ vi.stubGlobal('fetch',fetcher);await render();const releaseForm=host.querySelector('#account-admin-releases form')!;
+ await act(async()=>{button(users[0].email).click();releaseForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+ expect(releaseForm.closest('fieldset')?.disabled).toBe(true);expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
+ await act(async()=>read.resolve(Response.json({},{status:401})));expect(host.querySelector('#account-admin-releases')).toBeNull();
+});
+
+it('preserves a child release operation across parent disablement and retries its exact original body',async()=>{
+ const fetcher=vi.fn(async()=>Response.json({},{status:503}));vi.stubGlobal('fetch',fetcher);await act(async()=>root.render(createElement(AccountReleases)));
+ await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ const original=(fetcher.mock.calls as unknown as [string,RequestInit][])[0][1].body;
+ await act(async()=>root.render(createElement(AccountReleases,{disabled:true})));expect(button('Verify/retry same release operation').disabled).toBe(true);
+ await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));expect(fetcher).toHaveBeenCalledTimes(1);
+ await act(async()=>root.render(createElement(AccountReleases,{disabled:false})));await act(async()=>button('Verify/retry same release operation').click());
+ expect(fetcher).toHaveBeenCalledTimes(2);expect((fetcher.mock.calls as unknown as [string,RequestInit][])[1][1].body).toBe(original);
+});
+
+it('aborts and ignores a stale release read after parent disablement without losing standalone refresh',async()=>{
+ const read=pending();const fetcher=vi.fn(()=>read.promise);vi.stubGlobal('fetch',fetcher);await act(async()=>root.render(createElement(AccountReleases)));
+ await act(async()=>button('Refresh Cluera releases').click());await act(async()=>root.render(createElement(AccountReleases,{disabled:true})));
+ const request=(fetcher.mock.calls as unknown as [string,RequestInit][])[0][1];expect(request.signal?.aborted).toBe(true);
+ await act(async()=>read.resolve(Response.json({code:'ACTIVE',releases:[{id:'synthetic',version:'1.0.2',state:'DRAFT',downloadUrl:'https://example.invalid',sha256:'a'.repeat(64),fileSizeBytes:12,releaseNotes:'Synthetic stale release'}]})));
+ expect(host.querySelector('[name="confirmed"]')).toBeNull();await act(async()=>root.render(createElement(AccountReleases,{disabled:false})));
+ expect(button('Refresh Cluera releases').disabled).toBe(false);expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it('fences parent mutations while a release outcome is uncertain and keeps the release same-ID retry available',async()=>{
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({},{status:503}):Response.json(view(url.includes(a)?a:undefined)));
+ vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
+ await act(async()=>host.querySelector('#account-admin-releases form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(true);expect(button('Verify/retry same release operation').disabled).toBe(false);
+ await act(async()=>submit());expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+ await act(async()=>button('Verify/retry same release operation').click());const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');
+ expect(posts).toHaveLength(2);expect(posts[1][1]?.body).toBe(posts[0][1]?.body);
+});
+
+it('fences parent mutation in the same event as release admission before rendering its lock',async()=>{
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({},{status:503}):Response.json(view(url.includes(a)?a:undefined)));
+ vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());const release=host.querySelector('#account-admin-releases form')!;
+ await act(async()=>{release.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));submit();});
+ const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(1);expect(JSON.parse(String(posts[0][1]?.body)).action).toBe('RELEASE_DRAFT');
+});
+
+it('unlocks parent controls after a definitely rejected first release attempt without losing the form',async()=>{
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({error:'RELEASE_DATABASE_INVALID'},{status:400}):Response.json(view(url.includes(a)?a:undefined)));
+ vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
+ await act(async()=>host.querySelector('#account-admin-releases form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(false);expect(host.querySelector('#account-admin-releases fieldset')?.disabled).toBe(false);
+ expect(host.textContent).not.toContain('Result unconfirmed');
+});
+
+it('refreshes release rows and unlocks parent controls after confirmed application',async()=>{
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({code:'APPLIED'}):url.includes('releases=1')?Response.json({code:'ACTIVE',releases:[]}):Response.json(view(url.includes(a)?a:undefined)));
+ vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
+ await act(async()=>host.querySelector('#account-admin-releases form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(fetcher.mock.calls.some(([url,init])=>url.includes('releases=1')&&init?.method!=='POST')).toBe(true);
+ expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(false);expect(host.textContent).toContain('Audited release change confirmed');
 });
