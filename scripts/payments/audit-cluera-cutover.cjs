@@ -130,21 +130,43 @@ async function auditCutover(env = process.env, request = fetch, options = {}) {
     const payments = await get('/v1/orders/' + options.canonicalOrderId + '/payments');
     if (payments?.entity !== 'collection' || !Array.isArray(payments.items) || payments.items.length > 100
       || payments.count !== payments.items.length) throw Error('Invalid collection.');
-    const counts = { CREATED: 0, AUTHORIZED: 0, CAPTURED: 0, REFUNDED: 0, FAILED: 0 }; const paymentIds = new Set();
+    const counts = { CREATED: 0, AUTHORIZED: 0, CAPTURED: 0, REFUNDED: 0, FAILED: 0 };
+    const reportedStatuses = { ...counts, UNKNOWN: 0 }, paymentIds = new Set();
+    // These are fixed policy checks, not provider values. Reported status is
+    // independently tallied even when the record is unusable as financial
+    // authority. Missing optional fields remain a strict failure here; this
+    // diagnostic must never silently normalize application payment evidence.
+    const validation = { knownStatus: true, paymentIdValid: true, paymentIdUnique: true, paymentEntity: true,
+      canonicalOrder: true, approvedAmount: true, currencyINR: true, invoiceNull: true, domesticFalse: true,
+      capturedBoolean: true, refundAmountBounded: true, refundStatusKnown: true, stateConsistent: true };
+    const validationFailures = Object.fromEntries(Object.keys(validation).map(key => [key, 0]));
+    const shape = { invoiceFieldPresent: true, internationalFieldPresent: true, capturedFieldPresent: true,
+      amountRefundedFieldPresent: true, refundStatusFieldPresent: true };
     let valid = true;
     for (const payment of payments.items) {
       const state = typeof payment?.status === 'string' ? payment.status.toUpperCase() : 'UNKNOWN';
-      if (!Object.hasOwn(counts, state) || !/^pay_[A-Za-z0-9]{8,64}$/.test(payment?.id ?? '') || paymentIds.has(payment.id)
-        || payment.entity !== 'payment' || payment.order_id !== options.canonicalOrderId || payment.amount !== 54900 || payment.currency !== 'INR'
-        || payment.invoice_id !== null || payment.international !== false || typeof payment.captured !== 'boolean'
-        || !Number.isInteger(payment.amount_refunded) || payment.amount_refunded < 0 || payment.amount_refunded > 54900
-        || ![null, 'partial', 'full'].includes(payment.refund_status)
-        || (state === 'CAPTURED' && (!payment.captured || payment.amount_refunded !== 0 || payment.refund_status !== null))
-        || (state === 'REFUNDED' && (!payment.captured || payment.amount_refunded !== 54900 || payment.refund_status !== 'full'))
-        || (['CREATED', 'AUTHORIZED', 'FAILED'].includes(state) && (payment.captured || payment.amount_refunded !== 0 || payment.refund_status !== null))) { valid = false; break; }
-      paymentIds.add(payment.id); counts[state]++;
+      const known = Object.hasOwn(counts, state), row = payment && typeof payment === 'object' && !Array.isArray(payment) ? payment : {};
+      reportedStatuses[known ? state : 'UNKNOWN']++;
+      const checks = { knownStatus: known, paymentIdValid: /^pay_[A-Za-z0-9]{8,64}$/.test(row.id ?? ''),
+        paymentIdUnique: !paymentIds.has(row.id), paymentEntity: row.entity === 'payment', canonicalOrder: row.order_id === options.canonicalOrderId,
+        approvedAmount: row.amount === 54900, currencyINR: row.currency === 'INR', invoiceNull: row.invoice_id === null,
+        domesticFalse: row.international === false, capturedBoolean: typeof row.captured === 'boolean',
+        refundAmountBounded: Number.isInteger(row.amount_refunded) && row.amount_refunded >= 0 && row.amount_refunded <= 54900,
+        refundStatusKnown: [null, 'partial', 'full'].includes(row.refund_status),
+        stateConsistent: known && (state === 'CAPTURED' ? row.captured === true && row.amount_refunded === 0 && row.refund_status === null
+          : state === 'REFUNDED' ? row.captured === true && row.amount_refunded === 54900 && row.refund_status === 'full'
+            : row.captured === false && row.amount_refunded === 0 && row.refund_status === null) };
+      for (const key of Object.keys(validation)) if (!checks[key]) { validation[key] = false; validationFailures[key]++; }
+      for (const [key, field] of [['invoiceFieldPresent', 'invoice_id'], ['internationalFieldPresent', 'international'],
+        ['capturedFieldPresent', 'captured'], ['amountRefundedFieldPresent', 'amount_refunded'], ['refundStatusFieldPresent', 'refund_status']]) {
+        shape[key] = shape[key] && Object.hasOwn(row, field);
+      }
+      if (typeof row.id === 'string') paymentIds.add(row.id);
+      if (Object.values(checks).every(value => value === true)) counts[state]++;
+      else valid = false;
     }
-    report.payments = { count: payments.items.length, canonicalEvidence: valid, statuses: counts };
+    report.payments = { count: payments.items.length, canonicalEvidence: valid, statuses: counts,
+      reportedStatuses, validation, validationFailures, shape };
     if (!valid) return finish('OWNED_PAYMENT_EVIDENCE');
     report.financialState = counts.CAPTURED === 1 && counts.REFUNDED === 0 && counts.AUTHORIZED === 0 && status === 'PAID' ? 'CAPTURED'
       : counts.REFUNDED === 1 && counts.CAPTURED === 0 && counts.AUTHORIZED === 0 && status === 'PAID' ? 'REFUNDED'

@@ -129,6 +129,42 @@ it.each([
   const request = fake({ payments: [{ ...payment(), ...change }] }); const report = await auditCutover(env(), request, options);
   expect(report.stopped).toBe('OWNED_PAYMENT_EVIDENCE'); expect(report.mutations).toBe(0);
 });
+it('separates reported FAILED from canonical evidence when an optional invoice field is absent, without inferring no charge', async () => {
+  const record:any={...payment(),status:'failed',captured:false,error_code:'synthetic-private-error',error_description:'synthetic-private-description',email:'synthetic-private-customer'};
+  delete record.invoice_id;
+  const report=await auditCutover(env(),fake({order:{...order(),status:'attempted',attempts:1},payments:[record]}),options);
+  expect(report.stopped).toBe('OWNED_PAYMENT_EVIDENCE'); expect(report.financialState).toBeUndefined();
+  expect(report.payments).toMatchObject({count:1,canonicalEvidence:false,statuses:{FAILED:0},reportedStatuses:{FAILED:1,UNKNOWN:0},
+    validation:{knownStatus:true,canonicalOrder:true,approvedAmount:true,invoiceNull:false,stateConsistent:true},
+    validationFailures:{invoiceNull:1,approvedAmount:0},shape:{invoiceFieldPresent:false,internationalFieldPresent:true}});
+  for(const privateValue of [record.id,record.order_id,record.email,record.error_code,record.error_description,accountId,intentId])expect(JSON.stringify(report)).not.toContain(privateValue);
+});
+it.each([
+  {field:'international',check:'domesticFalse',present:'internationalFieldPresent'},
+  {field:'captured',check:'capturedBoolean',present:'capturedFieldPresent'},
+  {field:'amount_refunded',check:'refundAmountBounded',present:'amountRefundedFieldPresent'},
+  {field:'refund_status',check:'refundStatusKnown',present:'refundStatusFieldPresent'},
+])('emits only fixed field-presence and strict-policy reasons for omitted $field',async({field,check,present})=>{
+  const record:any={...payment(),status:'failed',captured:false}; delete record[field];
+  const report=await auditCutover(env(),fake({payments:[record]}),options);
+  expect(report.stopped).toBe('OWNED_PAYMENT_EVIDENCE');expect(report.payments.reportedStatuses.FAILED).toBe(1);
+  expect(report.payments.validation[check]).toBe(false);expect(report.payments.validationFailures[check]).toBe(1);expect(report.payments.shape[present]).toBe(false);
+  expect(report.financialState).toBeUndefined();expect(report.requests).toBe(4);expect(report.mutations).toBe(0);
+});
+it('tallies every bounded reported state even after a bad first record, without accepting the collection as evidence',async()=>{
+  const bad:any={...payment(),status:'failed',captured:false};delete bad.invoice_id;
+  const report=await auditCutover(env(),fake({payments:[bad,payment('pay_synthetic0002'),{...payment('pay_synthetic0003'),status:'synthetic-private-status'}]}),options);
+  expect(report.stopped).toBe('OWNED_PAYMENT_EVIDENCE');expect(report.payments.reportedStatuses).toEqual({CREATED:0,AUTHORIZED:0,CAPTURED:1,REFUNDED:0,FAILED:1,UNKNOWN:1});
+  expect(report.payments.statuses).toEqual({CREATED:0,AUTHORIZED:0,CAPTURED:1,REFUNDED:0,FAILED:0});
+  expect(report.payments.validationFailures.knownStatus).toBe(1);expect(report.payments.canonicalEvidence).toBe(false);
+  expect(report.financialState).toBeUndefined();expect(JSON.stringify(report)).not.toContain('synthetic-private-status');
+});
+it('reports duplicate identifiers as a boolean/count only even when the first record already failed another policy',async()=>{
+  const first:any={...payment(),international:null};const report=await auditCutover(env(),fake({payments:[first,payment()]}),options);
+  expect(report.payments.validation.paymentIdUnique).toBe(false);expect(report.payments.validationFailures.paymentIdUnique).toBe(1);
+  expect(report.payments.reportedStatuses.CAPTURED).toBe(2);expect(report.payments.statuses.CAPTURED).toBe(0);
+  expect(report.stopped).toBe('OWNED_PAYMENT_EVIDENCE');expect(JSON.stringify(report)).not.toContain(first.id);
+});
 it('does not reveal raw provider authentication errors', async () => {
   const request = vi.fn(async () => Response.json({ error: 'synthetic-private-key-value' }, { status: 401 }));
   const report = await auditCutover(env(), request, options); expect(report.stopped).toBe('WEBHOOK_READ'); expect(report.requests).toBe(1);

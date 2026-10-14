@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { expect, it } from 'vitest';
 import { CLUERA_WORKER_URL, workerProofMessage } from '../lib/payments/cluera/scheduler';
@@ -9,7 +8,10 @@ const syntheticBody = "begin insert into billing_private.old_calls values(1);end
 const expectedPin = '16b84964784d66febb352cd646903404';
 // This fixture substitutes only the fake old function's checksum. A separate
 // assertion retains the exact production preflight pin; no hosted SQL is run.
-const fixtureProposal = proposal.replace(expectedPin, createHash('md5').update(syntheticBody).digest('hex'));
+async function installFixture(db: PGlite) {
+  const pin = (await db.query<{ pin: string }>("select md5(pg_get_functiondef('billing_private.wake_worker()'::regprocedure)) pin")).rows[0].pin;
+  await db.exec(proposal.replace(expectedPin, pin));
+}
 async function fixture() {
   const db = new PGlite();
   await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
@@ -33,6 +35,7 @@ async function fixture() {
 }
 it('requires the exact reviewed old function pin and cannot schedule or switch ownership on apply', async () => {
   expect(proposal).toContain(expectedPin); expect(proposal).not.toMatch(/select\s+cron\.(schedule|unschedule)|select\s+public\.cluera_billing_cutover/i);
+  expect(proposal).toContain('md5(pg_get_functiondef(p.oid))');
   const db = await fixture();
   try { await expect(db.exec(proposal)).rejects.toThrow(/scheduler body changed/); }
   finally { await db.close(); }
@@ -40,7 +43,7 @@ it('requires the exact reviewed old function pin and cannot schedule or switch o
 it('passive installation keeps only the existing Account dispatch until separately approved CAS', async () => {
   const db = await fixture();
   try {
-    await db.exec(fixtureProposal);await db.exec('select billing_private.wake_worker()');
+    await installFixture(db);await db.exec('select billing_private.wake_worker()');
     expect((await db.query('select * from billing_private.old_calls')).rows).toHaveLength(1);
     expect((await db.query('select * from net.requests')).rows).toHaveLength(0);
     expect((await db.query<{owner:string}>('select owner from cluera_billing_private.processing_owner')).rows[0].owner).toBe('account');
@@ -53,7 +56,7 @@ it('passive installation keeps only the existing Account dispatch until separate
 it('the approved Cluera branch queues only an exact short-lived proof, never a bearer or Vault credential', async () => {
   const db = await fixture();
   try {
-    await db.exec(fixtureProposal);
+    await installFixture(db);
     await db.exec("update cluera_billing_private.processing_owner set owner='cluera',epoch=2,account_digest=repeat('b',64);select billing_private.wake_worker();select billing_private.wake_worker();");
     const requests = (await db.query<{url:string;body:unknown;params:unknown;headers:Record<string,string>;timeout_ms:number}>('select * from net.requests')).rows;
     expect(requests).toHaveLength(1); const request=requests[0];
@@ -67,10 +70,23 @@ it('the approved Cluera branch queues only an exact short-lived proof, never a b
 });
 it.each(["account_digest=null", "account_digest=repeat('b',64)"])('fails closed for missing merchant pin, disabled dispatch or malformed Vault key (%s)', async change => {
     const db=await fixture();try {
-      await db.exec(fixtureProposal);await db.exec(`update cluera_billing_private.processing_owner set owner='cluera',${change}`);
+      await installFixture(db);await db.exec(`update cluera_billing_private.processing_owner set owner='cluera',${change}`);
       if (change.includes('repeat')) await db.exec("update vault.decrypted_secrets set decrypted_secret='short'");
       await db.exec('select billing_private.wake_worker()');expect((await db.query('select * from net.requests')).rows).toHaveLength(0);
       await db.exec("update cluera_billing_private.processing_owner set account_digest=repeat('b',64);update billing_private.worker_config set enabled=false;select billing_private.wake_worker()");
       expect((await db.query('select * from net.requests')).rows).toHaveLength(0);
     } finally {await db.close();}
+});
+it('pins the complete function definition, including security, rather than confusing it with body bytes', async () => {
+  const db = await fixture();
+  try {
+    const before = (await db.query<{ body: string; definition: string }>("select md5(prosrc) body,md5(pg_get_functiondef(oid)) definition from pg_proc where oid='billing_private.wake_worker()'::regprocedure")).rows[0];
+    expect(before.body).not.toBe(before.definition);
+    await db.exec('alter function billing_private.wake_worker() security definer');
+    const after = (await db.query<{ body: string; definition: string }>("select md5(prosrc) body,md5(pg_get_functiondef(oid)) definition from pg_proc where oid='billing_private.wake_worker()'::regprocedure")).rows[0];
+    expect(after.body).toBe(before.body);expect(after.definition).not.toBe(before.definition);
+    await expect(db.exec(proposal.replace(expectedPin, before.definition))).rejects.toThrow(/scheduler body changed/);
+    expect((await db.query('select * from billing_private.old_calls')).rows).toHaveLength(0);
+    expect((await db.query("select owner,epoch from cluera_billing_private.processing_owner")).rows[0]).toEqual({ owner: 'account', epoch: 1 });
+  } finally { await db.close(); }
 });

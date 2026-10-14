@@ -4,7 +4,8 @@
 -- is 'account'. Only a separately approved owner CAS selects Cluera. No extra
 -- cron job, cadence change, Vault secret import/rotation or manual wake occurs.
 do $$begin
- if (select md5(p.prosrc) from pg_proc p where p.oid='billing_private.wake_worker()'::regprocedure)
+ -- This pin was reviewed from the complete pg_get_functiondef output, not prosrc.
+ if (select md5(pg_get_functiondef(p.oid)) from pg_proc p where p.oid='billing_private.wake_worker()'::regprocedure)
    is distinct from '16b84964784d66febb352cd646903404' then
    raise exception 'Reviewed Account scheduler body changed; re-review required';
  end if;
