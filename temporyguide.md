@@ -1,6 +1,24 @@
 # Cluera AI current handoff
 
-## Current result - completed safe Cluera rollout; one retirement approval remains
+## October 15 - containment compatibility completed; one security approval remains
+
+Exactly two products: Cluera AI and preserved SigmaRoundAI License Edition. **Owner confirms actual Cluera Admin login and MFA successful; never repeat registration/authenticator setup.** No cosmetic, EXE feature, installer, dependency or financial-policy change in this phase.
+
+Both website public Auth clients are **already modern**. Cluera's Production Config key privately matches an enabled retained-project publishable key and predates the accepted rollout. A fixed-target public old Admin audit reads page+9JS+Auth settings: **11 GETs, modern publishable accepted, no ambiguity/privileged credential, zero mutations**. No key value, session, body or header is output. Do not request or perform another public-key save/migration. Existing protected Cluera web/relay and old website server replacement evidence remains accepted.
+
+New bounded read-only inspector and actual modern-key SDK/factory regression pass focused **49/49** with classifier/private-config/Admin cases; web typecheck and fresh hosted staging **10/10** pass. SDK operations are mocked, not real signup/Google/payment/provider acceptance. Bounded00:53-01:53UTC gateway history77requests=50modern server+27modern public,0legacy API-key JWT markers/0unclassified; this does not prove absent hidden consumers or key retirement. Legacy API-key authority remains enabled/uncontained.
+
+At01:52:23.424854UTC, billing/vault/release schemas remain unapplied/new billing RPCs0; old cron active/exact complete definition hash16b84964784d66febb352cd646903404; active metered runs/unexpired windows0. New24-table preservation baseline01:47:17.354072UTC includes unchanged6customers/6original trials,2Admins/3audits, retained Paddle5intents/3recoveries/9receipts/7jobs, Razorpay1BOUND and old release1; paid grants/packs/terms/new receipts/applications/diagnostics0. No old website stop, service suspension/deletion, API-key revocation, financial row or provider setting change.
+
+**Single next owner action: approve or decline coordinated deactivation of only retained-project legacy anon/service_role API keys, after fresh modern/preservation checks, explicitly accepting temporary old-relay/unknown legacy-consumer interruption.** Do not click Deactivate yet, send values, rotate JWT signing secrets, modify License or stop the old billing website. The modern keys must remain. After separate approval, the agent gives the exact one dashboard action if no supported tool exists. [Full scope, safeguards and evidence](docs/CLUERA_EXECUTION_STATUS.md).
+
+Final01:57:41.599090UTC comparison matches all24 baseline digests/counts; Cluera18env entries unchanged. Old website protected release/redirect/Auth boundaries freshly pass7/7GET-only at01:57:40.300UTC. Checkout state-machine12752bytes retains exact hash e763b2a94eb92e53a8d36f892fee66185cce54872d9a38b7923b85094c896abc. No production/main/License, installer, legacy deactivation, schema, financial owner or payment mutation occurred.
+
+Once containment passes, execute existing exact conditional Phase A approval without requesting it again; keep old processing owner/cron/delivery operational and compare snapshots/security. Later Razorpay Test ownership/URL/checkout/one genuine purchase and separate provider-vault schema/KEK/bootstrap still require their specific authority. Actual capture+paid order+signed receipt+one10800-second pack+preserved balance+installed sync, Windows/provider/operations/signing acceptance remain incomplete. AI START blocked/auth-only; all Cluera payments disabled; **not production-ready**.
+
+Only Cluera compatibility tool/tests/guides are changed. Prior complete1098/22 web and366/1 desktop evidence stays dated; new publication/CI must be recorded after execution. Older next-action instructions below are historical and superseded.
+
+## Earlier rollout history - next-action instructions superseded above
 
 Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
 
