@@ -23,7 +23,9 @@ The 12,752-byte checkout denial/refresh/effect/buy/SDK/callback body is byte-ide
 
 ## Admin boundary
 
-Use `/account/admin` with the already authorized Admin and existing verified authenticator. Public signup never assigns an Admin role, and the support inbox is not an Admin. New invitations/roles require explicit verified-owner authorization; no role was granted by this work.
+Use `/account/admin` with an explicitly authorized Admin. On October15 the owner requested and the operator granted `clueraaisupport@gmail.com` the retained Account Admin role, atomically recording one truthful owner-authorized bootstrap audit. That allowlist also applies to temporary old Account Admin, not License Edition. Public signup still never grants a role; no general invitation/role-grant endpoint was added. [Exact guards, tests and preservation evidence](CLUERA_EXECUTION_STATUS.md).
+
+**Owner action now:** sign in normally as that account at https://cluera-ai-staging.vercel.app/account/admin, click **Enroll authenticator** if offered, and privately verify its six-digit code. The account currently has zero verified factors; the operator did not enroll one, read credentials or bypass AAL2. Keep setup keys/QR/codes private and report only whether the workspace opens. Do not enter AI keys or change payment/catalog/credits yet: vault schema/bootstrap and financial activation are still separately gated. This verifies browser Admin access, not Windows or payment acceptance.
 
 Customer/catalog/usage/release/provider reads require the existing server authorization. Sensitive operations need reasons, retained operation UUIDs, live allowed MFA and, where required, fresh authenticator reauthentication. An unknown write remains locked to its original operation/body; verify it by a read, never invent a replacement operation. No dashboard metric or provider cost should display a fabricated zero.
 

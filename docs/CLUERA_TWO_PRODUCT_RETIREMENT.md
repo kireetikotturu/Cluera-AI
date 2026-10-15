@@ -1,6 +1,18 @@
 # Two-product infrastructure and Account retirement plan
 
-## Current result - completed safe Cluera rollout; one retirement approval remains
+## October 15 - conditional suspension approved, not performed
+
+The owner authorizes reversible suspension of **only old sigmaround-account-relay-staging**, conditional on a fresh finding of no active sessions/critical dependencies, and accepts legacy desktop AI/audio loss. This supersedes every earlier request below to approve retention, save an old-relay key or approve suspension again. It does not authorize deletion, old website stop, License changes or credential revocation.
+
+Fresh01:04:33UTC inventory: exact old service `srv-db1402u0tbcc739dc5m0`, unchanged LIVEdep-db69g4n40ujc73d6fsug/6e3a4d4, not suspended. Twenty-four-hour app/request logs0 and empty request/instance/connection series are **not zero-session evidence**. The [active-connections API](https://api-docs.render.com/reference/get-active-connections) concerns databases, not web-service sockets; free services lack [SSH/shell](https://render.com/docs/free). Source has no billing/scheduler/webhook dependency. Fresh01:09:46.676626UTC DB evidence has active metered runs0/unexpired windows0/claimed jobs0, but pre-START/idle sockets remain unknown. Do not silently equate no metered work with the owner's stricter no-active-sessions condition.
+
+Available MCP exposes no suspension or live connection-inspection operation; CLI is absent. The [reversible suspend API](https://api-docs.render.com/reference/suspend-service-1) exists, but no authenticated generic tool exposes it. Do not extract connector tokens or substitute Delete. If the owner explicitly accepts closure of unknown idle connections after a fresh zero-active-metered-work guard, the remaining dashboard action is **Suspend**, only on https://dashboard.render.com/web/srv-db1402u0tbcc739dc5m0 . Otherwise retain the service until an authoritative session count is available. Do not click now on an unproved condition.
+
+Keep the old billing website/scheduler operational. A fresh01:22:29.872544UTC read retains enabled scheduling and ordinary01:08HTTP200/no timeout/error; exact definition hash/destination unchanged. Before any later stop recheck current usage/financial snapshots; afterward verify suspended state plus Cluera health, old website/native/feed/billing continuity and unchanged protected rows. Rollback must not reactivate a suspected compromised credential; obtain separately scoped safe replacement authority if required. Suspending this relay does not deactivate the exposed legacy JWT or authorize Phase A.
+
+The support Admin role was separately owner-authorized and granted through the shared retained Account allowlist, with one truthful atomic operator audit. It also covers temporary old Account Admin after independent Auth/MFA, not License. [Current evidence and next private MFA action](CLUERA_EXECUTION_STATUS.md). No existing desktop feature or installer was changed.
+
+## October 14 - earlier review; approval handoffs superseded above
 
 Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
 

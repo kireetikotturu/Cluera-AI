@@ -1,6 +1,12 @@
 # Cluera launch steps — October 14, 2026
 
-## Current result - completed safe Cluera rollout; one retirement approval remains
+## October 15 - immediate action supersedes earlier setup handoffs
+
+The requested support Admin role is now granted with one atomic, truthful owner-authorized operator audit; shared retained Account scope includes temporary old Account Admin, not License. **Next: sign in at https://cluera-ai-staging.vercel.app/account/admin as clueraaisupport@gmail.com and privately enroll/verify MFA.** No code, QR, setup key, password or token in chat. Do not change payments, grant time or enter provider credentials yet. [Actual tests, preservation and remaining blockers](CLUERA_EXECUTION_STATUS.md).
+
+Conditional old-relay suspension is approved, not performed: fresh active metered work is zero, but idle WebSockets cannot be counted with available tools; no supported authenticated suspend operation is exposed. Do not repeat approval/key-saving instructions below as current actions. Keep the old billing website and shared database intact. Frozen Phase A approval is retained but incident containment still fails; new privileged financial APIs are not installed. Provider-vault schema/KEK/bootstrap and actual Windows/payment/provider acceptance remain separate gates. No further cosmetic or EXE functionality changes are included.
+
+## October 14 - earlier rollout evidence; handoffs superseded above
 
 Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
 

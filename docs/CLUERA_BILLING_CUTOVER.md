@@ -1,6 +1,18 @@
 # Cluera Razorpay billing handoff - approval-required plan
 
-## Current result - completed safe Cluera rollout; one retirement approval remains
+## October 15 - billing remains first priority; exact approval boundaries
+
+No further cosmetic work is included. Existing buy/callback/raw-signature/independent verification/idempotent fulfillment/owner-epoch/passive scheduler engineering remains prepared, **not activated or accepted end to end**. Frozen core473a81c7…56e50d/scheduler5892b0b0…ed86e9 still match; fresh01:09:46.676626UTC confirms schemas absent and original cron active. New local selection293passes/2scheduler-fixture timeouts is not a clean suite pass; no deadline or SQL pin was relaxed. [Current complete result](CLUERA_EXECUTION_STATUS.md).
+
+The existing **conditional Phase A approval is sufficient once its original security condition genuinely passes**; do not ask for it again. What is still missing is verified containment/retirement of the exposed legacy service-role authority. The owner's separate modern keys and positive protected reads are completed evidence, not invalidation of a still-usable legacy JWT. New financial definer APIs would accept that authority. No partial installation or altered-grant variant may bypass the frozen approval.
+
+Before any legacy-key deactivation request, resolve the License deployment's non-secret Supabase project reference and legacy public/browser/desktop/CI/external compatibility. License mutation and revocation are expressly unapproved. Old-relay suspension approval is recorded but its no-active-sessions condition remains unproved; a stop alone would not contain the JWT. Keep the old website delivering billing/intake/scheduling throughout.
+
+After containment: recheck exact SQL/security/preservation pins, apply approved Phase A only, prove passive owner=account and unchanged old dispatch. Only then present the **separate Phase B/C Test financial approval** covering exact merchant/destination/signer and sole tester, receiver preparation, old/new processing ownership CAS/epoch, scheduler/webhook URL handoff and rollback, disabled new purchases until delivery is verified, then exactly one owner-initiated INR549/3h Test purchase. No agent-created order, replay, manual grant or handling of a different historical order is included. Browser callback grants nothing; capture+paid order+genuine signed receipt+one10800-second non-expiring pack+trial/balance preservation+installed desktop synchronization must all pass before acceptance. Monthly offers need their own canonical plan/invoice/lifecycle acceptance, not a cosmetic Admin price change.
+
+Support Admin assignment is complete, with fresh private MFA still required; it authorizes neither catalog changes nor payment activation. No Razorpay URL, Test/Live setting, financial row, old scheduler owner, key or environment value was changed in this turn. The next immediate owner interaction is the private Admin MFA acceptance in the execution guide, not a purchase.
+
+## October 14 - earlier rollout evidence; next-action instructions superseded above
 
 Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
 

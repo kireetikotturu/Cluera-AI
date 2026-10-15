@@ -1,6 +1,14 @@
 # Shared Supabase credential incident — approval-required plan
 
-## Current result - completed safe Cluera rollout; one retirement approval remains
+## October 15 - current containment state
+
+Both Cluera credentials and the old website-only bridge already have accepted protected authentication evidence; do not repeat saving those keys. Owner has now chosen conditional old-relay suspension, not another permanent key-retention setup. Its fresh zero-active-metered-work read is accepted, but zero idle sessions is unproved and suspension has not occurred. [Conditional action and tool limitations](CLUERA_TWO_PRODUCT_RETIREMENT.md).
+
+No legacy key is revoked/deactivated and its exact validity remains unknown. Remaining compatibility inventory includes the License deployment's non-secret project reference, public/browser/desktop key consumers and hidden CI/local/external dependencies. Do not ask for key values or change License; no legacy-wide deactivation may be inferred from the relay approval. Creating modern keys, role/MFA setup or suspending a consumer does not invalidate a leaked legacy JWT. Frozen financial/vault schema therefore remains held. After inventory passes, obtain separately scoped legacy API deactivation approval and verify negative retired/positive replacement auth without logging credentials; JWT signing-key rotation remains excluded.
+
+The separate support Admin request is completed through the retained allowlist with one truthful operator-bootstrap audit, not a schema/credential change. Next immediate owner interaction is private Admin MFA, as recorded in [execution status](CLUERA_EXECUTION_STATUS.md). All earlier retention/saving/type questions below are dated history, not repeated current requests.
+
+## October 14 - earlier rollout evidence; handoffs superseded above
 
 Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
 
