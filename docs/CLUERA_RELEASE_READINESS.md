@@ -1,5 +1,27 @@
 # Cluera release blockers
 
+## October 15 - new Windows 1.0.2 unsigned TEST candidate; launch remains blocked
+
+The requested separately versioned candidate is prepared locally at:
+
+```text
+desktop/release-cluera-staging/1.0.2/ClueraAITestSetup-1.0.2.exe
+SHA-256 5535609d6f301925ccc68376ffd587c37274aa95e88276b7ee159904261dc243
+Exact size 121924182 bytes
+Windows FileVersion / ProductVersion 1.0.2 / ProductName Cluera AI
+Authenticode NotSigned - unsigned TEST only
+```
+
+This is not installed, launched, uploaded, approved or published to any update feed. Cluera 1.0.0/1.0.1, old Account 1.0.10 and License 1.0.8 were independently rehashed before and after packaging and retain their recorded exact sizes and SHA-256 values. No application source or existing EXE was edited. All 110 files in `desktop/src` match the pre-build aggregate SHA-256 `5d042d1759b7d22324b72349001f9cf02a6ab0ffad8abc2eefbc4560ae1f479f` afterward. No customer profile, history, Auth credential, database or provider was opened by the candidate.
+
+Only packaging/version metadata changes: manifest 1.0.1 to 1.0.2, exactly two root-version lines in the existing lockfile, and the previously unused/stale version resource aligned to 1.0.2. No dependency resolution, dependency declaration, security fuse, installer destination, profile, callback, trust or desktop functionality changed. The packaging wrapper now refuses inconsistent version metadata and any already-existing version output, including an incomplete earlier build, before invoking electron-builder. Signing credentials and publish tokens remain excluded from its environment; publishing stays `never`.
+
+Fresh Windows verification: full desktop **366 passed / 1 opt-in skipped**, 56 files; both TypeScript configurations, renderer/main code builds and hardening pass. Packaging guards **3/3** pass. Both full and production-only desktop dependency audits report **zero advisories**, without installing or changing dependencies. NSIS packaging succeeds with Electron 44.4.5; the archive verifier accepts **2,276 entries**, product identity, public trust and all six expected Electron hardening fuses. Additional offline checks compare all **105 built dist files** plus bundled configuration/public-key bytes against the actual ASAR and pass **10 synthetic cases using its extracted manifest verifier**. These tests use an ephemeral synthetic signing pair, not the private Cluera release key; they make zero network requests and launch no Electron, installer or updater. They are not a real approved-feed, installed-updater or Windows secure-store acceptance claim. The bounded build/release artifact scan checks **257 files / 0 history blobs / zero findings**; it does not certify arbitrary unknown secrets or a full repository history.
+
+The existing Cluera identity remains `cluera-ai-desktop` / `ai.cluera.desktop`, profile `cluera-ai-desktop-staging`, local database `cluera-ai.sqlite`, channel `cluera-beta`, audience `cluera-ai-desktop-test-update`, staging API `https://cluera-ai-staging.vercel.app` and relay `wss://cluera-ai-relay-staging.onrender.com/v1/session`. Public Ed25519 DER/SPKI fingerprint remains `89d6409d29c8eed4f583936bdd2cab0b84a97b15552c340f5697b7336da6c5c1`. Existing install/profile/history features are preserved; normal installed high-DPI layout, email/Google/restore/logout/account isolation, secure storage, session/context/documents/audio/screenshots/shortcuts and update execution remain real acceptance gates. Do not transfer legacy encrypted refresh credentials or redirect the old Account feed to a Cluera manifest.
+
+Admin login/MFA and legacy API-key deactivation are already completed; do not repeat those setup steps. The Supabase security request for residual privileged JWT bearer authority is pending. **Billing Phase A remains blocked** until sufficient containment evidence passes; no migration, financial ownership change, payment/provider activation or historical-row edit is included in this candidate. Gemini/Deepgram remain auth-only blocked until the separately approved vault schema and encryption-key bootstrap are securely completed. Timestamped commercial Authenticode, real provider/shared-ledger/payment journeys, capacity/restore/rollback/telemetry and owner-reviewed legal/operational gates remain outstanding. **Commercial launch is NO-GO.** No additional manual setup is required merely to retain this local TEST candidate; later installed acceptance does not authorize AI or payments.
+
 ## Current result - completed safe Cluera rollout; one retirement approval remains
 
 Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.

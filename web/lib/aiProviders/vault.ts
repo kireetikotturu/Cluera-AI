@@ -11,7 +11,9 @@ export const envelopeSchema=z.object({v:z.literal(1),keyId:id,wrapIv:b64(12),wra
 export type Envelope=z.infer<typeof envelopeSchema>;
 export type Binding={provider:ProviderId;credentialId:string};
 export class VaultError extends Error {constructor(){super('Provider vault unavailable.');}}
-const binding=(b:Binding)=>`cluera-ai:provider-vault:v1:${providerId.parse(b.provider)}:${z.uuid().parse(b.credentialId)}`;
+// PostgreSQL uuid read-back is lowercase; AAD must bind that same identity
+// regardless of the accepted request UUID's textual case.
+const binding=(b:Binding)=>`cluera-ai:provider-vault:v1:${providerId.parse(b.provider)}:${z.uuid().parse(b.credentialId).toLowerCase()}`;
 
 /** Dedicated infrastructure keyring, never a provider/cookie/rate key. No file discovery,
  * automatic generation, secret-returning DTO, or legacy credential import. */

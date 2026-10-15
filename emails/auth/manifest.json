@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "brand": "Cluera AI",
+  "supportEmail": "clueraaisupport@gmail.com",
+  "projectRef": "dwqltsqumiwsxtkzdoaa",
+  "installationStatus": "prepared-not-installed",
+  "templates": [
+    {
+      "file": "confirm-signup.html",
+      "dashboardTemplate": "Confirm sign up",
+      "subjectField": "mailer_subjects_confirmation",
+      "contentField": "mailer_templates_confirmation_content",
+      "subject": "Confirm your Cluera AI email",
+      "placeholder": "ConfirmationURL",
+      "heading": "Confirm your email address",
+      "action": "Confirm email address"
+    },
+    {
+      "file": "recovery.html",
+      "dashboardTemplate": "Reset password",
+      "subjectField": "mailer_subjects_recovery",
+      "contentField": "mailer_templates_recovery_content",
+      "subject": "Reset your Cluera AI password",
+      "placeholder": "ConfirmationURL",
+      "heading": "Reset your password",
+      "action": "Reset password"
+    },
+    {
+      "file": "magic-link.html",
+      "dashboardTemplate": "Magic link",
+      "subjectField": "mailer_subjects_magic_link",
+      "contentField": "mailer_templates_magic_link_content",
+      "subject": "Your Cluera AI sign-in link",
+      "placeholder": "ConfirmationURL",
+      "heading": "Your secure sign-in link",
+      "action": "Sign in securely"
+    },
+    {
+      "file": "invite.html",
+      "dashboardTemplate": "Invite user",
+      "subjectField": "mailer_subjects_invite",
+      "contentField": "mailer_templates_invite_content",
+      "subject": "Your Cluera AI invitation",
+      "placeholder": "ConfirmationURL",
+      "heading": "You have been invited",
+      "action": "Accept invitation"
+    },
+    {
+      "file": "email-change.html",
+      "dashboardTemplate": "Change email address",
+      "subjectField": "mailer_subjects_email_change",
+      "contentField": "mailer_templates_email_change_content",
+      "subject": "Confirm your Cluera AI email change",
+      "placeholder": "ConfirmationURL",
+      "heading": "Confirm your email change",
+      "action": "Confirm email change"
+    },
+    {
+      "file": "reauthentication.html",
+      "dashboardTemplate": "Reauthentication",
+      "subjectField": "mailer_subjects_reauthentication",
+      "contentField": "mailer_templates_reauthentication_content",
+      "subject": "Your Cluera AI verification code",
+      "placeholder": "Token",
+      "heading": "Verify your identity",
+      "action": null
+    }
+  ]
+}

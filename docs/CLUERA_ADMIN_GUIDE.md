@@ -1,6 +1,18 @@
 # Cluera customer and Admin guide
 
-## Current result - completed safe Cluera rollout; one retirement approval remains
+## October 15 - accepted Admin setup; security Support case pending
+
+Admin login/MFA and legacy API-key disable are completed; do not repeat registration, role grants, authenticator enrollment or key configuration. The owner confirms the security Support case is submitted for Cluera AI-staging. No manual step is required now; wait for its reference/non-secret reply. The notification destination on the Support receipt is only a ticket contact, not an Admin identity/role or application configuration change.
+
+Post-disable read-only metadata confirmed active verified support customer/Admin, a verified TOTP factor and retained AAL2 session. Those checks preserve the earlier owner acceptance; no private browser session or new login journey is inspected. Phase A remains blocked and all payment/provider activation gates stay intact. No provider key or catalog/credit mutation is requested while containment and separately approved bootstrap are unresolved. [Current status](CLUERA_EXECUTION_STATUS.md).
+
+Offline preparation fixed a credential-UUID case/read-back issue in vault authenticated binding, covered by three new regressions and final 47/47 focused passes/typecheck. It is local only; no provider-vault schema, key, model or activation is applied. Existing Admin authorization/MFA/operation guards remain unchanged. Do not enter credentials until the security/schema/bootstrap gates genuinely pass.
+
+## Earlier October 15 - owner confirms protected Admin workspace opens
+
+`clueraaisupport@gmail.com` now has the requested retained Account Admin role, and the owner reports **Admin workspace opens** after the requested private sign-in/authenticator step. Record browser Admin access as owner-reported PASS; the agent did not inspect the private session or separately query current factors/AAL. Do not repeat enrollment or role setup. This does not accept provider-vault operations, financial changes, Windows or all Auth lifecycle cases. Payments and AI provider START remain gated. [Current status](CLUERA_EXECUTION_STATUS.md).
+
+## October 14 - earlier rollout evidence; next-action instructions superseded above
 
 Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
 
@@ -25,7 +37,7 @@ The 12,752-byte checkout denial/refresh/effect/buy/SDK/callback body is byte-ide
 
 Use `/account/admin` with an explicitly authorized Admin. On October15 the owner requested and the operator granted `clueraaisupport@gmail.com` the retained Account Admin role, atomically recording one truthful owner-authorized bootstrap audit. That allowlist also applies to temporary old Account Admin, not License Edition. Public signup still never grants a role; no general invitation/role-grant endpoint was added. [Exact guards, tests and preservation evidence](CLUERA_EXECUTION_STATUS.md).
 
-**Owner action now:** sign in normally as that account at https://cluera-ai-staging.vercel.app/account/admin, click **Enroll authenticator** if offered, and privately verify its six-digit code. The account currently has zero verified factors; the operator did not enroll one, read credentials or bypass AAL2. Keep setup keys/QR/codes private and report only whether the workspace opens. Do not enter AI keys or change payment/catalog/credits yet: vault schema/bootstrap and financial activation are still separately gated. This verifies browser Admin access, not Windows or payment acceptance.
+**Owner acceptance received:** the protected Admin workspace opens. The preceding zero-factor observation was before the owner's private interaction, not a current factor-count claim. The operator did not enroll factors, inspect credentials or bypass AAL2. Keep setup keys/QR/codes private; complete normal reauthentication only when the application requests it. Do not enter AI keys or change payment/catalog/credits yet: vault schema/bootstrap and financial activation remain separately gated. This is owner-reported browser Admin access, not Windows or payment acceptance.
 
 Customer/catalog/usage/release/provider reads require the existing server authorization. Sensitive operations need reasons, retained operation UUIDs, live allowed MFA and, where required, fresh authenticator reauthentication. An unknown write remains locked to its original operation/body; verify it by a read, never invent a replacement operation. No dashboard metric or provider cost should display a fabricated zero.
 

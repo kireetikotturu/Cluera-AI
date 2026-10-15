@@ -1,6 +1,52 @@
 # Shared Supabase credential incident — approval-required plan
 
-## October 15 - current containment state
+## October 15 - Support request submitted; containment response pending
+
+The owner supplied the Supabase confirmation **Support request sent**, logged for **Cluera AI-staging**, and confirms that the request concerns residual privileged bearer authority after legacy API-key disable. Submission is **owner-confirmed complete**; no ticket reference or technical response has been supplied yet. Do not submit a duplicate request, repeat legacy-key disable/key saving, or repeat Admin/MFA setup. The agent has not inspected the private ticket or inbox and is not monitoring email automatically.
+
+**No further owner action is required now.** Await the owner's ticket reference or non-secret Support response. A receipt is not containment evidence and grants no new permission. Phase A stays blocked; modern keys, original billing website/scheduler, users/balances/history, JWT signing/session trust, License and all Windows features remain protected. No rotation, schema, payment or provider activation is authorized by the submission.
+
+Independent safe work may continue only offline or under the existing read-only boundaries. The exact frozen billing/vault SQL remains unchanged. Evaluate Support's eventual answer for REST/Auth Admin/Storage/Realtime coverage and verifiable denial before applying the already-approved conditional Phase A; do not request that approval again. A proposed signing-trust change or new platform/schema control still requires its own review and specific authority.
+
+## Earlier October 15 - post-disable evidence retained
+
+Owner confirms both legacy API keys disabled; independent public-key catalog reads show the same legacy anon key disabled=true and modern publishable disabled=false. Five fixed-project GETs at **02:57:33.349 UTC** confirm public legacy API-key rejection, modern public acceptance and retained **public** legacy bearer-JWT validation against a signature-tampered control. No privileged token is retrieved/tested, no rows or response bodies output, no mutations. A disabled family does not certify the unavailable exposed service JWT is unusable.
+
+Actual Cluera web/relay modern configured DB authentication passes protected diagnostic `dpl_C6oER7JJp4fpfLd7DAHWmxDMRzQn` at **02:55:18.047 UTC**, all signed auth-only/provider-disabled checks pass, zero provider requests/mutations, intentional no-artifact ERROR. Old website 7/7 and Cluera public boundaries 10/10 pass. Support account/Admin/verified TOTP/AAL2 metadata remains present; no new private login journey is claimed. All 24 business snapshots match before/after disable through **02:58:45.092297 UTC**, old scheduler/hash/latest HTTP 200 intact, 18/33 website environment entries unchanged. [Full evidence](CLUERA_EXECUTION_STATUS.md).
+
+**Hold Phase A.** The [Authorization header determines service-role authority](https://supabase.com/docs/guides/troubleshooting/why-is-my-service-role-key-client-getting-rls-errors-or-not-returning-data-7_1K9z). The original exposed string remains unavailable. Public-anon evidence is not direct proof of privileged access, but there is no verified platform-wide privileged-bearer denial. App-only filtering or a Data API hook cannot certify Auth/Storage/Realtime containment. Do not re-enable legacy API keys, rotate JWT signing secrets or alter roles/schemas automatically.
+
+### Prepared request retained for reference - submission is complete
+
+This was the prepared request for project **dwqltsqumiwsxtkzdoaa**. The owner has now confirmed submission; do not send it again. Actual private ticket wording has not been independently read. Never attach secrets, screenshots containing credentials, tokens or request headers.
+
+> Subject: Contain exposed legacy service_role JWT after legacy API-key disable
+>
+> Project: dwqltsqumiwsxtkzdoaa. A legacy service_role JWT may have been exposed. Its original string is unavailable and compromise/abuse has not been disproved. Both legacy anon/service_role API keys are now disabled, and modern publishable/secret clients authenticate correctly.
+>
+> A controlled, row-free test shows the disabled public anon JWT still passes bearer validation with a modern publishable API key; a signature-tampered control is rejected. We have NOT tested or demonstrated privileged service-role access.
+>
+> Please confirm whether this project's old service_role JWT can still authorize REST, Auth Admin, Storage or Realtime through Authorization with a valid modern API key. Is there a supported project-wide way to reject that legacy privileged bearer authority while retaining modern keys and existing customer access-token/session/signing trust? Please specify coverage and a safe verification method that does not require sending key values.
+>
+> Guidance only: do not rotate/revoke signing keys, reset JWT secrets, invalidate customer sessions, alter permissions, or change project settings without a separately coordinated approval. If targeted rejection is not supported, please confirm the required staged signing-key migration and legacy verification-key revocation procedure and customer-session implications.
+
+When available, share only the ticket reference or non-secret response. Submission was performed by the owner, not the agent. If targeted containment is unsupported, prepare a separately authorized [staged signing-key migration](https://supabase.com/docs/guides/auth/signing-keys): verify getUser-based consumers, issue under the reviewed new key, observe the actual configured maximum access-token lifetime plus documented overlap, and retire old verification trust only under approval. Rotation of issuance alone does not invalidate the legacy JWT. Preserve modern keys, the old billing website/scheduler, refresh sessions, shared customer/financial data and License; no automatic rollback to the exposed authority.
+
+The already-approved exact Phase A proceeds only after sufficient containment and fresh preservation/security checks; approval is not requested again. Vault/KEK/payment activation remain separately unapproved. Local operator auditor plus synthetic regression pass 27 focused tests/typecheck, not incident clearance or full end-to-end acceptance. Older pending-disable instructions below are historical and superseded.
+
+## Earlier October 15 - disable authority received; JWT caveat prevents premature clearance
+
+The owner approved coordinated disable of only retained-project legacy `anon` and `service_role` API keys after fresh checks, explicitly accepting temporary old-relay/unknown legacy-consumer interruption. No renewed approval or key saving is needed. No toggle has been executed; modern keys, old billing website/scheduler, License and JWT signing/session trust remain protected.
+
+Fresh modern public Auth checks pass for both websites. Complete-source protected diagnostic `dpl_F9q5KfacWYdr5DZoHwExv9mVwk68` passes modern web-secret prefix and actual web/relay DB authentication, signed auth-only/provider-disabled state, zero provider requests/mutations. Initial relay checks timed out and are retained as failures; subsequent health and bounded diagnostic pass without longer application deadlines. Old protected release/Auth/download checks 7/7 and Cluera public boundaries 10/10 pass. All 24 business snapshots match 02:18:26.770503-02:24:13.400316 UTC, both websites' environment metadata compares unchanged, and original cron/security/HTTP 200 dispatch remain intact. [Detailed evidence](CLUERA_EXECUTION_STATUS.md).
+
+**Newly verified limitation:** [current official dashboard code](https://github.com/supabase/supabase/blob/4215b6ca32a3b8fa95d433c84f00a391c39efbec/apps/studio/components/ui/ProjectSettings/ToggleLegacyApiKeys.tsx) states this disables `apikey`-header use but leaves legacy JWTs valid. Do not equate the toggle with complete leaked-service-role-JWT retirement. A modern public key plus remaining bearer JWT authority must be evaluated independently. The original exposed string is unavailable; exact-token rejection is untested. No exploit, incident non-abuse, or implicit JWT-rotation authority is claimed.
+
+**Single manual action:** [retained project Legacy API keys](https://supabase.com/dashboard/project/dwqltsqumiwsxtkzdoaa/settings/api-keys/legacy) -> **Disable JWT-based API keys** -> type `disable` -> **Confirm to disable anon and service_role**. Any OAuth-app warning leads to the same confirmation. Do not change modern keys or JWT Signing Keys. Reply only **Legacy keys disabled**. Connected tools have no toggle; no credential value is needed.
+
+Afterward, verify platform family status/negative API-key requests, positive modern services and preservation. Keep Phase A held unless remaining privileged bearer authority is demonstrably contained. Any required additional security control must have its own narrowly reviewed authority; no automatic JWT signing rotation, session invalidation, database-permission change or compromised-key re-enable. Earlier next-approval/configuration instructions below are historical, not new requests.
+
+## Earlier October 15 - containment state before disable approval
 
 **Latest verification supersedes the proposed public-key migration below:** Cluera's configured Production public key exactly matches an enabled modern publishable key; old `/admin` page+9public scripts and fixed-project Auth settings also verify **modern publishable/accepted**,11GETs/0mutations. Neither website needs another key save. Fresh real Admin login/MFA is owner-confirmed, no setup repetition. New inspector/actual-SDK mock regressions plus existing relevant tests49/49 and typecheck pass. One-hour gateway categories77requests=50modern server+27modern public/0legacy markers do not certify hidden consumers or retire the exposed authority.
 

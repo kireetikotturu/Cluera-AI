@@ -47,6 +47,15 @@ it('encrypts a replacement before SQL, never returns credentials/tokens and neve
  expect(vaultKeyring(env).open(mutation.p_input.sealed,{provider:'gemini',credentialId:op.operationId})).toBe(secret);
  const output=JSON.stringify(await r.json());expect(output).not.toContain(secret);expect(output).not.toContain('sealed');expect(output).not.toContain(token);expect(mfa.challengeAndVerify).toHaveBeenCalledOnce();expect(fetch).not.toHaveBeenCalled();
 });
+it('decrypts accepted uppercase operation IDs after canonical database read-back',async()=>{
+ const op={...body(),operationId:'ABCDEF00-1234-4234-8234-ABCDEF123456'};
+ const r=await providerAdminRequest(request(op));expect(r.status).toBe(200);
+ const mutation=rpc.mock.calls.find(([name]:any)=>name==='cluera_provider_mutate')[1];
+ // PostgreSQL uuid text output is lowercase, independently of the input case.
+ const storedCredentialId=mutation.p_input.credentialId.toLowerCase();
+ expect(vaultKeyring(env).open(mutation.p_input.sealed,{provider:'gemini',credentialId:storedCredentialId})).toBe(secret);
+ expect(fetch).not.toHaveBeenCalled();expect(JSON.stringify(await r.json())).not.toContain(secret);
+});
 it('rejects schema/secret injection, arbitrary fallback and provider-host control without logging bodies',async()=>{
  for(const patch of [{endpoint:'https://attacker.invalid'},{apiKey:'bad\nsecret'},{action:'CONFIGURE',enabled:true,defaultModel:'x-model',fallback:'OPENAI'}]){
   const r=await providerAdminRequest(request({...body(),...patch}));expect(r.status).toBe(400);expect(await r.json()).toEqual({error:'INVALID_INPUT'});

@@ -9,6 +9,13 @@ const secret='synthetic-private-provider-credential',key=Buffer.alloc(32,41).toS
 const env={CLUERA_PROVIDER_VAULT_KEYRING_BASE64:Buffer.from(JSON.stringify({active:'test-1',keys:{'test-1':key}})).toString('base64')};
 const binding={provider:'gemini' as const,credentialId:randomUUID()};
 describe('encrypted Cluera provider vault',()=>{
+ it.each(['ABCDEF00-1234-4234-8234-ABCDEF123456','aBcDef00-1234-4234-8234-aBcDef123456'])('canonicalizes credential UUID case for database read-back (%s)',credentialId=>{
+  const vault=vaultKeyring(env),identity={provider:'gemini' as const,credentialId};
+  const sealed=vault.seal(secret,identity);
+  expect(vault.open(sealed,{...identity,credentialId:credentialId.toLowerCase()})).toBe(secret);
+  expect(vault.open(sealed,identity)).toBe(secret);
+  expect(()=>vault.open(sealed,{...identity,credentialId:'abcdef00-1234-4234-8234-abcdef123457'})).toThrow('Provider vault unavailable.');
+ });
  it('uses randomized envelope encryption, strict authenticated identity and fixed errors',()=>{
   const vault=vaultKeyring(env),a=vault.seal(secret,binding),b=vault.seal(secret,binding);
   expect(a).not.toEqual(b);expect(JSON.stringify(a)).not.toContain(secret);expect(vault.open(a,binding)).toBe(secret);
