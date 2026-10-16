@@ -7,8 +7,8 @@ const baseline=[
   "frame-ancestors 'none'","base-uri 'self'","form-action 'self'","object-src 'none'","upgrade-insecure-requests",
 ].join('; ');
 const settings={CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',
-  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',
-  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa',SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'true',
+  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',
+  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'true',
   SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'false',NEXT_PUBLIC_PADDLE_CLIENT_TOKEN:'test_syntheticpublicclient000000',
   SIGMAROUND_PADDLE_SANDBOX_TESTER_IDS:'00000000-0000-4000-8000-000000000001'};
 beforeEach(()=>{for(const [key,value]of Object.entries(settings))vi.stubEnv(key,value);});

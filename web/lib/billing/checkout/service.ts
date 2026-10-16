@@ -14,8 +14,8 @@ const boundSchema=z.object({code:z.literal('BOUND'),intentId:z.uuid(),transactio
 export function assertCheckoutStaging(env:NodeJS.ProcessEnv) {
   if(env.SIGMAROUND_ACCOUNTS_ENABLED!=='true' || env.PADDLE_ENVIRONMENT!=='sandbox'
     || env.SIGMAROUND_ACCOUNT_ORIGIN!=='https://cluera-ai-staging.vercel.app'
-    || env.NEXT_PUBLIC_SUPABASE_URL!=='https://dwqltsqumiwsxtkzdoaa.supabase.co'
-    || env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF!=='dwqltsqumiwsxtkzdoaa') throw new AccountError('UNAVAILABLE',503);
+    || env.NEXT_PUBLIC_SUPABASE_URL!=='https://yhnqlfcgrmckhyjdxegg.supabase.co'
+    || env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF!=='yhnqlfcgrmckhyjdxegg') throw new AccountError('UNAVAILABLE',503);
 }
 
 /** Server-only, guarded staging checkout. Neither CLAIMED nor BOUND is paid access. */

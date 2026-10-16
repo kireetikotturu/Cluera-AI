@@ -5,7 +5,7 @@ describe.skipIf(process.env.SIGMAROUND_RUN_CHECKOUT_DB_ACCEPTANCE!=='true')('sta
   it('claims one create, binds once and blocks unknown-outcome retries without paid writes',async()=>{
     const env=process.env;
     function check(value:unknown,message:string):asserts value{if(!value)throw new Error(`Checkout DB acceptance: ${message}`);}
-    check(env.NEXT_PUBLIC_SUPABASE_URL==='https://dwqltsqumiwsxtkzdoaa.supabase.co'
+    check(env.NEXT_PUBLIC_SUPABASE_URL==='https://yhnqlfcgrmckhyjdxegg.supabase.co'
       &&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://cluera-ai-staging.vercel.app'&&env.SUPABASE_SERVICE_ROLE_KEY,'wrong target');
     const user=env.SIGMAROUND_CHECKOUT_FIXTURE_USER,session=env.SIGMAROUND_CHECKOUT_FIXTURE_SESSION;
     const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;

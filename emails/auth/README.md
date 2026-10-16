@@ -1,5 +1,7 @@
 # Cluera AI authentication email bundle
 
+October 16 clean setup: both `manifest.json` and `manifest.cluera-production.json` target only **yhnqlfcgrmckhyjdxegg**. They reuse the six exact HTML bodies; neither is installed. Follow [clean Auth/provider setup](../../docs/CLUERA_CLEAN_AUTH_PROVIDER_SETUP.md), not historical shared-project installation instructions. No old SMTP/OAuth secret, Auth setting, identity or role is transferred.
+
 Prepared source only. These files are not imported by the web/desktop/relay, and publishing or deploying Cluera does not install Supabase email templates or send email.
 
 Use [manifest.json](manifest.json) for the exact template, subject and Auth configuration field mapping. The five link templates preserve Supabase's complete `{{ .ConfirmationURL }}`. Reauthentication deliberately displays `{{ .Token }}` instead; it is not an MFA enrollment template. No actual link, code or recipient is stored here.

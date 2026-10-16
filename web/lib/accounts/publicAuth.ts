@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {CLUERA_SUPABASE_URL,CLUERA_SITE_ORIGIN} from '../supabase/target';
 
 // Browser-only DTOs. No tokens, server configuration or raw upstream errors.
 export const publicAccountSchema=z.object({userId:z.uuid(),email:z.email().max(254),
@@ -18,10 +19,10 @@ export function safeGoogleRedirect(raw:unknown){
  const data=z.object({redirectUrl:z.string().max(4096)}).strict().parse(raw);
  const target=new URL(data.redirectUrl);
  const callback=target.searchParams.get('redirect_to');
- if(target.origin!=='https://dwqltsqumiwsxtkzdoaa.supabase.co'||target.pathname!=='/auth/v1/authorize'
+ if(target.origin!==CLUERA_SUPABASE_URL||target.pathname!=='/auth/v1/authorize'
   ||target.username||target.password||target.hash||target.searchParams.get('provider')!=='google'||!callback)throw new Error('Invalid redirect.');
  const next=new URL(callback);
- if(next.origin!=='https://cluera-ai-staging.vercel.app'||next.pathname!=='/api/account/callback'
+ if(next.origin!==CLUERA_SITE_ORIGIN||next.pathname!=='/api/account/callback'
   ||next.username||next.password||next.hash||[...next.searchParams.keys()].some(k=>k!=='sb_flow_id'))throw new Error('Invalid redirect.');
  return target.href;
 }

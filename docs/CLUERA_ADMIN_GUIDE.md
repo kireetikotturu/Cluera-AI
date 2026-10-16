@@ -1,5 +1,15 @@
 # Cluera customer and Admin guide
 
+## Current October16 - clean destination Admin workflow prepared
+
+The new authorized project **yhnqlfcgrmckhyjdxegg** has verified schema but zero Auth users/Admin roles. Old project's accepted Admin/MFA remains historical; it is not imported or requested again. No dummy UUID, role, session or factor is copied. After new infrastructure/Auth is configured, a new verified owner identity can use the project-pinned audited bootstrap and destination MFA; registration never grants Admin. Do not perform that step now. The single current owner action is fresh private server-key provisioning in [execution status](CLUERA_EXECUTION_STATUS.md). [Clean Auth/provider procedure](CLUERA_CLEAN_AUTH_PROVIDER_SETUP.md).
+
+Vault tables are applied but empty/disabled; no provider key or root-key custody is provisioned. Billing catalogs remain disabled, no credits/release approval exist. All existing Admin authorization/reauthentication/audit controls remain; no public role-grant API is added.
+
+## Earlier October16 - migration acceptance plan before clean authorization (superseded)
+
+The original Admin login/MFA success remains recorded; do not repeat it now. The intended new project yhnqlfcgrmckhyjdxegg is empty and source access/backup is blocked. Existing roles must be restored to the same UUIDs before new live-session/AAL2 acceptance; never grant by public email/signup or copy unsupported factor secrets. Later new-project enrollment may be necessary under fresh trust, but it is not the next manual action. [Migration/Auth gates](CLUERA_AUTH_MIGRATION.md).
+
 ## October 15 - accepted Admin setup; security Support case pending
 
 Admin login/MFA and legacy API-key disable are completed; do not repeat registration, role grants, authenticator enrollment or key configuration. The owner confirms the security Support case is submitted for Cluera AI-staging. No manual step is required now; wait for its reference/non-secret reply. The notification destination on the Support receipt is only a ticket contact, not an Admin identity/role or application configuration change.

@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ clients: vi.fn() }));
 vi.mock('../lib/accounts/clients', () => ({ accountClients: mocks.clients }));
 const origin = 'https://cluera-ai-staging.vercel.app';
 const uid = '00000000-0000-4000-8000-000000000001', sid = '00000000-0000-4000-8000-000000000002';
-const token = `header.${Buffer.from(JSON.stringify({ sub: uid, session_id: sid })).toString('base64url')}.synthetic`;
+const token = `header.${Buffer.from(JSON.stringify({ sub: uid, session_id: sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600 })).toString('base64url')}.synthetic`;
 const user = { id: uid, email: 'native@example.invalid', email_confirmed_at: '2026-10-04T00:00:00Z' };
 let auth: ReturnType<typeof makeAuth>, rpc: ReturnType<typeof vi.fn>, signOut: ReturnType<typeof vi.fn>;
 function makeAuth() {
@@ -16,8 +16,8 @@ function makeAuth() {
 }
 beforeEach(() => {
   vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','true'); vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN',origin);
-  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://dwqltsqumiwsxtkzdoaa.supabase.co');
-  vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY','sb_publishable_synthetic_public_key_00000000000000000'); vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY','synthetic-service-key-placeholder');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://yhnqlfcgrmckhyjdxegg.supabase.co');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY','sb_publishable_synthetic_public_key_00000000000000000'); vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY','sb_secret_synthetic-service-key-placeholder');
   vi.stubEnv('SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64',Buffer.alloc(32,3).toString('base64'));
   vi.stubEnv('SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64',Buffer.alloc(32,4).toString('base64'));
   auth = makeAuth(); signOut = vi.fn(async () => ({ error: null }));
@@ -95,7 +95,7 @@ it('rejects empty/oversized refresh credentials before Auth without accepting ca
 it('exchanges only a PKCE-bound code in native main, with no supplied user or redirect authority',async()=>{
  const verifier='v'.repeat(64),response=await handleNativeAccount(request('oauth-exchange',{code:'synthetic-one-use-code',verifier}),'oauth-exchange');
  expect(response.status).toBe(200);expect(auth.exchangeCodeForSession).toHaveBeenCalledWith('synthetic-one-use-code');
- expect(mocks.clients).toHaveBeenLastCalledWith(expect.anything(),{'sr-account-code-verifier':JSON.stringify(verifier)});
+ expect(mocks.clients).toHaveBeenLastCalledWith(expect.anything(),{'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier':JSON.stringify(verifier)});
  expect(response.headers.get('set-cookie')).toBeNull();
  expect((await handleNativeAccount(request('oauth-exchange',{code:'code',verifier:'short'}),'oauth-exchange')).status).toBe(400);
  expect((await handleNativeAccount(request('oauth-exchange',{code:'code',verifier,redirect:'https://bad.invalid'}),'oauth-exchange')).status).toBe(400);

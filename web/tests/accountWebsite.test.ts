@@ -19,8 +19,8 @@ import {accountWebsite} from '../lib/accounts/site';
 beforeEach(()=>{
  const pair=syntheticUpdatePair;
  const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
-  NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',NEXT_PUBLIC_SUPABASE_ANON_KEY:'sb_publishable_synthetic_public_key_00000000000000000',
-  SUPABASE_SERVICE_ROLE_KEY:'synthetic-server-key-only',SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64:Buffer.alloc(32,1).toString('base64'),
+  NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',NEXT_PUBLIC_SUPABASE_ANON_KEY:'sb_publishable_synthetic_public_key_00000000000000000',
+  SUPABASE_SERVICE_ROLE_KEY:'sb_secret_synthetic-server-key-only',SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64:Buffer.alloc(32,1).toString('base64'),
   SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64:Buffer.alloc(32,2).toString('base64'),RELEASE_DOWNLOAD_ORIGINS:'https://github.com',
   CLUERA_RELEASE_PRIVATE_KEY_BASE64:Buffer.from(pair.privateKey.export({type:'pkcs8',format:'pem'})).toString('base64'),
   CLUERA_RELEASE_PUBLIC_KEY_BASE64:pair.publicKey.export({type:'spki',format:'der'}).toString('base64')};

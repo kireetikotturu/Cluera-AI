@@ -15,8 +15,8 @@ function makeMfa(){return {
 };}
 beforeEach(()=>{
  vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','true');vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN',origin);
- vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://dwqltsqumiwsxtkzdoaa.supabase.co');
- vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY','sb_publishable_synthetic_public_key_00000000000000000');vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY','synthetic-service-key-placeholder');
+ vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://yhnqlfcgrmckhyjdxegg.supabase.co');
+ vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY','sb_publishable_synthetic_public_key_00000000000000000');vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY','sb_secret_synthetic-service-key-placeholder');
  vi.stubEnv('SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64',Buffer.alloc(32,3).toString('base64'));
  vi.stubEnv('SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64',Buffer.alloc(32,4).toString('base64'));
  vi.stubEnv('SIGMAROUND_ACCOUNT_TEST_ENTITLEMENTS_ENABLED','false');

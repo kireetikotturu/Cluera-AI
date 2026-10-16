@@ -6,6 +6,7 @@ import { json, apiError, readJsonBody } from '../http';
 import { usageService } from '../usage/service';
 import { accountContextCommand } from './context';
 import { readCredits } from './credits';
+import {CLUERA_AUTH_STORAGE_KEY,CLUERA_SUPABASE_URL} from '../supabase/target';
 
 /** Explicit native-main API, separate from browser HttpOnly-cookie BFF. Never
  * accepts cookies, browser Origin, query credentials or a client account ID.
@@ -15,7 +16,7 @@ export async function handleNativeAccount(request: Request, action: string): Pro
   try {
     const config = accountConfig();
     if (config.origin !== 'https://cluera-ai-staging.vercel.app'
-      || config.url !== 'https://dwqltsqumiwsxtkzdoaa.supabase.co') throw new AccountError('UNAVAILABLE', 503);
+      || config.url !== CLUERA_SUPABASE_URL) throw new AccountError('UNAVAILABLE', 503);
     if (request.headers.has('origin') || request.headers.has('cookie') || request.headers.has('sec-fetch-site')
       || new URL(request.url).search) throw new AccountError('FORBIDDEN', 403);
     let clients = accountClients(config);
@@ -32,7 +33,7 @@ export async function handleNativeAccount(request: Request, action: string): Pro
         // verified identity and the live-session RPC remain authoritative.
         : action==='refresh'?z.object({ refreshToken: z.string().min(1).max(12000) }).strict().parse(raw)
         : z.object({code:z.string().min(1).max(1024),verifier:z.string().regex(/^[A-Za-z0-9_-]{43,128}$/)}).strict().parse(raw);
-      if('verifier' in input)clients=accountClients(config,{'sr-account-code-verifier':JSON.stringify(input.verifier)});
+      if('verifier' in input)clients=accountClients(config,{[`${CLUERA_AUTH_STORAGE_KEY}-code-verifier`]:JSON.stringify(input.verifier)});
       if ('email' in input) await rateLimit(request, config, clients, input.email);
       const { data, error } = 'email' in input
         ? await clients.auth.auth.signInWithPassword(input)

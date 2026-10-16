@@ -3,7 +3,7 @@ describe.skipIf(process.env.SIGMAROUND_RUN_BILLING_PERMISSION_CHECK!=='true')('p
   it('reports only status codes, never raw Paddle resources, keys or customer data',async()=>{
     const env=process.env;
     if(env.PADDLE_ENVIRONMENT!=='sandbox'||env.SIGMAROUND_ACCOUNT_ORIGIN!=='https://cluera-ai-staging.vercel.app'
-      ||env.NEXT_PUBLIC_SUPABASE_URL!=='https://dwqltsqumiwsxtkzdoaa.supabase.co'||!env.PADDLE_API_KEY) throw new Error('Wrong staging target/config');
+      ||env.NEXT_PUBLIC_SUPABASE_URL!=='https://yhnqlfcgrmckhyjdxegg.supabase.co'||!env.PADDLE_API_KEY) throw new Error('Wrong staging target/config');
     // Syntactically valid nonexistent IDs avoid fetching existing customer records.
     const zero='0'.repeat(26);
     for(const [resource,prefix] of [['customers','ctm'],['subscriptions','sub'],['adjustments','adj']]){

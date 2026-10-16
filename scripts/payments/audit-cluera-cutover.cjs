@@ -36,10 +36,13 @@ function webhookSummary(row, account, expected, destination) {
 }
 function configuration(env, options) {
   const target = targets[options.phase];
+  // Historical Account inspection stays explicit. Cluera never falls back to
+  // that project, even while its old destination is inspected GET-only.
+  const databaseRef=options.phase==='account'?'dwqltsqumiwsxtkzdoaa':'yhnqlfcgrmckhyjdxegg';
   const scoped = Boolean(target && env.VERCEL_PROJECT_ID === target.project && env.VERCEL_ENV === 'production'
     && env.SIGMAROUND_ACCOUNTS_ENABLED === 'true' && env.SIGMAROUND_ACCOUNT_ORIGIN === target.origin
-    && env.NEXT_PUBLIC_SUPABASE_URL === 'https://dwqltsqumiwsxtkzdoaa.supabase.co'
-    && env.SIGMAROUND_RAZORPAY_TEST_PROJECT_REF === 'dwqltsqumiwsxtkzdoaa'
+    && env.NEXT_PUBLIC_SUPABASE_URL === `https://${databaseRef}.supabase.co`
+    && env.SIGMAROUND_RAZORPAY_TEST_PROJECT_REF === databaseRef
     && env.SIGMAROUND_PAYMENT_PROVIDER === 'razorpay' && env.RAZORPAY_ENVIRONMENT === 'test');
   const switches = env.SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED === 'false' && (options.phase === 'account'
     ? env.SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED === 'true' && env.SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED === 'true'

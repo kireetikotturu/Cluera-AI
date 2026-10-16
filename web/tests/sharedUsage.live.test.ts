@@ -11,7 +11,7 @@ describe.skipIf(process.env.SIGMAROUND_RUN_USAGE_ACCEPTANCE !== 'true')('staging
     const requireSafe=(ok:unknown, message:string):asserts ok=>{if(!ok) throw new Error(message);};
     requireSafe(env.SIGMAROUND_ACCOUNTS_ENABLED==='true'
       && env.SIGMAROUND_ACCOUNT_ORIGIN==='https://cluera-ai-staging.vercel.app'
-      && env.NEXT_PUBLIC_SUPABASE_URL==='https://dwqltsqumiwsxtkzdoaa.supabase.co', 'Usage acceptance: wrong target');
+      && env.NEXT_PUBLIC_SUPABASE_URL==='https://yhnqlfcgrmckhyjdxegg.supabase.co', 'Usage acceptance: wrong target');
     const user=env.SIGMAROUND_USAGE_FIXTURE_USER;
     const sessions=[env.SIGMAROUND_USAGE_FIXTURE_SESSION_A,env.SIGMAROUND_USAGE_FIXTURE_SESSION_B];
     const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

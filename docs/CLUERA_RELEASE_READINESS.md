@@ -1,5 +1,11 @@
 # Cluera release blockers
 
+## October 16 - new Auth target requires a later reviewed native candidate
+
+Intended target **yhnqlfcgrmckhyjdxegg** remains empty; source access/verified backup blocks migration. Actual1.0.2 ASAR directly pins the old Supabase Google authorization origin. Email/credits use the Cluera BFF, but Google is not a backend-only switch. A later immutable candidate must preserve PKCE/state/loopback, local data/features and updater trust while strictly pinning new Auth; do not overwrite1.0.2 or claim it accepted on the new project.
+
+Retained1.0.2:121924182bytes/SHA2565535609d6f301925ccc68376ffd587c37274aa95e88276b7ee159904261dc243, unsigned TEST/not installed/distributed. No EXE/version/feature change here. Old Admin/MFA acceptance is historical, not destination acceptance; no repeat now. [Source dashboard/backup boundary and migration gates](CLUERA_SUPABASE_MIGRATION.md).
+
 ## October 15 - new Windows 1.0.2 unsigned TEST candidate; launch remains blocked
 
 The requested separately versioned candidate is prepared locally at:

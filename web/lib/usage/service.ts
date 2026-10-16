@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AccountError } from '../accounts/config';
 import { SupabaseOperationError } from '../supabase/diagnostics';
+import {CLUERA_SUPABASE_URL} from '../supabase/target';
 
 type Rpc = (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown; status?: number }>;
 const identity = z.object({ userId: z.uuid(), sessionId: z.uuid() });
@@ -18,7 +19,7 @@ const denied = z.object({ code: z.enum(['INVALID','UNAUTHENTICATED','SUSPENDED',
 function assertStaging(env: NodeJS.ProcessEnv) {
   if (env.SIGMAROUND_ACCOUNTS_ENABLED !== 'true'
     || env.SIGMAROUND_ACCOUNT_ORIGIN !== 'https://cluera-ai-staging.vercel.app'
-    || env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dwqltsqumiwsxtkzdoaa.supabase.co') {
+    || env.NEXT_PUBLIC_SUPABASE_URL !== CLUERA_SUPABASE_URL) {
     throw new AccountError('UNAVAILABLE',503);
   }
 }

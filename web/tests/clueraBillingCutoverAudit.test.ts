@@ -15,6 +15,7 @@ const env = () => ({ VERCEL_PROJECT_ID: 'prj_VuG3xCUQqKmPhT0LIAmLuyUwBXg6', VERC
   RAZORPAY_TEST_KEY_ID: 'rzp_test_synthetic123456', RAZORPAY_TEST_KEY_SECRET: 'synthetic-api-secret-not-a-real-key',
   RAZORPAY_TEST_WEBHOOK_SECRET: 'synthetic-webhook-secret-not-a-real-secret-1234', RAZORPAY_TEST_ACCOUNT_ID: accountId });
 const intakeEnv=()=>({...env(),VERCEL_PROJECT_ID:'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
+  NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',
   SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:'false',SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED:'true',SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'true',
   CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',CLUERA_BILLING_V2_ENABLED:'true'});
 const intakeUrl='https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook';
@@ -65,6 +66,7 @@ it.each([
 });
 it('supports only the fixed disabled Cluera pre-cutover phase without changing the still-old provider destination', async () => {
   const source = { ...env(), VERCEL_PROJECT_ID: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', SIGMAROUND_ACCOUNT_ORIGIN: 'https://cluera-ai-staging.vercel.app',
+    NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',
     SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED: 'false', SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED: 'false', SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED: 'true',
     CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED: 'false', CLUERA_BILLING_V2_ENABLED: 'false' };
   const request = fake(), report = await auditCutover(source, request, { ...options, phase: 'cluera' });

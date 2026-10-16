@@ -1,6 +1,12 @@
 # Cluera AI
 
-## Current result - completed safe Cluera rollout; one retirement approval remains
+## Current October16 - clean backend setup, activation held
+
+Cluera now targets only **cluera-ai-production / yhnqlfcgrmckhyjdxegg**. The owner waived migration of old dummy users/trials. Clean Auth/customer/shared-ledger/Admin/billing/release foundation and encrypted vault schema are applied;48 tables private,85 function definitions/ACLs independently matched, no users/financial grants/provider credentials and no active scheduler. All payment flags remain off and AI auth-only. Existing website/relay are not partially switched; existing Cluera EXEs/features and License Edition are preserved.
+
+Read [current execution status](docs/CLUERA_EXECUTION_STATUS.md), [applied clean database/rollout](docs/CLUERA_CLEAN_DATABASE.md) and [clean Auth/Admin/provider setup](docs/CLUERA_CLEAN_AUTH_PROVIDER_SETUP.md). The single essential owner step is two newly named modern secret keys saved privately in the project-named ignored input file. No values in chat or hosted settings yet. Real Auth/Google/SMTP, external financial reconciliation, actual signed Test payment-to-credit, providers, Windows and operations remain unaccepted. **Not production-ready.** Older checkpoint instructions below are historical and superseded.
+
+## Historical October14 rollout - superseded next-action instructions
 
 Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
 

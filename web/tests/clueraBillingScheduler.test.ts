@@ -5,7 +5,7 @@ import { merchantDigest } from '../lib/payments/cluera/config';
 import { paymentTestEnvironment } from './helpers/paymentTestMode';
 
 const env = { ...paymentTestEnvironment, CLUERA_BILLING_V2_ENABLED: 'true',
-  SIGMAROUND_BILLING_WORKER_SECRET: 'synthetic-worker-proof-secret-000000000000', SUPABASE_SERVICE_ROLE_KEY: 'synthetic-server-key' };
+  SIGMAROUND_BILLING_WORKER_SECRET: 'synthetic-worker-proof-secret-000000000000', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_synthetic-server-key' };
 const now = Date.parse('2026-10-14T02:00:00Z'), seconds = now / 1000;
 const nonce = '00000000-0000-4000-8000-000000000910';
 function request(overrides: Record<string, string> = {}, body = '{}', url = CLUERA_WORKER_URL) {

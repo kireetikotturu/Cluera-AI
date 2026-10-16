@@ -7,7 +7,7 @@ it('binds a browser callback to main-only PKCE/state; rejects foreign and malfor
  const exchange=vi.fn(async()=>({accessToken:'synthetic-access',refreshToken:'synthetic-refresh',userId:'synthetic-user',validForMilliseconds:3600000}));
  let challenge='';
  const result=await googleAccountLogin(async target=>{
-  const url=new URL(target);expect(url.origin).toBe('https://dwqltsqumiwsxtkzdoaa.supabase.co');expect(url.pathname).toBe('/auth/v1/authorize');
+  const url=new URL(target);expect(url.origin).toBe('https://yhnqlfcgrmckhyjdxegg.supabase.co');expect(url.pathname).toBe('/auth/v1/authorize');
   expect(url.searchParams.get('provider')).toBe('google');expect(url.searchParams.get('code_challenge_method')).toBe('s256');challenge=url.searchParams.get('code_challenge')!;
   expect((await fetch(`${NATIVE_GOOGLE_CALLBACK}?state=${'x'.repeat(64)}&code=bad`)).status).toBe(400);
   expect((await fetch(`${NATIVE_GOOGLE_CALLBACK}?state=${encodeURIComponent('é'.repeat(64))}&code=bad`)).status).toBe(400);

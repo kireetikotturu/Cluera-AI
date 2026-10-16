@@ -4,9 +4,9 @@ import {executeNextSandboxBillingAction} from '../lib/billing/reconciliation/out
 import {sandboxOffers} from '../lib/billing/sandboxCatalog';
 const uid='00000000-0000-4000-8000-000000000981',claimId='00000000-0000-4000-8000-000000000982';
 const id=(p:string,n=1)=>`${p}_${String(n).padStart(26,'0')}`;
-const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',PADDLE_API_KEY:'synthetic-server-key-no-real-secret',
-  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',
-  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa'};
+const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',PADDLE_API_KEY:'sb_secret_synthetic-server-key-no-real-secret',
+  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',
+  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg'};
 function fixture(index=0){
   const offer=sandboxOffers[index],now=Date.now(),end=new Date(now+(offer.interval==='week'?7:30)*86400000).toISOString();
   const price={id:offer.priceId,product_id:id('pro'),unit_price:{amount:offer.amount,currency_code:'INR'},tax_mode:'external',trial_period:null,

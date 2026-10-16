@@ -9,7 +9,7 @@ export async function googleAccountLogin(open:(url:string)=>Promise<void>,signal
   api=new AccountApi()):Promise<AccountTokens>{
  const verifier=randomBytes(48).toString('base64url'),state=randomBytes(32).toString('hex');
  const challenge=createHash('sha256').update(verifier).digest('base64url');
- const authorize=new URL('https://dwqltsqumiwsxtkzdoaa.supabase.co/auth/v1/authorize');
+ const authorize=new URL('https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize');
  authorize.search=new URLSearchParams({provider:'google',redirect_to:`${NATIVE_GOOGLE_CALLBACK}?state=${state}`,code_challenge:challenge,code_challenge_method:'s256'}).toString();
  let complete!:(code:string)=>void,fail!:(error:Error)=>void,accepted=false;
  const callback=new Promise<string>((resolve,reject)=>{complete=resolve;fail=reject;});

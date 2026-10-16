@@ -15,9 +15,16 @@ const parse=(html:string)=>new DOMParser().parseFromString(html,'text/html');
 const placeholders=(html:string)=>Array.from(html.matchAll(/{{\s*\.([A-Za-z]+)\s*}}/g),match=>match[1]);
 const support='mailto:clueraaisupport@gmail.com';
 
+it('keeps both prepared manifests pinned only to the clean project without claiming hosted installation',()=>{
+  const destination=JSON.parse(readFileSync(join(directory,'manifest.cluera-production.json'),'utf8'));
+  expect(manifest.projectRef).toBe('yhnqlfcgrmckhyjdxegg');
+  expect(destination).toEqual(manifest);
+  expect(destination.installationStatus).toBe('prepared-not-installed');
+});
+
 it('maps all six Auth templates without an installer, enabled setting or credential',()=>{
   expect(manifest).toMatchObject({version:1,brand:'Cluera AI',supportEmail:'clueraaisupport@gmail.com',
-    projectRef:'dwqltsqumiwsxtkzdoaa',installationStatus:'prepared-not-installed'});
+    projectRef:'yhnqlfcgrmckhyjdxegg',installationStatus:'prepared-not-installed'});
   expect(templates.map(t=>[t.file,t.subjectField,t.contentField])).toEqual([
     ['confirm-signup.html','mailer_subjects_confirmation','mailer_templates_confirmation_content'],
     ['recovery.html','mailer_subjects_recovery','mailer_templates_recovery_content'],
@@ -71,20 +78,28 @@ it.each(templates)('keeps $file fluid without clipped content or a remote render
   }
 });
 
-for(const origin of ['https://cluera-ai-staging.vercel.app','https://sigmaround-account-staging.vercel.app']){
+for(const origin of ['https://cluera-ai-staging.vercel.app']){
   it.each(templates.filter(t=>t.placeholder==='ConfirmationURL'))(`preserves the complete provider link for $file (${origin})`,template=>{
     const callback=origin+'/api/account/callback?sb_flow_id=synthetic-flow';
-    const url=new URL('https://dwqltsqumiwsxtkzdoaa.supabase.co/auth/v1/verify');
+    const url=new URL('https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/verify');
     url.searchParams.set('token','synthetic-not-valid');url.searchParams.set('type','email');url.searchParams.set('redirect_to',callback);
     const doc=parse(template.html.replace('{{ .ConfirmationURL }}',url.href.replaceAll('&','&amp;')));
     const action=Array.from(doc.querySelectorAll('a')).find(a=>a.textContent===template.action)!;
     expect(action.getAttribute('href')).toBe(url.href);
-    const target=new URL(action.href);expect(target.origin).toBe('https://dwqltsqumiwsxtkzdoaa.supabase.co');
+    const target=new URL(action.href);expect(target.origin).toBe('https://yhnqlfcgrmckhyjdxegg.supabase.co');
     expect(target.searchParams.get('redirect_to')).toBe(callback);
     expect(Array.from(target.searchParams.keys())).toEqual(['token','type','redirect_to']);
     expect(placeholders(doc.documentElement.outerHTML)).toEqual([]);
   });
 }
+
+it.each(templates.filter(t=>t.placeholder==='ConfirmationURL'))('does not target or hard-code old project authority in $file',template=>{
+  expect(manifest.projectRef).not.toBe('dwqltsqumiwsxtkzdoaa');
+  expect(template.html).not.toMatch(/dwqltsqumiwsxtkzdoaa|sigmaround-account-staging/);
+  // The template preserves the provider's complete generated URL. It is not
+  // itself a URL validator; destination Auth/application configuration owns trust.
+  expect(placeholders(template.html)).toEqual(['ConfirmationURL']);
+});
 
 it('uses a reauthentication code only in the body, never an invented confirmation link or subject token',()=>{
   const template=templates.find(t=>t.file==='reauthentication.html')!;

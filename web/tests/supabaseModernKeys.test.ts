@@ -5,11 +5,11 @@ afterEach(()=>vi.unstubAllGlobals());
 
 it('supports modern keys in actual per-request clients without confusing application keys and user JWTs',async()=>{
  const publishable='sb_publishable_'+'p'.repeat(40),secret='sb_secret_'+'s'.repeat(40);
- const url='https://dwqltsqumiwsxtkzdoaa.supabase.co',userId='00000000-0000-4000-8000-000000000001',factorId='00000000-0000-4000-8000-000000000003';
+ const url='https://yhnqlfcgrmckhyjdxegg.supabase.co',userId='00000000-0000-4000-8000-000000000001',factorId='00000000-0000-4000-8000-000000000003';
  const expiresAt=Math.floor(Date.now()/1000)+3600;
  const accessToken=[Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),
   Buffer.from(JSON.stringify({sub:userId,session_id:'00000000-0000-4000-8000-000000000002',aud:'authenticated',role:'authenticated',aal:'aal2',exp:expiresAt})).toString('base64url'),
-  Buffer.from('synthetic-signature-not-valid-on-any-server').toString('base64url')].join('.');
+  Buffer.from('sb_secret_synthetic-signature-not-valid-on-any-server').toString('base64url')].join('.');
  const user={id:userId,aud:'authenticated',email:'fixture@example.invalid',factors:[{id:factorId,factor_type:'totp',status:'verified'}]};
  const calls:Array<{path:string;method:string;key:'public'|'server';userJwt:boolean}>=[];
  const request=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{

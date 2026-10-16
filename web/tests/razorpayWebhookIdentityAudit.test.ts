@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
 const {compare:implementation,invocation}=require('../../scripts/payments/compare-razorpay-webhook.cjs');
 const compare=(audit:any,request:any,env:any)=>implementation(audit,request,env,'WebhookTest0001');
-const env={RAZORPAY_TEST_ACCOUNT_ID:'acc_synthetic123456',RAZORPAY_TEST_KEY_SECRET:'synthetic-server-secret-not-real-0000'};
+const env={RAZORPAY_TEST_ACCOUNT_ID:'acc_synthetic123456',RAZORPAY_TEST_KEY_SECRET:'sb_secret_synthetic-server-secret-not-real-0000'};
 const row={id:'WebhookTest0001',url:'https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook',
  owner_id:'synthetic123456',owner_type:'merchant',service:'beta-api-test',active:false,disabled_at:0,
  events:{'payment.captured':1,'order.paid':1,'refund.processed':1},secret_exists:true,secret:env.RAZORPAY_TEST_KEY_SECRET};

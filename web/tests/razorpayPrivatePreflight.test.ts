@@ -9,9 +9,9 @@ import path from 'node:path';
 const require=createRequire(import.meta.url);
 const {audit}=require('../../scripts/payments/audit-razorpay-test.cjs');
 const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
- NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'dwqltsqumiwsxtkzdoaa',RAZORPAY_ENVIRONMENT:'test',
+ NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',RAZORPAY_ENVIRONMENT:'test',
  SIGMAROUND_PAYMENT_PROVIDER:'razorpay',SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:'false',SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED:'false',
- SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'false',RAZORPAY_TEST_KEY_ID:'rzp_test_synthetic123456',RAZORPAY_TEST_KEY_SECRET:'synthetic-server-secret-not-real-0000',
+ SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'false',RAZORPAY_TEST_KEY_ID:'rzp_test_synthetic123456',RAZORPAY_TEST_KEY_SECRET:'sb_secret_synthetic-server-secret-not-real-0000',
  RAZORPAY_TEST_WEBHOOK_SECRET:'synthetic-webhook-secret-not-real-0000',RAZORPAY_TEST_ACCOUNT_ID:'acc_synthetic123456'};
 const row={id:'webhook_synthetic',url:'https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook',
  active:true,disabled_at:0,service:'beta-api-test',owner_type:'merchant',owner_id:'synthetic123456',secret_exists:true,

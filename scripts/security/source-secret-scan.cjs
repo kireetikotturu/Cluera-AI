@@ -38,6 +38,31 @@ function loadKnownSecrets(root, env = process.env) {
       if (match) add(match[1], match[2].replace(/^['"]|['"]$/g, ''));
     }
   }
+  // Fixed clean-project inputs only. No directory discovery or value-bearing
+  // parse errors. Newly generated material must also be checked in artifacts.
+  for (const name of ['infrastructure','server-keys']) {
+    const location=path.join(root,`.local-secrets/cluera-yhnqlfcgrmckhyjdxegg-${name}.private.json`);
+    if(!fs.existsSync(location))continue;
+    try {
+      const stat=fs.lstatSync(location);
+      if(!stat.isFile()||stat.isSymbolicLink()||stat.size>16384)throw Error();
+      const data=JSON.parse(fs.readFileSync(location,'utf8'));
+      if(data.projectRef!=='yhnqlfcgrmckhyjdxegg')throw Error();
+      if(name==='infrastructure') {
+        for(const setting of ['SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64','SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64']) {
+          if(typeof data.web?.[setting]!=='string')throw Error();
+          add(setting,data.web[setting]);
+        }
+        if(typeof data.relay?.SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64!=='string')throw Error();
+        add('SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64',data.relay.SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64);
+      } else {
+        for(const setting of ['webSecretKey','relaySecretKey']) {
+          if(typeof data[setting]!=='string')throw Error();
+          add('SUPABASE_SERVICE_ROLE_KEY',data[setting]);
+        }
+      }
+    } catch { throw Error('Clean private scan input unavailable.'); }
+  }
   const accountPrivate=path.join(root,'.local-secrets/cluera-release-private.pem');
   if(fs.existsSync(accountPrivate)){
     const pem=fs.readFileSync(accountPrivate,'utf8');

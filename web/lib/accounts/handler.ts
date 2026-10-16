@@ -10,10 +10,12 @@ import { usageService } from '../usage/service';
 import { sandboxCheckoutAllowed, sandboxCheckoutEnabled } from '../billing/checkout/gate';
 import { checkoutService } from '../billing/checkout/service';
 import { resumeSandboxCheckout } from '../billing/checkout/resume';
+import {CLUERA_AUTH_ISSUER,CLUERA_SUPABASE_URL} from '../supabase/target';
 
 const emailSchema = z.string().trim().email().max(254);
 const passwordSchema = z.string().min(12).max(128);
-const sessionClaims = z.object({ sub: z.uuid(), session_id: z.uuid() });
+const sessionClaims = z.object({ sub:z.uuid(),session_id:z.uuid(),iss:z.literal(CLUERA_AUTH_ISSUER),
+  aud:z.union([z.literal('authenticated'),z.tuple([z.literal('authenticated')])]),role:z.literal('authenticated'),exp:z.number().int().positive() });
 type Clients = ReturnType<typeof accountClients>;
 type Account = { userId: string; email: string; trialSecondsGranted: number; remoteDesktop: false };
 export function authFailure(error: { status?: number } | null | undefined): AccountError {
@@ -36,7 +38,7 @@ export async function authorizeCustomer(clients: Clients, token: string): Promis
   let claims: z.infer<typeof sessionClaims>;
   try { claims = sessionClaims.parse(JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())); }
   catch { throw new AccountError('UNAUTHENTICATED', 401); }
-  if (claims.sub !== data.user.id) throw new AccountError('UNAUTHENTICATED', 401);
+  if (claims.sub !== data.user.id || claims.exp<=Math.floor(Date.now()/1000)) throw new AccountError('UNAUTHENTICATED', 401);
   const { data: account, error: dbError, status } = await clients.service.rpc('customer_authorize', {
     p_user_id: data.user.id, p_session_id: claims.session_id,
   });
@@ -50,7 +52,7 @@ export async function authorizeCustomer(clients: Clients, token: string): Promis
 export async function rateLimit(request: Request, config: AccountConfig, clients: Clients, email?: string): Promise<void> {
   const identifiers = [`ip:${clientIp(request)}`, ...(email ? [`email:${email.toLowerCase()}`] : [])];
   for (const identifier of identifiers) {
-    const bucket = createHmac('sha256', config.rateKey).update(`customer-auth-v1:${identifier}`).digest('hex');
+    const bucket = createHmac('sha256', config.rateKey).update(`customer-auth-v2:${CLUERA_SUPABASE_URL}:${identifier}`).digest('hex');
     const { data, error, status } = await clients.service.rpc('customer_auth_rate_limit', {
       p_bucket_hash: bucket, p_maximum: identifier.startsWith('ip:') ? 60 : 15,
     });

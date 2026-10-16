@@ -89,7 +89,7 @@ export async function handleSandboxWebhook(request: Request, env = process.env,
   if (env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED !== 'true' || env.SIGMAROUND_PADDLE_SANDBOX_INTAKE_ENABLED !== 'true' || env.PADDLE_ENVIRONMENT !== 'sandbox') {
     return json({ error: 'Not found.' }, 404);
   }
-  if (ref !== 'dwqltsqumiwsxtkzdoaa' || url !== 'https://dwqltsqumiwsxtkzdoaa.supabase.co'
+  if (ref !== 'yhnqlfcgrmckhyjdxegg' || url !== 'https://yhnqlfcgrmckhyjdxegg.supabase.co'
     || !env.SUPABASE_SERVICE_ROLE_KEY || !env.PADDLE_WEBHOOK_SECRET || env.PADDLE_WEBHOOK_SECRET.length < 20) {
     return json({ error: 'Billing sandbox is unavailable.' }, 503);
   }

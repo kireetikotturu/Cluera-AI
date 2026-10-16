@@ -4,8 +4,8 @@ import { runPaddleSimulation } from './helpers/paddleSimulation';
 const origin = 'https://cluera-ai-staging.vercel.app';
 const secret = 'synthetic-webhook-secret-for-unit-tests';
 const env = { SIGMAROUND_RUN_PADDLE_SIMULATION: 'true', PADDLE_ENVIRONMENT: 'sandbox',
-  SIGMAROUND_ACCOUNT_ORIGIN: origin, NEXT_PUBLIC_SUPABASE_URL: 'https://dwqltsqumiwsxtkzdoaa.supabase.co',
-  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF: 'dwqltsqumiwsxtkzdoaa',
+  SIGMAROUND_ACCOUNT_ORIGIN: origin, NEXT_PUBLIC_SUPABASE_URL: 'https://yhnqlfcgrmckhyjdxegg.supabase.co',
+  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF: 'yhnqlfcgrmckhyjdxegg',
   SIGMAROUND_PADDLE_SANDBOX_INTAKE_ENABLED: 'true', PADDLE_API_KEY: 'synthetic-sandbox-api-key-only',
   PADDLE_WEBHOOK_SECRET: secret };
 const id = (prefix: string, char = 'a') => `${prefix}_${char.repeat(26)}`;

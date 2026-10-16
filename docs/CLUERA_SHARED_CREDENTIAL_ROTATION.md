@@ -1,5 +1,17 @@
 # Shared Supabase credential incident — approval-required plan
 
+## Current October16 - new independent authority; no old credential import
+
+The owner confirms old project dwqltsqumiwsxtkzdoaa is unavailable and authorizes a clean setup only in **yhnqlfcgrmckhyjdxegg**. Dummy-user/trial migration and waiting for the old Support ticket are not prerequisites for clean development. The old exposure is not declared resolved and no exact old-token negative test is invented. No old JWT signing secret/API key/session/MFA/cookie/rate/provider/worker credential is copied. License Edition and its project remain untouched; no revocation or signing/session-trust rotation is performed there.
+
+The new clean schema/vault are applied and privately verified; fresh source rejects other project issuers/URLs and legacy API-key formats. Two separate new modern server keys are still owner-only provisioning, with fresh cookie/rate material prepared privately. No current environment or alias is switched. [Actual schema and single next action](CLUERA_CLEAN_DATABASE.md). Genuine external payment obligations remain independent of database deletion. Historical incident/consumer evidence below must not be used as current availability or new-project Auth acceptance.
+
+## Earlier October16 - source-recovery proposal before clean authorization (superseded)
+
+New target **yhnqlfcgrmckhyjdxegg** is healthy/empty, with required fresh modern keys and independent signing/cookie/vault custody. No old JWT/session/encryption/worker/SMTP secret may be imported. New project creation is not old-incident closure or migrated-customer evidence; the exact exposed string is still unavailable and its rejection cannot be invented.
+
+Old **dwqltsqumiwsxtkzdoaa** is absent from connected inventory/access unavailable, DNS unavailable and old feed503. Do not infer deletion or use yesterday's digests as a backup. [Source backup/recovery and isolation gates](CLUERA_SUPABASE_MIGRATION.md). No key, JWT/session trust, grant, old setting or schema changed. Support case remains historical/pending; no duplicate submission/inbox inspection. Next only check old dashboard visibility/status/backup date, not completed key/Admin/MFA setup or new credentials. Original Phase A approval does not automatically approve altered SQL/target.
+
 ## October 15 - Support request submitted; containment response pending
 
 The owner supplied the Supabase confirmation **Support request sent**, logged for **Cluera AI-staging**, and confirms that the request concerns residual privileged bearer authority after legacy API-key disable. Submission is **owner-confirmed complete**; no ticket reference or technical response has been supplied yet. Do not submit a duplicate request, repeat legacy-key disable/key saving, or repeat Admin/MFA setup. The agent has not inspected the private ticket or inbox and is not monitoring email automatically.

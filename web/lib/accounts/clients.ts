@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { AccountConfig } from './config';
+import {CLUERA_AUTH_STORAGE_KEY} from '../supabase/target';
 
 // Per-request clients only. Never share a logged-in Auth client across customers.
 export function accountClients(config: AccountConfig, storedFlow: Record<string, string> = {}) {
@@ -12,7 +13,7 @@ export function accountClients(config: AccountConfig, storedFlow: Record<string,
   const boundedFetch: typeof fetch = (input, init) => fetch(input, { ...init,
     signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000) });
   const auth = createClient(config.url, config.anonKey, { global: { fetch: boundedFetch }, auth: {
-      flowType: 'pkce', storageKey: 'sr-account', storage, persistSession: true,
+      flowType: 'pkce', storageKey: CLUERA_AUTH_STORAGE_KEY, storage, persistSession: true,
       autoRefreshToken: false, detectSessionInUrl: false, debug: false,
     } });
   let recovery = false;

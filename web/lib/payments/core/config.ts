@@ -1,10 +1,11 @@
 import { PaymentError } from './types';
+import {CLUERA_SUPABASE_PROJECT,CLUERA_SUPABASE_URL} from '../../supabase/target';
 
 export const ACCOUNT_PAYMENT_ORIGIN = 'https://cluera-ai-staging.vercel.app';
 export function assertPaymentStaging(env = process.env): void {
   if (env.SIGMAROUND_ACCOUNTS_ENABLED !== 'true' || env.SIGMAROUND_ACCOUNT_ORIGIN !== ACCOUNT_PAYMENT_ORIGIN
-    || env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dwqltsqumiwsxtkzdoaa.supabase.co'
-    || env.SIGMAROUND_RAZORPAY_TEST_PROJECT_REF !== 'dwqltsqumiwsxtkzdoaa'
+    || env.NEXT_PUBLIC_SUPABASE_URL !== CLUERA_SUPABASE_URL
+    || env.SIGMAROUND_RAZORPAY_TEST_PROJECT_REF !== CLUERA_SUPABASE_PROJECT
     || env.RAZORPAY_ENVIRONMENT !== 'test') throw new PaymentError('CONFIGURATION');
 }
 export function razorpayConfig(env = process.env) {

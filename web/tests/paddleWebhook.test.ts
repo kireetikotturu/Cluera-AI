@@ -5,8 +5,8 @@ import { SupabaseOperationError } from '../lib/supabase/diagnostics';
 
 const secret = 'synthetic-paddle-webhook-fixture-only';
 const env = { CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED: 'true', SIGMAROUND_PADDLE_SANDBOX_INTAKE_ENABLED: 'true', PADDLE_ENVIRONMENT: 'sandbox',
-  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF: 'dwqltsqumiwsxtkzdoaa', NEXT_PUBLIC_SUPABASE_URL: 'https://dwqltsqumiwsxtkzdoaa.supabase.co',
-  SUPABASE_SERVICE_ROLE_KEY: 'synthetic-service-fixture-only', PADDLE_WEBHOOK_SECRET: secret };
+  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF: 'yhnqlfcgrmckhyjdxegg', NEXT_PUBLIC_SUPABASE_URL: 'https://yhnqlfcgrmckhyjdxegg.supabase.co',
+  SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_synthetic-service-fixture-only', PADDLE_WEBHOOK_SECRET: secret };
 const event = { event_id: 'evt_' + 'a'.repeat(26), event_type: 'transaction.completed',
   occurred_at: '2026-10-04T01:00:00Z', notification_id: 'ntf_' + 'a'.repeat(26),
   data: { id: 'txn_' + 'a'.repeat(26), custom_data: { user: 'untrusted-user' }, email: 'private@example.invalid' } };

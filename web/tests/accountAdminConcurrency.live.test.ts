@@ -19,7 +19,7 @@ describe.skipIf(process.env.SIGMAROUND_RUN_ADMIN_ADJUSTMENT_ACCEPTANCE!=='true')
   function safe(ok:unknown,message:string):asserts ok{if(!ok)throw new Error(`Adjustment acceptance: ${message}`);}
   safe(env.SIGMAROUND_ACCOUNTS_ENABLED==='true'
    &&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://cluera-ai-staging.vercel.app'
-   &&env.NEXT_PUBLIC_SUPABASE_URL==='https://dwqltsqumiwsxtkzdoaa.supabase.co','wrong staging target');
+   &&env.NEXT_PUBLIC_SUPABASE_URL==='https://yhnqlfcgrmckhyjdxegg.supabase.co','wrong staging target');
   const actor=env.SIGMAROUND_ADJUSTMENT_FIXTURE_ADMIN,adminSession=env.SIGMAROUND_ADJUSTMENT_FIXTURE_ADMIN_SESSION;
   const user=env.SIGMAROUND_ADJUSTMENT_FIXTURE_USER,userSession=env.SIGMAROUND_ADJUSTMENT_FIXTURE_USER_SESSION;
   const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

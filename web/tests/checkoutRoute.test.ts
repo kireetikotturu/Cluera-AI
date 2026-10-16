@@ -8,13 +8,13 @@ vi.mock('../lib/billing/checkout/service',async original=>({...await original<ob
 vi.mock('../lib/billing/checkout/resume',()=>({resumeSandboxCheckout:mocks.resume}));
 const origin='https://cluera-ai-staging.vercel.app';
 const uid='00000000-0000-4000-8000-000000000991',sid='00000000-0000-4000-8000-000000000992';
-const access=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid})).toString('base64url')}.synthetic`;
+const access=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.synthetic`;
 let rpc:ReturnType<typeof vi.fn>,getUser:ReturnType<typeof vi.fn>;
 beforeEach(()=>{
   for(const [k,v] of Object.entries({CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:origin,
-    NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa',
+    NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',
     PADDLE_ENVIRONMENT:'sandbox',NEXT_PUBLIC_PADDLE_CLIENT_TOKEN:'test_syntheticpublicclient000000',SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'true',SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'false',SIGMAROUND_PADDLE_SANDBOX_TESTER_IDS:uid,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY:'sb_publishable_synthetic_public_key_00000000000000000',SUPABASE_SERVICE_ROLE_KEY:'synthetic-private-service-key',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:'sb_publishable_synthetic_public_key_00000000000000000',SUPABASE_SERVICE_ROLE_KEY:'sb_secret_synthetic-private-service-key',
     SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64:Buffer.alloc(32,3).toString('base64'),SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64:Buffer.alloc(32,4).toString('base64')}))vi.stubEnv(k,v);
   rpc=vi.fn(async(name:string)=>({data:name==='customer_auth_rate_limit'?true:{code:'ACTIVE',userId:uid,trialSecondsGranted:900,remoteDesktop:false},error:null}));
   getUser=vi.fn(async()=>({data:{user:{id:uid,email:'synthetic@example.invalid',email_confirmed_at:'2026-10-04',is_anonymous:false}},error:null}));

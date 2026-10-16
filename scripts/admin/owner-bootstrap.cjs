@@ -3,15 +3,17 @@
 // One-off operator SQL preparation, NOT an application endpoint or role API.
 // No network, credentials, execution, Auth/session/MFA mutation or schema change.
 const EMAIL = 'clueraaisupport@gmail.com';
+const PROJECT = 'yhnqlfcgrmckhyjdxegg';
 const ACTION = 'OWNER_AUTHORIZED_ADMIN_BOOTSTRAP';
-const REASON = 'Owner-authorized operator bootstrap; actor UUID is the recipient anchor, not an authenticated grantor.';
+const REASON = 'Owner-authorized clean Cluera operator bootstrap; actor UUID is the recipient anchor, not an authenticated grantor.';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const identity = "jsonb_build_object('id',u.id,'email',u.email,'email_confirmed_at',u.email_confirmed_at,'created_at',u.created_at,'deleted_at',u.deleted_at,'banned_until',u.banned_until,'is_anonymous',u.is_anonymous,'account',to_jsonb(c))";
 
 function prepareOwnerBootstrap(input) {
   if (!input || typeof input!=='object') throw new Error('Invalid bootstrap pins.');
-  const {targetId,operationId,identityDigest,evidenceAt}=input;
-  if (Object.keys(input).sort().join(',') !== 'evidenceAt,identityDigest,operationId,targetId'
+  const {projectRef,targetId,operationId,identityDigest,evidenceAt}=input;
+  if (Object.keys(input).sort().join(',') !== 'evidenceAt,identityDigest,operationId,projectRef,targetId'
+    || projectRef!==PROJECT
     || ![targetId,operationId,identityDigest,evidenceAt].every(value => typeof value === 'string')
     || !uuid.test(targetId) || !uuid.test(operationId)
     || !/^[a-f0-9]{32}$/.test(identityDigest)
@@ -19,12 +21,16 @@ function prepareOwnerBootstrap(input) {
     || !Number.isFinite(Date.parse(evidenceAt))) throw new Error('Invalid bootstrap pins.');
   const detail=after=>`jsonb_build_object(
   'actorSemantics','bootstrap_subject_not_authenticated_grantor',
-  'authorization','Direct owner request to grant clueraaisupport@gmail.com Admin, October 15 2026',
+  'authorization','Direct owner request for clean Cluera setup and verified owner Admin, October 16 2026',
   'executor',current_user,'sessionExecutor',session_user,
-  'scope','Retained Account allowlist shared by Cluera and temporary old Account Admin; excludes License Edition',
+  'scope','Clean independent Cluera project yhnqlfcgrmckhyjdxegg only; excludes old Account and License Edition',
+  'targetProjectRef','${PROJECT}','oldAuthorityImported',false,
   'noAuthenticatedSession',true,'noMfaClaim',true,'identityDigest',expected,
   'evidenceAt',observed,'before',null,'after',${after})`;
-  return `begin isolation level serializable;
+  // The operator must independently verify the connector/database target before
+  // executing this offline SQL; an input/audit pin is not remote host attestation.
+  return `-- Clean Cluera destination ${PROJECT}; independently verify execution target.
+begin isolation level serializable;
 set local lock_timeout='2s';
 set local statement_timeout='8s';
 set local timezone='UTC';
@@ -87,4 +93,4 @@ end $owner_bootstrap$;
 commit;`;
 }
 
-module.exports = { prepareOwnerBootstrap };
+module.exports = { PROJECT, prepareOwnerBootstrap };

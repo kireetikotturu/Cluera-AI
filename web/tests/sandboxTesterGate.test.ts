@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {sandboxCheckoutAllowed,sandboxCheckoutEnabled} from '../lib/billing/checkout/gate';
 const uid='00000000-0000-4000-8000-000000000001';
 const env={CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
- NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa',
+ NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',
  SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'true',SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'false',NEXT_PUBLIC_PADDLE_CLIENT_TOKEN:'test_syntheticpublic000000',
  SIGMAROUND_PADDLE_SANDBOX_TESTER_IDS:uid};
 describe('fail-closed designated Sandbox tester gate',()=>{

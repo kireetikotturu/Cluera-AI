@@ -1,6 +1,6 @@
 {
   "name": "cluera-ai-desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Cluera AI account-managed Windows workspace",
   "main": "dist/main/main.js",
   "author": "Kireeti",

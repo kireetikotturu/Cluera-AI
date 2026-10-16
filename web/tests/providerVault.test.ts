@@ -63,7 +63,7 @@ describe('encrypted Cluera provider vault',()=>{
   await expect(runtime.resolve('deepgram')).rejects.toThrow();
  });
  it('explicit auth-only bootstrap needs real infrastructure but no dummy provider keys or ledger/provider calls',async()=>{
-  const base={SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_RELAY_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:STAGING_SITE,NEXT_PUBLIC_SUPABASE_URL:STAGING_DATABASE,SUPABASE_SERVICE_ROLE_KEY:'synthetic-infrastructure-service-key',SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64:Buffer.alloc(32,5).toString('base64'),CLUERA_AI_BOOTSTRAP_MODE:'auth-only'};
+  const base={SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_RELAY_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:STAGING_SITE,NEXT_PUBLIC_SUPABASE_URL:STAGING_DATABASE,SUPABASE_SERVICE_ROLE_KEY:'sb_secret_synthetic-infrastructure-service-key',SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64:Buffer.alloc(32,5).toString('base64'),CLUERA_AI_BOOTSTRAP_MODE:'auth-only'};
   const config=relayConfig(base);expect(config.geminiKey).toBeUndefined();expect(config.deepgramKey).toBeUndefined();
   for(const missing of ['SUPABASE_SERVICE_ROLE_KEY','SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64'])expect(()=>relayConfig({...base,[missing]:undefined})).toThrow();
   expect(()=>relayConfig({...base,SIGMAROUND_ACCOUNT_ORIGIN:'https://sigmaround-account-staging.vercel.app'})).toThrow();

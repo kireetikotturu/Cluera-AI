@@ -8,7 +8,7 @@ describe.skipIf(process.env.SIGMAROUND_RUN_RECURRING_ACCEPTANCE!=='true')('stagi
   it('serializes renewal, refund, cancellation, queue and usage across real database connections',async()=>{
     const env=process.env;
     function check(v:unknown,message:string):asserts v{if(!v)throw new Error(`Recurring acceptance: ${message}`);}
-    check(env.NEXT_PUBLIC_SUPABASE_URL==='https://dwqltsqumiwsxtkzdoaa.supabase.co'
+    check(env.NEXT_PUBLIC_SUPABASE_URL==='https://yhnqlfcgrmckhyjdxegg.supabase.co'
       &&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://cluera-ai-staging.vercel.app'&&env.SUPABASE_SERVICE_ROLE_KEY,'wrong target');
     const user=env.SIGMAROUND_RECURRING_FIXTURE_USER,session=env.SIGMAROUND_RECURRING_FIXTURE_SESSION;
     check(user&&session&&/^[a-f0-9-]{36}$/.test(user)&&/^[a-f0-9-]{36}$/.test(session),'fixture missing');

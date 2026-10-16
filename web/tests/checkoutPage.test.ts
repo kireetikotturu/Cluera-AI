@@ -9,8 +9,8 @@ vi.mock('next/navigation',()=>({notFound:()=>{throw new Error('NOT_FOUND');}}));
 afterEach(()=>{vi.unstubAllEnvs();vi.mocked(readAccountCatalog).mockReset();});
 function staging(){
   for(const [key,value] of Object.entries({CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',
-    SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',
-    SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa'}))vi.stubEnv(key,value);
+    SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',
+    SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg'}))vi.stubEnv(key,value);
 }
 describe('disabled staging checkout landing page',()=>{
   it('renders a paused Cluera page without provisioning Paddle or Razorpay configuration',async()=>{

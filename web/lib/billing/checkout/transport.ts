@@ -15,8 +15,8 @@ export async function createSandboxCheckout(offer:SandboxOffer,intentId:string,e
   const canonical=sandboxOffer(offer.code,env.PADDLE_ENVIRONMENT);
   if(canonical.priceId!==offer.priceId || !z.uuid().safeParse(intentId).success || !env.PADDLE_API_KEY
     || env.SIGMAROUND_ACCOUNT_ORIGIN!=='https://cluera-ai-staging.vercel.app'
-    || env.NEXT_PUBLIC_SUPABASE_URL!=='https://dwqltsqumiwsxtkzdoaa.supabase.co'
-    || env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF!=='dwqltsqumiwsxtkzdoaa') throw new CheckoutTransportError('configuration');
+    || env.NEXT_PUBLIC_SUPABASE_URL!=='https://yhnqlfcgrmckhyjdxegg.supabase.co'
+    || env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF!=='yhnqlfcgrmckhyjdxegg') throw new CheckoutTransportError('configuration');
   let stage:'request'|'http'|'body'|'schema'|'binding'='request';
   let status:number|undefined;
   try {

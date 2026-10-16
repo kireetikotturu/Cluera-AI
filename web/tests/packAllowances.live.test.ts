@@ -6,7 +6,7 @@ describe.skipIf(process.env.SIGMAROUND_RUN_PACK_DB_ACCEPTANCE!=='true')('isolate
   it('deduplicates grants/refunds and serializes refund against usage without any Paddle call',async()=>{
     const env=process.env;
     function check(value:unknown,message:string):asserts value{if(!value)throw new Error(`Pack DB acceptance: ${message}`);}
-    check(env.NEXT_PUBLIC_SUPABASE_URL==='https://dwqltsqumiwsxtkzdoaa.supabase.co'
+    check(env.NEXT_PUBLIC_SUPABASE_URL==='https://yhnqlfcgrmckhyjdxegg.supabase.co'
       &&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://cluera-ai-staging.vercel.app'&&env.SUPABASE_SERVICE_ROLE_KEY,'wrong target');
     const user=env.SIGMAROUND_PACK_FIXTURE_USER,session=env.SIGMAROUND_PACK_FIXTURE_SESSION;
     check(user&&session&&/^[a-f0-9-]{36}$/.test(user)&&/^[a-f0-9-]{36}$/.test(session),'synthetic fixture missing');

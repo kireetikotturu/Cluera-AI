@@ -9,7 +9,7 @@ import { createRelayServer } from '../lib/accountRelay/server';
 import { createUsageCoordinator } from '../lib/usage/coordinator';
 
 const secrets = { geminiKey: 'synthetic-gemini-secret-only', deepgramKey: 'synthetic-deepgram-secret-only',
-  serviceKey: 'synthetic-service-secret-only', rateKey: Buffer.alloc(32, 7).toString('base64') };
+  serviceKey: 'sb_secret_synthetic-service-secret-only', rateKey: Buffer.alloc(32, 7).toString('base64') };
 const environment = () => ({ SIGMAROUND_ACCOUNTS_ENABLED: 'true', SIGMAROUND_ACCOUNT_RELAY_ENABLED: 'true',
   SIGMAROUND_ACCOUNT_ORIGIN: STAGING_SITE, NEXT_PUBLIC_SUPABASE_URL: STAGING_DATABASE,
   SUPABASE_SERVICE_ROLE_KEY: secrets.serviceKey, SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64: secrets.rateKey,

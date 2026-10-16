@@ -2,7 +2,7 @@ name: Cluera verification
 on:
   pull_request:
   push:
-    branches: [main, staging]
+    branches: [main, staging, codex/clean-cluera-setup]
 permissions:
   contents: read
 concurrency:

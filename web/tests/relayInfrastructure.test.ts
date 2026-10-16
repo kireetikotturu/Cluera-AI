@@ -8,7 +8,7 @@ import {createRelayServer} from '../lib/accountRelay/server';
 import {STAGING_DATABASE,STAGING_SITE,type RelayConfig} from '../lib/accountRelay/config';
 import type {AccountConfig} from '../lib/accounts/config';
 const key=Buffer.alloc(32,7),now=1780000000000;
-const config:RelayConfig={database:STAGING_DATABASE,site:STAGING_SITE,port:8080,rateKey:key.toString('base64'),serviceKey:'synthetic-service-key-only',providerMode:'auth-only'};
+const config:RelayConfig={database:STAGING_DATABASE,site:STAGING_SITE,port:8080,rateKey:key.toString('base64'),serviceKey:'sb_secret_synthetic-service-key-only',providerMode:'auth-only'};
 const web:AccountConfig={origin:STAGING_SITE,url:STAGING_DATABASE,secure:true,anonKey:'synthetic-public-key',serviceKey:config.serviceKey,rateKey:key,cookieKey:Buffer.alloc(32,8)};
 it('domain-separates operation proofs and rejects wrong key, nonce, stale time and modified responses',()=>{
  const proof=infrastructureStatusRequest(key,now);expect(verifyInfrastructureStatusRequest(key,proof,now)).toBe(true);

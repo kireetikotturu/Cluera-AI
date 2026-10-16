@@ -2,7 +2,7 @@ import {describe,it,expect,vi} from 'vitest';
 import {inspectBoundSandboxTransaction,inspectSandboxFullRefund} from '../lib/billing/reconciliation/transaction';
 import {sandboxOffers} from '../lib/billing/sandboxCatalog';
 const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',PADDLE_API_KEY:'synthetic-not-a-real-provider-key',
-  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa'};
+  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg'};
 const txn=`txn_${'a'.repeat(26)}`,ctm=`ctm_${'a'.repeat(26)}`,sub=`sub_${'a'.repeat(26)}`,adj=`adj_${'a'.repeat(26)}`;
 const bound={intentId:'00000000-0000-4000-8000-000000000811',userId:'00000000-0000-4000-8000-000000000812',transactionId:txn,offerCode:'pro_3_hours'};
 function fixtures(index=0){

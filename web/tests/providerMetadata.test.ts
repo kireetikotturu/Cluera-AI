@@ -9,7 +9,7 @@ import type {AccountConfig} from '../lib/accounts/config';
 
 const key=Buffer.alloc(32,7),now=1780000000000;
 const config:RelayConfig={database:STAGING_DATABASE,site:STAGING_SITE,port:8080,rateKey:key.toString('base64'),
- serviceKey:'synthetic-service-secret-only',geminiKey:'synthetic-gemini-secret-only',deepgramKey:'synthetic-deepgram-secret-only'};
+ serviceKey:'sb_secret_synthetic-service-secret-only',geminiKey:'synthetic-gemini-secret-only',deepgramKey:'synthetic-deepgram-secret-only'};
 const webConfig:AccountConfig={origin:STAGING_SITE,url:STAGING_DATABASE,secure:true,anonKey:'synthetic-public-key',serviceKey:config.serviceKey,rateKey:key,cookieKey:Buffer.alloc(32,8)};
 afterEach(()=>vi.restoreAllMocks());
 

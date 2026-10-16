@@ -11,8 +11,8 @@ export async function runPaddleSimulation(env = process.env, request: typeof fet
   report: (line: string) => void = line => console.info(line)) {
   if (env.SIGMAROUND_RUN_PADDLE_SIMULATION !== 'true' || env.PADDLE_ENVIRONMENT !== 'sandbox'
     || env.SIGMAROUND_ACCOUNT_ORIGIN !== origin
-    || env.NEXT_PUBLIC_SUPABASE_URL !== 'https://dwqltsqumiwsxtkzdoaa.supabase.co'
-    || env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF !== 'dwqltsqumiwsxtkzdoaa'
+    || env.NEXT_PUBLIC_SUPABASE_URL !== 'https://yhnqlfcgrmckhyjdxegg.supabase.co'
+    || env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF !== 'yhnqlfcgrmckhyjdxegg'
     || env.SIGMAROUND_PADDLE_SANDBOX_INTAKE_ENABLED !== 'true'
     || !env.PADDLE_API_KEY || env.PADDLE_API_KEY.length < 20
     || !env.PADDLE_WEBHOOK_SECRET || env.PADDLE_WEBHOOK_SECRET.length < 20) {

@@ -1,5 +1,11 @@
 # Cluera email and Auth branding
 
+## October 16 - clean independent Cluera setup supersedes shared-project installation
+
+The owner explicitly authorized a clean setup on **yhnqlfcgrmckhyjdxegg** without old Cluera users or dummy trial balances. Both `emails/auth/manifest.json` and `manifest.cluera-production.json` now pin only this new project and reuse the exact six HTML bodies/subjects. Neither is installed. No old Auth/template/SMTP configuration is changed or imported.
+
+The clean foundation and unchanged provider-vault schema are applied on the new project, but this does not install email templates or activate an Auth/customer journey. New verified sender/custom SMTP, exact callback configuration and controlled-inbox delivery remain separate acceptance. Do not follow historical shared-project/ticket-hold or old-source recovery instructions below; [clean Auth/provider setup](CLUERA_CLEAN_AUTH_PROVIDER_SETUP.md) is the current scope. Root execution status gives the next single private infrastructure action; no Admin/MFA/email action is requested now.
+
 Updated October 15, 2026. **Complete local template bundle; hosted installation and real delivery remain unaccepted.** No shared Supabase Auth/SMTP setting, callback, Site URL, rate limit or notification switch was changed, and no email was sent.
 
 ## Prepared templates

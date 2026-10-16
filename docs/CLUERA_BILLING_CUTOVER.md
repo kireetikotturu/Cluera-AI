@@ -1,5 +1,19 @@
 # Cluera Razorpay billing handoff - approval-required plan
 
+## Current October16 - clean database foundation complete; financial activation still held
+
+Owner-approved clean target **yhnqlfcgrmckhyjdxegg** now has verified billing/ledger schema (20261016014532) and vault (20261016015041). No dummy Auth/customer/trial/history import or old backup is required. Earlier source-preservation plans below are historical and superseded by this clean-start authority. [Applied schema/security](CLUERA_CLEAN_DATABASE.md).
+
+All catalog heads/models are disabled; no provider credentials, events, intents, grants or cron are present. Cluera owner/epoch1/null merchant is independent local standby, not provider-side handoff. Existing old endpoints/destinations have not been changed, but old DB availability/worker success must not be assumed. Real provider-side Razorpay/Paddle records, merchant/mode, payments, refunds, subscriptions and exact webhook ownership still require independent reconciliation. Existing one-order/preflight helpers do not establish complete obligations, and an unscoped connector is not Test merchant proof.
+
+No checkout/intake/processing activation, URL switch, replay, order, payment/refund, worker wake or credit is authorized by schema completion. New merchant binding, Test signing secret, receiver/delivery continuity, single processing owner and fresh sealed scheduler must pass before one owner-initiated acceptance purchase. Preserve unresolved provider resources; never automatically recreate old intents or credit them in the clean DB. Actual captured payment/paid order/genuine signature/one10800-second pack/trial preservation/installed sync remain unaccepted. The next essential action is only the new project's two private server keys in [execution status](CLUERA_EXECUTION_STATUS.md), not old setup or payment.
+
+## Earlier October16 - migration proposal before clean-start authorization (superseded)
+
+The new target is **yhnqlfcgrmckhyjdxegg**, empty/healthy. Old source metadata/backup is currently inaccessible and old protected feed returns503; yesterday's dispatch success is not today's processing proof. No endpoint/scheduler/ownership/history/flag/schema changed. [Backup and exclusive cross-project handoff gates](CLUERA_SUPABASE_MIGRATION.md).
+
+Do not replay old cron migrations or copy scheduler/Vault/network queues. Frozen owner/epoch CAS fences one database, not two; source freeze/drain/final delta and externally coordinated single-writer transition are mandatory. Preserve BOUND/REVIEW/PENDING records exactly, keep imported evidence processing sealed and never import via receive/apply/grant RPCs. Old Phase A conditional approval is not authority for changed SQL/another target. No purchase, webhook URL switch or financial activation now; next owner action is only old project visibility/status/backup availability.
+
 ## October 15 - disabled implementation reverified while Support is pending
 
 Fresh focused synthetic billing verification passes **154/154**, six files: server, actual PostgreSQL fixture flow, routes, UI, guard and scheduler. It covers canonical INR549 server order binding, callback without credit, signed synthetic capture/order-paid events, duplicate suppression, exactly one non-expiring10800-second pack, preserved trial, refunds, recurring queues and owner fencing. No new confirmed defect required a billing source or frozen proposal change. These are not real provider requests, genuine signed delivery, hosted contention or Windows balance-sync acceptance.

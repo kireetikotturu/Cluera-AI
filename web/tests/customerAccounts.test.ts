@@ -3,10 +3,11 @@ import { accountConfig } from '../lib/accounts/config';
 import { AccountCookies, seal, unseal } from '../lib/accounts/cookies';
 import { handleAccount } from '../lib/accounts/handler';
 import {accountAdminRequest} from '../lib/accounts/admin';
+import {createCipheriv} from 'node:crypto';
 const mocks = vi.hoisted(() => ({ clients: vi.fn() }));
 vi.mock('../lib/accounts/clients', () => ({ accountClients: mocks.clients }));
 const uid = '00000000-0000-4000-8000-000000000001', sid = '00000000-0000-4000-8000-000000000002';
-const token = `header.${Buffer.from(JSON.stringify({ sub: uid, session_id: sid })).toString('base64url')}.synthetic`;
+const token = `header.${Buffer.from(JSON.stringify({ sub: uid, session_id: sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600 })).toString('base64url')}.synthetic`;
 const session = { access_token: token, refresh_token: 'synthetic-refresh-credential', expires_in: 3600 };
 let auth: ReturnType<typeof makeAuth>; let rpc: ReturnType<typeof vi.fn>; let signOut: ReturnType<typeof vi.fn>;
 const user = { id: uid, email: 'account@example.invalid', email_confirmed_at: '2026-10-03T00:00:00Z', is_anonymous: false };
@@ -18,19 +19,19 @@ function makeAuth() {
     exchangeCodeForSession: vi.fn(async () => ({ data: { session }, error: null })),
     signUp: vi.fn(async () => ({ error: null })), resend:vi.fn(async()=>({error:null})), resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     updateUser: vi.fn(async () => ({ error: null })),
-    signInWithOAuth: vi.fn(async () => ({ data: { url: 'https://dwqltsqumiwsxtkzdoaa.supabase.co/auth/v1/authorize?provider=google' }, error: null })) };
+    signInWithOAuth: vi.fn(async () => ({ data: { url: 'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google' }, error: null })) };
 }
 beforeEach(() => {
   vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED', 'true'); vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN', 'https://cluera-ai-staging.vercel.app');
-  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://dwqltsqumiwsxtkzdoaa.supabase.co'); vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'sb_publishable_synthetic_public_key_00000000000000000');
-  vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'synthetic-service-placeholder');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://yhnqlfcgrmckhyjdxegg.supabase.co'); vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'sb_publishable_synthetic_public_key_00000000000000000');
+  vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_synthetic-service-placeholder');
   vi.stubEnv('SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64', Buffer.alloc(32, 3).toString('base64'));
   vi.stubEnv('SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64', Buffer.alloc(32, 4).toString('base64'));
   auth = makeAuth(); signOut = vi.fn(async () => ({ error: null }));
   rpc = vi.fn(async (name: string) => ({ data: name === 'customer_auth_rate_limit' ? true : {
     code: 'ACTIVE', userId: uid, trialSecondsGranted: 900, remoteDesktop: false }, error: null, status: 200 }));
   mocks.clients.mockReturnValue({ auth: { auth }, service: { rpc, auth: { admin: { signOut } } },
-    flow: () => ({ 'sr-account-code-verifier': 'synthetic-pkce-only' }), recovery: () => true });
+    flow: () => ({ 'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier': 'synthetic-pkce-only' }), recovery: () => true });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
 function request(action: string, body: object = {}, cookie = '', method = 'POST', origin = 'https://cluera-ai-staging.vercel.app') {
@@ -42,6 +43,20 @@ function cookiePair(kind: 'access' | 'refresh' | 'recovery' | 'flow', value: unk
 }
 const login = () => handleAccount(request('login', { email: user.email, password: 'synthetic-password' }), 'login');
 describe('customer BFF authentication', () => {
+  it.each([{iss:'https://dwqltsqumiwsxtkzdoaa.supabase.co/auth/v1'},{iss:'https://foreign.supabase.co/auth/v1'},
+    {role:'service_role'},{role:'anon'},{aud:'anon'},{aud:['authenticated','service_role']},{iss:undefined},{exp:1}])
+  ('rejects wrong-project or privileged user claims after Auth validation but before account/ledger access: %j',async changed=>{
+    const claims={...JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString()),...changed};
+    const candidate=`header.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.synthetic`;
+    auth.signInWithPassword.mockResolvedValueOnce({data:{session:{...session,access_token:candidate}},error:null});
+    expect((await login()).status).toBe(401);expect(auth.getUser).toHaveBeenCalledWith(candidate);
+    expect(rpc.mock.calls.some(([name])=>name==='customer_authorize'||name==='customer_usage_command')).toBe(false);
+  });
+  it('retains the supported singleton-array authenticated audience without accepting extra audiences',async()=>{
+    const claims={...JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString()),aud:['authenticated']};
+    auth.signInWithPassword.mockResolvedValueOnce({data:{session:{...session,access_token:`header.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.synthetic`}},error:null});
+    expect((await login()).status).toBe(200);
+  });
   it('resends only signup verification with sealed fresh PKCE, no account grant or token DTO',async()=>{
     const response=await handleAccount(request('resend-verification',{email:user.email}),'resend-verification');
     expect(response.status).toBe(200);expect(auth.resend).toHaveBeenCalledExactlyOnceWith({type:'signup',email:user.email,options:{emailRedirectTo:'https://cluera-ai-staging.vercel.app/api/account/callback'}});
@@ -64,7 +79,7 @@ describe('customer BFF authentication', () => {
   });
   it('exposes only the verified account balance and never exposes public spending operations', async () => {
     vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://cluera-ai-staging.vercel.app');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://dwqltsqumiwsxtkzdoaa.supabase.co');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://yhnqlfcgrmckhyjdxegg.supabase.co');
     const original=rpc.getMockImplementation()!;
     rpc.mockImplementation(async (name,args) => name==='customer_usage_balance'
       ? {data:{code:'ACTIVE',availableMilliseconds:900000,reservedMilliseconds:0,spentMilliseconds:0},error:null}
@@ -90,7 +105,7 @@ describe('customer BFF authentication', () => {
     const response = await login(); expect(response.status).toBe(200);
     const body = await response.text(); const cookies = response.headers.get('set-cookie')!;
     expect(JSON.parse(body).account).toMatchObject({ userId: uid, trialSecondsGranted: 900, remoteDesktop: false });
-    for (const secret of [token, session.refresh_token, 'synthetic-service-placeholder']) {
+    for (const secret of [token, session.refresh_token, 'sb_secret_synthetic-service-placeholder']) {
       expect(body).not.toContain(secret); expect(cookies).not.toContain(secret);
     }
     expect(cookies).toContain('HttpOnly'); expect(cookies).toContain('Secure'); expect(cookies).toContain('SameSite=Lax');
@@ -118,7 +133,7 @@ describe('customer BFF authentication', () => {
     expect(auth.setSession).not.toHaveBeenCalled(); expect(auth.refreshSession).not.toHaveBeenCalled();
   });
   it('refreshes an expired access cookie, revalidates the same live owner/session and seals rotated material', async () => {
-    const expired = `header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,exp:Math.floor(Date.now()/1000)-1,aal:'aal2'})).toString('base64url')}.synthetic`;
+    const expired = `header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)-1,aal:'aal2'})).toString('base64url')}.synthetic`;
     auth.getUser.mockResolvedValueOnce({data:{user:null},error:{status:401}} as never);
     const cookies = `${cookiePair('access',expired)}; ${cookiePair('refresh',session.refresh_token)}`;
     const response = await handleAccount(request('session',{},cookies,'GET'),'session');
@@ -135,7 +150,7 @@ describe('customer BFF authentication', () => {
     expect((await handleAccount(request('session',{},cookies,'GET'),'session')).status).toBe(401);
     expect(auth.refreshSession).not.toHaveBeenCalled();
     for(const changed of [{sub:'00000000-0000-4000-8000-000000000003',session_id:sid},{sub:uid,session_id:'00000000-0000-4000-8000-000000000003'}]){
-      const expired = `header.${Buffer.from(JSON.stringify({...changed,exp:1})).toString('base64url')}.synthetic`;
+      const expired = `header.${Buffer.from(JSON.stringify({...changed,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:1})).toString('base64url')}.synthetic`;
       auth.getUser.mockResolvedValueOnce({data:{user:null},error:{status:401}} as never);
       const result=await handleAccount(request('session',{},`${cookiePair('access',expired)}; ${cookiePair('refresh',session.refresh_token)}`,'GET'),'session');
       expect(result.status).toBe(401);expect(result.headers.get('set-cookie')).toContain('Max-Age=0');
@@ -143,8 +158,8 @@ describe('customer BFF authentication', () => {
   });
   it('does not inherit AAL2 from an expired Admin cookie after refresh and persists valid rotated cookies',async()=>{
     vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://cluera-ai-staging.vercel.app');
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://dwqltsqumiwsxtkzdoaa.supabase.co');
-    const expired=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,exp:1,aal:'aal2'})).toString('base64url')}.synthetic`;
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://yhnqlfcgrmckhyjdxegg.supabase.co');
+    const expired=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:1,aal:'aal2'})).toString('base64url')}.synthetic`;
     auth.getUser.mockResolvedValueOnce({data:{user:null},error:{status:401}} as never);
     const original=rpc.getMockImplementation()!;
     rpc.mockImplementation(async(name,args)=>name==='account_admin_check'?{data:true,error:null,status:200}:original(name,args));
@@ -154,7 +169,7 @@ describe('customer BFF authentication', () => {
     expect(rpc.mock.calls.some(call=>call[0]==='account_admin_read_v2'||(call[0]==='account_admin_check'&&call[1]?.p_require_mfa===true))).toBe(false);
   });
   it('fails closed on expired-cookie refresh failure, unverified identity or suspension',async()=>{
-    const expired=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,exp:1})).toString('base64url')}.synthetic`;
+    const expired=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:1})).toString('base64url')}.synthetic`;
     const cookies=`${cookiePair('access',expired)}; ${cookiePair('refresh',session.refresh_token)}`;
     auth.getUser.mockResolvedValueOnce({data:{user:null},error:{status:401}} as never);
     auth.refreshSession.mockResolvedValueOnce({data:{session:null},error:{status:503}} as never);
@@ -184,7 +199,7 @@ describe('customer BFF authentication', () => {
     const callback = new Request('https://cluera-ai-staging.vercel.app/api/account/callback?code=synthetic');
     expect((await handleAccount(callback, 'callback')).status).toBe(401);
     expect(auth.exchangeCodeForSession).not.toHaveBeenCalled();
-    const bound = new Request(callback.url, { headers: { cookie: cookiePair('flow', { 'sr-account-code-verifier': 'test' }) } });
+    const bound = new Request(callback.url, { headers: { cookie: cookiePair('flow', { 'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier': 'test' }) } });
     const complete = await handleAccount(bound, 'callback'); expect(complete.status).toBe(303);
     expect(complete.headers.get('location')).toBe('https://cluera-ai-staging.vercel.app/account');
     expect(complete.headers.get('set-cookie')).toContain('sr-account-recovery=');
@@ -217,9 +232,17 @@ describe('account cookie boundary', () => {
     expect(unseal(sealed, 'access', config, 61000)).toBeNull();
     expect(unseal(sealed, 'refresh', config, 2000)).toBeNull();
     expect(unseal(sealed, 'access', { ...config, origin: 'https://elsewhere.invalid' }, 2000)).toBeNull();
+    expect(unseal(sealed, 'access', { ...config, url: 'https://dwqltsqumiwsxtkzdoaa.supabase.co' }, 2000)).toBeNull();
     const bytes = Buffer.from(sealed, 'base64url'); bytes[30] ^= 1;
     expect(unseal(bytes.toString('base64url'), 'access', config, 2000)).toBeNull();
     expect(() => seal('x'.repeat(4000), 'access', config, 60)).toThrow();
+  });
+  it('rejects the old origin-only v1 cookie envelope even with an accidentally identical cookie key',()=>{
+    const config=accountConfig(),iv=Buffer.alloc(12,7),cipher=createCipheriv('aes-256-gcm',config.cookieKey,iv);
+    cipher.setAAD(Buffer.from(`${config.origin}:access:v1`));
+    const encrypted=Buffer.concat([cipher.update(JSON.stringify({value:token,exp:Date.now()+60000})),cipher.final()]);
+    const old=Buffer.concat([iv,cipher.getAuthTag(),encrypted]).toString('base64url');
+    expect(unseal(old,'access',config)).toBeNull();
   });
   it('needs account secrets but not legacy license pepper/signing credentials', () => {
     vi.stubEnv('LICENSE_HASH_PEPPER_BASE64', ''); vi.stubEnv('LICENSE_SIGNING_PRIVATE_KEY_BASE64', '');

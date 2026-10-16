@@ -4,8 +4,8 @@ import {createSandboxCheckout} from '../lib/billing/checkout/transport';
 import {sandboxOffers} from '../lib/billing/sandboxCatalog';
 import {CheckoutTransportError,logCheckoutFailure} from '../lib/billing/checkout/diagnostics';
 const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',PADDLE_API_KEY:'synthetic-key-not-a-real-credential',
-  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',
-  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa'};
+  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',
+  SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg'};
 const user={userId:'00000000-0000-4000-8000-000000000801',sessionId:'00000000-0000-4000-8000-000000000802'};
 const input={requestId:'00000000-0000-4000-8000-000000000803',offerCode:'pro_3_hours' as const};
 const claim={code:'CLAIMED',intentId:input.requestId,attemptId:'00000000-0000-4000-8000-000000000804'};

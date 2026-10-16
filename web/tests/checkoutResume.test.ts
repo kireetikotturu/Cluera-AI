@@ -1,8 +1,8 @@
 import {describe,it,expect,vi} from 'vitest';
 import {resumeSandboxCheckout} from '../lib/billing/checkout/resume';
 import {sandboxOffers} from '../lib/billing/sandboxCatalog';
-const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',PADDLE_API_KEY:'synthetic-server-key-not-real',
-  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://dwqltsqumiwsxtkzdoaa.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'dwqltsqumiwsxtkzdoaa'};
+const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',PADDLE_API_KEY:'sb_secret_synthetic-server-key-not-real',
+  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg'};
 const who={userId:'00000000-0000-4000-8000-000000000941',sessionId:'00000000-0000-4000-8000-000000000942'};
 const intentId='00000000-0000-4000-8000-000000000943',transactionId='txn_'+'a'.repeat(26),productId='pro_'+'b'.repeat(26),offer=sandboxOffers[0];
 const canonical={code:'BOUND',intentId,transactionId,offerCode:offer.code};

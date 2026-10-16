@@ -5,10 +5,10 @@ import { authorizeRelay } from '../lib/accountRelay/authorization';
 import { STAGING_DATABASE, STAGING_SITE } from '../lib/accountRelay/config';
 const user = '00000000-0000-4000-8000-000000000801', session = '00000000-0000-4000-8000-000000000802';
 const config = { port: 8080, database: STAGING_DATABASE, site: STAGING_SITE,
-  serviceKey: 'synthetic-service-only', geminiKey: 'synthetic-gemini-only', deepgramKey: 'synthetic-deepgram-only',
+  serviceKey: 'sb_secret_synthetic-service-only', geminiKey: 'synthetic-gemini-only', deepgramKey: 'synthetic-deepgram-only',
   rateKey: Buffer.alloc(32, 7).toString('base64') };
 const env = { SIGMAROUND_ACCOUNTS_ENABLED: 'true', SIGMAROUND_ACCOUNT_ORIGIN: STAGING_SITE, NEXT_PUBLIC_SUPABASE_URL: STAGING_DATABASE };
-const token = (claims = {}) => `synthetic.${Buffer.from(JSON.stringify({ sub: user, session_id: session,
+const token = (claims = {}) => `synthetic.${Buffer.from(JSON.stringify({ sub: user, session_id: session,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',
   exp: Math.floor(Date.now() / 1000) + 3600, ...claims })).toString('base64url')}.synthetic`;
 beforeEach(() => {
   vi.resetAllMocks(); fake.createClient.mockReturnValue({ auth: { getUser: fake.getUser }, rpc: fake.rpc });
@@ -16,6 +16,11 @@ beforeEach(() => {
   fake.rpc.mockImplementation(async name => ({ data: name === 'customer_authorize' ? { code: 'ACTIVE', userId: user } : true, error: null }));
 });
 describe('native account relay authorization', () => {
+  it.each([{iss:'https://dwqltsqumiwsxtkzdoaa.supabase.co/auth/v1'},{role:'service_role'},{aud:'anon'},
+    {aud:['authenticated','service_role']},{iss:undefined}])('rejects foreign-project/privileged claims before a usage-capable RPC: %j',async claims=>{
+    await expect(authorizeRelay(token(claims),config,env)).rejects.toThrow();
+    expect(fake.getUser).toHaveBeenCalledOnce();expect(fake.rpc).not.toHaveBeenCalled();
+  });
   it('verifies Auth, then live session/account, then bounded account rate; no raw token/provider key in result', async () => {
     const access = token(); const result = await authorizeRelay(access, config, env);
     expect(fake.getUser).toHaveBeenCalledWith(access);

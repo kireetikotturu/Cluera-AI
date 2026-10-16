@@ -7,12 +7,12 @@ import { sandboxOffers, verifySandboxOffer } from '../lib/billing/sandboxCatalog
 // Inject staging env into this process; never pull secrets into a file or log them.
 const enabled = process.env.SIGMAROUND_RUN_STAGING_ACCEPTANCE === 'true';
 const origin = 'https://cluera-ai-staging.vercel.app';
-const database = 'https://dwqltsqumiwsxtkzdoaa.supabase.co';
+const database = 'https://yhnqlfcgrmckhyjdxegg.supabase.co';
 function assertStaging() {
   if (process.env.SIGMAROUND_ACCOUNT_ORIGIN !== origin
     || process.env.NEXT_PUBLIC_SUPABASE_URL !== database
     || process.env.PADDLE_ENVIRONMENT !== 'sandbox'
-    || process.env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF !== 'dwqltsqumiwsxtkzdoaa') {
+    || process.env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF !== 'yhnqlfcgrmckhyjdxegg') {
     throw new Error('Refusing acceptance checks outside the dedicated staging targets.');
   }
 }
