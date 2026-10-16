@@ -1,6 +1,27 @@
 # Cluera AI current handoff
 
-## October16 - CLEAN project database and vault applied
+## October16 - new private keys accepted; clean release verification
+
+**New Cluera keys saved privately is completed. Do not repeat the save.** Two bounded GETs at02:14:55.803UTC authenticate the distinct new modern web/relay keys against **yhnqlfcgrmckhyjdxegg**, zero mutations/values displayed. One GET at02:30:37.349UTC confirms email/signup enabled, verification required and Google not configured. New-project users/sessions/customers/trials/Admins/providers/releases remain0 at02:30:23.168936UTC; no old identity/session/credential import.
+
+Reviewed **c12f55f0f2b94597e01161f13a7d458c72f041e1**, exactly103 scanned/hash-matched files, complete776-entry/643-blob tree, isolated clean-branch publication/read-back pass. [CI38839674123 SUCCESS](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38839674123): web **1181 passed/22 skipped**, desktop **366 passed/1 skipped**, preparation94/94, all typechecks/code builds/audits/source scan pass. Local full1165/16failed/22skipped and concurrent desktop365/1failed/1skipped remain non-passes; no security/assertion/deadline relaxation.
+
+New **1.0.3 unsigned TEST** prepared at `desktop/release-cluera-staging/1.0.3/ClueraAITestSetup-1.0.3.exe`:121924027bytes/SHA256 **d8e782a3cfa18ceb3e10f90940a403f3d0277e701953cc7db1644c17ac078a59**. Package2276/six fuses/105 file matches/10 offline verifier cases/308-file scan pass. Existing desktop features, retained EXEs and release trust are preserved; only native Google project pin changes. Not installed, uploaded, approved or published; backend/Auth acceptance is required first. [Release evidence](docs/CLUERA_RELEASE_READINESS.md).
+
+Clean branch has21 Preview settings;18 existing Production settings remain exactly unchanged and stable website is not promoted. Initial SHA-as-ref Preview READY/feed503 is not accepted; documented branch+exactSHA correction passes32tests and replacement independently matches branch/c12. Only Cluera relay's seven-entry new tuple was merged and reviewed c12 fast-forwarded to staging for existing auto-deploy. LIVE/signed/new DB proof and replacement Preview results follow actual checks. Payments false/paused, AI auth-only/vault disabled; no provider/order/event/grant/scheduler/old-service/License action. [Current complete results and remaining owner boundary](docs/CLUERA_EXECUTION_STATUS.md). Older key-saving instructions below are superseded; **commercial launch NO-GO**.
+
+**Final hosted verification:** Preview **READY dpl_B68Qmz4kEK6cvdcdGYoFwZxAGQ4K/c12**, exact clean branch/Preview environment, protected database-backed feed404/no approved installer and four other GETs pass. Admin/credits GETs are2BLOCKED by connector deployment authentication, not application-denial passes.97build events confirm exact clone/npm ci/Next16.3.8/zero dependency vulnerabilities/20-file scan/completion/zero error events; npm cache-dir/script-approval warnings are retained. Cluera relay **LIVE dep-db8oot3rjlhs73b7vd60/c12**;02:33:12.531UTC three GETs prove health/no-store/revisionheader, fresh signed rate proof, auth-only/disabled providers and actual relay-own modern DB authentication. Providerrequests/mutations0. Connector also queued an old-source API deploy, canceled/superseded within seconds by reviewedc12; no old-source LIVE result is accepted.
+
+At02:35:38.615738UTC all new Auth/customer/trial/Admin/financial/grant/provider/release counts remain0,48tables RLS/0policies/0direct access.18Production entries unchanged/21Preview branch entries isolated; canonical website still originalb254/dpl_2tS3ohg, no partial promotion.
+
+**One next manual action:** [new-project Auth URL Configuration](https://supabase.com/dashboard/project/yhnqlfcgrmckhyjdxegg/auth/url-configuration): set Site URL `https://cluera-ai-staging.vercel.app`, add Redirect URLs below and Save. Keep the literal backslash before `?`; no wildcard origins, preview hosts, key changes or activation. Reply **Cluera Auth URLs saved**, no values/codes. Google/SMTP and new verified owner/Admin acceptance follow separately, not another old-project setup.
+
+```text
+https://cluera-ai-staging.vercel.app/api/account/callback
+http://127.0.0.1:43822/cluera/callback\?state=*
+```
+
+## Earlier October16 - CLEAN project database and vault applied
 
 New target only **yhnqlfcgrmckhyjdxegg /cluera-ai-production**. Owner confirms old project unavailable/dummy accounts and trials need not migrate; earlier old-backup/import blockers below are superseded. Genuine Razorpay/Paddle obligations and webhook ownership are still unresolved until independently reconciled. License Edition remains unchanged.
 

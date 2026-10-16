@@ -37,7 +37,11 @@ The new clean composition fixes a reproduced readiness defect: PACK has no subsc
 
 Rollback before promotion leaves the alias unchanged. After new records exist, retain them and use a compatible reviewed code rollback; do not drop/reset this DB, resurrect old Auth or automatically revoke keys.
 
-## Single essential private action now
+## Completed fresh private-key action
+
+The owner confirmed both new keys saved privately. Two bounded GETs at02:14:55.803UTC authenticate the distinct modern web/relay keys against this exact project, zero mutations and no values displayed. Do not repeat key creation/saving. Reviewed sourcec12f55f0 and CI38839674123 pass complete web1181/22-skipped, desktop366/1-skipped, preparation94/94 and all typechecks/builds/audits. New Preview and relay integration results are recorded in execution status only after hosted read-back; the canonical website is not switched to a partial tuple.
+
+### Earlier private saving instruction - completed, not another request
 
 Open new Supabase **yhnqlfcgrmckhyjdxegg → Settings → API Keys → Secret keys**. Create separate `cluera-web-production` and `cluera-relay-production` keys. Privately save their values into `webSecretKey` and `relaySecretKey` respectively in the prepared ignored file `.local-secrets/cluera-yhnqlfcgrmckhyjdxegg-server-keys.private.json`; leave projectRef unchanged. Reply **New Cluera keys saved privately**, no values. Do not change hosted settings, deploy, alter JWT signing or enable anything. Modern secrets remain privileged server credentials, not per-table roles. This is fresh provisioning, not another old-key migration.
 

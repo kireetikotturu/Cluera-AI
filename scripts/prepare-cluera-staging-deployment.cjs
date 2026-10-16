@@ -4,15 +4,22 @@ const {createHash}=require('node:crypto');
 const path=require('node:path');
 const {verifyTree}=require('./prepare-reviewed-sources.cjs');
 const {verifyProxyFork,PREFIX}=require('./verify-cluera-proxy-fork.cjs');
-const TARGET={teamId:'team_AksnPXhi2VBXI5UsY2xBIakc',project:'cluera-ai-staging',
- name:'cluera-ai-staging',branch:'staging',repoId:'1416291494'};
+const TARGET=Object.freeze({teamId:'team_AksnPXhi2VBXI5UsY2xBIakc',project:'cluera-ai-staging',
+ name:'cluera-ai-staging',branch:'staging',repoId:'1416291494'});
+const PREVIEW_BRANCH='codex/clean-cluera-setup';
+const inputFields=new Set(['commitSha','commitTreeSha','branch','tree','webPackage','webLock','reviewedBlobs','diagnostic']);
 const requiredFiles=['web/package.json','web/package-lock.json','web/next.config.ts','web/tsconfig.json',
  'web/app/layout.tsx','web/app/page.tsx','web/app/account/checkout/page.tsx',
  'web/app/api/account/payments/checkout/route.ts','web/app/api/payments/razorpay/test/webhook/route.ts',
  'web/lib/payments/core/config.ts','scripts/verify-cluera-artifacts.cjs','scripts/security/source-secret-scan.cjs'];
 function prepare(input){
  const {commitSha,commitTreeSha,branch,tree,webPackage,webLock,reviewedBlobs,diagnostic=false}=input;
- if(branch!==TARGET.branch||! /^[a-f0-9]{40}$/.test(commitSha??'')||tree?.sha!==commitTreeSha
+ // Environment/branch routing is fixed here, never accepted from a caller.
+ // Vercel's API represents Preview by omitting target; no production alias or
+ // caller-selected custom environment is added to the clean review payload.
+ const preview=branch===PREVIEW_BRANCH;
+ if((branch!==TARGET.branch&&!preview)||Object.keys(input).some(key=>!inputFields.has(key))
+  ||! /^[a-f0-9]{40}$/.test(commitSha??'')||tree?.sha!==commitTreeSha
   ||! /^[a-f0-9]{40}$/.test(commitTreeSha??'')||tree.truncated!==false||!Array.isArray(tree.tree)
   ||'files' in input||'deploymentId' in input||typeof diagnostic!=='boolean')throw Error('Unreviewed or incomplete deployment source.');
  const reviewedGeneratedPaths=new Set();
@@ -55,9 +62,15 @@ function prepare(input){
   const actual=lock.packages[''][section]??{},expected=manifest[section]??{};
   if(Object.keys(actual).length!==Object.keys(expected).length||Object.entries(expected).some(([key,value])=>actual[key]!==value))throw Error('Web manifest/lock mismatch.');
  }
- return{teamId:TARGET.teamId,requestBody:{name:TARGET.name,project:TARGET.project,target:'production',
-  gitSource:{type:'github',repoId:TARGET.repoId,ref:commitSha},projectSettings:{rootDirectory:'web',framework:'nextjs',
+ return{teamId:TARGET.teamId,requestBody:{name:TARGET.name,project:TARGET.project,
+  ...(preview?{gitMetadata:{commitRef:PREVIEW_BRANCH,commitSha}}:{target:'production'}),
+  // The documented GitHub source accepts a branch ref AND a pinned sha.
+  // Keep branch-scoped Preview configuration truthful without building a moving
+  // branch head. gitMetadata alone does not establish the source branch.
+  // https://openapi.vercel.sh (/v13/deployments, GitHub repoId alternative)
+  gitSource:{type:'github',repoId:TARGET.repoId,...(preview?{ref:PREVIEW_BRANCH,sha:commitSha}:{ref:commitSha})},
+  projectSettings:{rootDirectory:'web',framework:'nextjs',
    buildCommand:diagnostic?'node ../scripts/payments/audit-razorpay-test.cjs':'npm run build',installCommand:'npm ci',
    nodeVersion:'24.x',sourceFilesOutsideRootDirectory:true,skipGitConnectDuringLink:true}}};
 }
-module.exports={prepare,TARGET,requiredFiles};
+module.exports={prepare,TARGET,PREVIEW_BRANCH,requiredFiles};

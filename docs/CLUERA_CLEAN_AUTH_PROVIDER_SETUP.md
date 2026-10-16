@@ -41,8 +41,8 @@ These are **non-secret configuration requirements**, not a claim that hosted set
 | Destination Auth project | `yhnqlfcgrmckhyjdxegg` only |
 | Account email/password | Enabled with email verification; do not auto-confirm signups |
 | Site URL | Reviewed Cluera application origin; current canonical origin is `https://cluera-ai-staging.vercel.app`. Do not use an unreviewed preview origin or change old project settings. |
-| Web return | `https://cluera-ai-staging.vercel.app/api/account/callback`, preserving SDK `sb_flow_id` and sealed PKCE verifier behavior |
-| Native return | `http://127.0.0.1:43822/cluera/callback`, preserving the per-attempt 64-hex `state` query, fixed host/port/path, PKCE S256 and one-shot loopback validation |
+| Web return | `https://cluera-ai-staging.vercel.app/api/account/callback`; current SDK uses this bare callback, while optional `sb_flow_id` is accepted defensively with sealed PKCE verifier behavior |
+| Native return | Generated `http://127.0.0.1:43822/cluera/callback?state=<64hex>`; explicit narrow Redirect URL pattern `http://127.0.0.1:43822/cluera/callback\?state=*` preserves the fixed host/port/path, per-attempt state, PKCE S256 and one-shot loopback validation |
 | Google Cloud authorized redirect URI | `https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/callback` — not the application's loopback URL |
 | Google credentials | Privately configured for this destination; no old secret import through tools or chat |
 | Redirect scope | No wildcard origins or unrestricted preview hosts; verify actual hosted matching with the complete generated callback query |

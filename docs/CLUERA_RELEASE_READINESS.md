@@ -1,10 +1,32 @@
 # Cluera release blockers
 
-## October 16 - new Auth target requires a later reviewed native candidate
+## October 16 - clean-target Windows 1.0.3 prepared, not installed or released
 
-Intended target **yhnqlfcgrmckhyjdxegg** remains empty; source access/verified backup blocks migration. Actual1.0.2 ASAR directly pins the old Supabase Google authorization origin. Email/credits use the Cluera BFF, but Google is not a backend-only switch. A later immutable candidate must preserve PKCE/state/loopback, local data/features and updater trust while strictly pinning new Auth; do not overwrite1.0.2 or claim it accepted on the new project.
+The owner chose a **clean Cluera-only setup** in `yhnqlfcgrmckhyjdxegg`, not an import of old dummy identities, trials, balances or sessions. The clean foundation/vault and complete fresh infrastructure tuple are tracked in [execution status](CLUERA_EXECUTION_STATUS.md). The earlier source-backup/import prerequisite is superseded for this clean setup; real provider/financial obligations remain separately gated. SigmaRoundAI License Edition and old services are not changed by this candidate.
 
-Retained1.0.2:121924182bytes/SHA2565535609d6f301925ccc68376ffd587c37274aa95e88276b7ee159904261dc243, unsigned TEST/not installed/distributed. No EXE/version/feature change here. Old Admin/MFA acceptance is historical, not destination acceptance; no repeat now. [Source dashboard/backup boundary and migration gates](CLUERA_SUPABASE_MIGRATION.md).
+```text
+desktop/release-cluera-staging/1.0.3/ClueraAITestSetup-1.0.3.exe
+SHA-256 d8e782a3cfa18ceb3e10f90940a403f3d0277e701953cc7db1644c17ac078a59
+Exact size 121924027 bytes
+Windows FileVersion / ProductVersion 1.0.3 / ProductName Cluera AI
+Authenticode NotSigned - unsigned TEST only
+```
+
+**PREPARED, not install-ready until the complete new-project backend is READY and its Auth configuration is verified.** The candidate was not installed, launched, uploaded, approved or published to an update feed. Its actual ASAR pins Google authorization only to `https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize`; it has no old-project fallback. Retained 1.0.2 still pins the old Google project, so Google is not a backend-only switch. Do not overwrite an old EXE or use either candidate's static checks as real new-project Google acceptance.
+
+Desktop feature preservation is independently checked across all 110 `desktop/src` files. The only application-source change is the fixed Google authorization target: replacing that one new URL with its prior value reconstructs the exact prior source aggregate `5d042d1759b7d22324b72349001f9cf02a6ab0ffad8abc2eefbc4560ae1f479f`; the current aggregate is `6ac765eae77586d67439a5ca171545dba9e968e717dffcc9903eee0a2f7a1971`. PKCE S256, per-attempt state, the fixed loopback listener, Auth/session fences, secure storage, local history/context/documents, audio/screenshots, shortcuts, updater and UI features are preserved. Metadata is separately versioned 1.0.3 in the desktop manifest, exactly two root lockfile version lines and the matching version resource. No dependency resolution or installer/trust/security control changed.
+
+Fresh full serial desktop verification passes **366 tests / 1 opt-in skipped**, 56 files. Both desktop TypeScript configurations, renderer/main build and hardening pass. [Hosted CI 38839674123](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38839674123) independently reports complete web **1181 passed / 22 opt-in skipped** and desktop **366 passed / 1 skipped** on the reviewed clean-source branch. Skips are not passes; these automated results do not prove private Google/email, installed Windows or real provider/payment acceptance.
+
+NSIS packaging succeeds with Electron 44.4.5. Actual package verification passes **2276 ASAR entries**, expected identity/public trust and all six hardened Electron fuses. All **105 built dist files**, bundled configuration and public-key bytes match the actual archive. The extracted manifest verifier passes **10 offline synthetic cases**, using an ephemeral synthetic signing pair rather than the private release key. These checks make zero network requests and launch no application, installer or updater. The bounded artifact scan passes **308 files / 0 history blobs / zero findings**, including retained release directories; it is not full-history or arbitrary-secret certification.
+
+Fresh read-only hashes confirm Cluera 1.0.0, 1.0.1 and 1.0.2, old Account 1.0.10 and License 1.0.8 remain byte-identical to their recorded sizes/hashes. In particular, retained 1.0.2 remains **121924182 bytes**, SHA-256 `5535609d6f301925ccc68376ffd587c37274aa95e88276b7ee159904261dc243`. No customer profile or old product was opened or modified.
+
+The Cluera identity remains `cluera-ai-desktop` / `ai.cluera.desktop`, profile `cluera-ai-desktop-staging`, local database `cluera-ai.sqlite`, channel `cluera-beta`, audience `cluera-ai-desktop-test-update`, staging API `https://cluera-ai-staging.vercel.app` and WSS relay `wss://cluera-ai-relay-staging.onrender.com/v1/session`. Public Ed25519 DER/SPKI fingerprint remains `89d6409d29c8eed4f583936bdd2cab0b84a97b15552c340f5697b7336da6c5c1`. No Supabase credential is embedded in the EXE; the separate public installer trust is retained, not treated as an old Supabase signing secret.
+
+Earlier local failed runs remain disclosed: complete native-path web **1165 passed / 16 failed / 22 skipped** (ancestor-path esbuild failures and a scheduler-fixture deadline), concurrent desktop **365 passed / 1 deadline failure / 1 skipped**, and short-drive mixed selection **38 passed / 2 failed** are not passes. Without source/assertion/deadline/security changes, later isolated preflight **33/33**, standalone relay **1/1**, dependency consumer **3/3**, the full serial desktop run and hosted CI pass. No test bound was increased and no failure or skip is relabelled.
+
+Normal installed high-DPI layout, destination email/Google/secure-store/restart/logout/account isolation, sessions/audio/providers, approved-feed/updater and shared usage require real acceptance after a complete reviewed target switch. New-project Admin/MFA depends on a fresh verified identity, not imported old acceptance; do not repeat old setup prematurely. Providers remain auth-only blocked, all Cluera payment flags remain false, and the new release registry has no approved installer. Commercial Authenticode, operational/restore/capacity controls and genuine provider/financial journeys remain gates: **commercial launch is NO-GO**. [Clean Auth/provider requirements](CLUERA_CLEAN_AUTH_PROVIDER_SETUP.md).
 
 ## October 15 - new Windows 1.0.2 unsigned TEST candidate; launch remains blocked
 

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {expect,it} from 'vitest';
 const require=createRequire(import.meta.url);
-const {prepare,TARGET,requiredFiles}=require('../../scripts/prepare-cluera-staging-deployment.cjs');
+const {prepare,TARGET,PREVIEW_BRANCH,requiredFiles}=require('../../scripts/prepare-cluera-staging-deployment.cjs');
 const {verifyProxyFork,PREFIX}=require('../../scripts/verify-cluera-proxy-fork.cjs');
 const {verifyTree}=require('../../scripts/prepare-reviewed-sources.cjs');
 const root=path.resolve(import.meta.dirname,'../..');
@@ -31,6 +31,46 @@ it('builds a complete SHA-pinned Account-only Git deployment with npm ci',()=>{
  expect(result.requestBody).toMatchObject({project:TARGET.project,target:'production',gitSource:{type:'github',repoId:TARGET.repoId,ref:'a'.repeat(40)},
   projectSettings:{rootDirectory:'web',installCommand:'npm ci',buildCommand:'npm run build',sourceFilesOutsideRootDirectory:true,skipGitConnectDuringLink:true}});
  expect(result.requestBody).not.toHaveProperty('files');expect(result.requestBody).not.toHaveProperty('deploymentId');
+ expect(result.requestBody).not.toHaveProperty('gitMetadata');
+ expect(result.requestBody.gitSource).toEqual({type:'github',repoId:TARGET.repoId,ref:'a'.repeat(40)});
+});
+it('maps only the exact clean review branch to an isolated Preview request with truthful branch metadata',()=>{
+ const f={...fixture(true),branch:PREVIEW_BRANCH},result=prepare(f);
+ expect(PREVIEW_BRANCH).toBe('codex/clean-cluera-setup');expect(Object.isFrozen(TARGET)).toBe(true);
+ expect(result).toMatchObject({teamId:TARGET.teamId,requestBody:{name:TARGET.name,project:TARGET.project,
+  gitMetadata:{commitRef:'codex/clean-cluera-setup',commitSha:f.commitSha},
+  gitSource:{type:'github',repoId:TARGET.repoId,ref:PREVIEW_BRANCH,sha:f.commitSha},
+  projectSettings:{rootDirectory:'web',installCommand:'npm ci',buildCommand:'npm run build',nodeVersion:'24.x',
+   sourceFilesOutsideRootDirectory:true,skipGitConnectDuringLink:true}}});
+ for(const field of ['target','customEnvironmentSlugOrId','alias','files','deploymentId'])expect(result.requestBody).not.toHaveProperty(field);
+ expect(JSON.parse(JSON.stringify(result.requestBody)).gitSource).toEqual({
+  type:'github',repoId:TARGET.repoId,ref:'codex/clean-cluera-setup',sha:f.commitSha});
+});
+it.each(['main','production','refs/heads/codex/clean-cluera-setup','codex/clean-cluera-setup/extra',
+ 'codex/another-review','CODEX/clean-cluera-setup',null,undefined,'__proto__','constructor'])('does not admit unreviewed branch %s',branch=>{
+ expect(()=>prepare({...fixture(),branch})).toThrow('Unreviewed or incomplete deployment source');
+});
+it.each([TARGET.branch,PREVIEW_BRANCH])('rejects caller target/custom-environment/source overrides on %s',branch=>{
+ for(const override of [{target:'production'},{target:'preview'},{target:'staging'},{target:null},
+  {customEnvironmentSlugOrId:'production'},{requestBody:{target:'production'}},
+  {gitMetadata:{commitRef:'staging'}},{gitSource:{ref:'main'}},{gitSource:{ref:PREVIEW_BRANCH,sha:'b'.repeat(40)}},
+  {ref:PREVIEW_BRANCH},{sha:'b'.repeat(40)},{project:'another-project'},{teamId:'another-team'}]){
+  expect(()=>prepare({...fixture(),branch,...override})).toThrow('Unreviewed or incomplete deployment source');
+ }
+});
+it('retains complete-tree/blob/lock and no-redeployment guards for the clean Preview path',()=>{
+ const f={...fixture(),branch:PREVIEW_BRANCH};
+ for(const change of [{files:[]},{deploymentId:'dpl_failed'},{commitSha:'main'},
+  {tree:{...f.tree,truncated:true}},{commitTreeSha:'c'.repeat(40)},{reviewedBlobs:{}},{webLock:'{}'}]){
+  expect(()=>prepare({...f,...change})).toThrow();
+ }
+ const missingLock={...f,tree:{...f.tree,tree:f.tree.tree.filter((r:any)=>r.path!=='web/package-lock.json')}};
+ expect(()=>prepare(missingLock)).toThrow();
+ const vendor=fixture(true),rows=vendor.tree.tree.filter((r:any)=>r.type==='blob').map((r:any)=>({...r}));
+ rows.find((r:any)=>r.path===PREFIX+'dist/classes/Agent.js')!.sha='d'.repeat(40);
+ const tree=completeTree(rows);
+ expect(()=>prepare({...vendor,branch:PREVIEW_BRANCH,tree,commitTreeSha:tree.sha,
+  reviewedBlobs:Object.fromEntries(rows.map((r:any)=>[r.path,r.sha]))})).toThrow('Reviewed vendor source mismatch');
 });
 it('accepts the complete fixed-manifest vendor package including all44 exact runtime files, not generic generated outputs',()=>{
  const f=fixture(true),pins=verifyProxyFork();expect(pins.size).toBe(77);
@@ -76,4 +116,12 @@ it('private audits also require complete Git source; never produce a website by 
  expect(result.requestBody.projectSettings.buildCommand).toBe('node ../scripts/payments/audit-razorpay-test.cjs');
  const f=fixture();f.tree.tree=f.tree.tree.filter((row:any)=>row.path!=='scripts/payments/audit-razorpay-test.cjs');
  expect(()=>prepare({...f,diagnostic:true})).toThrow();
+});
+it('pins the same reviewed commit and exact Preview branch for complete-source diagnostic requests',()=>{
+ const f={...fixture(true),branch:PREVIEW_BRANCH,diagnostic:true},result=prepare(f);
+ expect(result.requestBody.gitSource).toEqual({type:'github',repoId:TARGET.repoId,ref:PREVIEW_BRANCH,sha:f.commitSha});
+ expect(result.requestBody.gitMetadata).toEqual({commitRef:PREVIEW_BRANCH,commitSha:f.commitSha});
+ expect(result.requestBody).not.toHaveProperty('target');
+ expect(result.requestBody.projectSettings.buildCommand).toBe('node ../scripts/payments/audit-razorpay-test.cjs');
+ expect(result.requestBody.projectSettings.installCommand).toBe('npm ci');
 });
