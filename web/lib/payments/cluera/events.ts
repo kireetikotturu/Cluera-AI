@@ -43,7 +43,12 @@ export async function readClueraRawBody(request: Request, maximumBytes = 256 * 1
     for (;;) { const chunk = await Promise.race([reader.read(), expired]); if (chunk.done) break;
       size += chunk.value.byteLength; if (size > maximumBytes) throw new ClueraBillingError('INVALID'); parts.push(chunk.value); }
     return Buffer.concat(parts);
-  } finally { clearTimeout(timer!); await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+  } finally {
+    clearTimeout(timer!);
+    // Cancellation of a hostile body must not outlive the unchanged 2s bound.
+    void reader.cancel().catch(() => undefined);
+    try { reader.releaseLock(); } catch { /* A pending read must not mask the fixed result. */ }
+  }
 }
 export async function handleClueraWebhook(request: Request, env = process.env, rpc?: PaymentRpc, onStored?: () => void) {
   if (!clueraIntakeEnabled(env)) return json({error:'Not found.'},404);

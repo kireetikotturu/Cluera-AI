@@ -1,6 +1,14 @@
 # Cluera Test merchant-pin approval
 
-October 17, 2026. Preparation only; no SQL has been executed. Target only `yhnqlfcgrmckhyjdxegg`.
+October 17, 2026. The exact owner-approved pin is now **EXECUTED AND INDEPENDENTLY VERIFIED**, only in `yhnqlfcgrmckhyjdxegg`. The frozen template bytes remain unchanged.
+
+## Completed operation — do not approve or execute again
+
+Operation **f5ed88ad-af8c-4d01-91f2-9237c71b5b9f** committed once at **13:32:12.820084UTC**, with one immutable audit at13:32:12.821449UTC. Exact rendered SQL SHA-256 **f0e4225846909bd120e7a65e8d76987a84ba8f518f519c900bd814258f4d9c03**. The approval timestamp13:28:15.000UTC is explicitly the operator-observed receipt time, not a supplied message timestamp. Fresh complete-source Test identity diagnostic **dpl_4p4aBrzTWN3FffpYbZhbwejkiMCJ /13:31:29.019UTC** made2GETs/0mutations; the same merchant matched before execution within both original validity bounds.
+
+Independent read-back confirms exact before/after/provenance/current-row equality, one matching audit, configured ACTIVE/cluera/epoch1 and different-merchant CONFLICT. Only processing_owner digest/timestamp and cutover_audit changed; all other45of47 business snapshots and all85function/security/ACL metadata match. All48environment entry metadata, disabled gates, native no-op/passive CHECK and original migrations remain unchanged. No schema, worker wake, order/payment/event/replay/credit, provider or License mutation. [Full current acceptance and next staged scope](CLUERA_V1_COMPLETION_CHECKLIST.md).
+
+The scope and original wording below are retained as review history, not another pending approval or instruction to run SQL.
 
 ## Verified prerequisite and narrow change
 
@@ -20,11 +28,11 @@ Frozen template: [cluera-test-merchant-pin.sql](proposals/cluera-test-merchant-p
 - Independently recheck function/ACL/trigger/RLS/security pins, passive worker/no native schedule, zero enabled offers/providers, fresh complete business snapshots and empty financial evidence. The SERIALIZABLE transaction locks and checks state and performs only NULL-to-digest plus atomic audit. Any mismatch aborts; audit failure rolls back the pin. Same-operation replay must match its exact immutable provenance/current state.
 - Independently read back the one owner change/audit; compare all other business snapshots and unchanged disabled flags. Do not invoke a worker, send/replay an event or create an order to test the pin.
 
-## One next owner reply
+## Original owner approval wording — consumed
 
 “Approve only the frozen clean Razorpay Test merchant pin in yhnqlfcgrmckhyjdxegg for the configured merchant independently reverified immediately before execution, using template c76a00e938d8588fb852442ad9f3d08a3e8bd44b51c1875ddda05711d2e35f73. Allow only NULL-to-verified-digest and its immutable audit. Keep owner/epoch1, payments, catalog, worker/scheduler and providers disabled. No webhook change, order, payment, refund, replay, credit or Live activation.”
 
-No dashboard action, credential, MFA enrollment or repeated Phase A approval is requested. This approval is NOT yet received.
+The owner approved this exact scope and it is complete. Do not repeat the approval, dashboard/key setup or Admin/MFA enrollment. Later financial/provider/release gates remain separate; the current next scope is in the completion checklist linked above.
 
 ## Later independent gates
 

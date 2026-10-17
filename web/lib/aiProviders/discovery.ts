@@ -10,16 +10,20 @@ const endpoints:Record<ProviderId,string>={gemini:'https://generativelanguage.go
 /** Explicit Admin metadata GET only. No generation, audio, retries, redirects,
  * arbitrary hosts, provider error bodies, display names or reflected secrets. */
 export async function discoverModels(provider:ProviderId,key:string,request=fetch):Promise<Probe>{
+ let timer:ReturnType<typeof setTimeout>|undefined,reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
+ const controller=new AbortController();
  try{
   providerId.parse(provider);apiKey.parse(key);
   const headers:Record<string,string>=provider==='gemini'?{'x-goog-api-key':key}:provider==='anthropic'?{'x-api-key':key,'anthropic-version':'2023-06-01'}:{Authorization:`${provider==='deepgram'?'Token':'Bearer'} ${key}`};
-  const signal=AbortSignal.timeout(7000);
-  const response=await request(endpoints[provider],{method:'GET',redirect:'error',cache:'no-store',signal,headers});
-  if(response.status===401||response.status===403){await response.body?.cancel();return {status:'REJECTED',models:[],complete:false};}
-  if(!response.ok||!response.body){await response.body?.cancel();return {status:'UNAVAILABLE',models:[],complete:false};}
-  const reader=response.body.getReader();const parts:Uint8Array[]=[];let size=0;
-  try{for(;;){const chunk=await reader.read();if(chunk.done)break;size+=chunk.value.byteLength;if(size>256000||signal.aborted)throw Error();parts.push(chunk.value);}}
-  finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+  const expired=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{
+   reject(Error());controller.abort();void reader?.cancel().catch(()=>{});
+  },7000);});
+  const response=await Promise.race([request(endpoints[provider],{method:'GET',redirect:'error',cache:'no-store',signal:controller.signal,headers}),expired]);
+  if(response.status===401||response.status===403){void response.body?.cancel().catch(()=>{});return {status:'REJECTED',models:[],complete:false};}
+  if(!response.ok||!response.body){void response.body?.cancel().catch(()=>{});return {status:'UNAVAILABLE',models:[],complete:false};}
+  reader=response.body.getReader();const parts:Uint8Array[]=[];let size=0;
+  for(;;){const chunk=await Promise.race([reader.read(),expired]);if(chunk.done)break;
+   size+=chunk.value.byteLength;if(size>256000||controller.signal.aborted)throw Error();parts.push(chunk.value);}
   const body=JSON.parse(Buffer.concat(parts).toString('utf8'));
   const rows:unknown=provider==='gemini'?body.models:provider==='deepgram'?body.stt:body.data;
   if(!Array.isArray(rows)||rows.length>1000)throw Error();
@@ -37,4 +41,6 @@ export async function discoverModels(provider:ProviderId,key:string,request=fetc
   const complete=provider==='gemini'?!body.nextPageToken:provider==='anthropic'?body.has_more===false:true;
   return {status:'VERIFIED',models:[...models.values()].sort((a,b)=>a.id.localeCompare(b.id)),complete};
  }catch{return {status:'UNAVAILABLE',models:[],complete:false};}
+ finally{clearTimeout(timer);controller.abort();void reader?.cancel().catch(()=>{});
+  try{reader?.releaseLock();}catch{/* Cancellation is requested, never awaited without a deadline. */}}
 }

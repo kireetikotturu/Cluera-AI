@@ -18,10 +18,14 @@ const inputSchema=z.discriminatedUnion('action',[
 async function readBody(request:Request){
  const declared=Number(request.headers.get('content-length'));if(declared>8192||!request.body)throw new AccountError('INVALID_INPUT',400);
  const reader=request.body.getReader(),parts:Uint8Array[]=[];let size=0,timedOut=false;
- const timer=setTimeout(()=>{timedOut=true;void reader.cancel().catch(()=>{});},2000);
- try{for(;;){const chunk=await reader.read();if(timedOut)throw new AccountError('INVALID_INPUT',400);if(chunk.done)break;size+=chunk.value.byteLength;if(size>8192)throw new AccountError('INVALID_INPUT',400);parts.push(chunk.value);}
+ let timer:ReturnType<typeof setTimeout>|undefined;
+ const expired=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{timedOut=true;
+  reject(new AccountError('INVALID_INPUT',400));void reader.cancel().catch(()=>{});
+ },2000);});
+ try{for(;;){const chunk=await Promise.race([reader.read(),expired]);if(timedOut)throw new AccountError('INVALID_INPUT',400);if(chunk.done)break;size+=chunk.value.byteLength;if(size>8192)throw new AccountError('INVALID_INPUT',400);parts.push(chunk.value);}
   try{return JSON.parse(Buffer.concat(parts).toString('utf8'));}catch{throw new AccountError('INVALID_INPUT',400);}
- }finally{clearTimeout(timer);await reader.cancel().catch(()=>{});reader.releaseLock();}
+ }finally{clearTimeout(timer);void reader.cancel().catch(()=>{});
+  try{reader.releaseLock();}catch{/* A non-settling cancel cannot extend the request deadline. */}}
 }
 /** Dedicated write-only endpoint. Every sensitive operation requires a NEW
  * authenticator challenge, Auth-verified same user/session and live SQL AAL2.

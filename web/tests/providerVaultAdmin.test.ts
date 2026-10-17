@@ -22,7 +22,7 @@ beforeEach(()=>{
  mocks.clients.mockReturnValue({service:{rpc},auth:{auth:{setSession:vi.fn(async()=>({error:null})),getUser,mfa}}});
  vi.stubGlobal('fetch',vi.fn());
 });
-afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks();});
+afterEach(()=>{vi.useRealTimers();vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks();});
 it('fails at missing infrastructure before any session, vault, MFA, SQL or provider action',async()=>{
  vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY','');const r=await providerAdminRequest(request(body()));expect(r.status).toBe(503);expect(mocks.clients).not.toHaveBeenCalled();expect(mfa.challengeAndVerify).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
 });
@@ -65,4 +65,22 @@ it('rejects schema/secret injection, arbitrary fallback and provider-host contro
 it('validates metadata allowlist instead of reflecting a malformed server result or plaintext',async()=>{
  rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:{code:'ACTIVE',providers:[{...metadata(),apiKey:secret}]},error:null}));
  const r=await providerAdminRequest(request());expect(r.status).toBe(400);expect(JSON.stringify(await r.json())).not.toContain(secret);
+});
+it.each(['read','cancel'] as const)('an untrusted Admin body cannot extend the existing2s limit through hanging %s',async failure=>{
+ vi.useFakeTimers();
+ const never=()=>new Promise<never>(()=>{}),cancel=vi.fn(never),releaseLock=vi.fn();let part=0;
+ const read=vi.fn(()=>failure==='read'?never():Promise.resolve(part++===0
+  ?{done:false,value:Buffer.from('{malformed-json')}:{done:true,value:undefined}));
+ const req=request(body());Object.defineProperty(req,'body',{value:{getReader:()=>({read,cancel,releaseLock})}});
+ let finished=false;const pending=providerAdminRequest(req).then(response=>{finished=true;return response;});
+ await vi.advanceTimersByTimeAsync(0);
+ if(failure==='read'){
+  expect(finished).toBe(false);await vi.advanceTimersByTimeAsync(1999);expect(finished).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+ }
+ expect(finished).toBe(true);const response=await pending;
+ expect(response.status).toBe(400);expect(await response.json()).toEqual({error:'INVALID_INPUT'});
+ expect(cancel).toHaveBeenCalled();expect(releaseLock).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+ expect(mfa.challengeAndVerify).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+ expect(rpc.mock.calls.every(([name]:any)=>name==='account_admin_check')).toBe(true);
 });

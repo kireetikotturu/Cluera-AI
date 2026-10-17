@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import styles from '../../cluera-commerce.module.css';
+import ClueraBillingHistory from './ClueraBillingHistory';
 import { z } from 'zod';
 import { usageDuration } from '../../../lib/usage/display';
 import {offerDisplay} from '../../../lib/billing/offerDisplay';
@@ -39,8 +40,8 @@ async function loadSdk(signal: AbortSignal): Promise<void> {
 }
 
 /** Explicit user action only. Browser callbacks never fulfill or grant usage. */
-export default function ClueraCheckoutClient({ enabled, offers = [] }: {
-  enabled: boolean; offers?: ClueraPublicRevision[];
+export default function ClueraCheckoutClient({ enabled, offers = [], historyEnabled = false }: {
+  enabled: boolean; offers?: ClueraPublicRevision[]; historyEnabled?: boolean;
 }) {
   const statusId = useId();
   const [catalog, setCatalog] = useState<ClueraPublicRevision[]>(offers);
@@ -288,10 +289,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [] }: {
     <div className={styles.safetyNote}><p><strong>Server verification protects your balance.</strong> Browser callbacks never grant time. Recurring Test setup is not production acceptance. Payment-method availability must be verified; no high-value UPI mandate is promised. Stripe and customer BYOK are unavailable.</p></div>
     <section className={styles.history} aria-label="Preserved server-confirmed history">
       <h3>Preserved server-confirmed history</h3>
-      <p>Existing Account and Paddle financial history remains intact. Old drafts are not resumed, canceled or retried here.</p>
+      <p>This clean Cluera project shows only its current server snapshot. Earlier Account and Paddle database history was not imported; provider-side obligations remain subject to independent reconciliation. Old drafts are not resumed, canceled or retried here.</p>
       {credits?.payments.length ? <ul>{credits.payments.map((payment, index) => <li key={`${payment.createdAt}:${index}`}>
         <span>{payment.offerCode}</span><span className={styles.badge}>{payment.state}</span><time dateTime={payment.createdAt}>{payment.createdAt}</time>
       </li>)}</ul> : <p>No historical entries are displayed in this snapshot.</p>}
     </section>
+    <ClueraBillingHistory accountId={credits?.userId??null} enabled={historyEnabled} disabled={busy}/>
   </section>;
 }

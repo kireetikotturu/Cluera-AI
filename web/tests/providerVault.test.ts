@@ -52,6 +52,40 @@ describe('encrypted Cluera provider vault',()=>{
   const request=vi.fn(async()=>new Response('x'.repeat(256001)));expect((await discoverModels('gemini',secret,request)).status).toBe('UNAVAILABLE');expect(request).toHaveBeenCalledOnce();
   expect(await discoverModels('gemini',secret,async()=>{throw Error(secret);})).toEqual({status:'UNAVAILABLE',models:[],complete:false});
  });
+ it.each(['request','body'] as const)('discovery keeps the existing7s total bound even when %s and cancellation ignore abort',async failure=>{
+  vi.useFakeTimers();
+  try{
+   const never=()=>new Promise<never>(()=>{}),cancel=vi.fn(never);
+   const request=vi.fn((_url:string,_init?:RequestInit):Promise<Response>=>failure==='request'?never():Promise.resolve(new Response(
+    new ReadableStream<Uint8Array>({pull:never,cancel}),{headers:{'Content-Type':'application/json'}})));
+   let finished=false;const pending=discoverModels('gemini',secret,request).then(result=>{finished=true;return result;});
+   await vi.advanceTimersByTimeAsync(6999);expect(finished).toBe(false);
+   await vi.advanceTimersByTimeAsync(1);expect(finished).toBe(true);
+   expect(await pending).toEqual({status:'UNAVAILABLE',models:[],complete:false});
+   expect(request).toHaveBeenCalledOnce();expect(request.mock.calls[0][1]?.signal?.aborted).toBe(true);
+   if(failure==='body')expect(cancel).toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
+  }finally{vi.useRealTimers();}
+ });
+ it.each([401,403,503])('a non-settling rejection-body cancel cannot hang discovery (%s)',async status=>{
+  vi.useFakeTimers();
+  try{
+   const cancel=vi.fn(()=>new Promise<void>(()=>{}));
+   const request=vi.fn(async(_url:string,_init?:RequestInit)=>new Response(new ReadableStream<Uint8Array>({start(){},cancel}),{status}));
+   let finished=false;const pending=discoverModels('gemini',secret,request).then(result=>{finished=true;return result;});
+   await vi.advanceTimersByTimeAsync(0);expect(finished).toBe(true);
+   expect(await pending).toEqual({status:status===503?'UNAVAILABLE':'REJECTED',models:[],complete:false});
+   expect(cancel).toHaveBeenCalledOnce();expect(request).toHaveBeenCalledOnce();expect(request.mock.calls[0][1]?.signal?.aborted).toBe(true);
+   expect(vi.getTimerCount()).toBe(0);
+  }finally{vi.useRealTimers();}
+ });
+ it('successful discovery still preserves metadata/model semantics and releases its timer',async()=>{
+  vi.useFakeTimers();
+  try{
+   const request=vi.fn(async(_url:string,_init?:RequestInit)=>Response.json({models:[{name:'models/gemini-3.5-flash',supportedGenerationMethods:['generateContent']}]}));
+   expect(await discoverModels('gemini',secret,request)).toEqual({status:'VERIFIED',models:[{id:'gemini-3.5-flash',runtimeCompatible:true}],complete:true});
+   expect(request).toHaveBeenCalledOnce();expect(request.mock.calls[0][1]?.signal?.aborted).toBe(true);expect(vi.getTimerCount()).toBe(0);
+  }finally{vi.useRealTimers();}
+ });
  it('deduplicates cipher reads, expires cache, fails closed on disable/outage and cannot switch providers',async()=>{
   let now=0,enabled=true,failing=false;
   const sealed=vaultKeyring(env).seal(secret,binding);

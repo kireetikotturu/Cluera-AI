@@ -5,6 +5,7 @@ import type { PaymentRpc } from '../core/types';
 import { billingRpc, clueraIntakeEnabled, merchantDigest } from './config';
 import { readClueraRawBody } from './events';
 import { reconcileClueraPayment } from './reconciliation';
+import { beginClueraReconciliationObservation } from './reconciliationObservation';
 
 export const CLUERA_WORKER_URL = 'https://cluera-ai-staging.vercel.app/api/internal/billing/cluera/tick';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -52,7 +53,11 @@ export async function handleClueraBillingTick(request: Request, env = process.en
     });
     if (state === 'REPLAY' || state === 'INVALID') return json({ error: 'Unauthorized.' }, 401);
     if (state !== 'CLAIMED') return json({ error: 'Worker unavailable.' }, 503);
-    await (deps.reconcile ?? reconcileClueraPayment)(rpc, env);
+    // Observe only a durably admitted reconciliation; never infer granted time
+    // from the HTTP acknowledgement or an idempotent VERIFIED result.
+    const observe = beginClueraReconciliationObservation();
+    try { observe(await (deps.reconcile ?? reconcileClueraPayment)(rpc, env)); }
+    catch { observe('UNAVAILABLE'); throw new Error('Worker unavailable.'); }
     return json({ processed: true });
   } catch { return json({ error: 'Worker unavailable.' }, 503); }
 }

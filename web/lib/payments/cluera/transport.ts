@@ -27,6 +27,12 @@ export function clueraRazorpayTransport(env = process.env, request: typeof fetch
         bytes += value.byteLength; if (bytes > 256 * 1024) throw new ClueraBillingError('UNAVAILABLE'); chunks.push(value); }
       return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
     } catch (error) { throw error instanceof ClueraBillingError ? error : new ClueraBillingError('UNAVAILABLE'); }
-    finally { clearTimeout(timer!); await reader?.cancel().catch(() => undefined); reader?.releaseLock(); }
+    finally {
+      clearTimeout(timer!); controller.abort();
+      // An upstream stream may never settle cancellation. Preserve the fixed
+      // request/lease bounds without waiting for cancellation or leaking it.
+      void reader?.cancel().catch(() => undefined);
+      try { reader?.releaseLock(); } catch { /* A pending read must not mask the fixed result. */ }
+    }
   };
 }
