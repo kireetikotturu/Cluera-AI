@@ -173,7 +173,56 @@ async function audit(input=process.env,request=fetch,options={},monotonic=()=>pe
  // Empty complete Test collections do NOT clear Live/Paddle, ownership or grants.
  return finish('READ_ONLY_INVENTORY_COMPLETE');
 }
-module.exports={audit};
+// Connector-safe structural validation, not authentication of an external report.
+function serializeReport(report){
+ const refuse=()=>{throw Error('Safe obligations report logging refused.');};
+ const record=(value,schema)=>{
+  if(!object(value)||![null,Object.prototype].includes(Object.getPrototypeOf(value)))return refuse();
+  const d=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(d),expected=Object.keys(schema);
+  if(keys.some(key=>typeof key!=='string')||keys.length!==expected.length||expected.some(key=>!Object.hasOwn(d,key))
+   ||Object.values(d).some(item=>!Object.hasOwn(item,'value')))return refuse();
+  const output=Object.create(null);for(const key of expected)output[key]=schema[key](d[key].value);return output;
+ };
+ const fixed=expected=>value=>value===expected?expected:refuse(),boolean=value=>typeof value==='boolean'?value:refuse();
+ const count=maximum=>value=>integer(value)&&value<=maximum?value:refuse(),total=value=>value===null||integer(value)?value:refuse();
+ const choice=values=>value=>typeof value==='string'&&values.includes(value)?value:refuse();
+ const warnings=allowed=>value=>{
+  if(!Array.isArray(value)||Object.getPrototypeOf(value)!==Array.prototype)return refuse();
+  const d=Object.getOwnPropertyDescriptors(value),size=d.length?.value;
+  if(!integer(size)||size>allowed.length||Reflect.ownKeys(d).length!==size+1)return refuse();
+  const output=[];for(let index=0;index<size;index++){const item=d[String(index)];
+   if(!item||!Object.hasOwn(item,'value')||typeof item.value!=='string'||!allowed.includes(item.value)||output.includes(item.value))return refuse();
+   output.push(item.value);}
+  return Object.setPrototypeOf(output,null);
+ };
+ const timestamp=value=>{if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+  ||!Number.isFinite(Date.parse(value))||new Date(value).toISOString()!==value)return refuse();return value;};
+ const template=base(),schema=Object.create(null);
+ for(const key of ['component','scope','mutations','atomicSnapshot','limitation','financialClearance','obligationsUnresolved',
+  'liveReviewed','paddleReviewed','databaseCompared','signedDeliveryVerified','activationAuthorized','fullTreeAttested','externalDeploymentVerificationRequired'])schema[key]=fixed(template[key]);
+ schema.requests=count(53);schema.financialRequests=count(40);schema.completeInventory=boolean;schema.needsReview=boolean;
+ schema.warnings=warnings(['DEADLINE']);
+ schema.limits=value=>record(value,Object.fromEntries(Object.entries(template.limits).map(([key,value])=>[key,fixed(value)])));
+ schema.merchant=value=>record(value,{configurationAccepted:boolean,testAuthentication:boolean,listingComplete:boolean,verified:boolean,
+  newDestinationState:choice(['UNVERIFIED','MISSING','AMBIGUOUS','MATCHED_TEST_MERCHANT','IDENTITY_REVIEW','DIRECT_UNAVAILABLE','DIRECT_IDENTITY_REVIEW'])});
+ schema.collections=value=>record(value,Object.fromEntries(Object.keys(COLLECTIONS).map(name=>[name,value=>{
+  const amounts={unit:fixed('minor-units'),currency:fixed('INR'),knownAmount:total,
+   ...(name==='orders'?{knownPaid:total}:name==='payments'?{knownRefunded:total}:{}),complete:boolean};
+  return record(value,{complete:boolean,pages:count(10),records:count(1000),invalidRecords:count(1000),duplicateIds:count(1000),
+   statuses:value=>record(value,Object.fromEntries([...COLLECTIONS[name].statuses,'unknown'].map(status=>[status,count(1000)]))),
+   currency:name==='subscriptions'?fixed(null):value=>record(value,{INR:count(1000),other:count(1000),unknown:count(1000)}),
+   amounts:name==='subscriptions'?fixed(null):value=>record(value,amounts),warnings:warnings(WARNINGS)});
+ }])));
+ schema.stopped=choice(['CONFIGURATION','MERCHANT_REVIEW_REQUIRED','READ_ONLY_INVENTORY_COMPLETE','INVENTORY_DEADLINE']);schema.completedAt=timestamp;
+ const safe=record(report,schema),header=Object.create(null);for(const key of Object.keys(safe))if(key!=='collections')header[key]=safe[key];
+ const lines=['CLUERA_TEST_OBLIGATIONS_HEADER '+JSON.stringify(header)];
+ for(const name of Object.keys(COLLECTIONS)){const item=Object.create(null);item.collection=name;item.report=safe.collections[name];
+  lines.push('CLUERA_TEST_OBLIGATIONS_COLLECTION '+JSON.stringify(item));}
+ const complete=Object.create(null);complete.stopped=safe.stopped;complete.completedAt=safe.completedAt;
+ lines.push('CLUERA_TEST_OBLIGATIONS_COMPLETE '+JSON.stringify(complete));
+ if(lines.some(line=>line.length>1900||Buffer.byteLength(line)>1900||/[\r\n]/.test(line)))return refuse();return lines;
+}
+module.exports={audit,serializeReport};
 if(require.main===module){const args=process.argv.slice(2),options=args.length===1?{expectedSourceSha:args[0]}:{};
- audit(process.env,fetch,options).then(report=>{console.log('CLUERA_TEST_OBLIGATIONS '+JSON.stringify(report));process.exitCode=2;})
- .catch(()=>{console.log('CLUERA_TEST_OBLIGATIONS '+JSON.stringify({component:'cluera-test-obligations-get-only',stopped:'UNAVAILABLE',completeInventory:false,needsReview:true,mutations:0}));process.exitCode=2;});}
+ audit(process.env,fetch,options).then(report=>{for(const line of serializeReport(report))console.log(line);process.exitCode=2;})
+ .catch(()=>{console.log('CLUERA_TEST_OBLIGATIONS_COMPLETE {"stopped":"UNAVAILABLE","completeInventory":false,"needsReview":true,"mutations":0}');process.exitCode=2;});}

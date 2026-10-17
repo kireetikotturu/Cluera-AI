@@ -2,7 +2,7 @@ import {afterEach,beforeEach,test,vi} from 'vitest';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
-const {audit}=require('../../scripts/payments/audit-cluera-test-obligations.cjs');
+const {audit,serializeReport}=require('../../scripts/payments/audit-cluera-test-obligations.cjs');
 const sha='a'.repeat(40),options={expectedSourceSha:sha};
 const env={VERCEL_ENV:'production',VERCEL_TARGET_ENV:'production',VERCEL_PROJECT_ID:'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',
  VERCEL_ORG_ID:'team_AksnPXhi2VBXI5UsY2xBIakc',VERCEL_GIT_COMMIT_SHA:sha,SIGMAROUND_ACCOUNTS_ENABLED:'true',
@@ -233,4 +233,55 @@ test('cross-currency linkage cannot silently reconcile or leak currency/identiti
  const r=await audit(env,fetcher(name=>Response.json(collection(rows[name]))).request,options);
  assert.ok(r.collections.payments.warnings.includes('CROSS_CURRENCY'));assert.ok(r.collections.refunds.warnings.includes('CROSS_CURRENCY'));
  assert.ok(!JSON.stringify(r).includes('USD'));assert.equal(r.needsReview,true);
+});
+
+test('safe log framing preserves the full aggregate report in six deterministic lines below the connector limit',async()=>{
+ const rows:any={orders:[order()],payments:[payment()],refunds:[],subscriptions:[subscription()]};
+ const report=await audit(env,fetcher(name=>Response.json(collection(rows[name]))).request,options),before=JSON.stringify(report);
+ const lines=serializeReport(report);assert.equal(lines.length,6);assert.deepEqual(serializeReport(report),lines);
+ assert.ok(lines[0].startsWith('CLUERA_TEST_OBLIGATIONS_HEADER '));
+ const rebuilt=JSON.parse(lines[0].slice('CLUERA_TEST_OBLIGATIONS_HEADER '.length));rebuilt.collections={};
+ for(let index=1;index<=4;index++){
+  const value=JSON.parse(lines[index].slice('CLUERA_TEST_OBLIGATIONS_COLLECTION '.length));
+  assert.equal(value.collection,['orders','payments','refunds','subscriptions'][index-1]);rebuilt.collections[value.collection]=value.report;
+ }
+ assert.deepEqual(rebuilt,report);
+ assert.deepEqual(JSON.parse(lines[5].slice('CLUERA_TEST_OBLIGATIONS_COMPLETE '.length)),{stopped:report.stopped,completedAt:report.completedAt});
+ for(const line of lines){assert.ok(line.length<=1900);assert.ok(Buffer.byteLength(line)<=1900);assert.ok(!/[\r\n]/.test(line));}
+ assert.equal(JSON.stringify(report),before);
+ for(const row of Object.values(rows).flat() as any[])assert.ok(!lines.join('').includes(row.id));
+});
+
+test('all allowed warning categories and maximum safe numeric aggregates still fit the fixed log framing',async()=>{
+ const report=await audit(env,fetcher().request,options);
+ const warnings=['NONEMPTY_HISTORY','UNKNOWN_STATUS','INVALID_RECORD','INVALID_AMOUNT','NON_INR_CURRENCY','UNKNOWN_CURRENCY',
+  'INCONSISTENT_ORDER','INCONSISTENT_REFUND','INCONSISTENT_CAPTURE','INCONSISTENT_CYCLES','AMOUNT_OVERFLOW','DUPLICATE_ID',
+  'COLLECTION_SHAPE','PAGE_CAP','HTTP_AUTH','HTTP_RATE_LIMIT','HTTP_UNAVAILABLE','REDIRECT','CONTENT_TYPE','BODY_BOUND',
+  'MALFORMED_BODY','DEADLINE','NETWORK','MISSING_ORDER_REFERENCE','MISSING_PAYMENT_REFERENCE','CROSS_CURRENCY',
+  'ORDER_PAYMENT_TOTAL_REVIEW','REFUND_TOTAL_REVIEW','SUBSCRIPTION_AMOUNT_UNAVAILABLE'];
+ report.warnings=['DEADLINE'];report.completeInventory=false;report.needsReview=true;report.stopped='INVENTORY_DEADLINE';
+ for(const value of Object.values(report.collections) as any[]){
+  value.warnings=warnings;value.pages=10;value.records=1000;value.invalidRecords=1000;value.duplicateIds=1000;
+  for(const status of Object.keys(value.statuses))value.statuses[status]=1000;
+  if(value.currency)for(const key of Object.keys(value.currency))value.currency[key]=1000;
+  if(value.amounts)for(const key of ['knownAmount','knownPaid','knownRefunded'])if(key in value.amounts)value.amounts[key]=Number.MAX_SAFE_INTEGER;
+ }
+ const lines=serializeReport(report);for(const line of lines)assert.ok(Buffer.byteLength(line)<=1900);
+});
+
+test('unknown or tampered log fields, accessors and serialization hooks fail closed without reflecting data',async()=>{
+ const report=await audit(env,fetcher().request,options),secret='DO_NOT_LOG_PRIVATE_PROVIDER_OR_CREDENTIAL';
+ const changes=[(value:any)=>value.raw=secret,(value:any)=>value.component=secret,(value:any)=>value.liveReviewed=true,
+  (value:any)=>value.completedAt=secret,(value:any)=>value.collections.orders.statuses[secret]=1,
+  (value:any)=>value.collections.payments.warnings=[secret],(value:any)=>value.collections.orders.amounts.knownAmount=secret,
+  (value:any)=>value.merchant.newDestinationState=secret,(value:any)=>value.financialClearance='GRANTED'];
+ for(const change of changes){const value=structuredClone(report);change(value);assert.throws(()=>serializeReport(value),{message:'Safe obligations report logging refused.'});}
+ let called=0;const getter=structuredClone(report);Object.defineProperty(getter,'requests',{get(){called++;return 6;}});
+ assert.throws(()=>serializeReport(getter));assert.equal(called,0);
+ const hook=structuredClone(report);Object.defineProperty(hook,'toJSON',{value(){called++;return secret;}});
+ assert.throws(()=>serializeReport(hook));assert.equal(called,0);
+ const inherited=Object.assign(Object.create({toJSON(){called++;return secret;}}),report);
+ assert.throws(()=>serializeReport(inherited));assert.equal(called,0);
+ const array=structuredClone(report);Object.defineProperty(array.collections.orders.warnings,'0',{get(){called++;return secret;}});
+ assert.throws(()=>serializeReport(array));assert.equal(called,0);
 });
