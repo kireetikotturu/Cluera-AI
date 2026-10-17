@@ -18,7 +18,9 @@ describe('disabled staging checkout landing page',()=>{
     for(const name of ['PADDLE_ENVIRONMENT','SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF','RAZORPAY_ENVIRONMENT','RAZORPAY_TEST_KEY_ID','NEXT_PUBLIC_PADDLE_CLIENT_TOKEN'])vi.stubEnv(name,'');
     vi.mocked(readAccountCatalog).mockResolvedValue(sandboxOffers.map((offer,priority)=>({...offer,enabled:true,priority})));
     const html=renderToStaticMarkup(await CheckoutPage());expect(html).toContain('Test payments are paused');
-    expect((html.match(/<button[^>]*disabled[^>]*>Checkout unavailable<\/button>/g)||[])).toHaveLength(4);expect((html.match(/disabled=""/g)||[])).toHaveLength(4);
+    expect((html.match(/<button[^>]*disabled[^>]*>Checkout unavailable<\/button>/g)||[])).toHaveLength(4);
+    expect((html.match(/<button[^>]*disabled[^>]*>Refresh billing history<\/button>/g)||[])).toHaveLength(1);
+    expect((html.match(/disabled=""/g)||[])).toHaveLength(5);
     expect(html).not.toMatch(/<script|<iframe|<form/);expect(html).toContain('Recurring offers and Stripe are unavailable');
     expect(html).toContain('not active catalog offers');expect(html).toContain('100 hours per month');
     expect(readAccountCatalog).not.toHaveBeenCalled();
