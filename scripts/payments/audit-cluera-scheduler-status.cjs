@@ -26,6 +26,15 @@ function validOptions(value){
  return Reflect.ownKeys(d).length===1&&Object.hasOwn(d,'expectedSourceSha')&&Object.hasOwn(d.expectedSourceSha,'value')
   &&typeof d.expectedSourceSha.value==='string'&&/^[a-f0-9]{40}$/.test(d.expectedSourceSha.value);
 }
+function activeOptions(value){
+ if(!value||typeof value!=='object'||![null,Object.prototype].includes(Object.getPrototypeOf(value)))return null;
+ const d=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(d);
+ if(keys.length!==2||!Object.hasOwn(d,'expectedSourceSha')||!Object.hasOwn(d,'expectedRelayEnabled')
+  ||!Object.hasOwn(d.expectedSourceSha,'value')||!Object.hasOwn(d.expectedRelayEnabled,'value')
+  ||typeof d.expectedSourceSha.value!=='string'||!/^[a-f0-9]{40}$/.test(d.expectedSourceSha.value)
+  ||typeof d.expectedRelayEnabled.value!=='boolean')return null;
+ return {expectedSourceSha:d.expectedSourceSha.value,expectedRelayEnabled:d.expectedRelayEnabled.value};
+}
 function environment(value){
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('CONFIGURATION');
  const safe=Object.create(null);
@@ -38,8 +47,12 @@ function base(){return {component:'cluera-scheduler-status-only',activationAutho
  requests:0,dispatchRequests:0,wakeRequests:0,databaseRequests:0,providerRequests:0,mutations:0,
  fullTreeAttested:false,externalDeploymentVerificationRequired:true,deploymentContext:'external-deployment-pin-required'};}
 // Expected SHA remains an external pin, never full-tree self-attestation.
-async function audit(input=process.env,request=fetch,options={},monotonic=()=>performance.now(),wall=()=>Date.now()){
- const report=base(),finish=stopped=>({...report,stopped,completedAt:new Date().toISOString()});
+async function inspect(input,request,options,monotonic,wall,expectedRelayEnabled=null){
+ const active=expectedRelayEnabled!==null;
+ // processingEnabled is the legacy diagnostic-action field: this tool never
+ // turns on or invokes processing. observedRelayEnabled is the live flag.
+ const report={...base(),...(active?{mode:'ACTIVE_METADATA_ONLY',expectedRelayEnabled,observedRelayEnabled:null,diagnosticProcessingInvoked:false}:{})};
+ const finish=stopped=>({...report,stopped,completedAt:new Date().toISOString()});
  let env,actual,key;
  try{
   if(!validOptions(options)||typeof request!=='function'||typeof monotonic!=='function'||typeof wall!=='function')return finish('CONFIGURATION');
@@ -47,10 +60,11 @@ async function audit(input=process.env,request=fetch,options={},monotonic=()=>pe
   const context=[[env.VERCEL_PROJECT_ID,PROJECT],[env.VERCEL_ORG_ID,TEAM],[env.VERCEL_GIT_COMMIT_SHA,options.expectedSourceSha]];
   if(context.some(([value,expected])=>value!==undefined&&value!==expected))return finish('CONFIGURATION');
   report.deploymentContext=context.every(([value])=>value!==undefined)?'available-system-values-match':'external-deployment-pin-required';
+  const flagsMatch=FLAGS.every(flag=>env[flag]===(active&&['CLUERA_BILLING_V2_ENABLED','CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED'].includes(flag)?'true':'false'));
   if(env.VERCEL_ENV!=='production'||env.VERCEL_TARGET_ENV!==undefined&&env.VERCEL_TARGET_ENV!=='production'
-   ||!FLAGS.every(flag=>env[flag]==='false')||env.CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED!=='false'
+   ||!flagsMatch||env.CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED!==(active?'true':'false')
    ||env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED!=='true'||env.CLUERA_PROVIDER_VAULT_ENABLED!=='false'
-   ||env.CLUERA_PROVIDER_VAULT_KEYRING_BASE64||env.CLUERA_AI_BOOTSTRAP_MODE!==undefined&&env.CLUERA_AI_BOOTSTRAP_MODE!=='auth-only')return finish('CONFIGURATION');
+   ||env.CLUERA_PROVIDER_VAULT_KEYRING_BASE64||(active?env.CLUERA_AI_BOOTSTRAP_MODE!=='auth-only':env.CLUERA_AI_BOOTSTRAP_MODE!==undefined&&env.CLUERA_AI_BOOTSTRAP_MODE!=='auth-only'))return finish('CONFIGURATION');
   actual=loadApplication();report.actualProtocolLoaded=true;
   if(actual.RELAY_STATUS_URL!==STATUS||!actual.schedulerTargetMatches(env)||!(key=actual.schedulerSecret(env)))return finish('CONFIGURATION');
   report.configurationAccepted=true;
@@ -78,17 +92,32 @@ async function audit(input=process.env,request=fetch,options={},monotonic=()=>pe
    if(!value||typeof value!=='object'||Array.isArray(value))throw Error('SHAPE');
    const keys=Object.keys(value).sort().join(',');
    if(corrupt){if(keys!=='error'||value.error!=='Unauthorized.')throw Error('SHAPE');}
-   else if(keys!=='configured,enabled'||value.configured!==true||value.enabled!==false)throw Error('SHAPE');
+   else{
+    if(keys!=='configured,enabled'||value.configured!==true||typeof value.enabled!=='boolean')throw Error('SHAPE');
+    if(active)report.observedRelayEnabled=value.enabled;
+    if(value.enabled!==(active?expectedRelayEnabled:false))throw Error('SHAPE');
+   }
   }finally{clearTimeout(timer);controller.abort();void reader?.cancel().catch(()=>{});try{reader?.releaseLock();}catch{/* Never await cancellation. */}}
  }
  let stage='BAD_PROOF';
  try{
   await status(true);report.badProofRejected=true;stage='SIGNED_STATUS';
-  await status(false);report.sharedSecretMatched=true;report.relayDisabled=true;
-  return finish('STATUS_VERIFIED_PROCESSING_DISABLED');
+  await status(false);report.sharedSecretMatched=true;report.relayDisabled=active?!expectedRelayEnabled:true;
+  return finish(active?(expectedRelayEnabled?'ACTIVE_STATUS_VERIFIED_RELAY_ENABLED':'ACTIVE_STATUS_VERIFIED_RELAY_DISABLED'):'STATUS_VERIFIED_PROCESSING_DISABLED');
  }catch{return finish(stage+'_UNAVAILABLE');}
 }
-module.exports={audit};
+async function audit(input=process.env,request=fetch,options={},monotonic=()=>performance.now(),wall=()=>Date.now()){
+ // Extra arguments cannot switch the original OFF-only authorization policy.
+ return inspect(input,request,options,monotonic,wall,null);
+}
+async function auditActiveStatus(input=process.env,request=fetch,options={},monotonic=()=>performance.now(),wall=()=>Date.now()){
+ try{
+  const selected=activeOptions(options);
+  if(selected)return inspect(input,request,{expectedSourceSha:selected.expectedSourceSha},monotonic,wall,selected.expectedRelayEnabled);
+ }catch{/* Never evaluate or reflect malformed option properties. */}
+ return {...base(),mode:'ACTIVE_METADATA_ONLY',expectedRelayEnabled:null,observedRelayEnabled:null,diagnosticProcessingInvoked:false,stopped:'CONFIGURATION',completedAt:new Date().toISOString()};
+}
+module.exports={audit,auditActiveStatus};
 if(require.main===module){const args=process.argv.slice(2),options=args.length===1?{expectedSourceSha:args[0]}:{};
  audit(process.env,fetch,options).then(value=>{console.log('CLUERA_SCHEDULER_STATUS '+JSON.stringify(value));process.exitCode=1;})
  .catch(()=>{console.log('CLUERA_SCHEDULER_STATUS '+JSON.stringify({stopped:'UNAVAILABLE',activationAuthorized:false,requests:0,mutations:0}));process.exitCode=1;});}

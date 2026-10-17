@@ -72,7 +72,7 @@ export function BillingCatalog({ disabled = false }: { disabled?: boolean }) {
   const applyRevision = (row: ClueraPublicRevision) => {
     operation.current = null; setPending(false);
     setCatalog(previous => [...previous.filter(item => item.offerCode !== row.offerCode), row]);
-    setAvailable(true); setMessage('Audited change confirmed. A new revision remains disabled; enabling a catalog entry does not activate checkout or migrate the webhook/scheduler.');
+    setAvailable(true); setMessage(`Audited change confirmed. The current catalog revision is ${row.enabled ? 'enabled' : 'disabled'}. Catalog availability does not activate checkout or change webhook/scheduler ownership.`);
   };
   const submit = (row: ClueraPublicRevision, form: HTMLFormElement) => {
     if (disabledRef.current || running.current || operation.current || !available || !factors.length) return;

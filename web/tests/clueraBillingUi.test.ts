@@ -300,7 +300,7 @@ it('Admin creates a disabled immutable future revision with exact paise/time, cl
     expectedRevisionId: catalog[0].revisionId, factorId, code: '123456', operationId: expect.any(String),
     input: { amountPaise: 59950, allowanceSeconds: 10800, razorpayPlanId: null, totalCount: null } });
   expect((form.elements.namedItem('code') as HTMLInputElement).value).toBe('');
-  expect(host.textContent).toContain('Revision 2'); expect(host.textContent).toContain('new revision remains disabled');
+  expect(host.textContent).toContain('Revision 2'); expect(host.textContent).toContain('current catalog revision is disabled');
 });
 
 it('Admin unknown outcome stays locked through refresh and is verified by GET, never retransmitted', async () => {
@@ -332,6 +332,43 @@ it('Admin catalog availability sends only the intended SET_ENABLED action and do
   (form.elements.namedItem('enabled') as HTMLInputElement).checked = false;
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   expect(JSON.parse(request.mock.calls.find(([, init]) => init?.method === 'POST')![1]!.body as string)).toMatchObject({ action: 'SET_ENABLED', input: { enabled: false } });
+});
+
+it.each([true, false])('catalog confirmation reports audited availability %s without implying checkout or worker activation', async enabled => {
+  const changed = { ...catalog[0], enabled };
+  const request = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => init?.method === 'POST'
+    ? Response.json({ code: 'APPLIED', revision: changed }) : adminGet(url));
+  vi.stubGlobal('fetch', request); await readyAdmin(); const form = fillAdminForm();
+  (form.elements.namedItem('action') as HTMLSelectElement).value = 'SET_ENABLED';
+  (form.elements.namedItem('enabled') as HTMLInputElement).checked = enabled;
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  const statusMessage = host.querySelector('[role="status"]')!.textContent;
+  expect(statusMessage).toContain(`current catalog revision is ${enabled ? 'enabled' : 'disabled'}`);
+  expect(statusMessage).toContain('does not activate checkout or change webhook/scheduler ownership');
+  const changedCard = [...host.querySelectorAll('article')].find(card => card.querySelector('h3')?.textContent === catalog[0].name)!;
+  expect(changedCard.querySelector('header')!.textContent).toContain(enabled ? 'Catalog enabled' : 'Catalog disabled');
+  const writes = request.mock.calls.filter(([, init]) => init?.method === 'POST'); expect(writes).toHaveLength(1);
+  expect(JSON.parse(writes[0][1]!.body as string)).toMatchObject({ action: 'SET_ENABLED', expectedRevisionId: catalog[0].revisionId,
+    factorId, code: '123456', input: { enabled } });
+  expect((form.elements.namedItem('code') as HTMLInputElement).value).toBe('');
+  expect(request.mock.calls.every(([url]) => String(url).startsWith('/api/account/payments/cluera/admin'))).toBe(true);
+});
+
+it.each([true, false])('catalog confirmation uses original-operation read-back availability %s without another mutation', async enabled => {
+  const request = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => init?.method === 'POST'
+    ? Response.json({ error: 'Outcome unknown' }, { status: 503 }) : String(url).includes('operation=')
+      ? Response.json({ code: 'APPLIED', revision: { ...catalog[0], enabled } }) : adminGet(url));
+  vi.stubGlobal('fetch', request); await readyAdmin(); const form = fillAdminForm();
+  (form.elements.namedItem('action') as HTMLSelectElement).value = 'SET_ENABLED';
+  (form.elements.namedItem('enabled') as HTMLInputElement).checked = enabled;
+  await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(host.querySelector('fieldset')!.disabled).toBe(true);
+  await act(async () => button('Verify original billing change').click());
+  expect(host.querySelector('[role="status"]')!.textContent).toContain(`current catalog revision is ${enabled ? 'enabled' : 'disabled'}`);
+  expect(request.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+  const mutation = JSON.parse(request.mock.calls.find(([, init]) => init?.method === 'POST')![1]!.body as string);
+  const read = request.mock.calls.find(([url]) => String(url).includes('operation='))!;
+  expect(String(read[0])).toContain(`operation=${mutation.operationId}`); expect(read[1]?.method).toBeUndefined();
 });
 
 it('Admin rejects secret-bearing metadata instead of rendering it or enabling mutation', async () => {
