@@ -63,6 +63,28 @@ function loadKnownSecrets(root, env = process.env) {
       }
     } catch { throw Error('Clean private scan input unavailable.'); }
   }
+  // New scheduler material is one fixed ignored file, not a directory search.
+  // Reject unsafe paths/shape before adding its shared secret to scan memory.
+  const schedulerPrivate=path.join(root,'.local-secrets/cluera-billing-scheduler.private.json');
+  try {
+    let present=false;
+    try{fs.lstatSync(schedulerPrivate,{bigint:true});present=true;}catch(error){if(error.code!=='ENOENT')throw error;}
+    if(present){
+      const directory=fs.lstatSync(path.dirname(schedulerPrivate),{bigint:true}),before=fs.lstatSync(schedulerPrivate,{bigint:true});
+      if(!directory.isDirectory()||directory.isSymbolicLink()||!before.isFile()||before.isSymbolicLink()
+        ||before.nlink!==1n||before.size<1n||before.size>8192n)throw Error();
+      const descriptor=fs.openSync(schedulerPrivate,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));
+      try {
+        const opened=fs.fstatSync(descriptor,{bigint:true});
+        if(opened.dev!==before.dev||opened.ino!==before.ino||opened.size!==before.size||opened.nlink!==1n)throw Error();
+        const data=JSON.parse(fs.readFileSync(descriptor,'utf8'));
+        require('../payments/prepare-cluera-billing-scheduler-private.cjs').validate(data);
+        const after=fs.lstatSync(schedulerPrivate,{bigint:true});
+        if(after.isSymbolicLink()||after.nlink!==1n||after.dev!==opened.dev||after.ino!==opened.ino||after.size!==opened.size)throw Error();
+        add('SIGMAROUND_BILLING_WORKER_SECRET',data.web.SIGMAROUND_BILLING_WORKER_SECRET);
+      } finally {fs.closeSync(descriptor);}
+    }
+  } catch {throw Error('Cluera scheduler private scan input unavailable.');}
   const accountPrivate=path.join(root,'.local-secrets/cluera-release-private.pem');
   if(fs.existsSync(accountPrivate)){
     const pem=fs.readFileSync(accountPrivate,'utf8');

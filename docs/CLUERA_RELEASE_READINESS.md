@@ -1,5 +1,15 @@
 # Cluera release blockers
 
+## Current October17 - controlled Windows candidate; public release not yet accepted
+
+Canonical clean staging and modern web/relay DB authentication are verified; signup feedback/password8 repair is live. Clean-project Admin login/MFA and private Razorpay Test configuration are complete: do not repeat signup, role bootstrap, authenticator enrollment, SMTP, keys or Auth URLs. The latest accepted full CI desktop result remains366passed/1opt-in skipped; it is not a new installed-Windows test.
+
+Fresh read-only October17 checks reconfirm1.0.3 at121924027bytes/SHA-256 `d8e782a3cfa18ceb3e10f90940a403f3d0277e701953cc7db1644c17ac078a59`, productCluera AI/version1.0.3/NotSigned. The actual static package verifier again passes2276ASARentries, product identity, pinned public trust and hardened fuses. No application, installer or updater was executed. With the clean canonical backend READY, the old backend-readiness hold below is superseded for controlled owner installation acceptance, not for public/commercial approval.
+
+At12:01:30.673140UTC the clean registry has0release rows/0published releases; the vault has0providers/0enabled providers. Existing configured/no-approved-release404 evidence is dated separately; this static/read-only check does not claim a fresh hosted download test. A public Download button must not point to an unapproved arbitrary EXE. Distribution still needs immutable hosting, an independent hosted-byte hash/size check and deliberate private-MFA release approval. No upload or approval occurred here.
+
+Actual normal Windows installation/secure-store/login/restart/A-B isolation/high-DPI/AI/audio/shared balance/updater and signing remain acceptance gates. Google is last-observed unconfigured and providers remain auth-only; no full-function acceptance is inferred from CI/static package checks. A1.0.3 installation cannot prove an updater upgrade to the same1.0.3; use a separately reviewed genuinely newer candidate for that later test. See [execution status](CLUERA_EXECUTION_STATUS.md) for the single next action; do not follow historical setup instructions below. Commercial launch remains NO-GO.
+
 ## October 16 - clean-target Windows 1.0.3 prepared, not installed or released
 
 The owner chose a **clean Cluera-only setup** in `yhnqlfcgrmckhyjdxegg`, not an import of old dummy identities, trials, balances or sessions. The clean foundation/vault and complete fresh infrastructure tuple are tracked in [execution status](CLUERA_EXECUTION_STATUS.md). The earlier source-backup/import prerequisite is superseded for this clean setup; real provider/financial obligations remain separately gated. SigmaRoundAI License Edition and old services are not changed by this candidate.

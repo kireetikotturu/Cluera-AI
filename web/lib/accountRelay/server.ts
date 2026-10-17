@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import type {IncomingMessage,ServerResponse} from 'node:http';
 import { WebSocketServer } from 'ws';
 import type WebSocket from 'ws';
 import { MAX_FRAME_BYTES } from './protocol';
@@ -9,7 +10,7 @@ import {INFRASTRUCTURE_STATUS_PATH,infrastructureStatusResponse,verifyInfrastruc
 
 /** Persistent Node server, NOT a Next/Vercel function. TLS must terminate at the
  * private container ingress. No access logging of paths/headers/bodies/tokens. */
-export function createRelayServer(dependencies: Parameters<typeof attachRelaySession>[1],revision?:string,metadata?:RelayConfig,databaseCheck?:()=>Promise<boolean>) {
+export function createRelayServer(dependencies: Parameters<typeof attachRelaySession>[1]&{internalRequest?:(request:IncomingMessage,response:ServerResponse)=>boolean},revision?:string,metadata?:RelayConfig,databaseCheck?:()=>Promise<boolean>) {
   let statusAttempts=0,statusWindow=performance.now();
   let infrastructureAttempts=0,infrastructureWindow=performance.now(),infrastructureBusy=false;
   const infrastructureNonces=new Map<string,number>();
@@ -17,6 +18,7 @@ export function createRelayServer(dependencies: Parameters<typeof attachRelaySes
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Content-Type', 'application/json');
+    if(dependencies.internalRequest?.(request,response))return;
     if(metadata&&databaseCheck&&request.url===INFRASTRUCTURE_STATUS_PATH){
       const now=Date.now(),elapsed=performance.now();
       if(elapsed-infrastructureWindow>=60000){infrastructureWindow=elapsed;infrastructureAttempts=0;}

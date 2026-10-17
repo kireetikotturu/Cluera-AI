@@ -1,5 +1,15 @@
 # Cluera Admin AI provider vault — staged implementation
 
+## Current October17 - clean schema applied; Admin MFA accepted; vault still off
+
+Only **yhnqlfcgrmckhyjdxegg** is current. The unchanged vault schema was applied as20261016015041 after clean foundation20261016014532; old-project schema/credential/Support prerequisites below are historical and superseded. New modern web/relay keys and Auth configuration are already verified. Owner protected Admin access is now accepted, independently supported by verifiedTOTP1/liveAAL2session1/protectedAdmin=true at02:06:24.451327UTC. Never repeat registration, role bootstrap or enrollment merely for this feature.
+
+Fresh12:01:30.673140UTC read confirms provider rows0/enabled0 in the clean project; vault=false and relay auth-only remain the accepted configuration. Dedicated KEK custody/keyring/recovery, synthetic server envelope round-trip, reviewed vault-mode activation and real metered Gemini/Deepgram acceptance remain unfinished; no dummy/env fallback/automatic import is allowed. Clean-project Admin/MFA and Razorpay Test private saving are already complete. Do not repeat them or enter provider keys yet. [Execution status](CLUERA_EXECUTION_STATUS.md) owns the single next action.
+
+The reviewed runtime uses server-only AES-256-GCM envelopes, fresh-MFA write operations, metadata-only discovery and bounded revision/cache checks. This is implementation evidence, not accepted hosted provider operation. A new dedicated32-byte KEK/keyring plus separately protected offline recovery escrow must be provisioned and synthetically verified before any deliberate vault-mode change. Never reuse Supabase, billing-worker, cookie/rate or release-signing material. No root key/provider credential was generated, imported, displayed or activated by this review. Billing scheduler transport work can proceed independently with all spending and provider START gates still disabled. Historical old-project/startup/schema instructions below are not current actions.
+
+## Historical October13 design and bootstrap proposal
+
 October 13, 2026. Cluera only. Source/test-covered, **not operational or production accepted**.
 
 ## Architecture and authority

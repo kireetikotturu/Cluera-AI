@@ -4,6 +4,8 @@ WORKDIR /app/backend
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY backend/main.ts backend/build.mjs backend/tsconfig.json ./
+COPY backend/billingTransport.ts ./
+COPY shared/billingDispatch.ts /app/shared/billingDispatch.ts
 COPY web/lib /app/web/lib
 COPY desktop/src/shared /app/desktop/src/shared
 RUN npm run typecheck && npm run build

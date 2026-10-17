@@ -45,7 +45,7 @@ export async function readClueraRawBody(request: Request, maximumBytes = 256 * 1
     return Buffer.concat(parts);
   } finally { clearTimeout(timer!); await reader.cancel().catch(() => undefined); reader.releaseLock(); }
 }
-export async function handleClueraWebhook(request: Request, env = process.env, rpc?: PaymentRpc) {
+export async function handleClueraWebhook(request: Request, env = process.env, rpc?: PaymentRpc, onStored?: () => void) {
   if (!clueraIntakeEnabled(env)) return json({error:'Not found.'},404);
   let event:BillingEvent|null;
   try {
@@ -62,6 +62,9 @@ export async function handleClueraWebhook(request: Request, env = process.env, r
     const state = await billingRpc(rpc ?? ((name,args) => service!.rpc(name,args)), 'cluera_billing_event_accept', {p_event:event,p_account_digest:merchantDigest(env)});
     if (state === 'CONFLICT') return json({error:'Webhook requires review.'},409);
     if (state !== 'STORED' && state !== 'DUPLICATE') throw new ClueraBillingError('UNAVAILABLE');
+    // Scheduling belongs to the platform route, not this reusable verifier.
+    // Failure to register a hint cannot undo an already durable receipt.
+    if (state === 'STORED' && onStored) { try { onStored(); } catch { /* Periodic catch-up remains responsible. */ } }
     return json({received:true});
   } catch { return json({error:'Webhook intake is unavailable.'},503); }
 }

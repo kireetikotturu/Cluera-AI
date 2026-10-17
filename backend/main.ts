@@ -3,23 +3,30 @@ import { authorizeRelay } from '../web/lib/accountRelay/authorization';
 import { approvedProviders } from '../web/lib/accountRelay/approvedProviders';
 import { createRelayServer } from '../web/lib/accountRelay/server';
 import { relayDatabaseAuthenticated } from '../web/lib/accountRelay/infrastructureCheck';
+import { createRenderBillingTransport } from './billingTransport';
 
 // Deliberately no dotenv/file discovery: inject rotated staging secrets at runtime.
 try {
   const config = relayConfig();
+  const billing = createRenderBillingTransport({database:config.database,site:config.site},process.env,{
+    observe:event=>console.info(JSON.stringify({component:'cluera-billing-dispatch',event})),
+  });
   const relay = createRelayServer({ authorize: token => authorizeRelay(token, config),
     providers: approvedProviders(config),
     observe: event => console.info(JSON.stringify({ component: 'account-relay', event })),
+    internalRequest:billing.handleRequest,
   },process.env.RENDER_GIT_COMMIT,config,()=>relayDatabaseAuthenticated(config));
   relay.server.on('error', () => { console.error('{"component":"account-relay","event":"listener_failed"}'); process.exitCode = 1; });
-  relay.server.listen(config.port, '0.0.0.0');
+  relay.server.listen(config.port, '0.0.0.0',()=>billing.start());
   let stopping = false;
   const shutdown = () => {
     if (stopping) return; stopping = true;
     // STOP RPCs have an 8s transport limit. Let them settle after sockets close;
     // crash/unknown results still expire through the 30s database reservation.
     const bound = setTimeout(() => process.exit(0), 10000); bound.unref();
-    void relay.stop().catch(() => { process.exitCode = 1; });
+    // Stop timer/abort dispatch synchronously before closing existing AI sessions.
+    const billingStopped=billing.stop();
+    void Promise.all([billingStopped,relay.stop()]).catch(() => { process.exitCode = 1; });
   };
   process.once('SIGTERM', shutdown); process.once('SIGINT', shutdown);
 } catch {

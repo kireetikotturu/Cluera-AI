@@ -1,5 +1,19 @@
 # Clean Cluera Auth, Admin, email and provider setup
 
+## Current October17 - clean Admin login and MFA accepted
+
+The owner reports protected workspace access; independent02:06:24.451327UTC metadata confirms verifiedTOTP1/liveAAL2session1/protectedAdmin=true and null-sessionfalse in **yhnqlfcgrmckhyjdxegg**. Do not repeat clean signup/role/enrollment, SMTP, keys or URLs. No private session/code was read; this is not full privileged-mutation, Google/recovery/Windows/provider acceptance.
+
+Cluera Razorpay Test private provisioning is also complete and authenticated Test merchant read-only evidence is recorded in [execution status](CLUERA_EXECUTION_STATUS.md). Do not repeat SMTP, signup template, minimum8, Auth URLs, key saving, role bootstrap or Admin/MFA. No new private Auth test is claimed by this update. Google remains last-observed disabled; recovery/header/delivery and installed-Windows acceptance remain distinct from the accepted Admin report.
+
+At12:01:30.673140UTC the clean vault has0providers/0enabled providers and the release registry0rows/0published. Vault stays off/auth-only; dedicated new encryption-key custody, offline recovery, synthetic envelope verification and reviewed activation still precede entering Gemini/Deepgram keys or spending. Scheduler engineering is independent of that bootstrap and does not authorize a provider/payment call. Use execution status for the single current owner action, not the completed enrollment/zero-factor instructions retained below.
+
+## Earlier October17 - exact role grant before owner MFA
+
+New keys/Auth URLs/SMTP/signup template saves and owner email verification are complete; do not repeat them. Exactly one support customer retains its original900-second trial. Following specific owner approval, one Admin profile+one truthful operator audit were atomically inserted and independently verified; no factor/session was imported or created. **Only next private step: first clean-project Admin authenticator enrollment**, with existing verified login if needed. [Exact UI action/current evidence](CLUERA_EXECUTION_STATUS.md).
+
+Signup/reset validation is8-128 across source; Supabase minimum8 is owner-confirmed. Password feedback and mail errors are deployed, without weakening confirmation/rate/MFA/leaked-password controls. Vault schema remains present but empty/off; KEK custody/bootstrap and metered Gemini/Deepgram acceptance are not complete. All payments disabled and AI auth-only; no provider/credit/payment action is implied by Admin role creation. Historical zero-user/configuration instructions below are superseded.
+
 October 16, 2026. **Clean destination only: yhnqlfcgrmckhyjdxegg / cluera-ai-production.** The owner explicitly chose a fresh start and does not require old Cluera users or dummy trial balances. This supersedes the earlier customer/Auth migration prerequisites in `CLUERA_AUTH_MIGRATION.md`; do not import old users, password hashes, identities, sessions, MFA factors, roles, trial rows or private credentials.
 
 This is not permission to reconcile or erase any real provider/payment obligation. Razorpay/Paddle ownership, pending provider state and financial cutover remain independently gated. SigmaRoundAI License Edition, old services and retained EXE files are not changed by this setup. A database named production does not establish production readiness.
@@ -59,6 +73,8 @@ Only then may the existing reviewed owner-authorized bootstrap workflow pin the 
 The owner then completes new-project authenticator enrollment/verification privately. This is a different trust domain, not a request to repeat the already accepted old-project setup. Do not ask for it before the clean identity exists. Current-session AAL2 plus live SQL authorization remains mandatory for the protected Admin workspace and sensitive mutations. Wrong/expired/revoked/AAL1 sessions remain denied. [MFA assurance](https://supabase.com/docs/guides/auth/auth-mfa/totp).
 
 ## Cluera email branding and SMTP
+
+**Current owner decision, October16:** no domain yet; use **clueraaisupport@gmail.com** as support and temporary low-volume verification sender, exact display **Cluera AI**. Dedicated App Password creation, private Gmail SMTP and **Confirm sign up** template saving are owner-confirmed complete; never request secrets or repeat those steps. Literal **{{ .ConfirmationURL }}** and all existing controls remain required. Clean canonical staging is verified; next is one private same-browser signup/verification, not another configuration step. [Exact handoff and stop conditions](CLUERA_TEMPORARY_GMAIL_SMTP.md). Actual SMTP authentication, From header and delivery still must pass; no normal Gmail password, protection downgrade, spoofing, automated send or mailbox access. Completed key/URL/old Admin steps are not repeated. Owned-domain mail remains a later production gate, not a block on safe temporary engineering.
 
 Use `emails/auth/manifest.json` and the six prepared HTML bodies/subjects **only on the new project**. The HTML retains provider-generated `ConfirmationURL`; reauthentication displays `Token` only in its body. It includes no tracking/remote images, hand-built token URLs or customer metadata interpolation. Support is **clueraaisupport@gmail.com**. Sender display is **Cluera AI**, but the verified sender address/domain is not invented.
 
