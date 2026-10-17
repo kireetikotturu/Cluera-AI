@@ -2,6 +2,7 @@
 // Protected-build GET diagnostic only: no DB/SDK/schema/settings/event/payment
 // write, local secret file, retry, URL override or website artifact/promotion.
 const path=require('node:path'),{createRequire,Module}=require('node:module');
+const {createHash}=require('node:crypto');
 const PROJECT='prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',TEAM='team_AksnPXhi2VBXI5UsY2xBIakc';
 const TARGETS=Object.freeze({oldAccount:'https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook',
  clueraLegacy:'https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook',
@@ -17,7 +18,7 @@ let application;
 function loadApplication(){
  if(application)return application;
  const web=path.resolve(__dirname,'../../web'),webRequire=createRequire(path.join(web,'package.json'));
- const output=webRequire('esbuild').buildSync({stdin:{contents:"export {assertPaymentStaging,razorpayConfig} from './lib/payments/core/config';export {eventTypes} from './lib/payments/cluera/contracts';",
+ const output=webRequire('esbuild').buildSync({stdin:{contents:"export {assertPaymentStaging,razorpayConfig} from './lib/payments/core/config';export {eventTypes} from './lib/payments/cluera/contracts';export {merchantDigest} from './lib/payments/cluera/config';",
    resolveDir:web,loader:'ts'},bundle:true,write:false,platform:'node',format:'cjs',logLevel:'silent'}).outputFiles[0].text;
  const filename=path.join(web,'cluera-test-readiness-memory.cjs'),loaded=new Module(filename,module);
  loaded.filename=filename;loaded.paths=Module._nodeModulePaths(web);loaded._compile(output,filename);
@@ -157,7 +158,67 @@ async function audit(input=process.env,request=fetch,options={},monotonic=()=>pe
   return finish('READ_ONLY_REVIEW_COMPLETE');
  }catch{return finish(stage+'_UNAVAILABLE');}
 }
-module.exports={audit};
+const PIN_PROJECT='yhnqlfcgrmckhyjdxegg';
+const PIN_FIELDS=Object.freeze(['projectRef','sourceCommit','observedAt','merchantDigest','reportDigest','testAuthentication',
+ 'merchantMatches','configuredDigestMatches','testModeVerified','requests','mutations','activationAuthorized','financialClearance']);
+function pinFailure(sourceCommit=null,observedAt=new Date().toISOString()){
+ return {projectRef:PIN_PROJECT,sourceCommit,observedAt,merchantDigest:null,reportDigest:null,testAuthentication:false,
+  merchantMatches:false,configuredDigestMatches:false,testModeVerified:false,requests:0,mutations:0,
+  activationAuthorized:false,financialClearance:'NOT_GRANTED'};
+}
+/** Private operator correlation metadata, not an authentication credential.
+ * Snapshot configuration so proof for one merchant cannot bind another digest. */
+async function auditMerchantPinEvidence(input=process.env,request=fetch,options={},monotonic=()=>performance.now()){
+ let report,sourceCommit=null;
+ try{
+  if(!optionsValid(options))return pinFailure();sourceCommit=options.expectedSourceSha;
+  // Drop only originally absent descriptors. Explicit undefined/accessor input
+  // is rejected by the first environment validation, never silently accepted.
+  const env=Object.freeze(Object.fromEntries(Object.entries(environment(input)).filter(([,value])=>value!==undefined)));
+  report=await audit(env,request,options,monotonic);
+  const failed=pinFailure(sourceCommit,report.completedAt);
+  failed.requests=Number.isSafeInteger(report.requests)&&report.requests>=0&&report.requests<=13?report.requests:0;
+  failed.testAuthentication=report.testAuthentication===true;
+  const destinations=Object.values(report.destinations);
+  const matching=destinations.filter(destination=>destination.count===1&&destination.state==='MATCHED_TEST_MERCHANT'
+   &&destination.listingConsistent===true&&identity(destination.listing)&&identity(destination.direct));
+  if(report.stopped!=='READ_ONLY_REVIEW_COMPLETE'||report.actualPaymentGuardLoaded!==true||report.configurationAccepted!==true
+   ||report.testAuthentication!==true||report.listing.complete!==true||report.merchantVerified!==true||report.mutations!==0
+   ||!matching.length||!destinations.every(destination=>destination.count===0?destination.state==='MISSING':matching.includes(destination)))return failed;
+  const digest=loadApplication().merchantDigest(env);
+  if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))return failed;
+  return {...failed,merchantDigest:digest,reportDigest:createHash('sha256').update(JSON.stringify(report)).digest('hex'),
+   merchantMatches:true,configuredDigestMatches:true,testModeVerified:true};
+ }catch{
+  const failed=pinFailure(sourceCommit);
+  if(report){failed.testAuthentication=report.testAuthentication===true;
+   failed.requests=Number.isSafeInteger(report.requests)&&report.requests>=0&&report.requests<=13?report.requests:0;}
+  return failed;
+ }
+}
+/** Dedicated bounded line: never raw provider bodies, credentials or arbitrary fields. */
+function merchantPinEvidenceLine(value){
+ let safe;
+ try{
+  if(!value||typeof value!=='object'||![null,Object.prototype].includes(Object.getPrototypeOf(value)))throw Error();
+  const descriptors=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(descriptors);
+  if(keys.some(key=>typeof key!=='string')||keys.sort().join(',')!==[...PIN_FIELDS].sort().join(',')
+   ||Object.values(descriptors).some(property=>!Object.hasOwn(property,'value')))throw Error();
+  safe=Object.create(null);for(const key of PIN_FIELDS)safe[key]=descriptors[key].value;
+  const hex=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
+  const instant=typeof safe.observedAt==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(safe.observedAt)
+   &&Number.isFinite(Date.parse(safe.observedAt))&&new Date(safe.observedAt).toISOString()===safe.observedAt;
+  const proved=safe.merchantMatches===true&&safe.configuredDigestMatches===true&&safe.testModeVerified===true&&safe.testAuthentication===true;
+  if(safe.projectRef!==PIN_PROJECT||!(safe.sourceCommit===null||typeof safe.sourceCommit==='string'&&/^[a-f0-9]{40}$/.test(safe.sourceCommit))
+   ||!instant||!['testAuthentication','merchantMatches','configuredDigestMatches','testModeVerified'].every(key=>typeof safe[key]==='boolean')
+   ||!Number.isSafeInteger(safe.requests)||safe.requests<0||safe.requests>13||safe.mutations!==0||safe.activationAuthorized!==false
+   ||safe.financialClearance!=='NOT_GRANTED'||(proved?!(hex(safe.merchantDigest)&&hex(safe.reportDigest)&&safe.sourceCommit&&safe.requests>=2)
+    :safe.merchantDigest!==null||safe.reportDigest!==null||safe.merchantMatches||safe.configuredDigestMatches||safe.testModeVerified))throw Error();
+ }catch{safe=pinFailure();}
+ const line='CLUERA_TEST_MERCHANT_PIN '+JSON.stringify(safe);
+ return Buffer.byteLength(line,'utf8')<=1200?line:'CLUERA_TEST_MERCHANT_PIN '+JSON.stringify(pinFailure());
+}
+module.exports={audit,auditMerchantPinEvidence,merchantPinEvidenceLine};
 if(require.main===module){const args=process.argv.slice(2),options=args.length===1?{expectedSourceSha:args[0]}:{};
  audit(process.env,fetch,options).then(report=>{console.log('CLUERA_TEST_READINESS '+JSON.stringify(report));process.exitCode=2;})
  .catch(()=>{console.log('CLUERA_TEST_READINESS '+JSON.stringify({stopped:'UNAVAILABLE',mutations:0,activationAuthorized:false}));process.exitCode=2;});}
