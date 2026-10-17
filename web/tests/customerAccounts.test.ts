@@ -43,6 +43,66 @@ function cookiePair(kind: 'access' | 'refresh' | 'recovery' | 'flow', value: unk
 }
 const login = () => handleAccount(request('login', { email: user.email, password: 'synthetic-password' }), 'login');
 describe('customer BFF authentication', () => {
+  it.each([8,12,64,128])('accepts a %i-character signup password without creating a session or allowance',async length=>{
+    const response=await handleAccount(request('signup',{email:user.email,password:'x'.repeat(length)}),'signup');
+    expect(response.status).toBe(200);expect(auth.signUp).toHaveBeenCalledOnce();
+    expect(rpc.mock.calls.every(([name])=>name==='customer_auth_rate_limit')).toBe(true);
+    expect(response.headers.get('set-cookie')).not.toContain('__Host-sr-account-access=');
+  });
+  it.each([7,129])('rejects a %i-character signup password before Auth',async length=>{
+    const response=await handleAccount(request('signup',{email:user.email,password:'x'.repeat(length)}),'signup');
+    expect(response.status).toBe(400);expect((await response.json()).code).toBe('WEAK_PASSWORD');
+    expect(auth.signUp).not.toHaveBeenCalled();
+  });
+  it('uses the same password bounds and upstream strength checks for an authorized recovery',async()=>{
+    const cookies=`${cookiePair('access',token)}; ${cookiePair('refresh',session.refresh_token)}; ${cookiePair('recovery',sid)}`;
+    expect((await handleAccount(request('reset-password',{password:'1234!Abc'},cookies),'reset-password')).status).toBe(200);
+    expect(auth.updateUser).toHaveBeenCalledExactlyOnceWith({password:'1234!Abc'});
+    auth.updateUser.mockClear();
+    for(const size of [7,129])expect((await handleAccount(request('reset-password',{password:'x'.repeat(size)},cookies),'reset-password')).status).toBe(400);
+    expect(auth.updateUser).not.toHaveBeenCalled();
+    auth.updateUser.mockResolvedValueOnce({error:{status:422,code:'weak_password',message:'PRIVATE_COMPROMISED_REASON'}} as never);
+    const failed=await handleAccount(request('reset-password',{password:'1234!Abc'},cookies),'reset-password');
+    expect(failed.status).toBe(400);expect((await failed.json()).code).toBe('WEAK_PASSWORD');
+  });
+  it.each(['signup','resend-verification','forgot-password'])('returns upstream rate limits instead of email success for %s',async action=>{
+    const fn=action==='signup'?auth.signUp:action==='resend-verification'?auth.resend:auth.resetPasswordForEmail;
+    fn.mockResolvedValueOnce({error:{status:429,code:'over_email_send_rate_limit',message:'PRIVATE_RECIPIENT'}} as never);
+    const response=await handleAccount(request(action,{email:user.email,...(action==='signup'?{password:'1234!Abc'}:{})}),action);
+    expect(response.status).toBe(429);expect(response.headers.get('retry-after')).toBe('60');
+    expect(await response.text()).not.toMatch(/PRIVATE_RECIPIENT|If this request is eligible/);
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+  it('explains weak-password rejection with a fixed code but never provider reasons or account data',async()=>{
+    auth.signUp.mockResolvedValueOnce({error:{status:422,code:'weak_password',message:'PRIVATE_PASSWORD_REASON'}} as never);
+    const response=await handleAccount(request('signup',{email:user.email,password:'1234!Abc'}),'signup');
+    expect(response.status).toBe(400);expect(await response.json()).toEqual({code:'WEAK_PASSWORD',error:'Choose a stronger password of 8 to 128 characters. Use a unique long passphrase and avoid compromised passwords.'});
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+  it('does not claim mail success or replace a pending verifier after a delivery or transport failure',async()=>{
+    auth.signUp.mockResolvedValueOnce({error:{status:500,code:'unexpected_failure',message:'PRIVATE_SMTP_DETAILS'}} as never);
+    const response=await handleAccount(request('signup',{email:user.email,password:'1234!Abc'}),'signup');
+    expect(response.status).toBe(503);expect(await response.json()).toEqual({code:'EMAIL_DELIVERY_FAILED',error:'Email delivery could not be confirmed. Check your inbox before using resend, or contact Cluera AI support.'});
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+  it.each(['email_exists','user_already_exists','user_not_found'])('keeps %s indistinguishable from eligible email responses without overwriting the verifier',async code=>{
+    auth.signUp.mockResolvedValueOnce({error:{status:400,code,message:'PRIVATE_ACCOUNT_EXISTENCE'}} as never);
+    const r=await handleAccount(request('signup',{email:user.email,password:'1234!Abc'}),'signup');
+    expect(r.status).toBe(200);expect(await r.json()).toEqual({message:'If this request is eligible, check your email. Open the link in this browser.'});
+    expect(r.headers.get('set-cookie')).toContain('__Host-sr-account-flow=');
+  });
+  it('normalizes generic email cookie headers and preserves the original pending verifier and expiry',async()=>{
+    const prior={'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier':'synthetic-prior-verifier'};
+    const original=seal(prior,'flow',accountConfig(),60);
+    auth.signUp.mockResolvedValueOnce({error:{status:400,code:'email_exists'}} as never);
+    const denied=await handleAccount(request('signup',{email:user.email,password:'1234!Abc'},`__Host-sr-account-flow=${original}`),'signup');
+    const encoded=denied.headers.get('set-cookie')!.split(';')[0].slice('__Host-sr-account-flow='.length);
+    expect(encoded).not.toBe(original);expect(unseal(encoded,'flow',accountConfig())).toEqual(prior);
+    expect(unseal(encoded,'flow',accountConfig(),Date.now()+61_000)).toBeNull();
+    const accepted=await handleAccount(request('signup',{email:user.email,password:'1234!Abc'}),'signup');
+    expect(denied.headers.get('set-cookie')!.length).toBe(accepted.headers.get('set-cookie')!.length);
+    expect(await denied.json()).toEqual(await accepted.json());
+  });
   it.each([{iss:'https://dwqltsqumiwsxtkzdoaa.supabase.co/auth/v1'},{iss:'https://foreign.supabase.co/auth/v1'},
     {role:'service_role'},{role:'anon'},{aud:'anon'},{aud:['authenticated','service_role']},{iss:undefined},{exp:1}])
   ('rejects wrong-project or privileged user claims after Auth validation but before account/ledger access: %j',async changed=>{
@@ -226,6 +286,23 @@ describe('customer BFF authentication', () => {
   });
 });
 describe('account cookie boundary', () => {
+  it('pads only flow envelopes to a fixed bounded size with authenticated round trips and tamper denial',()=>{
+    const config=accountConfig(),lengths=[];
+    for(const value of [{},{'synthetic-code-verifier':'short'},{'synthetic-code-verifier':'x'.repeat(900),'unicode-code-verifier':'✓'.repeat(100)}]){
+      const encoded=seal(value,'flow',config,60,1000);lengths.push(encoded.length);
+      expect(encoded.length).toBeLessThan(3800);expect(unseal(encoded,'flow',config,2000)).toEqual(value);
+      expect(unseal(encoded,'flow',config,61000)).toBeNull();expect(unseal(encoded,'access',config,2000)).toBeNull();
+      const bytes=Buffer.from(encoded,'base64url');bytes[bytes.length-2]^=1;expect(unseal(bytes.toString('base64url'),'flow',config,2000)).toBeNull();
+    }
+    expect(new Set(lengths).size).toBe(1);expect(()=>seal({'synthetic-code-verifier':'x'.repeat(2700)},'flow',config,60)).toThrow();
+  });
+  it('still reads existing unpadded v2 flow envelopes under their original deadline',()=>{
+    const config=accountConfig(),iv=Buffer.alloc(12,8),cipher=createCipheriv('aes-256-gcm',config.cookieKey,iv),value={'synthetic-code-verifier':'pending-before-rollout'};
+    cipher.setAAD(Buffer.from(`${config.origin}:${config.url}:flow:v2`));
+    const encrypted=Buffer.concat([cipher.update(JSON.stringify({value,exp:61000})),cipher.final()]);
+    const old=Buffer.concat([iv,cipher.getAuthTag(),encrypted]).toString('base64url');
+    expect(unseal(old,'flow',config,2000)).toEqual(value);expect(unseal(old,'flow',config,61000)).toBeNull();
+  });
   it('rejects tampering, expiry, wrong purpose and wrong deployment origin', () => {
     const config = accountConfig(), sealed = seal('private', 'access', config, 60, 1000);
     expect(unseal(sealed, 'access', config, 2000)).toBe('private');

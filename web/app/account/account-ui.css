@@ -18,6 +18,19 @@
 .account-auth-password button { position: absolute; right: 6px; top: 6px; bottom: 6px; padding: 0 9px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; font-size: 11px; cursor: pointer; }
 .account-auth .account-actions { justify-content: space-between; font-size: 12px; }
 .account-auth .account-auth-safety { margin: 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 11px; color: var(--faint); }
+.account-auth-feedback { min-width: 0; max-width: 100%; box-sizing: border-box; padding: 14px 16px; border: 1px solid #45516a; border-radius: 12px; background: #101725; color: #edf2fa; line-height: 1.6; overflow-wrap: anywhere; scroll-margin-block: 24px; }
+.account-auth-feedback:empty { padding: 0; border: 0; }
+.account-auth-feedback p { margin: 0; }
+.account-auth-feedback p + p { margin-top: 9px; }
+.account-auth-feedback-success { border-color: #5f9e8c; background: #112e2b; }
+.account-auth-feedback-error { border-color: #c4848e; background: #361d29; }
+.account-auth-feedback-info { border-color: #7d72a0; background: #211e35; }
+.account-auth-feedback .account-auth-feedback-detail, .account-auth-feedback .account-auth-feedback-address { font-size: 12px; line-height: 1.6; }
+.account-auth-feedback:focus { outline: 2px solid #c8b9ff; outline-offset: 3px; }
+.account-auth-resend { display: grid; min-width: 0; gap: 8px; }
+.account-auth-resend p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.account-auth :is(button,.account-actions) { max-width: 100%; overflow-wrap: anywhere; }
+.account-auth .account-actions { flex-wrap: wrap; gap: 12px; }
 .account-auth :is(input,button):focus-visible, .account-admin-shell :is(input,textarea,select,button,a):focus-visible { outline: 2px solid #c8b9ff; outline-offset: 3px; }
 
 .account-page.account-admin-page { max-width: 1200px; margin: 36px auto 72px; padding: 0 clamp(14px,3vw,30px); }

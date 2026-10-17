@@ -1,5 +1,6 @@
 import {expect,it} from 'vitest';
-import {authFailure,publicSessionSchema,safeGoogleRedirect} from '../lib/accounts/publicAuth';
+import {authFailure,publicSessionSchema,safeGoogleRedirect,signupNotice,emailDeliveryNotice} from '../lib/accounts/publicAuth';
+import {MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH,weakPasswordNotice} from '../lib/accounts/passwordPolicy';
 const url='https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent('https://cluera-ai-staging.vercel.app/api/account/callback?sb_flow_id=synthetic');
 it('accepts only a bounded fixed Supabase Google redirect to the Cluera callback',()=>{
  expect(safeGoogleRedirect({redirectUrl:url})).toBe(url);
@@ -11,4 +12,13 @@ it('rejects secret-bearing, wrong-product and malformed session DTOs',()=>{
  expect(publicSessionSchema.safeParse({account,passwordRecovery:false}).success).toBe(true);
  for(const value of [{account:{...account,access_token:'synthetic'},passwordRecovery:false},{account:{...account,remoteDesktop:true},passwordRecovery:false},{account:{...account,trialSecondsGranted:999},passwordRecovery:false},{account,passwordRecovery:'true'}])expect(publicSessionSchema.safeParse(value).success).toBe(false);
  expect(authFailure(503)).toBe('Account service is unavailable.');expect(authFailure(429)).toContain('wait');
+});
+it('shares the eight-to-128-character policy and displays only allowlisted contextual failure codes',()=>{
+ expect([MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH]).toEqual([8,128]);
+ expect(signupNotice).toBe('Verification email sent! Please check your inbox and click the verification link to activate your Cluera AI account.');
+ expect(authFailure(400,'signup','WEAK_PASSWORD')).toBe(weakPasswordNotice);
+ expect(authFailure(503,'signup','EMAIL_DELIVERY_FAILED')).toBe(emailDeliveryNotice);
+ expect(authFailure(503,'login','EMAIL_DELIVERY_FAILED')).toBe('Account service is unavailable.');
+ expect(authFailure(400,'signup','PRIVATE_UPSTREAM_DETAIL')).not.toContain('PRIVATE_UPSTREAM_DETAIL');
+ expect(authFailure(400,'reset-password')).toContain('8 to 128');
 });

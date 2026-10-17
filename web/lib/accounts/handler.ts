@@ -11,9 +11,22 @@ import { sandboxCheckoutAllowed, sandboxCheckoutEnabled } from '../billing/check
 import { checkoutService } from '../billing/checkout/service';
 import { resumeSandboxCheckout } from '../billing/checkout/resume';
 import {CLUERA_AUTH_ISSUER,CLUERA_SUPABASE_URL} from '../supabase/target';
+import {MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH,weakPasswordNotice} from './passwordPolicy';
+import {emailNotice,emailDeliveryNotice} from './publicAuth';
 
 const emailSchema = z.string().trim().email().max(254);
-const passwordSchema = z.string().min(12).max(128);
+const passwordSchema = z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH);
+class AuthMailError extends Error {
+  constructor(readonly code:'WEAK_PASSWORD'|'EMAIL_DELIVERY_FAILED',readonly status:400|503){super(code);}
+}
+// Inspect only documented fixed categories, never provider messages/identities.
+function rejectMailFailure(error:{status?:number;code?:string}|null|undefined){
+  if(!error)return;
+  if(error.status===429||['over_email_send_rate_limit','over_request_rate_limit'].includes(error.code??''))throw new AccountError('RATE_LIMITED',429);
+  if(error.code==='weak_password')throw new AuthMailError('WEAK_PASSWORD',400);
+  if(!error.status||error.status>=500||['email_address_not_authorized','email_provider_disabled','signup_disabled'].includes(error.code??''))throw new AuthMailError('EMAIL_DELIVERY_FAILED',503);
+  // All other account-specific outcomes retain the same anti-enumeration response.
+}
 const sessionClaims = z.object({ sub:z.uuid(),session_id:z.uuid(),iss:z.literal(CLUERA_AUTH_ISSUER),
   aud:z.union([z.literal('authenticated'),z.tuple([z.literal('authenticated')])]),role:z.literal('authenticated'),exp:z.number().int().positive() });
 type Clients = ReturnType<typeof accountClients>;
@@ -184,6 +197,8 @@ export async function handleAccount(request: Request, action: string): Promise<R
       const restored = await clients.auth.auth.setSession(session);
       if (restored.error) throw authFailure(restored.error);
       const { error } = await clients.auth.auth.updateUser({ password: input.password });
+      if(error?.code==='weak_password')throw new AuthMailError('WEAK_PASSWORD',400);
+      if(error?.status===429)throw new AccountError('RATE_LIMITED',429);
       if (error) throw new AccountError('INVALID_INPUT', 400);
       const signedOut = await clients.service.auth.admin.signOut(session.access_token, 'global');
       cookies.clear();
@@ -219,17 +234,26 @@ export async function handleAccount(request: Request, action: string): Promise<R
       : await clients.auth.auth.resetPasswordForEmail(email!, { redirectTo: callback });
     // Avoid account enumeration; delivery/account-existence responses never reach the browser.
     // Service failures are distinct from account-specific rejections.
-    if (result.error && (!result.error.status || result.error.status >= 500)) throw new AccountError('UNAVAILABLE', 503);
+    rejectMailFailure(result.error);
+    // Rejected eligibility must not overwrite a previously valid pending verifier.
+    if(result.error){cookies.retainPendingFlow();return cookies.apply(json({message:emailNotice}));}
     // The installed SDK creates a NEW PKCE verifier for resend. Export that
     // request-local slot; the owner must open the latest link in this browser.
     cookies.set('flow', clients.flow(), 3600);
-    return cookies.apply(json({ message: 'If this request is eligible, check your email. Open the link in this browser.' }));
+    return cookies.apply(json({ message: emailNotice }));
   } catch (error) {
+    if(['signup','reset-password'].includes(action)&&error instanceof z.ZodError
+      &&error.issues.some(issue=>issue.path.length===1&&issue.path[0]==='password'&&['too_small','too_big'].includes(issue.code))){
+      const response=json({code:'WEAK_PASSWORD',error:weakPasswordNotice},400);
+      return cookies?cookies.apply(response):response;
+    }
+    if(error instanceof AuthMailError)return cookies?cookies.apply(json({code:error.code,error:error.code==='WEAK_PASSWORD'?weakPasswordNotice:emailDeliveryNotice},error.status)):json({code:error.code,error:error.code==='WEAK_PASSWORD'?weakPasswordNotice:emailDeliveryNotice},error.status);
     if (error instanceof AccountError) {
       const messages = { UNAVAILABLE: 'Account service is unavailable.', UNAUTHENTICATED: 'Sign in with a verified email to continue.',
         FORBIDDEN: 'This action is not allowed.', INVALID_INPUT: 'The request could not be accepted.', RATE_LIMITED: 'Too many attempts. Try again later.' };
       if (error.status === 401) cookies?.clear();
       const response = json({ error: messages[error.code] }, error.status);
+      if(error.code==='RATE_LIMITED')response.headers.set('Retry-After','60');
       return cookies ? cookies.apply(response) : response;
     }
     const response = apiError(error);

@@ -7,12 +7,21 @@ export function seal(value: unknown, kind: CookieKind, config: AccountConfig, tt
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', config.cookieKey, iv);
   cipher.setAAD(Buffer.from(`${config.origin}:${config.url}:${kind}:v2`));
-  const encrypted = Buffer.concat([cipher.update(JSON.stringify({ value, exp: now + ttl * 1000 }), 'utf8'), cipher.final()]);
+  const payload={value,exp:now+ttl*1000,padding:''};
+  if(kind==='flow'){
+    // Eligible and obscured email outcomes must not differ by cookie length.
+    // One current SDK verifier ring fits comfortably; keep the existing 3800 cap.
+    const bytes=Buffer.byteLength(JSON.stringify(payload));
+    if(bytes>2560)throw new AccountError('UNAVAILABLE',503);
+    payload.padding='0'.repeat(2560-bytes);
+  }
+  const plaintext=kind==='flow'?JSON.stringify(payload):JSON.stringify({value,exp:payload.exp});
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const encoded = Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64url');
   if (encoded.length > 3800) throw new AccountError('UNAVAILABLE', 503);
   return encoded;
 }
-export function unseal(value: string | undefined, kind: CookieKind, config: AccountConfig, now = Date.now()): unknown {
+function openEnvelope(value: string | undefined, kind: CookieKind, config: AccountConfig, now = Date.now()): {value:unknown;exp:number}|null {
   if (!value || value.length > 3800 || !/^[\w-]+$/.test(value)) return null;
   try {
     const bytes = Buffer.from(value, 'base64url');
@@ -20,8 +29,11 @@ export function unseal(value: string | undefined, kind: CookieKind, config: Acco
     decipher.setAAD(Buffer.from(`${config.origin}:${config.url}:${kind}:v2`));
     decipher.setAuthTag(bytes.subarray(12, 28));
     const data = JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString('utf8'));
-    return Number.isSafeInteger(data.exp) && data.exp > now ? data.value : null;
+    return Number.isSafeInteger(data.exp) && data.exp > now ? {value:data.value,exp:data.exp} : null;
   } catch { return null; }
+}
+export function unseal(value: string | undefined, kind: CookieKind, config: AccountConfig, now = Date.now()): unknown {
+  return openEnvelope(value,kind,config,now)?.value??null;
 }
 export class AccountCookies {
   private readonly incoming = new Map<string, string>();
@@ -34,9 +46,19 @@ export class AccountCookies {
   }
   private name(kind: CookieKind) { return `${this.config.secure ? '__Host-' : ''}sr-account-${kind}`; }
   get(kind: CookieKind): unknown { return unseal(this.incoming.get(this.name(kind)), kind, this.config); }
+  private queue(kind:CookieKind,encoded:string,ttl:number){
+    this.outgoing.push(`${this.name(kind)}=${encoded}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ttl}${this.config.secure ? '; Secure' : ''}`);
+  }
   set(kind: CookieKind, value: unknown, ttl: number): void {
     const encoded = ttl > 0 ? seal(value, kind, this.config, ttl) : '';
-    this.outgoing.push(`${this.name(kind)}=${encoded}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ttl}${this.config.secure ? '; Secure' : ''}`);
+    this.queue(kind,encoded,ttl);
+  }
+  retainPendingFlow():void {
+    const prior=openEnvelope(this.incoming.get(this.name('flow')),'flow',this.config);
+    // Re-encrypt to normalize headers without extending the signed deadline of
+    // a previously pending flow. Empty state cannot authorize an exchange.
+    const encoded=prior?seal(prior.value,'flow',this.config,0,prior.exp):seal({},'flow',this.config,3600);
+    this.queue('flow',encoded,3600);
   }
   clear(): void { for (const kind of ['access', 'refresh', 'flow', 'recovery'] as const) this.set(kind, null, 0); }
   apply(response: Response): Response {
