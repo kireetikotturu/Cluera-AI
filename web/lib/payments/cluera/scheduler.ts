@@ -6,6 +6,7 @@ import { billingRpc, clueraIntakeEnabled, merchantDigest } from './config';
 import { readClueraRawBody } from './events';
 import { reconcileClueraPayment } from './reconciliation';
 import { beginClueraReconciliationObservation } from './reconciliationObservation';
+import { schedulerEnabled } from '../../../../shared/billingDispatch';
 
 export const CLUERA_WORKER_URL = 'https://cluera-ai-staging.vercel.app/api/internal/billing/cluera/tick';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -20,7 +21,8 @@ export function workerProofMessage(epoch: number, seconds: number, nonce: string
 export async function handleClueraBillingTick(request: Request, env = process.env, deps: {
   rpc?: PaymentRpc; reconcile?: typeof reconcileClueraPayment; now?: () => number;
 } = {}): Promise<Response> {
-  if (!clueraIntakeEnabled(env)) return json({ error: 'Not found.' }, 404);
+  // Receiver-only activation must not admit even a correctly signed worker.
+  if (!clueraIntakeEnabled(env) || !schedulerEnabled(env)) return json({ error: 'Not found.' }, 404);
   const secret = env.SIGMAROUND_BILLING_WORKER_SECRET;
   if (!secret || secret.length < 32 || secret.length > 256 || !env.SUPABASE_SERVICE_ROLE_KEY)
     return json({ error: 'Worker unavailable.' }, 503);

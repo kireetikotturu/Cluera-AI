@@ -39,6 +39,8 @@ async function rawBody(request: Request): Promise<Uint8Array> {
   } finally { clearTimeout(timer!); await reader.cancel().catch(() => undefined); reader.releaseLock(); }
 }
 export async function handleRazorpayWebhook(request: Request, env = process.env, rpc?: PaymentRpc): Promise<Response> {
+  // V2 has one canonical inbox; shared intake flags must not admit both.
+  if (env.CLUERA_BILLING_V2_ENABLED === 'true') return json({ error: 'Not found.' }, 404);
   if (env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED !== 'true' || env.SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED !== 'true') return json({ error: 'Not found.' }, 404);
   let event: PaymentEvent | null;
   try {

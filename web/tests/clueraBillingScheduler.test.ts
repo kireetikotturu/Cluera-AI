@@ -4,7 +4,7 @@ import { handleClueraBillingTick, workerProofMessage, CLUERA_WORKER_URL } from '
 import { merchantDigest } from '../lib/payments/cluera/config';
 import { paymentTestEnvironment } from './helpers/paymentTestMode';
 
-const env = { ...paymentTestEnvironment, CLUERA_BILLING_V2_ENABLED: 'true',
+const env = { ...paymentTestEnvironment, CLUERA_BILLING_V2_ENABLED: 'true', CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED: 'true',
   SIGMAROUND_BILLING_WORKER_SECRET: 'synthetic-worker-proof-secret-000000000000', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_synthetic-server-key' };
 const now = Date.parse('2026-10-14T02:00:00Z'), seconds = now / 1000;
 const nonce = '00000000-0000-4000-8000-000000000910';
@@ -49,6 +49,7 @@ it.each(['REPLAY', 'INVALID', 'UNAVAILABLE'])('never processes a rejected nonce 
   expect(d.reconcile).not.toHaveBeenCalled();
 });
 it.each([{ CLUERA_BILLING_V2_ENABLED: 'false' }, { CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED: 'false' },
+  { CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED: 'false' }, { CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED: undefined },
   { SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED: 'false' }, { RAZORPAY_ENVIRONMENT: 'live' }, { SIGMAROUND_ACCOUNT_ORIGIN: 'https://other.invalid' }])
 ('fails closed before auth or schema access while disabled/mis-targeted', async override => {
   const d = deps(); expect((await handleClueraBillingTick(request(), { ...env, ...override }, d)).status).toBe(404); expect(d.rpc).not.toHaveBeenCalled();

@@ -36,6 +36,7 @@ export async function reconcilePayment(rpc: PaymentRpc, env = process.env, reque
   }
 }
 export async function handlePaymentTick(request: Request, env = process.env, rpc?: PaymentRpc): Promise<Response> {
+  if (env.CLUERA_BILLING_V2_ENABLED === 'true') return json({ error: 'Not found.' }, 404);
   if (env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED !== 'true' || env.SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED !== 'true') return json({ error: 'Not found.' }, 404);
   try {
     razorpayConfig(env);

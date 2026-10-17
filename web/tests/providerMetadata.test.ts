@@ -11,7 +11,7 @@ const key=Buffer.alloc(32,7),now=1780000000000;
 const config:RelayConfig={database:STAGING_DATABASE,site:STAGING_SITE,port:8080,rateKey:key.toString('base64'),
  serviceKey:'sb_secret_synthetic-service-secret-only',geminiKey:'synthetic-gemini-secret-only',deepgramKey:'synthetic-deepgram-secret-only'};
 const webConfig:AccountConfig={origin:STAGING_SITE,url:STAGING_DATABASE,secure:true,anonKey:'synthetic-public-key',serviceKey:config.serviceKey,rateKey:key,cookieKey:Buffer.alloc(32,8)};
-afterEach(()=>vi.restoreAllMocks());
+afterEach(()=>{vi.useRealTimers();vi.restoreAllMocks();});
 
 it('authenticates a bounded time, unique nonce and operation, never plain shared secrets',()=>{
  const proof=providerStatusRequest(key,now);expect(verifyProviderStatusRequest(key,proof,now)).toBe(true);
@@ -57,6 +57,37 @@ it('uses only the fixed staging TLS endpoint, rejects redirects, limits time and
 it('does not return configuration on failed, oversized or unsigned relay responses',async()=>{
  for(const response of [new Response('{}',{status:503}),new Response('x'.repeat(8193)),new Response('{}')])
   await expect(readProviderStatus(webConfig,vi.fn(async()=>response))).rejects.toThrow();
+});
+it.each(['request','body'] as const)('keeps7s total bound when relay %s ignores abort and cancellation hangs',async failure=>{
+ vi.useFakeTimers();
+ const never=()=>new Promise<never>(()=>{}),cancel=vi.fn(never);
+ const request=vi.fn((_url:unknown,_init?:RequestInit):Promise<Response>=>failure==='request'?never():Promise.resolve(new Response(new ReadableStream<Uint8Array>({pull:never,cancel}))));
+ let finished=false;const pending=readProviderStatus(webConfig,request).then(()=>{finished=true;return null;},error=>{finished=true;return error;});
+ await vi.advanceTimersByTimeAsync(6999);expect(finished).toBe(false);await vi.advanceTimersByTimeAsync(1);expect(finished).toBe(true);
+ expect(await pending).toMatchObject({message:'Provider status unavailable.'});expect(request).toHaveBeenCalledOnce();
+ expect(request.mock.calls[0][1]?.signal?.aborted).toBe(true);if(failure==='body')expect(cancel).toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0);
+});
+it('rejects unavailable responses without awaiting non-settling body cancellation',async()=>{
+ vi.useFakeTimers();const cancel=vi.fn(()=>new Promise<void>(()=>{}));
+ const request=vi.fn(async(_url:unknown,_init?:RequestInit)=>new Response(new ReadableStream<Uint8Array>({start(){},cancel}),{status:503}));
+ let finished=false;const pending=readProviderStatus(webConfig,request).then(()=>{finished=true;return null;},error=>{finished=true;return error;});
+ await vi.advanceTimersByTimeAsync(0);expect(finished).toBe(true);expect(await pending).toMatchObject({message:'Provider status unavailable.'});
+ expect(cancel).toHaveBeenCalledOnce();expect(request).toHaveBeenCalledOnce();expect(request.mock.calls[0][1]?.signal?.aborted).toBe(true);expect(vi.getTimerCount()).toBe(0);
+});
+it('still verifies signed metadata when cleanup cancellation never resolves',async()=>{
+ vi.useFakeTimers();const cancel=vi.fn(()=>new Promise<void>(()=>{})),releaseLock=vi.fn();
+ const request=vi.fn(async(_url:unknown,init?:RequestInit)=>{
+  const proof=providerStatusResponse(config,new Headers(init?.headers).get('X-Cluera-Nonce')!);
+  const response=new Response(proof.body,{headers:{'X-Cluera-Proof':proof.signature}});let part=0;
+  Object.defineProperty(response,'body',{value:{getReader:()=>({read:()=>Promise.resolve(part++===0?{done:false,value:Buffer.from(proof.body)}:{done:true,value:undefined}),cancel,releaseLock})}});return response;
+ });
+ let finished=false;const pending=readProviderStatus(webConfig,request).then(value=>{finished=true;return value;});
+ await vi.advanceTimersByTimeAsync(0);expect(finished).toBe(true);expect((await pending).providers[0]).toMatchObject({provider:'gemini',configured:true,enabled:true,health:'UNVERIFIED'});
+ expect(cancel).toHaveBeenCalledOnce();expect(releaseLock).toHaveBeenCalledOnce();expect(request).toHaveBeenCalledOnce();expect(request.mock.calls[0][1]?.signal?.aborted).toBe(true);expect(vi.getTimerCount()).toBe(0);
+});
+it('never reflects transport exceptions or retries a failed snapshot',async()=>{
+ const request=vi.fn(async()=>{throw Error('SYNTHETIC_PRIVATE_RELAY_ERROR');});
+ await expect(readProviderStatus(webConfig,request)).rejects.toThrow('Provider status unavailable.');expect(request).toHaveBeenCalledOnce();
 });
 it('real local HTTP status rejects unauthenticated/browser requests and never opens provider work',async()=>{
  const authorize=vi.fn(),generate=vi.fn(),audio=vi.fn();

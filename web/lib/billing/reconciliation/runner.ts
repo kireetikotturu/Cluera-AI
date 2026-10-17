@@ -13,6 +13,8 @@ import {razorpayConfig} from '../../payments/core/config';
 export async function handleBillingTick(request:Request,env=process.env,deps:{
   rpc?:BillingRpc;reconcile?:typeof reconcileNextSandboxEvent;action?:typeof executeNextSandboxBillingAction;payment?:typeof reconcilePayment;
 }={}){
+  // The V2 owner uses only its separately admitted external/HMAC worker.
+  if(env.CLUERA_BILLING_V2_ENABLED==='true')return json({error:'Not found.'},404);
   if(env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED!=='true')return json({error:'Not found.'},404);
   let paddleEnabled=false,razorpayEnabled=false;
   // Each provider validates its own exact Test/staging boundary. Retaining the

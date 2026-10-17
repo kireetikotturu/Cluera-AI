@@ -22,3 +22,17 @@ it('clears the earlier snapshot when refresh fails or AAL2 is no longer active',
  await act(async()=>host.querySelector('button')!.click());expect(host.textContent).toContain('0123456789abcdef');
  await act(async()=>host.querySelector('button')!.click());expect(host.textContent).not.toContain('0123456789abcdef');expect(host.textContent).toContain('Configuration unknown');
 });
+it('never conflates admin-vault mode with legacy environment booleans',async()=>{
+ const request=vi.fn(async()=>Response.json({providerStatus:{...snapshot,bootstrapMode:'admin-vault'}}));vi.stubGlobal('fetch',request);
+ await act(async()=>root.render(createElement(ProviderStatus)));await act(async()=>host.querySelector('button')!.click());
+ expect(host.textContent).toContain('Admin-vault mode is selected');expect(host.textContent).toContain('does not report current vault credentials or enablement');
+ expect(host.textContent).not.toContain('Relay enabled');expect(host.textContent).not.toContain('Relay disabled');expect(host.textContent).not.toContain('0123456789abcdef');
+ expect(host.textContent).not.toContain('Privately replace keys in Render');expect(host.querySelector('a[href="#account-admin-providers"]')?.textContent).toBe('AI Providers & Models');expect(request).toHaveBeenCalledOnce();
+});
+it('reports auth-only START blocked without claiming current vault credential state',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>Response.json({providerStatus:{...snapshot,bootstrapMode:'auth-only'}})));
+ await act(async()=>root.render(createElement(ProviderStatus)));await act(async()=>host.querySelector('button')!.click());
+ expect(host.textContent).toContain('Auth-only bootstrap is active');expect(host.textContent).toContain('AI START remains blocked');
+ expect(host.textContent).toContain('No current vault state is inferred');expect(host.textContent).not.toContain('Relay enabled');expect(host.textContent).not.toContain('0123456789abcdef');
+ expect(host.textContent).not.toContain('Privately replace keys in Render');
+});
