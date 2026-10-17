@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
 import { razorpayConfig, razorpayCheckoutAllowed, razorpayCheckoutEnabled } from '../core/config';
 import { ClueraBillingError } from './contracts';
 import type { PaymentRpc } from '../core/types';
@@ -23,9 +24,18 @@ export async function billingRpc(rpc: PaymentRpc, name: string, args: Record<str
 }
 export async function billingOwner(rpc: PaymentRpc, env = process.env) {
   if (!clueraBillingV2Enabled(env)) throw new ClueraBillingError('CONFIGURATION');
-  const result = await billingRpc(rpc, 'cluera_billing_owner', { p_account_digest: merchantDigest(env) });
-  const value = result as { owner?: unknown; epoch?: unknown };
-  if (value?.owner !== 'cluera' || !Number.isSafeInteger(value.epoch) || Number(value.epoch) < 1)
+  const accountDigest = merchantDigest(env);
+  const result = await billingRpc(rpc, 'cluera_billing_owner', { p_account_digest: accountDigest });
+  const value = z.object({ code: z.literal('ACTIVE'), owner: z.literal('cluera'),
+    epoch: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER) }).strict().safeParse(result);
+  if (!value.success)
     throw new ClueraBillingError('CONFIGURATION');
-  return { epoch: Number(value.epoch), accountDigest: merchantDigest(env) };
+  // Clean SQL reports ACTIVE while account_digest is NULL. Prove that the
+  // configured merchant is actually pinned: a distinct valid digest must conflict.
+  // These reads cannot pin/change ownership or invoke a financial writer.
+  const foreignDigest = `${(Number.parseInt(accountDigest[0], 16) ^ 1).toString(16)}${accountDigest.slice(1)}`;
+  const foreign = await billingRpc(rpc, 'cluera_billing_owner', { p_account_digest: foreignDigest });
+  if (!z.object({ code: z.literal('CONFLICT') }).strict().safeParse(foreign).success)
+    throw new ClueraBillingError('CONFIGURATION');
+  return { epoch: value.data.epoch, accountDigest };
 }

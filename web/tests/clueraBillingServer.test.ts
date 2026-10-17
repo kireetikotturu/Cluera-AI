@@ -2,13 +2,15 @@ import { createHmac } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { clueraRazorpayAdapter, recurringMethodAllowed, verifyClueraPlan } from '../lib/payments/cluera/adapter';
 import { clueraRazorpayTransport } from '../lib/payments/cluera/transport';
-import { clueraCheckoutAllowed, clueraCheckoutEnabled, clueraIntakeEnabled } from '../lib/payments/cluera/config';
+import { clueraCheckoutAllowed, clueraCheckoutEnabled, clueraIntakeEnabled, merchantDigest } from '../lib/payments/cluera/config';
 import { callbackSchema, clueraBillingCatalog, createClueraCheckout, verifyClueraCallback } from '../lib/payments/cluera/checkout';
 import { handleClueraWebhook, parseClueraRazorpayEvent } from '../lib/payments/cluera/events';
 import { reconcileClueraPayment } from '../lib/payments/cluera/reconciliation';
 import { revisionSchema, type BillingEvent, type Binding, type Revision } from '../lib/payments/cluera/contracts';
 import { paymentTestEnvironment } from './helpers/paymentTestMode';
 const env={...paymentTestEnvironment,CLUERA_BILLING_V2_ENABLED:'true'};
+const ownerResponse=(args:Record<string,unknown>)=>args.p_account_digest===merchantDigest(env)
+  ?{code:'ACTIVE',owner:'cluera',epoch:2}:{code:'CONFLICT'};
 
 const uuid = (last:number)=>`00000000-0000-4000-8000-${last.toString().padStart(12,'0')}`;
 const actor=env.SIGMAROUND_PAYMENT_TESTER_IDS,intentId=uuid(901),attemptId=uuid(902),revisionId=uuid(903);
@@ -167,19 +169,19 @@ it('safe catalog projection excludes plan/merchant/secret authority and rejects 
   rpc.mockResolvedValue({data:[{...pack,apiKey:'never'}],error:null});await expect(clueraBillingCatalog(rpc)).rejects.toThrow();
 });
 it('provider creation is attempted once only for fresh CLAIMED; replay/UNCERTAIN is never posted again',async()=>{
-  const rpc=vi.fn(async(name:string)=>({data:name==='cluera_billing_owner'?{owner:'cluera',epoch:2}:name==='cluera_billing_prepare'?{code:'PENDING'}:null,error:null}));
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_prepare'?{code:'PENDING'}:null,error:null}));
   const request=provider(),adapter=clueraRazorpayAdapter(env,request);expect(await createClueraCheckout(rpc,{userId:actor,sessionId:uuid(904)},uuid(905),revisionId,env,adapter)).toEqual({code:'PENDING'});expect(request).not.toHaveBeenCalled();
 });
 it('post/bind/identity uncertainty persists without retry or grant',async()=>{
-  const rpc=vi.fn(async(name:string)=>({data:name==='cluera_billing_owner'?{owner:'cluera',epoch:2}:name==='cluera_billing_prepare'?{code:'CLAIMED',intentId,attemptId,revision:pack}:name==='cluera_billing_bind'?'BOUND':{userId:uuid(999),code:'AVAILABLE',pending:null,resolvedOrderIds:[],resolvedSubscriptionIds:[]},error:null}));
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_prepare'?{code:'CLAIMED',intentId,attemptId,revision:pack}:name==='cluera_billing_bind'?'BOUND':{userId:uuid(999),code:'AVAILABLE',pending:null,resolvedOrderIds:[],resolvedSubscriptionIds:[]},error:null}));
   const request=provider();expect(await createClueraCheckout(rpc,{userId:actor,sessionId:uuid(904)},uuid(905),revisionId,env,clueraRazorpayAdapter(env,request))).toEqual({code:'PENDING'});
   expect(request).toHaveBeenCalledOnce();expect(rpc.mock.calls.filter(([name])=>name==='cluera_billing_bind')).toHaveLength(2);expect(rpc.mock.calls.some(([name])=>/apply|grant|receive/.test(name))).toBe(false);
 });
 it('callback verifies exact bound same owner even when webhook won race; no financial RPC',async()=>{
-  const rpc=vi.fn(async(name:string)=>({data:name==='cluera_billing_owner'?{owner:'cluera',epoch:2}:{...bind(),code:'VERIFIED'},error:null}));
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):{...bind(),code:'VERIFIED'},error:null}));
   const signature=createHmac('sha256',env.RAZORPAY_TEST_KEY_SECRET).update(`${orderId}|${paymentId}`).digest('hex');
   expect(await verifyClueraCallback(rpc,{userId:actor,sessionId:uuid(904)},{expectedAccountId:actor,orderId,subscriptionId:null,paymentId,signature},env)).toEqual({code:'AWAITING_WEBHOOK'});
-  expect(rpc.mock.calls.map(([name])=>name)).toEqual(['cluera_billing_owner','cluera_billing_binding']);
+  expect(rpc.mock.calls.map(([name])=>name)).toEqual(['cluera_billing_owner','cluera_billing_owner','cluera_billing_binding']);
 });
 it('parses signed receipt projection only; foreign merchant and future timestamp fail before durability',()=>{
   const payload={entity:'event',account_id:env.RAZORPAY_TEST_ACCOUNT_ID,event:'subscription.charged',created_at:1767225600,
@@ -197,24 +199,24 @@ it('disabled intake does no reads/mutations; enabled raw HMAC accepts only durab
   const response=await handleClueraWebhook(req(),env,rpc);expect(response.status).toBe(200);expect(await response.json()).toEqual({received:true});expect(rpc).toHaveBeenCalledOnce();expect(rpc.mock.calls[0][0]).toBe('cluera_billing_event_accept');
 });
 it('worker requires Cluera owner/epoch and cannot apply when wrong owner remains Account',async()=>{
-  const rpc=vi.fn(async()=>({data:{owner:'account',epoch:1},error:null})),request=provider();await expect(reconcileClueraPayment(rpc,env,request)).rejects.toThrow();expect(request).not.toHaveBeenCalled();expect(rpc).toHaveBeenCalledOnce();
+  const rpc=vi.fn(async()=>({data:{code:'ACTIVE',owner:'account',epoch:1},error:null})),request=provider();await expect(reconcileClueraPayment(rpc,env,request)).rejects.toThrow();expect(request).not.toHaveBeenCalled();expect(rpc).toHaveBeenCalledOnce();
 });
 it('worker accepts actual strict claimed projection, independent pack evidence and exactly one apply',async()=>{
   const claimed={code:'CLAIMED',claimId:uuid(910),legacy:false,...event()};
-  const rpc=vi.fn(async(name:string)=>({data:name==='cluera_billing_owner'?{code:'ACTIVE',owner:'cluera',epoch:2}:name==='cluera_billing_event_claim'?claimed:name==='cluera_billing_binding'?{...bind(),legacy:false}:name==='cluera_billing_apply'?{code:'VERIFIED'}:null,error:null}));
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_event_claim'?claimed:name==='cluera_billing_binding'?{...bind(),legacy:false}:name==='cluera_billing_apply'?{code:'VERIFIED'}:null,error:null}));
   const request=provider();expect(await reconcileClueraPayment(rpc,env,request)).toBe('VERIFIED');
   expect(rpc.mock.calls.filter(([name])=>name==='cluera_billing_apply')).toHaveLength(1);expect(vi.mocked(request).mock.calls.every(call=>call[1]?.method==='GET')).toBe(true);
 });
 it('ordinary captured event may omit subscription links; independent invoice resolves exact owned subscription',async()=>{
   const claimed={code:'CLAIMED',claimId:uuid(910),legacy:false,...event('payment.captured',recurring),subscriptionId:null,invoiceId:null};
-  const rpc=vi.fn(async(name:string)=>({data:name==='cluera_billing_owner'?{owner:'cluera',epoch:2}:name==='cluera_billing_event_claim'?claimed:name==='cluera_billing_binding'?{...bind(recurring),legacy:false}:name==='cluera_billing_apply'?{code:'VERIFIED'}:null,error:null}));
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_event_claim'?claimed:name==='cluera_billing_binding'?{...bind(recurring),legacy:false}:name==='cluera_billing_apply'?{code:'VERIFIED'}:null,error:null}));
   expect(await reconcileClueraPayment(rpc,env,provider(recurring))).toBe('VERIFIED');
   const bindingCall=rpc.mock.calls.find(([name])=>name==='cluera_billing_binding')!;expect(bindingCall[1]).toMatchObject({p_resource:subscriptionId});
   const applied=rpc.mock.calls.find(([name])=>name==='cluera_billing_apply')!;expect(applied[1]).toMatchObject({p_epoch:2,p_evidence:{subscriptionId,invoiceId,paymentId,action:'GRANT'}});
 });
 it('subscription lifecycle with optional payment entity applies status only, not a new paid grant',async()=>{
   const claimed={code:'CLAIMED',claimId:uuid(910),legacy:false,...event('subscription.cancelled',recurring),resourceId:subscriptionId};
-  const rpc=vi.fn(async(name:string)=>({data:name==='cluera_billing_owner'?{owner:'cluera',epoch:2}:name==='cluera_billing_event_claim'?claimed:name==='cluera_billing_binding'?{...bind(recurring),legacy:false}:name==='cluera_billing_apply'?{code:'APPLIED'}:null,error:null}));
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_event_claim'?claimed:name==='cluera_billing_binding'?{...bind(recurring),legacy:false}:name==='cluera_billing_apply'?{code:'APPLIED'}:null,error:null}));
   expect(await reconcileClueraPayment(rpc,env,provider(recurring,{subscription:{...fixtures(recurring).subscription,status:'cancelled',ended_at:Math.floor(Date.now()/1000)}}))).toBe('APPLIED');
   const applied=rpc.mock.calls.find(([name])=>name==='cluera_billing_apply')!;expect(applied[1]).toMatchObject({p_evidence:{action:'STATUS',paymentId:null,orderId:null,invoiceId:null,subscriptionState:'CANCELED'}});
 });
@@ -226,13 +228,13 @@ it('refund-before-capture legacy receipt resolves old binding and applies throug
   const claimed={code:'CLAIMED',claimId:uuid(910),legacy:false,...event('refund.processed'),orderId:null};
   const oldBinding={legacy:true,code:'BOUND',intentId,userId:actor,orderId,offerCode:'pro_3_hours'};
   const values=fixtures(),request=provider(pack,{order:{...values.order,notes:{sigma_intent:intentId,sigma_offer:'pro_3_hours',sigma_environment:'test'}},payment:{...values.payment,status:'refunded',amount_refunded:54900,refund_status:'full'}});
-  const rpc=vi.fn(async(name:string)=>({data:name==='cluera_billing_owner'?{owner:'cluera',epoch:2}:name==='cluera_billing_event_claim'?claimed:name==='cluera_billing_binding'?oldBinding:name==='cluera_billing_legacy_apply'?{code:'REFUNDED'}:null,error:null}));
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_event_claim'?claimed:name==='cluera_billing_binding'?oldBinding:name==='cluera_billing_legacy_apply'?{code:'REFUNDED'}:null,error:null}));
   expect(await reconcileClueraPayment(rpc,env,request)).toBe('REFUNDED');expect(rpc.mock.calls.some(([name])=>name==='cluera_billing_apply')).toBe(false);
   expect(rpc.mock.calls.find(([name])=>name==='cluera_billing_legacy_apply')![1]).toMatchObject({p_evidence:{action:'REFUND',amount:54900,orderId,paymentId}});
 });
 it('malformed claimed projection releases only exact safe lease without inventing occurrence time or evidence',async()=>{
   const claimed={code:'CLAIMED',claimId:uuid(910),legacy:false,...event(),occurredAt:undefined};
-  const rpc=vi.fn(async(name:string)=>({data:name==='cluera_billing_owner'?{owner:'cluera',epoch:2}:name==='cluera_billing_event_claim'?claimed:'RETRY',error:null}));
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_event_claim'?claimed:'RETRY',error:null}));
   const request=provider();expect(await reconcileClueraPayment(rpc,env,request)).toBe('PENDING');expect(request).not.toHaveBeenCalled();
   expect(rpc.mock.calls.find(([name])=>name==='cluera_billing_event_finish')![1]).toEqual({p_event:claimed.eventId,p_claim:claimed.claimId,p_epoch:2,p_retry:true});
 });

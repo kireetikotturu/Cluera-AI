@@ -16,7 +16,8 @@ function request(headers: Record<string, string> = {}, body = '{}', url = WEB_DI
 function deps() {
   const consumed = new Set<string>();
   return { now: () => now, reconcile: vi.fn(async () => 'EMPTY'), rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
-    if (name === 'cluera_billing_owner') return { data: { owner: 'cluera', epoch: 1 }, error: null };
+    if (name === 'cluera_billing_owner') return { data: args.p_account_digest === merchantDigest(env)
+      ? { code: 'ACTIVE', owner: 'cluera', epoch: 1 } : { code: 'CONFLICT' }, error: null };
     expect(name).toBe('cluera_billing_worker_nonce'); const nonce = String(args.p_nonce);
     if (consumed.has(nonce)) return { data: 'REPLAY', error: null };
     consumed.add(nonce); return { data: 'CLAIMED', error: null };
@@ -28,9 +29,11 @@ afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 it('authenticates fixed dispatch, resolves server ownership and delegates once in-process to the unchanged worker', async () => {
   const d = deps(), response = await handleClueraExternalDispatch(request(), env, d);
   expect(response.status).toBe(200); expect(await response.json()).toEqual({ processed: true });
-  expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(['cluera_billing_owner', 'cluera_billing_worker_nonce']);
+  expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(['cluera_billing_owner', 'cluera_billing_owner', 'cluera_billing_worker_nonce']);
   expect(d.rpc.mock.calls[0][1]).toEqual({ p_account_digest: merchantDigest(env) });
-  expect(d.rpc.mock.calls[1][1]).toEqual({ p_nonce: schedulerNonce('DISPATCH', now / 1000, env.SIGMAROUND_BILLING_WORKER_SECRET),
+  const digest = merchantDigest(env);
+  expect(d.rpc.mock.calls[1][1]).toEqual({ p_account_digest: `${(Number.parseInt(digest[0],16)^1).toString(16)}${digest.slice(1)}` });
+  expect(d.rpc.mock.calls[2][1]).toEqual({ p_nonce: schedulerNonce('DISPATCH', now / 1000, env.SIGMAROUND_BILLING_WORKER_SECRET),
     p_issued_at: new Date(now).toISOString(), p_epoch: 1, p_account_digest: merchantDigest(env) });
   expect(d.reconcile).toHaveBeenCalledExactlyOnceWith(d.rpc, env); expect(fetch).not.toHaveBeenCalled(); expect(clients.create).not.toHaveBeenCalled();
   expect(response.headers.get('cache-control')).toBe('no-store');
@@ -85,7 +88,7 @@ it('creates exactly one SDK only after proof verification and never performs sel
   expect(response.status).toBe(200); expect(clients.create).toHaveBeenCalledTimes(1); expect(fetch).not.toHaveBeenCalled();
   expect(clients.create.mock.calls[0][0]).toBe('https://yhnqlfcgrmckhyjdxegg.supabase.co');
 });
-it.each([{ owner: 'account', epoch: 1 }, { owner: 'cluera', epoch: 0 }, { owner: 'cluera', epoch: 1.5 }, null])
+it.each([{ code: 'ACTIVE', owner: 'account', epoch: 1 }, { code: 'ACTIVE', owner: 'cluera', epoch: 0 }, { code: 'ACTIVE', owner: 'cluera', epoch: 1.5 }, null])
 ('owner/epoch rejection cannot consume a nonce: %j', async owner => {
   const d = deps(); d.rpc.mockResolvedValue({ data: owner as any, error: null });
   expect((await handleClueraExternalDispatch(request(), env, d)).status).toBe(503); expect(d.rpc).toHaveBeenCalledTimes(1); expect(d.reconcile).not.toHaveBeenCalled();
