@@ -116,6 +116,47 @@ test('safe integer totals never silently overflow and numeric strings are not mo
  assert.ok(r.collections.orders.warnings.includes('AMOUNT_OVERFLOW'));assert.ok(r.collections.orders.warnings.includes('INVALID_AMOUNT'));
 });
 
+const orderFacts=['amountMissing','amountNonNumeric','amountOutOfRange','paidMissing','paidNonNumeric','paidOutOfRange',
+ 'dueMissing','dueNonNumeric','dueOutOfRange','paidExceedsAmount','dueEquationMismatch','paidStateMismatch','createdStateMismatch'];
+for(const [field,prefix] of [['amount','amount'],['amount_paid','paid'],['amount_due','due']] as const){
+ for(const [suffix,value] of [['Missing',undefined],['NonNumeric',null],['NonNumeric','54900'],['OutOfRange',-1],['OutOfRange',1.5]] as const){
+  test(`strict order validation facts distinguish ${field}/${suffix}/${typeof value} without inferring an equation mismatch`,async()=>{
+   const r=await audit(env,fetcher(name=>Response.json(collection(name==='orders'?[order(1,{status:'attempted',[field]:value})]:[]))).request,options);
+   const facts=r.collections.orders.validationFacts;
+   assert.deepEqual(Object.keys(facts),orderFacts);assert.equal(facts[prefix+suffix],1);
+   assert.equal(Object.values(facts).reduce((a:any,b:any)=>a+b,0),1);
+   assert.ok(r.collections.orders.warnings.includes('INCONSISTENT_ORDER'));assert.equal(r.collections.orders.amounts.complete,false);
+   assert.equal(r.needsReview,true);assert.equal(r.financialClearance,'NOT_GRANTED');assert.equal(r.activationAuthorized,false);
+   assert.ok(!JSON.stringify(r).includes('order_synthetic1'));
+  });
+ }
+}
+test('valid attempted unpaid order remains consistent; genuine numeric equation/state violations have separate fixed counters',async()=>{
+ const cases=[
+  {extra:{status:'attempted'},facts:{}},
+  {extra:{status:'attempted',amount_due:1},facts:{dueEquationMismatch:1}},
+  {extra:{status:'attempted',amount_paid:54901,amount_due:0},facts:{paidExceedsAmount:1,dueEquationMismatch:1}},
+  {extra:{status:'paid',amount_paid:0,amount_due:54900},facts:{paidStateMismatch:1}},
+  {extra:{status:'created',amount_paid:1,amount_due:54899},facts:{createdStateMismatch:1}},
+  {extra:{status:'attempted',amount:0,amount_due:0},facts:{amountOutOfRange:1}},
+ ];
+ for(const {extra,facts} of cases){
+  const r=await audit(env,fetcher(name=>Response.json(collection(name==='orders'?[order(1,extra)]:[]))).request,options);
+  assert.deepEqual(r.collections.orders.validationFacts,Object.fromEntries(orderFacts.map(key=>[key,(facts as any)[key]??0])));
+  assert.equal(r.collections.orders.warnings.includes('INCONSISTENT_ORDER'),Object.keys(facts).length>0);
+  assert.equal(r.collections.orders.amounts.complete,Object.keys(facts).length===0);
+  assert.equal(r.needsReview,true);assert.equal(r.mutations,0);
+ }
+});
+test('invalid or duplicate order identities cannot inflate validation-fact counts',async()=>{
+ const first=order(1,{amount_due:null}),duplicate={...first,amount_paid:null},invalid={...first,id:'foreign/not-an-order'};
+ const r=await audit(env,fetcher(name=>Response.json(collection(name==='orders'?[first,duplicate,invalid]:[]))).request,options);
+ assert.equal(r.collections.orders.records,1);assert.equal(r.collections.orders.duplicateIds,1);assert.equal(r.collections.orders.invalidRecords,1);
+ assert.equal(r.collections.orders.validationFacts.dueNonNumeric,1);assert.equal(r.collections.orders.validationFacts.paidNonNumeric,0);
+ assert.equal(Object.values(r.collections.orders.validationFacts).reduce((a:any,b:any)=>a+b,0),1);
+ assert.equal(r.completeInventory,false);assert.equal(r.needsReview,true);
+});
+
 test('duplicate IDs across pages are not double-counted or declared complete',async()=>{
  const first=Array.from({length:100},(_,i)=>order(i));
  const f=fetcher((name,page)=>Response.json(collection(name==='orders'?(page===0?first:[first[0]]):[]))),r=await audit(env,f.request,options);
@@ -265,6 +306,7 @@ test('all allowed warning categories and maximum safe numeric aggregates still f
   for(const status of Object.keys(value.statuses))value.statuses[status]=1000;
   if(value.currency)for(const key of Object.keys(value.currency))value.currency[key]=1000;
   if(value.amounts)for(const key of ['knownAmount','knownPaid','knownRefunded'])if(key in value.amounts)value.amounts[key]=Number.MAX_SAFE_INTEGER;
+  if(value.validationFacts)for(const key of Object.keys(value.validationFacts))value.validationFacts[key]=1000;
  }
  const lines=serializeReport(report);for(const line of lines)assert.ok(Buffer.byteLength(line)<=1900);
 });
@@ -275,6 +317,10 @@ test('unknown or tampered log fields, accessors and serialization hooks fail clo
   (value:any)=>value.completedAt=secret,(value:any)=>value.collections.orders.statuses[secret]=1,
   (value:any)=>value.collections.payments.warnings=[secret],(value:any)=>value.collections.orders.amounts.knownAmount=secret,
   (value:any)=>value.merchant.newDestinationState=secret,(value:any)=>value.financialClearance='GRANTED'];
+ changes.push((value:any)=>value.collections.orders.validationFacts[secret]=1,
+  (value:any)=>value.collections.orders.validationFacts.amountMissing=1001,
+  (value:any)=>value.collections.orders.validationFacts.amountMissing='0',
+  (value:any)=>delete value.collections.orders.validationFacts.dueEquationMismatch);
  for(const change of changes){const value=structuredClone(report);change(value);assert.throws(()=>serializeReport(value),{message:'Safe obligations report logging refused.'});}
  let called=0;const getter=structuredClone(report);Object.defineProperty(getter,'requests',{get(){called++;return 6;}});
  assert.throws(()=>serializeReport(getter));assert.equal(called,0);
@@ -284,4 +330,6 @@ test('unknown or tampered log fields, accessors and serialization hooks fail clo
  assert.throws(()=>serializeReport(inherited));assert.equal(called,0);
  const array=structuredClone(report);Object.defineProperty(array.collections.orders.warnings,'0',{get(){called++;return secret;}});
  assert.throws(()=>serializeReport(array));assert.equal(called,0);
+ const factGetter=structuredClone(report);Object.defineProperty(factGetter.collections.orders.validationFacts,'amountMissing',{get(){called++;return 0;}});
+ assert.throws(()=>serializeReport(factGetter));assert.equal(called,0);
 });

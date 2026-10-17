@@ -19,6 +19,11 @@ const WARNINGS=Object.freeze(['NONEMPTY_HISTORY','UNKNOWN_STATUS','INVALID_RECOR
  'COLLECTION_SHAPE','PAGE_CAP','HTTP_AUTH','HTTP_RATE_LIMIT','HTTP_UNAVAILABLE','REDIRECT','CONTENT_TYPE','BODY_BOUND',
  'MALFORMED_BODY','DEADLINE','NETWORK','MISSING_ORDER_REFERENCE','MISSING_PAYMENT_REFERENCE','CROSS_CURRENCY',
  'ORDER_PAYMENT_TOTAL_REVIEW','REFUND_TOTAL_REVIEW','SUBSCRIPTION_AMOUNT_UNAVAILABLE']);
+// Fixed aggregate observations ONLY. Invalid/missing operands are not evidence
+// that an otherwise numeric order equation is wrong. Never return raw values.
+const ORDER_FACTS=Object.freeze(['amountMissing','amountNonNumeric','amountOutOfRange',
+ 'paidMissing','paidNonNumeric','paidOutOfRange','dueMissing','dueNonNumeric','dueOutOfRange',
+ 'paidExceedsAmount','dueEquationMismatch','paidStateMismatch','createdStateMismatch']);
 const integer=value=>Number.isSafeInteger(value)&&value>=0;
 const id=(value,prefix)=>typeof value==='string'&&value.startsWith(prefix)&&/^[A-Za-z0-9]{1,64}$/.test(value.slice(prefix.length));
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -32,7 +37,8 @@ function collection(name){return {complete:false,pages:0,records:0,invalidRecord
  statuses:Object.fromEntries([...COLLECTIONS[name].statuses,'unknown'].map(status=>[status,0])),
  currency:name==='subscriptions'?null:{INR:0,other:0,unknown:0},
  amounts:name==='subscriptions'?null:{unit:'minor-units',currency:'INR',knownAmount:0,
-  ...(name==='orders'?{knownPaid:0}:name==='payments'?{knownRefunded:0}:{}),complete:true},warnings:[]};}
+  ...(name==='orders'?{knownPaid:0}:name==='payments'?{knownRefunded:0}:{}),complete:true},
+ ...(name==='orders'?{validationFacts:Object.fromEntries(ORDER_FACTS.map(key=>[key,0]))}:{}),warnings:[]};}
 function base(){return {component:'cluera-test-obligations-get-only',scope:'CONFIGURED_TEST_MERCHANT_ONLY',mutations:0,requests:0,
  financialRequests:0,completeInventory:false,needsReview:true,atomicSnapshot:false,
  limitation:'BOUNDED_NON_ATOMIC_TEST_COLLECTIONS_NOT_FINANCIAL_CLEARANCE',financialClearance:'NOT_GRANTED',obligationsUnresolved:true,
@@ -114,6 +120,20 @@ async function audit(input=process.env,request=fetch,options={},monotonic=()=>pe
   }
   const amountValid=money(row,target);
   if(name==='orders'){
+   const facts=target.validationFacts;
+   const field=(name,prefix,positive)=>{
+    if(!Object.hasOwn(row,name)){facts[prefix+'Missing']++;return false;}
+    if(typeof row[name]!=='number'){facts[prefix+'NonNumeric']++;return false;}
+    if(!integer(row[name])||(positive&&row[name]===0)){facts[prefix+'OutOfRange']++;return false;}
+    return true;
+   };
+   const amountKnown=field('amount','amount',true),paidKnown=field('amount_paid','paid',false),dueKnown=field('amount_due','due',false);
+   if(amountKnown&&paidKnown&&row.amount_paid>row.amount)facts.paidExceedsAmount++;
+   if(amountKnown&&paidKnown&&dueKnown&&row.amount_due!==row.amount-row.amount_paid)facts.dueEquationMismatch++;
+   if(amountKnown&&paidKnown&&dueKnown&&status==='paid'&&(row.amount_paid!==row.amount||row.amount_due!==0))facts.paidStateMismatch++;
+   if(paidKnown&&status==='created'&&row.amount_paid!==0)facts.createdStateMismatch++;
+   // Existing strict warning/acceptance rules remain unchanged. Facts improve
+   // diagnosis only; even complete valid Test history grants no clearance.
    if(!integer(row.amount_paid)||!integer(row.amount_due)||!amountValid||row.amount_paid>row.amount||row.amount_due!==row.amount-row.amount_paid
     ||status==='paid'&&(row.amount_paid!==row.amount||row.amount_due!==0)||status==='created'&&row.amount_paid!==0){
     warning(target,'INCONSISTENT_ORDER');target.amounts.complete=false;}
@@ -211,7 +231,8 @@ function serializeReport(report){
   return record(value,{complete:boolean,pages:count(10),records:count(1000),invalidRecords:count(1000),duplicateIds:count(1000),
    statuses:value=>record(value,Object.fromEntries([...COLLECTIONS[name].statuses,'unknown'].map(status=>[status,count(1000)]))),
    currency:name==='subscriptions'?fixed(null):value=>record(value,{INR:count(1000),other:count(1000),unknown:count(1000)}),
-   amounts:name==='subscriptions'?fixed(null):value=>record(value,amounts),warnings:warnings(WARNINGS)});
+   amounts:name==='subscriptions'?fixed(null):value=>record(value,amounts),
+   ...(name==='orders'?{validationFacts:value=>record(value,Object.fromEntries(ORDER_FACTS.map(key=>[key,count(1000)])))}:{}),warnings:warnings(WARNINGS)});
  }])));
  schema.stopped=choice(['CONFIGURATION','MERCHANT_REVIEW_REQUIRED','READ_ONLY_INVENTORY_COMPLETE','INVENTORY_DEADLINE']);schema.completedAt=timestamp;
  const safe=record(report,schema),header=Object.create(null);for(const key of Object.keys(safe))if(key!=='collections')header[key]=safe[key];
