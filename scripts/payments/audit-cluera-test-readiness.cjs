@@ -18,7 +18,7 @@ let application;
 function loadApplication(){
  if(application)return application;
  const web=path.resolve(__dirname,'../../web'),webRequire=createRequire(path.join(web,'package.json'));
- const output=webRequire('esbuild').buildSync({stdin:{contents:"export {assertPaymentStaging,razorpayConfig} from './lib/payments/core/config';export {eventTypes} from './lib/payments/cluera/contracts';export {merchantDigest} from './lib/payments/cluera/config';",
+ const output=webRequire('esbuild').buildSync({stdin:{contents:"export {assertPaymentStaging,razorpayConfig} from './lib/payments/core/config';export {eventTypes} from './lib/payments/cluera/contracts';export {merchantDigest,clueraIntakeEnabled,clueraCheckoutEnabled} from './lib/payments/cluera/config';",
    resolveDir:web,loader:'ts'},bundle:true,write:false,platform:'node',format:'cjs',logLevel:'silent'}).outputFiles[0].text;
  const filename=path.join(web,'cluera-test-readiness-memory.cjs'),loaded=new Module(filename,module);
  loaded.filename=filename;loaded.paths=Module._nodeModulePaths(web);loaded._compile(output,filename);
@@ -72,22 +72,33 @@ const identity=record=>record.mode==='test'&&record.merchantOwner&&record.mercha
  * platform values fail closed; absent values require external metadata/clone/tree
  * verification. Even matching system values NEVER attest the complete Git tree.
  */
-async function audit(input=process.env,request=fetch,options={},monotonic=()=>performance.now()){
+async function inspect(input=process.env,request=fetch,options={},monotonic=()=>performance.now(),receiverId=null){
  const report=base(),finish=stopped=>({...report,stopped,completedAt:new Date().toISOString()});
+ const receiver=receiverId!==null;
+ if(receiver)Object.assign(report,{component:'cluera-test-receiver-get-only',scope:'TEST_RECEIVER_CONFIGURATION_ONLY',
+  operatorIdMatches:false,actualIntakeVerified:false,actualCheckoutDisabledVerified:false,receiverConfigurationAccepted:false});
  let env,recurring;try{
   if(!optionsValid(options)||typeof request!=='function'||typeof monotonic!=='function')return finish('CONFIGURATION');
   env=environment(input);
+  if(receiver){const external=Object.getOwnPropertyDescriptor(input,'CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED');
+   if(!external||!Object.hasOwn(external,'value')||external.value!=='false')return finish('CONFIGURATION');}
   const context=[[env.VERCEL_PROJECT_ID,PROJECT],[env.VERCEL_ORG_ID,TEAM],[env.VERCEL_GIT_COMMIT_SHA,options.expectedSourceSha]];
   if(context.some(([actual,expected])=>actual!==undefined&&actual!==expected))return finish('CONFIGURATION');
   report.deploymentContext=context.every(([actual])=>actual!==undefined)?'available-system-values-match':'external-deployment-pin-required';
   if(env.VERCEL_ENV!=='production'||env.VERCEL_TARGET_ENV!==undefined&&env.VERCEL_TARGET_ENV!=='production'
-    ||!FLAGS.every(key=>env[key]==='false')||env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED!=='true'||env.SIGMAROUND_PAYMENT_PROVIDER!=='razorpay')return finish('CONFIGURATION');
+    ||!FLAGS.every(key=>env[key]===(receiver&&['CLUERA_BILLING_V2_ENABLED','CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED'].includes(key)?'true':'false'))
+    ||env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED!=='true'||env.SIGMAROUND_PAYMENT_PROVIDER!=='razorpay')return finish('CONFIGURATION');
   report.formats={testKeyId:typeof env.RAZORPAY_TEST_KEY_ID==='string'&&/^rzp_test_[A-Za-z0-9]{8,64}$/.test(env.RAZORPAY_TEST_KEY_ID),
    apiSecret:typeof env.RAZORPAY_TEST_KEY_SECRET==='string'&&env.RAZORPAY_TEST_KEY_SECRET.length>=16&&env.RAZORPAY_TEST_KEY_SECRET.length<=256,
    webhookSecret:typeof env.RAZORPAY_TEST_WEBHOOK_SECRET==='string'&&env.RAZORPAY_TEST_WEBHOOK_SECRET.length>=32&&env.RAZORPAY_TEST_WEBHOOK_SECRET.length<=256,
    merchantId:typeof env.RAZORPAY_TEST_ACCOUNT_ID==='string'&&/^acc_[A-Za-z0-9]{8,64}$/.test(env.RAZORPAY_TEST_ACCOUNT_ID)};
   if(!Object.values(report.formats).every(value=>value))return finish('CONFIGURATION');
   const actual=loadApplication();actual.assertPaymentStaging(env);actual.razorpayConfig(env);
+  if(receiver){
+   report.actualIntakeVerified=actual.clueraIntakeEnabled(env)===true;
+   report.actualCheckoutDisabledVerified=actual.clueraCheckoutEnabled(env)===false;
+   if(!report.actualIntakeVerified||!report.actualCheckoutDisabledVerified)return finish('CONFIGURATION');
+  }
   recurring=actual.eventTypes;
   if(!Array.isArray(recurring)||recurring.length!==13||new Set(recurring).size!==13
     ||!recurring.every(name=>typeof name==='string'&&/^(?:payment\.captured|order\.paid|refund\.processed|subscription\.[a-z_]+)$/.test(name))
@@ -142,8 +153,10 @@ async function audit(input=process.env,request=fetch,options={},monotonic=()=>pe
   for(const [target,rows] of Object.entries(selected)){
    const destination=report.destinations[target];
    if(!rows.length){destination.state='MISSING';continue;}if(rows.length!==1){destination.state='AMBIGUOUS';continue;}
+   if(receiver&&target!=='clueraV2'){destination.state='NONCANONICAL_TARGET_REVIEW';continue;}
    const listed=rows[0];destination.listing=summary(listed,env.RAZORPAY_TEST_ACCOUNT_ID,recurring);
    if(!identity(destination.listing)){destination.state='IDENTITY_REVIEW';continue;}
+   if(receiver){if(listed.id!==receiverId){destination.state='OPERATOR_ID_MISMATCH';continue;}report.operatorIdMatches=true;}
    const resource='/v1/webhooks/'+listed.id;directPaths.add(resource);destination.state='DIRECT_UNAVAILABLE';
    const direct=await get(resource);
    if(!direct||typeof direct!=='object'||Array.isArray(direct))throw Error('DIRECT_SHAPE');
@@ -155,8 +168,50 @@ async function audit(input=process.env,request=fetch,options={},monotonic=()=>pe
    destination.listingConsistent=JSON.stringify(destination.listing)===JSON.stringify(destination.direct);
    destination.state='MATCHED_TEST_MERCHANT';report.merchantVerified=true;
   }
+  if(receiver){const canonical=report.destinations.clueraV2;
+   const ready=value=>value&&identity(value)&&value.active.type==='boolean'&&value.active.value===true
+    &&value.events.valid===true&&value.events.enabledCount===3&&value.events.profile==='exact-pack'&&value.signerPresence==='present';
+   report.receiverConfigurationAccepted=report.operatorIdMatches&&report.listing.complete&&report.listing.records===1
+    &&report.listing.otherDestinations===0&&report.destinations.oldAccount.count===0&&report.destinations.clueraLegacy.count===0
+    &&canonical.count===1&&canonical.state==='MATCHED_TEST_MERCHANT'&&canonical.listingConsistent
+    &&ready(canonical.listing)&&ready(canonical.direct);
+   return finish(report.receiverConfigurationAccepted?'RECEIVER_CONFIGURATION_VERIFIED':'RECEIVER_REVIEW_REQUIRED');
+  }
   return finish('READ_ONLY_REVIEW_COMPLETE');
  }catch{return finish(stage+'_UNAVAILABLE');}
+}
+// The original OFF-phase entry point cannot be switched with an extra argument.
+async function audit(input=process.env,request=fetch,options={},monotonic=()=>performance.now()){
+ return inspect(input,request,options,monotonic,null);
+}
+function receiverOptions(value){
+ if(!value||typeof value!=='object'||![null,Object.prototype].includes(Object.getPrototypeOf(value)))return null;
+ const d=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(d);
+ if(keys.some(k=>typeof k!=='string')||keys.sort().join(',')!=='expectedSourceSha,expectedWebhookId'
+  ||Object.values(d).some(p=>!Object.hasOwn(p,'value'))
+  ||typeof d.expectedSourceSha.value!=='string'||!/^[a-f0-9]{40}$/.test(d.expectedSourceSha.value)
+  ||typeof d.expectedWebhookId.value!=='string'||!/^[A-Za-z0-9_]{8,64}$/.test(d.expectedWebhookId.value))return null;
+ return {expectedSourceSha:d.expectedSourceSha.value,expectedWebhookId:d.expectedWebhookId.value};
+}
+function receiverProjection(report){
+ const c=report.destinations.clueraV2,count=(value,max)=>Number.isSafeInteger(value)&&value>=0&&value<=max?value:null;
+ return {component:'cluera-test-receiver-get-only',scope:'TEST_RECEIVER_CONFIGURATION_ONLY',
+  configurationAccepted:report.configurationAccepted===true,actualIntakeVerified:report.actualIntakeVerified===true,
+  actualCheckoutDisabledVerified:report.actualCheckoutDisabledVerified===true,merchantVerified:report.merchantVerified===true,
+  operatorIdMatches:report.operatorIdMatches===true,receiverConfigurationAccepted:report.receiverConfigurationAccepted===true,
+  listing:{complete:report.listing.complete===true,pages:count(report.listing.pages,10),records:count(report.listing.records,1000),otherDestinations:count(report.listing.otherDestinations,1000)},
+  destinations:{oldAccount:count(report.destinations.oldAccount.count,1000),clueraLegacy:count(report.destinations.clueraLegacy.count,1000),clueraV2:count(c.count,1000)},
+  canonical:{state:c.state,listing:c.listing,direct:c.direct,listingConsistent:c.listingConsistent===true},
+  signerMatch:'UNVERIFIED',signedDelivery:'UNVERIFIED',activationAuthorized:false,financialClearance:'NOT_GRANTED',
+  mutations:0,requests:count(report.requests,13),financialRequests:0,fullTreeAttested:false,externalDeploymentVerificationRequired:true,
+  stopped:report.stopped,completedAt:report.completedAt};
+}
+/** Actual receiver-only phase: no env rewriting, financial resources or events.
+ * URL/profile agreement never proves secret equality or signed delivery. */
+async function auditReceiver(input=process.env,request=fetch,options={},monotonic=()=>performance.now()){
+ const selected=receiverOptions(options);
+ if(!selected)return receiverProjection({...base(),stopped:'CONFIGURATION',completedAt:new Date().toISOString()});
+ return receiverProjection(await inspect(input,request,{expectedSourceSha:selected.expectedSourceSha},monotonic,selected.expectedWebhookId));
 }
 const PIN_PROJECT='yhnqlfcgrmckhyjdxegg';
 const PIN_FIELDS=Object.freeze(['projectRef','sourceCommit','observedAt','merchantDigest','reportDigest','testAuthentication',
@@ -218,7 +273,7 @@ function merchantPinEvidenceLine(value){
  const line='CLUERA_TEST_MERCHANT_PIN '+JSON.stringify(safe);
  return Buffer.byteLength(line,'utf8')<=1200?line:'CLUERA_TEST_MERCHANT_PIN '+JSON.stringify(pinFailure());
 }
-module.exports={audit,auditMerchantPinEvidence,merchantPinEvidenceLine};
+module.exports={audit,auditMerchantPinEvidence,merchantPinEvidenceLine,auditReceiver};
 if(require.main===module){const args=process.argv.slice(2),options=args.length===1?{expectedSourceSha:args[0]}:{};
  audit(process.env,fetch,options).then(report=>{console.log('CLUERA_TEST_READINESS '+JSON.stringify(report));process.exitCode=2;})
  .catch(()=>{console.log('CLUERA_TEST_READINESS '+JSON.stringify({stopped:'UNAVAILABLE',mutations:0,activationAuthorized:false}));process.exitCode=2;});}

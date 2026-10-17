@@ -2,7 +2,11 @@
 
 Updated October 17, 2026. Only Cluera AI and preserved SigmaRoundAI License Edition are products. Current database: `yhnqlfcgrmckhyjdxegg / cluera-ai-production`. This is a completion checklist, NOT permission to activate payments/spending or publish an installer. Commercial launch: NO-GO until the gates below pass.
 
-## Completed in this phase
+## Current receiver-only checkpoint
+
+Section2 is approved and its receiver-only stage is deployed/verified. V2/rollout/intake are now true, but checkoutfalse/pausetrue/externalfalse/catalog0enabled; no payment, worker or provider spending is activated. Reviewed65dad3f6/READYdpl_5BBA1XRqf91w1dNAXKnBjzS1mMnT passes31public boundaries plus health; CI39041296798 passes1646web/22skips and366desktop/1skip. [Exact evidence and the single consolidated essential owner checklist](CLUERA_CONTROLLED_TEST_ROLLOUT.md) now give the existing Test-webhook URL-only/private signer-continuity action. Do not ask for section2 approval again or pay yet. Older disabled-all statements below describe the earlier merchant-pin checkpoint.
+
+## Completed merchant-pin phase - historical evidence
 
 The owner approved the exact frozen Test merchant pin. It executed once at **13:32:12.820084 UTC** with operation **f5ed88ad-af8c-4d01-91f2-9237c71b5b9f**; immutable audit created13:32:12.821449UTC. Frozen template SHA-256 `c76a00e938d8588fb852442ad9f3d08a3e8bd44b51c1875ddda05711d2e35f73`; generated exact SQL SHA-256 `f0e4225846909bd120e7a65e8d76987a84ba8f518f519c900bd814258f4d9c03`. No schema or permission changed. Owner=cluera and epoch=1 remain unchanged.
 
@@ -17,7 +21,7 @@ Source completion adds fail-closed request cleanup for existing2s/7s/10s bounds,
 | Area | Actual state | Remaining gate |
 | --- | --- | --- |
 | Signup/email/password8 | Existing repair and Gmail signup template deployed; support Admin/MFA accepted | Google remains unconfigured; real recovery/session/device acceptance and remaining email templates are separate |
-| Pack billing | Immutable catalog, server order binding, raw-HMAC intake, leases, authoritative verification and exactly-once SQL implemented behind disabled flags; Test merchant now pinned | Receiver/destination/signer/worker/catalog/tester approvals, one genuine owner-operated Test purchase and actual website/Windows balance sync |
+| Pack billing | Test merchant pinned; receiver-only stage deployed and rejects unsigned input; checkout/worker/catalog disabled | Approved destination/signer continuity, processing/catalog/tester stages, one genuine owner-operated Test purchase and actual website/Windows balance sync |
 | Monthly billing | Test subscription creation, invoice/resource verification, recurring-term/refund/status processing implemented but disabled | Actual3plan mappings and lifecycle acceptance; customer cancellation/pause/resume/refund command orchestration, cross-subscription same-tier queues and Pro-to-Enterprise pause/restore rules are NOT complete |
 | History | Owner-bound handler/UI prepared, no auto fetch or fake empty state | Approve/apply exact SELECT-only schema and enable only its read capability; invoice references are not downloadable invoices; Admin-wide billing reporting remains incomplete |
 | Scheduler | Authenticated Render transport and STATUS are deployed; native worker remains passive | No processing is enabled. One-event-per-tick throughput, backlog/catch-up, crash/concurrency and alert acceptance remain; free-service sleep is not reliable unattended commercial renewal scheduling |
