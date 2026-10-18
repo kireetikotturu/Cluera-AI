@@ -2,7 +2,7 @@
 // Protected full-source diagnostic only. NO payment/settings/DB/event writes.
 // Provider contracts: official razorpay/razorpay-node lib/types/{orders,payments,
 // refunds,subscriptions}.d.ts and lib/resources/{refunds,subscriptions}.js.
-const {audit:readiness,auditReceiver:receiverReadiness}=require('./audit-cluera-test-readiness.cjs');
+const {audit:readiness,auditReceiver:receiverReadiness,auditCheckoutPrepared:preparedReadiness,auditCheckout:checkoutReadiness}=require('./audit-cluera-test-readiness.cjs');
 const COLLECTIONS=Object.freeze({
  orders:{entity:'order',prefix:'order_',statuses:['created','attempted','paid']},
  payments:{entity:'payment',prefix:'pay_',statuses:['created','authorized','captured','refunded','failed']},
@@ -27,9 +27,11 @@ const ORDER_FACTS=Object.freeze(['amountMissing','amountNonNumeric','amountOutOf
 const integer=value=>Number.isSafeInteger(value)&&value>=0;
 const id=(value,prefix)=>typeof value==='string'&&value.startsWith(prefix)&&/^[A-Za-z0-9]{1,64}$/.test(value.slice(prefix.length));
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
-function environment(input,receiver=false){
+function environment(input,receiver=false,checkout=false){
  if(!object(input))throw Error('CONFIGURATION');const env=Object.create(null);
- for(const key of receiver?[...ENV,'CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED']:ENV){const d=Object.getOwnPropertyDescriptor(input,key);
+ const names=[...ENV,...(receiver?['CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED']:[]),...(checkout?
+  ['SIGMAROUND_PAYMENT_TESTER_IDS','CLUERA_PROVIDER_VAULT_ENABLED','CLUERA_AI_BOOTSTRAP_MODE','CLUERA_PROVIDER_VAULT_KEYRING_BASE64']:[])];
+ for(const key of names){const d=Object.getOwnPropertyDescriptor(input,key);
   if(d&&(!Object.hasOwn(d,'value')||typeof d.value!=='string'))throw Error('CONFIGURATION');if(d)env[key]=d.value;}
  return Object.freeze(env);
 }
@@ -48,24 +50,29 @@ function base(){return {component:'cluera-test-obligations-get-only',scope:'CONF
  merchant:{configurationAccepted:false,testAuthentication:false,listingComplete:false,verified:false,newDestinationState:'UNVERIFIED'},
  collections:Object.fromEntries(Object.keys(COLLECTIONS).map(name=>[name,collection(name)]))};}
 /** Never return provider fields, IDs, request headers, exceptions or dynamic keys. */
-async function inspect(input=process.env,request=fetch,options={},monotonic=()=>performance.now(),receiver=false){
+async function inspect(input=process.env,request=fetch,options={},monotonic=()=>performance.now(),receiver=false,checkout=null){
  const report=base(),warning=(target,code)=>{if(!WARNINGS.includes(code))code='NETWORK';if(!target.warnings.includes(code))target.warnings.push(code);};
  const finish=stopped=>({...report,stopped,completedAt:new Date().toISOString()});
  let env,lastClock=-Infinity,deadline;
  const now=()=>{const value=monotonic();if(!Number.isFinite(value)||value<lastClock)throw Error('DEADLINE');lastClock=value;return value;};
- try{env=environment(input,receiver);if(typeof request!=='function'||typeof monotonic!=='function')throw Error('CONFIGURATION');deadline=now()+500000;}
+ try{env=environment(input,receiver||checkout!==null,checkout!==null);if(typeof request!=='function'||typeof monotonic!=='function')throw Error('CONFIGURATION');deadline=now()+500000;}
  catch{return finish('CONFIGURATION');}
  // Each entry point uses its own ACTUAL application phase guard. The original
  // remains OFF-only; receiver proof requires intake-only flags, the operator's
  // exact webhook ID and one consistent canonical Test destination. Neither
  // performs a financial resource read before its bounded webhook proof.
- let proof;try{proof=await (receiver?receiverReadiness:readiness)(env,request,options,now);}catch{return finish('MERCHANT_REVIEW_REQUIRED');}
+ const verifier=checkout==='prepared'?preparedReadiness:checkout==='enabled'?checkoutReadiness:receiver?receiverReadiness:readiness;
+ let proof;try{proof=await verifier(env,request,options,now);}catch{return finish('MERCHANT_REVIEW_REQUIRED');}
  report.requests=Number.isSafeInteger(proof.requests)?proof.requests:0;
- if(receiver){
+ if(receiver||checkout!==null){
   // Map only the completed fixed projection, never infer equality/delivery from
   // partial key authentication or secret presence.
-  const accepted=proof.stopped==='RECEIVER_CONFIGURATION_VERIFIED'&&proof.receiverConfigurationAccepted===true
-   &&proof.configurationAccepted===true&&proof.actualIntakeVerified===true&&proof.actualCheckoutDisabledVerified===true
+  const phaseAccepted=checkout===null?proof.stopped==='RECEIVER_CONFIGURATION_VERIFIED'&&proof.receiverConfigurationAccepted===true&&proof.actualCheckoutDisabledVerified===true
+   :proof.stopped===(checkout==='prepared'?'CHECKOUT_PREPARED_CONFIGURATION_VERIFIED':'CHECKOUT_CONFIGURATION_VERIFIED')
+    &&proof.phase===checkout&&proof.checkoutConfigurationAccepted===true&&proof.actualCheckoutEnabled===(checkout==='enabled')
+    &&proof.actualOwnerAllowed===(checkout==='enabled')&&proof.foreignTesterDenied===true&&proof.soleTesterVerified===true
+    &&proof.approvedOwnerMatches===true&&proof.providerConfigurationDisabled===true;
+  const accepted=phaseAccepted&&proof.configurationAccepted===true&&proof.actualIntakeVerified===true
    &&proof.operatorIdMatches===true&&proof.merchantVerified===true&&proof.listing?.complete===true
    &&proof.listing.records===1&&proof.listing.otherDestinations===0&&proof.destinations?.oldAccount===0
    &&proof.destinations.clueraLegacy===0&&proof.destinations.clueraV2===1
@@ -216,6 +223,12 @@ async function auditReceiverInventory(input=process.env,request=fetch,options={}
  return inspect(input,request,options,monotonic,true);
 }
 // Connector-safe structural validation, not authentication of an external report.
+async function auditCheckoutPreparedInventory(input=process.env,request=fetch,options={},monotonic=()=>performance.now()){
+ return inspect(input,request,options,monotonic,false,'prepared');
+}
+async function auditCheckoutInventory(input=process.env,request=fetch,options={},monotonic=()=>performance.now()){
+ return inspect(input,request,options,monotonic,false,'enabled');
+}
 function serializeReport(report){
  const refuse=()=>{throw Error('Safe obligations report logging refused.');};
  const record=(value,schema)=>{
@@ -265,7 +278,7 @@ function serializeReport(report){
  lines.push('CLUERA_TEST_OBLIGATIONS_COMPLETE '+JSON.stringify(complete));
  if(lines.some(line=>line.length>1900||Buffer.byteLength(line)>1900||/[\r\n]/.test(line)))return refuse();return lines;
 }
-module.exports={audit,auditReceiverInventory,serializeReport};
+module.exports={audit,auditReceiverInventory,auditCheckoutPreparedInventory,auditCheckoutInventory,serializeReport};
 if(require.main===module){const args=process.argv.slice(2),options=args.length===1?{expectedSourceSha:args[0]}:{};
  audit(process.env,fetch,options).then(report=>{for(const line of serializeReport(report))console.log(line);process.exitCode=2;})
  .catch(()=>{console.log('CLUERA_TEST_OBLIGATIONS_COMPLETE {"stopped":"UNAVAILABLE","completeInventory":false,"needsReview":true,"mutations":0}');process.exitCode=2;});}

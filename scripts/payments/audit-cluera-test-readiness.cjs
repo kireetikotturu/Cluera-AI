@@ -18,7 +18,7 @@ let application;
 function loadApplication(){
  if(application)return application;
  const web=path.resolve(__dirname,'../../web'),webRequire=createRequire(path.join(web,'package.json'));
- const output=webRequire('esbuild').buildSync({stdin:{contents:"export {assertPaymentStaging,razorpayConfig} from './lib/payments/core/config';export {eventTypes} from './lib/payments/cluera/contracts';export {merchantDigest,clueraIntakeEnabled,clueraCheckoutEnabled} from './lib/payments/cluera/config';",
+ const output=webRequire('esbuild').buildSync({stdin:{contents:"export {assertPaymentStaging,razorpayConfig} from './lib/payments/core/config';export {eventTypes} from './lib/payments/cluera/contracts';export {merchantDigest,clueraIntakeEnabled,clueraCheckoutEnabled,clueraCheckoutAllowed} from './lib/payments/cluera/config';",
    resolveDir:web,loader:'ts'},bundle:true,write:false,platform:'node',format:'cjs',logLevel:'silent'}).outputFiles[0].text;
  const filename=path.join(web,'cluera-test-readiness-memory.cjs'),loaded=new Module(filename,module);
  loaded.filename=filename;loaded.paths=Module._nodeModulePaths(web);loaded._compile(output,filename);
@@ -72,22 +72,36 @@ const identity=record=>record.mode==='test'&&record.merchantOwner&&record.mercha
  * platform values fail closed; absent values require external metadata/clone/tree
  * verification. Even matching system values NEVER attest the complete Git tree.
  */
-async function inspect(input=process.env,request=fetch,options={},monotonic=()=>performance.now(),receiverId=null){
+async function inspect(input=process.env,request=fetch,options={},monotonic=()=>performance.now(),receiverId=null,checkout=null){
  const report=base(),finish=stopped=>({...report,stopped,completedAt:new Date().toISOString()});
  const receiver=receiverId!==null;
+ const checkoutPhase=checkout!==null,checkoutEnabled=checkoutPhase&&checkout.enabled===true;
  if(receiver)Object.assign(report,{component:'cluera-test-receiver-get-only',scope:'TEST_RECEIVER_CONFIGURATION_ONLY',
   operatorIdMatches:false,actualIntakeVerified:false,actualCheckoutDisabledVerified:false,receiverConfigurationAccepted:false});
+ if(checkoutPhase)Object.assign(report,{checkoutConfigurationAccepted:false,actualCheckoutEnabled:false,
+  actualOwnerAllowed:false,foreignTesterDenied:false,soleTesterVerified:false,approvedOwnerMatches:false,providerSpendingBlocked:false});
  let env,recurring;try{
   if(!optionsValid(options)||typeof request!=='function'||typeof monotonic!=='function')return finish('CONFIGURATION');
   env=environment(input);
+  if(checkoutPhase){
+   // Snapshot additional ACTUAL descriptors. No flag, identity or key is rewritten.
+   for(const key of ['SIGMAROUND_PAYMENT_TESTER_IDS','CLUERA_PROVIDER_VAULT_ENABLED','CLUERA_AI_BOOTSTRAP_MODE','CLUERA_PROVIDER_VAULT_KEYRING_BASE64']){
+    const d=Object.getOwnPropertyDescriptor(input,key);
+    if(d&&(!Object.hasOwn(d,'value')||typeof d.value!=='string'))return finish('CONFIGURATION');if(d)env[key]=d.value;
+   }
+   report.providerSpendingBlocked=env.CLUERA_PROVIDER_VAULT_ENABLED==='false'&&env.CLUERA_AI_BOOTSTRAP_MODE==='auth-only'
+    &&!env.CLUERA_PROVIDER_VAULT_KEYRING_BASE64;
+   if(!report.providerSpendingBlocked)return finish('CONFIGURATION');
+  }
   if(receiver){const external=Object.getOwnPropertyDescriptor(input,'CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED');
-   if(!external||!Object.hasOwn(external,'value')||external.value!=='false')return finish('CONFIGURATION');}
+   if(!external||!Object.hasOwn(external,'value')||external.value!==(checkoutPhase?'true':'false'))return finish('CONFIGURATION');}
   const context=[[env.VERCEL_PROJECT_ID,PROJECT],[env.VERCEL_ORG_ID,TEAM],[env.VERCEL_GIT_COMMIT_SHA,options.expectedSourceSha]];
   if(context.some(([actual,expected])=>actual!==undefined&&actual!==expected))return finish('CONFIGURATION');
   report.deploymentContext=context.every(([actual])=>actual!==undefined)?'available-system-values-match':'external-deployment-pin-required';
   if(env.VERCEL_ENV!=='production'||env.VERCEL_TARGET_ENV!==undefined&&env.VERCEL_TARGET_ENV!=='production'
-    ||!FLAGS.every(key=>env[key]===(receiver&&['CLUERA_BILLING_V2_ENABLED','CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED'].includes(key)?'true':'false'))
-    ||env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED!=='true'||env.SIGMAROUND_PAYMENT_PROVIDER!=='razorpay')return finish('CONFIGURATION');
+    ||!FLAGS.every(key=>env[key]===((receiver&&['CLUERA_BILLING_V2_ENABLED','CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED'].includes(key)
+      ||checkoutEnabled&&key==='SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED')?'true':'false'))
+    ||env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED!==(checkoutEnabled?'false':'true')||env.SIGMAROUND_PAYMENT_PROVIDER!=='razorpay')return finish('CONFIGURATION');
   report.formats={testKeyId:typeof env.RAZORPAY_TEST_KEY_ID==='string'&&/^rzp_test_[A-Za-z0-9]{8,64}$/.test(env.RAZORPAY_TEST_KEY_ID),
    apiSecret:typeof env.RAZORPAY_TEST_KEY_SECRET==='string'&&env.RAZORPAY_TEST_KEY_SECRET.length>=16&&env.RAZORPAY_TEST_KEY_SECRET.length<=256,
    webhookSecret:typeof env.RAZORPAY_TEST_WEBHOOK_SECRET==='string'&&env.RAZORPAY_TEST_WEBHOOK_SECRET.length>=32&&env.RAZORPAY_TEST_WEBHOOK_SECRET.length<=256,
@@ -97,7 +111,18 @@ async function inspect(input=process.env,request=fetch,options={},monotonic=()=>
   if(receiver){
    report.actualIntakeVerified=actual.clueraIntakeEnabled(env)===true;
    report.actualCheckoutDisabledVerified=actual.clueraCheckoutEnabled(env)===false;
-   if(!report.actualIntakeVerified||!report.actualCheckoutDisabledVerified)return finish('CONFIGURATION');
+   if(checkoutPhase){
+    const ids=(env.SIGMAROUND_PAYMENT_TESTER_IDS??'').split(',').map(value=>value.trim());
+    report.soleTesterVerified=ids.length===1&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(ids[0]);
+    report.approvedOwnerMatches=report.soleTesterVerified&&ids[0]===checkout.expectedOwnerUuid;
+    if(!report.approvedOwnerMatches)return finish('CONFIGURATION');
+    const foreignUuid=(Number.parseInt(ids[0][0],16)^1).toString(16)+ids[0].slice(1);
+    report.actualCheckoutEnabled=actual.clueraCheckoutEnabled(env)===true;
+    report.actualOwnerAllowed=actual.clueraCheckoutAllowed(ids[0],env)===true;
+    report.foreignTesterDenied=actual.clueraCheckoutAllowed(foreignUuid,env)===false;
+    if(!report.actualIntakeVerified||report.actualCheckoutEnabled!==checkoutEnabled
+      ||report.actualOwnerAllowed!==checkoutEnabled||!report.foreignTesterDenied)return finish('CONFIGURATION');
+   }else if(!report.actualIntakeVerified||!report.actualCheckoutDisabledVerified)return finish('CONFIGURATION');
   }
   recurring=actual.eventTypes;
   if(!Array.isArray(recurring)||recurring.length!==13||new Set(recurring).size!==13
@@ -175,6 +200,10 @@ async function inspect(input=process.env,request=fetch,options={},monotonic=()=>
     &&report.listing.otherDestinations===0&&report.destinations.oldAccount.count===0&&report.destinations.clueraLegacy.count===0
     &&canonical.count===1&&canonical.state==='MATCHED_TEST_MERCHANT'&&canonical.listingConsistent
     &&ready(canonical.listing)&&ready(canonical.direct);
+   if(checkoutPhase){
+    report.checkoutConfigurationAccepted=report.receiverConfigurationAccepted;
+    return finish(report.checkoutConfigurationAccepted?(checkoutEnabled?'CHECKOUT_CONFIGURATION_VERIFIED':'CHECKOUT_PREPARED_CONFIGURATION_VERIFIED'):'CHECKOUT_REVIEW_REQUIRED');
+   }
    return finish(report.receiverConfigurationAccepted?'RECEIVER_CONFIGURATION_VERIFIED':'RECEIVER_REVIEW_REQUIRED');
   }
   return finish('READ_ONLY_REVIEW_COMPLETE');
@@ -212,6 +241,43 @@ async function auditReceiver(input=process.env,request=fetch,options={},monotoni
  const selected=receiverOptions(options);
  if(!selected)return receiverProjection({...base(),stopped:'CONFIGURATION',completedAt:new Date().toISOString()});
  return receiverProjection(await inspect(input,request,{expectedSourceSha:selected.expectedSourceSha},monotonic,selected.expectedWebhookId));
+}
+function checkoutOptions(value){
+ if(!value||typeof value!=='object'||![null,Object.prototype].includes(Object.getPrototypeOf(value)))return null;
+ const d=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(d);
+ if(keys.some(key=>typeof key!=='string')||keys.sort().join(',')!=='expectedOwnerUuid,expectedSourceSha,expectedWebhookId'
+  ||Object.values(d).some(p=>!Object.hasOwn(p,'value'))
+  ||typeof d.expectedSourceSha.value!=='string'||!/^[a-f0-9]{40}$/.test(d.expectedSourceSha.value)
+  ||typeof d.expectedWebhookId.value!=='string'||!/^[A-Za-z0-9_]{8,64}$/.test(d.expectedWebhookId.value)
+  ||typeof d.expectedOwnerUuid.value!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(d.expectedOwnerUuid.value))return null;
+ return {expectedSourceSha:d.expectedSourceSha.value,expectedWebhookId:d.expectedWebhookId.value,expectedOwnerUuid:d.expectedOwnerUuid.value};
+}
+function checkoutProjection(report,enabled){
+ const safe=receiverProjection(report);
+ return {component:'cluera-test-checkout-readiness-get-only',scope:'TEST_CHECKOUT_CONFIGURATION_ONLY',phase:enabled?'enabled':'prepared',
+  configurationAccepted:safe.configurationAccepted,actualIntakeVerified:safe.actualIntakeVerified,
+  actualCheckoutEnabled:report.actualCheckoutEnabled===true,actualOwnerAllowed:report.actualOwnerAllowed===true,
+  foreignTesterDenied:report.foreignTesterDenied===true,soleTesterVerified:report.soleTesterVerified===true,
+  approvedOwnerMatches:report.approvedOwnerMatches===true,providerConfigurationDisabled:report.providerSpendingBlocked===true,
+  checkoutConfigurationAccepted:report.checkoutConfigurationAccepted===true,merchantVerified:safe.merchantVerified,
+  operatorIdMatches:safe.operatorIdMatches,listing:safe.listing,destinations:safe.destinations,
+  canonical:{state:safe.canonical.state,listingConsistent:safe.canonical.listingConsistent},
+  signerMatch:'UNVERIFIED',signedDelivery:'UNVERIFIED',activationAuthorized:false,financialClearance:'NOT_GRANTED',
+  mutations:0,requests:safe.requests,financialRequests:0,databaseRequests:0,authRequests:0,
+  fullTreeAttested:false,externalDeploymentVerificationRequired:true,stopped:report.stopped,completedAt:report.completedAt};
+}
+async function checkoutInspect(input,request,options,monotonic,enabled){
+ const selected=checkoutOptions(options);
+ if(!selected)return checkoutProjection({...base(),stopped:'CONFIGURATION',completedAt:new Date().toISOString()},enabled);
+ return checkoutProjection(await inspect(input,request,{expectedSourceSha:selected.expectedSourceSha},monotonic,selected.expectedWebhookId,
+  {expectedOwnerUuid:selected.expectedOwnerUuid,enabled}),enabled);
+}
+// Distinct fixed phases. Extra arguments and caller options cannot rewrite gates.
+async function auditCheckoutPrepared(input=process.env,request=fetch,options={},monotonic=()=>performance.now()){
+ return checkoutInspect(input,request,options,monotonic,false);
+}
+async function auditCheckout(input=process.env,request=fetch,options={},monotonic=()=>performance.now()){
+ return checkoutInspect(input,request,options,monotonic,true);
 }
 const PIN_PROJECT='yhnqlfcgrmckhyjdxegg';
 const PIN_FIELDS=Object.freeze(['projectRef','sourceCommit','observedAt','merchantDigest','reportDigest','testAuthentication',
@@ -273,7 +339,7 @@ function merchantPinEvidenceLine(value){
  const line='CLUERA_TEST_MERCHANT_PIN '+JSON.stringify(safe);
  return Buffer.byteLength(line,'utf8')<=1200?line:'CLUERA_TEST_MERCHANT_PIN '+JSON.stringify(pinFailure());
 }
-module.exports={audit,auditMerchantPinEvidence,merchantPinEvidenceLine,auditReceiver};
+module.exports={audit,auditMerchantPinEvidence,merchantPinEvidenceLine,auditReceiver,auditCheckoutPrepared,auditCheckout};
 if(require.main===module){const args=process.argv.slice(2),options=args.length===1?{expectedSourceSha:args[0]}:{};
  audit(process.env,fetch,options).then(report=>{console.log('CLUERA_TEST_READINESS '+JSON.stringify(report));process.exitCode=2;})
  .catch(()=>{console.log('CLUERA_TEST_READINESS '+JSON.stringify({stopped:'UNAVAILABLE',mutations:0,activationAuthorized:false}));process.exitCode=2;});}

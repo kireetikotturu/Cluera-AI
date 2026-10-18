@@ -8,6 +8,9 @@ import { razorpayCheckoutAllowed, razorpayCheckoutEnabled } from '../core/config
 import { createPaymentOrder, paymentStatus, verifyPaymentCallback } from './service';
 
 export async function handlePaymentCheckout(request: Request): Promise<Response> {
+  // V2 owns new Cluera checkout. Keep the older API closed even when the
+  // shared Test checkout flag is enabled; legacy behavior outside V2 is intact.
+  if (process.env.CLUERA_BILLING_V2_ENABLED === 'true') return json({ error: 'Not found.' }, 404);
   let cookies: AccountCookies | undefined;
   try {
     if (!razorpayCheckoutEnabled()) return json({ error: 'Test checkout awaits configuration.' }, 404);
