@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import type { AccountConfig } from './config';
 import { AccountError } from './config';
 
-export type CookieKind = 'access' | 'refresh' | 'flow' | 'recovery';
+export type CookieKind = 'access' | 'refresh' | 'flow' | 'recovery' | 'session' | 'recovery-lock';
 export function seal(value: unknown, kind: CookieKind, config: AccountConfig, ttl: number, now = Date.now()): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', config.cookieKey, iv);
@@ -45,7 +45,21 @@ export class AccountCookies {
     }
   }
   private name(kind: CookieKind) { return `${this.config.secure ? '__Host-' : ''}sr-account-${kind}`; }
-  get(kind: CookieKind): unknown { return unseal(this.incoming.get(this.name(kind)), kind, this.config); }
+  get(kind: CookieKind): unknown {
+    if(kind==='recovery')return this.recoveryState()?.sessionId??null;
+    return unseal(this.incoming.get(this.name(kind)), kind, this.config);
+  }
+  recoveryState():{sessionId:string;resetUntil:number}|null{
+    const lock=unseal(this.incoming.get(this.name('recovery-lock')),'recovery-lock',this.config);
+    if(lock&&typeof lock==='object'&&!Array.isArray(lock)&&Object.keys(lock).length===2
+      &&'sessionId'in lock&&typeof lock.sessionId==='string'&&/^[a-f0-9-]{36}$/.test(lock.sessionId)
+      &&'resetUntil'in lock&&typeof lock.resetUntil==='number'&&Number.isSafeInteger(lock.resetUntil))return {sessionId:lock.sessionId,resetUntil:lock.resetUntil};
+    const legacy=openEnvelope(this.incoming.get(this.name('recovery')),'recovery',this.config);
+    return legacy&&typeof legacy.value==='string'?{sessionId:legacy.value,resetUntil:legacy.exp}:null;
+  }
+  recoveryResetAllowed(sessionId:string):boolean{
+    const state=this.recoveryState();return state?.sessionId===sessionId&&state.resetUntil>Date.now();
+  }
   private queue(kind:CookieKind,encoded:string,ttl:number){
     this.outgoing.push(`${this.name(kind)}=${encoded}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ttl}${this.config.secure ? '; Secure' : ''}`);
   }
@@ -60,7 +74,7 @@ export class AccountCookies {
     const encoded=prior?seal(prior.value,'flow',this.config,0,prior.exp):seal({},'flow',this.config,3600);
     this.queue('flow',encoded,3600);
   }
-  clear(): void { for (const kind of ['access', 'refresh', 'flow', 'recovery'] as const) this.set(kind, null, 0); }
+  clear(): void { for (const kind of ['access', 'refresh', 'flow', 'recovery', 'session', 'recovery-lock'] as const) this.set(kind, null, 0); }
   apply(response: Response): Response {
     for (const cookie of this.outgoing) response.headers.append('Set-Cookie', cookie);
     response.headers.set('Cache-Control', 'no-store');

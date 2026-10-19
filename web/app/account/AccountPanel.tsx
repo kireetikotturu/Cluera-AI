@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { AccountWorkspace } from './AccountWorkspace';
+import {notifyAccountSessionChanged,ACCOUNT_SESSION_STORAGE_KEY} from './AdminRoleNavigation';
+import {selectedPlanReturn,replaceAccountLocation} from '../../lib/accounts/browserNavigation';
 import {authFailure,emailNotice,signupNotice,publicLoginSchema,publicSessionSchema,safeGoogleRedirect,type PublicAccount} from '../../lib/accounts/publicAuth';
 import {MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH} from '../../lib/accounts/passwordPolicy';
 import {resolveCheckoutSelection,selectionFromSearch,clearCheckoutSelection,checkoutSelectionHref,checkoutSelectionName,type CheckoutSelection} from '../../lib/cluera/checkoutJourney';
@@ -26,16 +28,30 @@ export function AccountPanel() {
   const [selection,setSelection]=useState<CheckoutSelection|null>(null);
   const [resendSeconds,setResendSeconds]=useState(0);
   const [verificationReady,setVerificationReady]=useState(false);
+  const [google,setGoogle]=useState<'enabled'|'disabled'|'unavailable'>('unavailable');
+  const [reauthSeconds,setReauthSeconds]=useState(0);
   const inFlight = useRef(false),alive = useRef(true);
   const writeController = useRef<AbortController | null>(null),sessionController=useRef<AbortController|null>(null);
   const writeDeadline=useRef<ReturnType<typeof setTimeout>|null>(null);
   const sessionEpoch=useRef(0),writeEpoch=useRef(0),resendUntil=useRef(0);
   const verificationEmail=useRef(''),feedbackElement=useRef<HTMLDivElement|null>(null);
+  const selected=useRef<CheckoutSelection|null>(null),currentAccount=useRef<PublicAccount|null>(null);
+  const reauthUntil=useRef(0),lastSessionCheck=useRef(0),returned=useRef(false);
+  const callbackFeedback=useRef<Feedback|null>(null);
+  const restoreSession=useRef<(expectedAccountId?:string,writeCurrent?:()=>boolean)=>Promise<boolean>>(async()=>false);
   const busy=pendingAction!==null;
   const emailOnly=mode==='forgot-password'||mode==='resend-verification';
   const verificationCoolingDown=verificationAction(mode)&&resendSeconds>0;
   const cooldownActive=resendSeconds>0;
   function startResendCooldown(){resendUntil.current=Date.now()+60_000;setResendSeconds(60);}
+  function clearSessionView(){currentAccount.current=null;setAccount(null);setRecovery(false);setVisible(false);}
+  function completeSignOut(message:Feedback|null){
+    try{clearCheckoutSelection(window.sessionStorage);}catch{/* Storage is optional. */}
+    window.history.replaceState(null,'',`${window.location.pathname}#login`);
+    selected.current=null;setSelection(null);clearSessionView();verificationEmail.current='';
+    setVerificationReady(false);resendUntil.current=0;setResendSeconds(0);setReauthSeconds(0);
+    reauthUntil.current=0;setMode('login');setFeedback(message);notifyAccountSessionChanged();
+  }
   function chooseMode(value:FormMode){
     if(inFlight.current)return;
     window.history.replaceState(null,'',`${window.location.pathname}${window.location.search}#${value}`);
@@ -49,6 +65,11 @@ export function AccountPanel() {
     return()=>clearInterval(timer);
   },[cooldownActive]);
   useEffect(()=>{
+    if(reauthSeconds<=0)return;
+    const timer=setInterval(()=>setReauthSeconds(Math.max(0,Math.ceil((reauthUntil.current-Date.now())/1000))),1000);
+    return()=>clearInterval(timer);
+  },[reauthSeconds>0]);
+  useEffect(()=>{
     if(feedback&&feedback.tone!=='info'){
       feedbackElement.current?.focus({preventScroll:true});
       feedbackElement.current?.scrollIntoView?.({block:'center',inline:'nearest'});
@@ -56,8 +77,9 @@ export function AccountPanel() {
   },[feedback]);
   useEffect(() => {
     alive.current = true;
-    try{setSelection(resolveCheckoutSelection(window.location.search,window.sessionStorage));}
-    catch{setSelection(selectionFromSearch(window.location.search));}
+    try{selected.current=resolveCheckoutSelection(window.location.search,window.sessionStorage);}
+    catch{selected.current=selectionFromSearch(window.location.search);}
+    setSelection(selected.current);
     const selectMode = () => {
       if (inFlight.current) return;
       setVerificationReady(false);verificationEmail.current='';
@@ -66,32 +88,99 @@ export function AccountPanel() {
       else if (hash === '#forgot-password') setMode('forgot-password');
       else if (hash === '#resend-verification') setMode('resend-verification');
       else if (hash === '#login' || !hash) setMode('login');
-      setVisible(false);
+      setVisible(false);setFeedback(null);
     };
     selectMode();
+    const handoffQuery=new URLSearchParams(window.location.search),handoffErrors=handoffQuery.getAll('authError');
+    if(handoffErrors.length){
+      const code=handoffErrors.length===1?handoffErrors[0]:'';
+      callbackFeedback.current={tone:'error',message:code==='cancelled'?'Google sign-in was cancelled. You can use email sign-in or deliberately try Google again.':code==='link_invalid'?'This sign-in or recovery link is invalid, expired or already used. Request a new link explicitly.':'Sign-in was not completed. Try the sign-in form or request a new link explicitly.'};
+      setFeedback(callbackFeedback.current);returned.current=true;
+      handoffQuery.delete('authError');const remaining=handoffQuery.toString();
+      window.history.replaceState(null,'',`${window.location.pathname}${remaining?`?${remaining}`:''}${window.location.hash}`);
+    }
     window.addEventListener('hashchange', selectMode);
-    const controller = new AbortController(),epoch=++sessionEpoch.current;
-    sessionController.current=controller;
-    const current=()=>alive.current&&!controller.signal.aborted&&sessionEpoch.current===epoch;
-    const deadline=setTimeout(()=>{if(current()){
-      controller.abort();setLoading(false);setFeedback({tone:'error',message:'Account service is unavailable.'});
-    }},15000);
-    fetch('/api/account/session', { cache: 'no-store', signal: controller.signal }).then(async response => {
-      const data = await response.json();
-      if (current()) {
-        if (response.ok) { const session=publicSessionSchema.parse(data);setAccount(session.account); setRecovery(session.passwordRecovery); }
-        else if (response.status !== 401) setFeedback({tone:'error',message:authFailure(response.status)});
+    const readSession=async(expectedAccountId?:string,writeCurrent:()=>boolean=()=>true):Promise<boolean>=>{
+      if(!alive.current||sessionController.current||(!expectedAccountId&&inFlight.current))return false;
+      const controller=new AbortController(),epoch=++sessionEpoch.current;
+      sessionController.current=controller;lastSessionCheck.current=Date.now();
+      const current=()=>alive.current&&!controller.signal.aborted&&sessionEpoch.current===epoch&&writeCurrent();
+      const deadline=setTimeout(()=>{if(current()){
+        controller.abort();setLoading(false);setFeedback({tone:'error',message:'Account service is unavailable.'});
+        if(expectedAccountId)clearSessionView();
+        if(sessionController.current===controller)sessionController.current=null;
+      }},15000);
+      try{
+        const response=await fetch('/api/account/session',{cache:'no-store',signal:controller.signal});
+        const data=await response.json();if(!current())return false;
+        if(!response.ok){
+          if(response.status===401||response.status===403){const hadAccount=Boolean(currentAccount.current);clearSessionView();
+            if(expectedAccountId)setFeedback({tone:'error',message:'Sign-in could not be confirmed. Please sign in again.'});
+            else if(hadAccount)setFeedback({tone:'error',message:'Your session ended. Sign in again.'});}
+          else setFeedback({tone:'error',message:authFailure(response.status)});
+          return false;
+        }
+        const session=publicSessionSchema.parse(data);
+        if(expectedAccountId&&session.account.userId!==expectedAccountId){
+          clearSessionView();setFeedback({tone:'error',message:'The signed-in account changed. Check the account before continuing.'});return false;
+        }
+        const changed=currentAccount.current?.userId!==session.account.userId;
+        currentAccount.current=session.account;setAccount(session.account);setRecovery(session.passwordRecovery);
+        if(changed||expectedAccountId){setFeedback(expectedAccountId?null:callbackFeedback.current);callbackFeedback.current=null;setReauthSeconds(0);reauthUntil.current=0;}
+        const destination=selectedPlanReturn(selected.current,session.account.userId,session.passwordRecovery);
+        const sensitiveHandoff=['#forgot-password','#reset-password'].includes(window.location.hash);
+        if(destination&&!returned.current&&!sensitiveHandoff){
+          returned.current=true;try{clearCheckoutSelection(window.sessionStorage);}catch{/* Storage is optional. */}
+          selected.current=null;setSelection(null);
+          window.history.replaceState(null,'',window.location.pathname);
+          replaceAccountLocation(destination);
+        }
+        return true;
+      }catch{
+        if(current()){if(expectedAccountId)clearSessionView();setFeedback({tone:'error',message:'Account service is unavailable.'});}
+        return false;
+      }finally{
+        clearTimeout(deadline);if(current())setLoading(false);
+        if(sessionController.current===controller)sessionController.current=null;
       }
-    }).catch(() => { if (current()) setFeedback({tone:'error',message:'Account service is unavailable.'}); })
-      .finally(() => { clearTimeout(deadline);if(current())setLoading(false);if(sessionController.current===controller)sessionController.current=null; });
+    };
+    restoreSession.current=readSession;void readSession();
+    const optionsController=new AbortController(),optionsDeadline=setTimeout(()=>optionsController.abort(),10000);
+    fetch('/api/account/auth-options',{cache:'no-store',signal:optionsController.signal}).then(async response=>{
+      const data=await response.json();
+      if(!alive.current||optionsController.signal.aborted)return;
+      if(!response.ok||!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).length!==1||!['enabled','disabled','unavailable'].includes(data.google))throw new Error('Invalid options.');
+      setGoogle(data.google);
+    }).catch(()=>{if(alive.current&&!optionsController.signal.aborted)setGoogle('unavailable');}).finally(()=>clearTimeout(optionsDeadline));
+    const checkOnReturn=()=>{
+      if(document.visibilityState==='hidden'||inFlight.current||sessionController.current||Date.now()-lastSessionCheck.current<5000)return;
+      void readSession();
+    };
+    const invalidate=(event:StorageEvent)=>{
+      if(event.key!==ACCOUNT_SESSION_STORAGE_KEY)return;
+      ++writeEpoch.current;writeController.current?.abort();writeController.current=null;
+      if(writeDeadline.current!==null)clearTimeout(writeDeadline.current);
+      writeDeadline.current=null;inFlight.current=false;setPendingAction(null);
+      ++sessionEpoch.current;sessionController.current?.abort();sessionController.current=null;
+      clearSessionView();setFeedback(null);setLoading(true);void readSession();
+    };
+    window.addEventListener('storage',invalidate);window.addEventListener('focus',checkOnReturn);
+    window.addEventListener('pageshow',checkOnReturn);document.addEventListener('visibilitychange',checkOnReturn);
     return () => {
-      alive.current = false;++sessionEpoch.current;++writeEpoch.current;clearTimeout(deadline);controller.abort();
+      alive.current = false;++sessionEpoch.current;++writeEpoch.current;sessionController.current?.abort();sessionController.current=null;
+      optionsController.abort();clearTimeout(optionsDeadline);
       if(writeDeadline.current!==null)clearTimeout(writeDeadline.current);
       writeController.current?.abort();window.removeEventListener('hashchange', selectMode);
+      window.removeEventListener('storage',invalidate);window.removeEventListener('focus',checkOnReturn);
+      window.removeEventListener('pageshow',checkOnReturn);document.removeEventListener('visibilitychange',checkOnReturn);
     };
   }, []);
   async function submit(action: string, values: object = {}) {
-    if (inFlight.current||(verificationAction(action)&&resendUntil.current>Date.now())) return;
+    if(inFlight.current||(verificationAction(action)&&resendUntil.current>Date.now())
+      ||(action==='google'&&google!=='enabled')||(action==='reauthenticate'&&reauthUntil.current>Date.now()))return;
+    if('expectedAccountId' in values&&values.expectedAccountId!==currentAccount.current?.userId)return;
+    callbackFeedback.current=null;if(action==='login')returned.current=false;
+    const failureNotice=['change-password','reset-password'].includes(action)?'Password update could not be confirmed. Do not repeat it automatically. Check sign-in with the new password or use the explicit recovery flow.':uncertainNotice;
     // A restoration read may not replace a newer explicit submission's feedback.
     ++sessionEpoch.current;sessionController.current?.abort();sessionController.current=null;
     const epoch=++writeEpoch.current,current=()=>alive.current&&writeEpoch.current===epoch;
@@ -100,7 +189,7 @@ export function AccountPanel() {
     const controller=new AbortController();writeController.current=controller;
     const deadline=setTimeout(()=>{
       controller.abort();if(current()){
-        setFeedback({tone:'error',message:uncertainNotice});setPendingAction(null);setVisible(false);
+        setFeedback({tone:'error',message:failureNotice});setPendingAction(null);setVisible(false);
         inFlight.current=false;if(writeController.current===controller)writeController.current=null;
       }
     },15000);
@@ -116,16 +205,25 @@ export function AccountPanel() {
       }
       if(action==='google'){window.location.assign(safeGoogleRedirect(data));return;}
       if(action==='login'){
-        const result=publicLoginSchema.parse(data);setAccount(result.account);setRecovery(false);setFeedback(null);
-        verificationEmail.current='';setVerificationReady(false);resendUntil.current=0;setResendSeconds(0);return;
+        const result=publicLoginSchema.parse(data);clearSessionView();
+        const restored=await restoreSession.current(result.account.userId,()=>current()&&!controller.signal.aborted);
+        if(current()&&restored){notifyAccountSessionChanged();verificationEmail.current='';setVerificationReady(false);resendUntil.current=0;setResendSeconds(0);}
+        return;
       }
-      if (action === 'logout' || action === 'reset-password') {
+      if(action==='reauthenticate'){
+        if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).length!==2||data.ok!==true||data.message!==emailNotice)throw new Error('Invalid response.');
+        reauthUntil.current=Date.now()+60000;setReauthSeconds(60);
+        setFeedback({tone:'success',message:'Reauthentication email requested. Enter the latest code only if a password update requires it. No email is resent automatically.'});return;
+      }
+      if(action==='change-password'||action==='reset-password'){
+        if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).length!==3||data.ok!==true||typeof data.message!=='string'||typeof data.sessionsRevoked!=='boolean'
+          ||Object.keys(data).some(key=>!['ok','message','sessionsRevoked'].includes(key)))throw new Error('Invalid response.');
+        completeSignOut(data.sessionsRevoked?{tone:'success',message:'Password updated. Sign in again.'}
+          :{tone:'error',message:'Your password was changed and this browser was signed out. Sign-out on other devices could not be confirmed. Do not repeat the password update; sign in with the new password and contact support.'});return;
+      }
+      if (action === 'logout') {
         if(data?.ok!==true||Object.keys(data).some(k=>!['ok','message'].includes(k)))throw new Error('Invalid response.');
-        try{clearCheckoutSelection(window.sessionStorage);}catch{/* Auth works without browser storage. */}
-        window.history.replaceState(null,'',`${window.location.pathname}#login`);
-        setSelection(null);setAccount(null);setRecovery(false);verificationEmail.current='';setVerificationReady(false);resendUntil.current=0;setResendSeconds(0);
-        setMode('login');setVisible(false);
-        setFeedback(action==='reset-password'?{tone:'success',message:'Password updated. Sign in again.'}:null);return;
+        completeSignOut(null);return;
       }
       if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).length!==1||data.message!==emailNotice)throw new Error('Invalid response.');
       const email='email' in values?values.email:undefined,masked=maskedEmail(email);
@@ -134,7 +232,7 @@ export function AccountPanel() {
       }
       setFeedback({tone:'success',message:action==='signup'?signupNotice:emailNotice,maskedEmail:masked,
         ...(verificationAction(action)?{detail:'For eligible requests only. This does not confirm whether an account exists or guarantee inbox delivery. Open the latest link in this same browser.'}:{})});
-    } catch { if (current()&&!controller.signal.aborted) setFeedback({tone:'error',message:uncertainNotice}); }
+    } catch { if (current()&&!controller.signal.aborted) setFeedback({tone:'error',message:failureNotice}); }
     finally {
       clearTimeout(deadline);if(writeDeadline.current===deadline)writeDeadline.current=null;
       if(writeController.current===controller)writeController.current=null;
@@ -155,18 +253,38 @@ export function AccountPanel() {
     </aside>:null}
     {account ? <>
       <p>Signed in as <strong>{account.email}</strong></p>
-      <p>Your one-time 15-minute trial is registered. This is the isolated account staging environment.</p>
-      {!recovery ? <AccountWorkspace/> : null}
-      {recovery ? <form aria-describedby="account-auth-feedback" onSubmit={event => {
+      <p>Email verified. Your balances and plans are loaded from the account service below.</p>
+      {!recovery ? <><h2>Your workspace</h2><AccountWorkspace key={`workspace:${account.userId}`}/>
+        <details key={`security:${account.userId}`} className="account-security"><summary>Account security · Change password</summary>
+          <p>Changing a password is optional. A successful update signs you out; a failed update does not. Never share your password or reauthentication code.</p>
+          <form aria-label="Change password" aria-describedby="account-auth-feedback" onSubmit={event=>{
+            event.preventDefault();const form=event.currentTarget,data=new FormData(form);
+            const currentPassword=String(data.get('currentPassword')??''),nonce=String(data.get('nonce')??'');
+            const values={expectedAccountId:account.userId,password:String(data.get('password')??''),...(currentPassword?{currentPassword}:{}),...(nonce?{nonce}:{})};
+            form.reset();void submit('change-password',values);
+          }}>
+            <label>Current password (when required)<input name="currentPassword" type="password" maxLength={MAX_PASSWORD_LENGTH} autoComplete="current-password" disabled={busy}/></label>
+            <label>New password<input name="password" type="password" minLength={MIN_PASSWORD_LENGTH} maxLength={MAX_PASSWORD_LENGTH} autoComplete="new-password" required disabled={busy}/></label>
+            <p>Use {MIN_PASSWORD_LENGTH}–{MAX_PASSWORD_LENGTH} characters. Strong passphrases are welcome.</p>
+            <label>Reauthentication code (only if requested)<input name="nonce" type="text" inputMode="numeric" pattern="[0-9]{6,12}" minLength={6} maxLength={12} autoComplete="one-time-code" disabled={busy}/></label>
+            <button className="button" type="submit" disabled={busy}>{pendingAction==='change-password'?'Updating password…':'Change password and sign out'}</button>
+          </form>
+          <button className="button secondary" type="button" disabled={busy||reauthSeconds>0}
+            onClick={()=>void submit('reauthenticate',{expectedAccountId:account.userId})}>
+            {reauthSeconds>0?`Request another code in ${reauthSeconds}s`:'Email a reauthentication code'}
+          </button><p>No code is requested automatically. Email sending and server rate limits still apply.</p>
+        </details></> : null}
+      {recovery ? <form key={account.userId} aria-describedby="account-auth-feedback" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget;
         const password = String(new FormData(form).get('password') ?? '');
-        form.reset();void submit('reset-password', { password });
+        form.reset();void submit('reset-password', { password,expectedAccountId:account.userId });
       }}>
+        <h2>Choose a new password</h2><p>This browser is in a verified password-recovery flow. Update your password, then sign in again.</p>
         <label>New password<input name="password" type="password" minLength={MIN_PASSWORD_LENGTH} maxLength={MAX_PASSWORD_LENGTH} autoComplete="new-password" required disabled={busy}/></label>
         <button className="button" type="submit" disabled={busy}>Update password and sign out</button>
       </form> : null}
       {feedbackRegion}
-      <button className="button secondary" type="button" disabled={busy} onClick={() => void submit('logout')}>Sign out of this browser</button>
+      <button className="button secondary" type="button" disabled={busy} onClick={() => void submit('logout',{expectedAccountId:account.userId})}>Sign out of this browser</button>
     </> : <>
       <div className="account-auth-brand" aria-hidden="true">C</div><p className="account-ui-kicker">CLUERA AI · TEST WORKSPACE</p>
       <h2>{mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create an account' : mode==='resend-verification'?'Resend verification':'Reset your password'}</h2>
@@ -191,7 +309,8 @@ export function AccountPanel() {
           {resendSeconds>0?`Resend verification email — wait at least ${resendSeconds}s`:'Resend verification email'}
         </button><p>No email is resent automatically. Server sending limits may require a longer wait.</p>
       </div>:null}
-      <button className="button secondary" type="button" disabled={busy} onClick={() => void submit('google')}>Continue with Google</button>
+      <button className="button secondary" type="button" disabled={busy||google!=='enabled'} aria-describedby="account-google-status" onClick={() => void submit('google')}>Continue with Google</button>
+      <p id="account-google-status">{google==='enabled'?'Google sign-in is configured. You choose whether to continue.':google==='disabled'?'Google sign-in is not enabled for this deployment. Use email sign-in.':'Google sign-in availability could not be verified. Email sign-in remains available.'}</p>
       {mode==='resend-verification'?<p>Open the latest verification link in this same browser. This does not reset your password.</p>:null}
       <div className="account-actions">{(['login', 'signup', 'forgot-password','resend-verification'] as const).filter(value => value !== mode).map(value =>
         <button type="button" disabled={busy} key={value} onClick={() => chooseMode(value)}>

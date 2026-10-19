@@ -18,7 +18,7 @@ function makeAuth() {
     refreshSession: vi.fn(async () => ({ data: { session }, error: null })),
     exchangeCodeForSession: vi.fn(async () => ({ data: { session }, error: null })),
     signUp: vi.fn(async () => ({ error: null })), resend:vi.fn(async()=>({error:null})), resetPasswordForEmail: vi.fn(async () => ({ error: null })),
-    updateUser: vi.fn(async () => ({ error: null })),
+    updateUser: vi.fn(async () => ({ data:{user},error: null })),
     signInWithOAuth: vi.fn(async () => ({ data: { url: 'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google' }, error: null })) };
 }
 beforeEach(() => {
@@ -254,10 +254,12 @@ describe('customer BFF authentication', () => {
     expect(auth.resetPasswordForEmail).toHaveBeenCalledWith(user.email, { redirectTo: 'https://cluera-ai-staging.vercel.app/api/account/callback' });
   });
   it('starts only Google via PKCE and requires bound verifier on callback', async () => {
+    vi.stubGlobal('fetch',vi.fn(async()=>Response.json({external:{google:true}})));
     const start = await handleAccount(request('google'), 'google'); expect(start.status).toBe(200);
     expect(auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: 'https://cluera-ai-staging.vercel.app/api/account/callback', skipBrowserRedirect: true } });
     const callback = new Request('https://cluera-ai-staging.vercel.app/api/account/callback?code=synthetic');
-    expect((await handleAccount(callback, 'callback')).status).toBe(401);
+    const rejected=await handleAccount(callback,'callback');expect(rejected.status).toBe(303);
+    expect(rejected.headers.get('location')).toBe('https://cluera-ai-staging.vercel.app/account?authError=link_invalid#login');
     expect(auth.exchangeCodeForSession).not.toHaveBeenCalled();
     const bound = new Request(callback.url, { headers: { cookie: cookiePair('flow', { 'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier': 'test' }) } });
     const complete = await handleAccount(bound, 'callback'); expect(complete.status).toBe(303);

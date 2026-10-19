@@ -5,9 +5,11 @@ import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {AccountPanel} from '../app/account/AccountPanel';
 import {emailNotice} from '../lib/accounts/publicAuth';
 import {resolveCheckoutSelection} from '../lib/cluera/checkoutJourney';
+import {replaceAccountLocation} from '../lib/accounts/browserNavigation';
+vi.mock('../lib/accounts/browserNavigation',async original=>({...await original<typeof import('../lib/accounts/browserNavigation')>(),replaceAccountLocation:vi.fn()}));
 vi.mock('../app/account/AccountWorkspace',()=>({AccountWorkspace:()=>createElement('p',{},'Synthetic account workspace')}));
 let host:HTMLDivElement,root:ReturnType<typeof createRoot>;
-beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);sessionStorage.clear();host=document.createElement('div');document.body.append(host);root=createRoot(host);history.replaceState(null,'','/account');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({},{status:401})));});
+beforeEach(()=>{vi.mocked(replaceAccountLocation).mockClear();vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);sessionStorage.clear();host=document.createElement('div');document.body.append(host);root=createRoot(host);history.replaceState(null,'','/account');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({},{status:401})));});
 afterEach(()=>{act(()=>root.unmount());host.remove();vi.useRealTimers();vi.unstubAllGlobals();});
 const requestedSignupNotice='Verification email sent! Please check your inbox and click the verification link to activate your Cluera AI account.';
 function fillSignup(email='synthetic@example.invalid',password='12345678'){
@@ -71,7 +73,7 @@ it('holds a second signup while pending and shows loading without storing a pass
 });
 it.each(['reject','401'])('does not let a late initial-session %s erase later signup feedback',async outcome=>{
  vi.useFakeTimers();history.replaceState(null,'','/account#signup');let finish!:(value:Response)=>void,reject!:(reason:Error)=>void;
- vi.stubGlobal('fetch',vi.fn((_url:any,init?:RequestInit)=>init?.method==='POST'?Promise.resolve(Response.json({message:emailNotice})):
+ vi.stubGlobal('fetch',vi.fn((_url:any,init?:RequestInit)=>_url==='/api/account/auth-options'?Promise.resolve(Response.json({google:'disabled'})):init?.method==='POST'?Promise.resolve(Response.json({message:emailNotice})):
   new Promise<Response>((resolve,fail)=>{finish=resolve;reject=fail;})));
  await act(async()=>root.render(createElement(AccountPanel)));await act(async()=>{await vi.advanceTimersByTimeAsync(15001);});
  fillSignup();await sendForm();expect(host.textContent).toContain(requestedSignupNotice);
@@ -110,7 +112,7 @@ it('updates an existing browser page for a new handoff and clears the previous p
  await act(async()=>{history.replaceState(null,'','/account#signup');window.dispatchEvent(new HashChangeEvent('hashchange'));});
  expect(host.querySelector('h2')?.textContent).toBe('Create an account');expect((host.querySelector('input[name="password"]') as HTMLInputElement).value).toBe('');
  await act(async()=>{history.replaceState(null,'','/account#forgot-password');window.dispatchEvent(new HashChangeEvent('hashchange'));});
- expect(host.querySelector('h2')?.textContent).toBe('Reset your password');expect(host.querySelector('input[name="password"]')).toBeNull();expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+ expect(host.querySelector('h2')?.textContent).toBe('Reset your password');expect(host.querySelector('input[name="password"]')).toBeNull();expect(vi.mocked(fetch).mock.calls.filter(([url])=>url==='/api/account/session')).toHaveLength(1);
 });
 it('clears a remembered resend recipient on mode navigation without bypassing its backoff',async()=>{
  history.replaceState(null,'','/account#signup');
@@ -143,7 +145,7 @@ it('rejects malformed account snapshots rather than entering the workspace',asyn
 });
 it('offers explicit email-only verification resend with no automatic request',async()=>{
  history.replaceState(null,'','/account#resend-verification');const fetcher=vi.fn(async(_url:any,init?:RequestInit)=>init?.method==='POST'?Response.json({message:emailNotice}):Response.json({},{status:401}));vi.stubGlobal('fetch',fetcher);
- await act(async()=>root.render(createElement(AccountPanel)));expect(host.querySelector('h2')?.textContent).toBe('Resend verification');expect(host.querySelector('input[name="password"]')).toBeNull();expect(fetcher).toHaveBeenCalledOnce();
+ await act(async()=>root.render(createElement(AccountPanel)));expect(host.querySelector('h2')?.textContent).toBe('Resend verification');expect(host.querySelector('input[name="password"]')).toBeNull();expect(fetcher.mock.calls.filter(([url])=>url==='/api/account/session')).toHaveLength(1);
  (host.querySelector('input[name="email"]') as HTMLInputElement).value='fixture@example.invalid';await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
  const post=fetcher.mock.calls.find(([,init])=>init?.method==='POST')!;expect(post[0]).toBe('/api/account/resend-verification');expect(JSON.parse(post[1]!.body as string)).toEqual({email:'fixture@example.invalid'});expect(host.textContent).toContain(emailNotice);
 });
@@ -152,18 +154,17 @@ it('retains the selected plan through signup and email/Google return without req
  await act(async()=>root.render(createElement(AccountPanel)));
  expect(host.textContent).toContain('Selected plan: Cluera Pro 100 Hours');
  expect(sessionStorage.getItem('cluera.checkout-selection.v1')).toContain('cluera_monthly_100h_v2');
- expect(vi.mocked(fetch).mock.calls.every(([url,init])=>url==='/api/account/session'&&!init?.method)).toBe(true);
+ expect(vi.mocked(fetch).mock.calls.every(([url,init])=>['/api/account/session','/api/account/auth-options'].includes(String(url))&&!init?.method)).toBe(true);
  await act(async()=>Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Back to sign in')!.click());
  expect(location.search).toBe('?offer=cluera_monthly_100h_v2');
 });
 const syntheticAccount={userId:'00000000-0000-4000-8000-000000000801',email:'fixture@example.invalid',trialSecondsGranted:900,remoteDesktop:false};
-it('a restored verified session offers the remembered plan but never automatically navigates or starts checkout',async()=>{
+it('a restored verified session returns only to the remembered plan without starting a purchase',async()=>{
  resolveCheckoutSelection('?offer=cluera_monthly_40h_v2',sessionStorage);
  const request=vi.fn(async()=>Response.json({account:syntheticAccount,passwordRecovery:false}));vi.stubGlobal('fetch',request);
  await act(async()=>root.render(createElement(AccountPanel)));
- const link=host.querySelector<HTMLAnchorElement>('a[href*="checkout"]')!;
- expect(link.textContent).toBe('Continue to selected plan');expect(link.getAttribute('href')).toBe('/account/checkout?offer=cluera_monthly_40h_v2');
- expect(location.pathname).toBe('/account');expect(request).toHaveBeenCalledOnce();expect(host.querySelector('script')).toBeNull();
+ expect(replaceAccountLocation).toHaveBeenCalledExactlyOnceWith('/account/checkout?offer=cluera_monthly_40h_v2');
+ expect(sessionStorage.getItem('cluera.checkout-selection.v1')).toBeNull();expect(request.mock.calls.every(([,init])=>!init?.method)).toBe(true);expect(host.querySelector('script')).toBeNull();
 });
 it('password recovery cannot expose the plan continuation and logout clears both selection storage and query',async()=>{
  history.replaceState(null,'','/account?offer=cluera_pack_3h_v2');

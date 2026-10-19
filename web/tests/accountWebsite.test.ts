@@ -62,7 +62,7 @@ it('uses Account branding, navigation, CTAs and setup copy without legacy onboar
  for(const html of [home,setup,layout]){expect(html).not.toContain('href="/download/installer"');expect(html).not.toContain('href="/admin"');expect(html).not.toContain('Activate your license');expect(html).not.toContain('One-time purchase');expect(html).not.toContain('Bring your own AI');}
  expect(home).toContain('href="/download"');expect(home).toContain('shared account balance');
  expect(setup).toContain('ClueraAITestSetup-');expect(setup).toContain('no personal provider credentials');
- expect(layout).toContain('href="/account/admin"');expect(layout).toContain('My account');
+ expect(layout).not.toContain('href="/account/admin"');expect(layout).not.toContain('>Admin<');expect(layout).toContain('My account');
  expect(layout).toContain('class="account-site cluera-site"');
  expect(siteMetadata.description).toContain('managed AI');expect(downloadMetadata.title).toContain('Cluera');expect(setupMetadata.description).not.toContain('activate');
  expect(mocks.rpc).not.toHaveBeenCalled();expect(mocks.legacy).not.toHaveBeenCalled();

@@ -1,6 +1,7 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {usageDuration} from '../../lib/usage/display';
+import {AdminRoleLink} from './AdminRoleNavigation';
 interface Workspace {
  displayName:string;
  balance:{availableMilliseconds:number;reservedMilliseconds:number;spentMilliseconds:number};
@@ -75,7 +76,7 @@ export function AccountWorkspace(){
   </form>
   <h3>Plans and billing</h3>
   {data.plans.length?data.plans.map((plan,i)=><p key={i}>{plan.tier} · {plan.state} · {plan.paymentState}{plan.endsAt?` · until ${new Date(plan.endsAt).toLocaleDateString()}`:''}{plan.cancelFuture?' · renewal stopped':''}{plan.state==='PAUSED'?` · preserved ${minutes(plan.remainingMilliseconds??0)} of access time`:''}</p>):<p>No recurring paid plan is active. Staging test allowances, if granted, appear in the balance above.</p>}
-  <p>Sandbox checkout acceptance is blocked; do not repeat an unresolved payment attempt.</p>
+  <p><a href="/account/checkout?offer=cluera_pack_3h_v2">View credit purchase availability and payment status</a>. Access is verified again there. Do not repeat an unresolved payment attempt. Payment history appears there only when available; Live payments remain disabled.</p>
   <h3>Recent AI sessions</h3>
   {data.sessions.length?<ul>{data.sessions.map((session,i)=><li key={i}>{new Date(session.startedAt).toLocaleString()} · {session.state}</li>)}</ul>:<p>No account-managed AI sessions yet.</p>}
   <h3>Private context</h3><p>Save résumé text, a job description, supporting context or instructions. Text only here, up to 120 KB per document and 20 documents. In the account desktop, Settings → Selected account context also imports PDF/DOCX/TXT/Markdown as extracted text. Only documents you explicitly select there contribute bounded excerpts to future answers. Original files are not stored in the cloud.</p>
@@ -85,7 +86,7 @@ export function AccountWorkspace(){
    <button className="button secondary" disabled={locked}>Save private context</button>
   </form>
   <ul>{data.documents.map(doc=><li key={doc.id}>{doc.name} · {doc.kind} · {doc.bytes} bytes <button type="button" disabled={locked} onClick={()=>void submit({body:{action:'DELETE_CONTEXT',operationId:crypto.randomUUID(),id:doc.id}})}>Delete</button></li>)}</ul>
-  <p><a href="/account/download">Cluera TEST download / updates</a> · <a href="/account/admin">Cluera administration</a></p>
+  <p><a href="/account/download">Cluera TEST download / updates</a> · <AdminRoleLink>Cluera administration</AdminRoleLink></p>
   <p>The Cluera TEST installer has its own installation and update trust. A download is available only after explicit Cluera release approval.</p>
  </>:!loading?<p>No verified account snapshot is available. <a href="/account">Return to sign in</a>.</p>:null}</div>;
 }
