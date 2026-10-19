@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {metadataListSchema,metadataSchema,type Metadata} from '../../../lib/aiProviders/publicMetadata';
+import {ProviderUsage} from './ProviderUsage';
 
 const endpoint='/api/account/admin/ai-providers';
 const labels={gemini:'Google Gemini',deepgram:'Deepgram Flux',openai:'OpenAI',anthropic:'Anthropic Claude'};
@@ -77,6 +78,6 @@ export function AiProviders({disabled=false}:{disabled?:boolean}){
     </fieldset>
    </form><p>Fallback: none. Discovered models are not automatically approved. Metadata tests do not prove streaming quality, billing permissions or actual availability.</p>
   </article>;})}</div>
-  <p>Usage/cost telemetry: not activated. No estimated invoice total or zero-cost claim is shown. Prices, balances and payment controls are unchanged.</p>
+  <ProviderUsage disabled={disabled}/>
  </div>;
 }

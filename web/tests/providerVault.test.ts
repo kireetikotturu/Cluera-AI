@@ -102,6 +102,8 @@ describe('encrypted Cluera provider vault',()=>{
   for(const missing of ['SUPABASE_SERVICE_ROLE_KEY','SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64'])expect(()=>relayConfig({...base,[missing]:undefined})).toThrow();
   expect(()=>relayConfig({...base,SIGMAROUND_ACCOUNT_ORIGIN:'https://sigmaround-account-staging.vercel.app'})).toThrow();
   expect(()=>relayConfig({...base,CLUERA_AI_BOOTSTRAP_MODE:'admin-vault'})).toThrow();
+  expect(()=>relayConfig({...base,CLUERA_PROVIDER_TELEMETRY_ENABLED:'true'})).toThrow();
+  expect(()=>relayConfig({...base,CLUERA_PROVIDER_TELEMETRY_ENABLED:'yes'})).toThrow();
   const providers=approvedProviders(config);await expect(providers.prepare!('gemini')).rejects.toThrow();
  });
 });

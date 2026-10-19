@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { assertPaymentStaging } from '../core/config';
 import type { PaymentRpc } from '../core/types';
-import { billingRpc, clueraBillingV2Enabled } from './config';
+import { billingOwner, billingRpc, clueraBillingV2Enabled } from './config';
 import { ClueraBillingError } from './contracts';
 import { clueraBillingHistorySchema } from './historyContracts';
 import { accountClients } from '../../accounts/clients';
@@ -64,9 +64,12 @@ export async function readClueraBillingHistory(rpc: PaymentRpc,
   if (!clueraBillingV2Enabled(env)) throw new ClueraBillingError('CONFIGURATION');
   assertPaymentStaging(env);
   z.uuid().parse(account.userId); z.uuid().parse(account.sessionId);
-  const history = clueraBillingHistorySchema.parse(await billingRpc(rpc, 'cluera_billing_history', {
-    p_user: account.userId, p_session: account.sessionId,
+  const native=env.CLUERA_NATIVE_RECURRING_HISTORY_ENABLED==='true';
+  const owner=native?await billingOwner(rpc,env):null;
+  const history = clueraBillingHistorySchema.parse(await billingRpc(rpc, native?'cluera_billing_native_history':'cluera_billing_history', {
+    p_user: account.userId, p_session: account.sessionId,...(owner?{p_account_digest:owner.accountDigest,p_epoch:owner.epoch}:{}),
   }));
+  if(native&&!history.nativeSchedule)throw new ClueraBillingError('UNAVAILABLE');
   if (history.userId !== account.userId) throw new ClueraBillingError('UNAVAILABLE');
   return history;
 }

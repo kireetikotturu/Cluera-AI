@@ -23,7 +23,7 @@ export default async function CheckoutPage() {
       ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
     return <main className="account-page"><h1>Buy Cluera credits</h1>
       <p>Razorpay Test only. Checkout requires a separately approved rollout and the existing verified tester gate. No Live payments or Stripe.</p>
-      <ClueraCheckoutClient enabled={clueraCheckoutEnabled()} historyEnabled={clueraBillingHistoryEnabled()} cancellationEnabled={clueraCancellationEnabled()}/>
+      <ClueraCheckoutClient enabled={clueraCheckoutEnabled()} historyEnabled={clueraBillingHistoryEnabled()} cancellationEnabled={clueraCancellationEnabled()} firstSubscriptionOnly={process.env.CLUERA_RECURRING_SCHEDULE_ENABLED==='true'}/>
       <a href="/account">Return to your account</a></main>;
   }
   // Presentation only: a paused new Cluera rollout must not need old Paddle

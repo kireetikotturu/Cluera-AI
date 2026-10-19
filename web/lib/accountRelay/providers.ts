@@ -1,7 +1,9 @@
 import WebSocket from 'ws';
 import { DEEPGRAM_MODEL, GEMINI_MODEL, secretFilter, type Generate } from './protocol';
+import {providerReceiptMetadata} from '../aiProviders/telemetry';
+import type {ReceiptMetadata} from '../aiProviders/usageMetadata';
 
-export type Guard = { signal: AbortSignal; assertActive(): void };
+export type Guard = { signal: AbortSignal; assertActive(): void; runId?:string };
 export type ProviderSecrets = { geminiKey?: string; deepgramKey?: string; serviceKey: string; rateKey: string };
 export type AudioConnection = { write(bytes: Buffer): void; forceEndTurn(): void; close(): void };
 export type Providers = {
@@ -18,6 +20,7 @@ const unavailable = () => new Error('Provider unavailable.');
 export function providerAdapters(secrets: ProviderSecrets, dependencies: {
   fetch?: typeof fetch; connect?: (url: string, options: WebSocket.ClientOptions) => WebSocket;
   resolveModel?: (input: Generate) => Promise<string>;
+  receipt?: (metadata:ReceiptMetadata)=>void;
 } = {}): Providers {
   const request = dependencies.fetch ?? fetch;
   const connect = dependencies.connect ?? ((url, options) => new WebSocket(url, options));
@@ -56,6 +59,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
           const data = raw.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5)).join('\n').trim();
           if (!data || data === '[DONE]') return;
           const value = JSON.parse(data);
+          const receipt=providerReceiptMetadata('gemini',value);if(receipt)dependencies.receipt?.(receipt);
           if (value.error) throw unavailable();
           // Gemini can return HTTP 200 for blocked prompts/candidates. These are
           // bounded failures, never a successful empty or policy-blocked answer.
@@ -132,6 +136,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
           try {
             active();
             const value = JSON.parse(raw.toString());
+            const receipt=providerReceiptMetadata('deepgram',value);if(receipt)dependencies.receipt?.(receipt);
             if (value.type === 'Error') throw unavailable();
             if (!fluxEvents.has(value.event) || typeof value.transcript !== 'string' || value.transcript.length > 16000) return;
             const transcript = secretFilter(privateValues).push(value.transcript, true);

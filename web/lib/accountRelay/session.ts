@@ -172,7 +172,7 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
           await ensureStarted(); touch();
           if (abort.signal.aborted) return;
           const signal = AbortSignal.any([run!.signal, abort.signal]);
-          await dependencies.providers.generate(command, { signal, assertActive() { active(); if (signal.aborted) throw Error(); } }, text => {
+          await dependencies.providers.generate(command, { signal, runId:run!.runId, assertActive() { active(); if (signal.aborted) throw Error(); } }, text => {
             active(); if (signal.aborted) throw Error(); touch(); send({ type: 'answer', id: command.id, text });
           });
           if (!signal.aborted) send({ type: 'answerDone', id: command.id });

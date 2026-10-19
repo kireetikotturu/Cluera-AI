@@ -5,6 +5,7 @@ import { razorpayTransport } from '../providers/razorpay/transport';
 import { billingOwner, billingRpc, clueraIntakeEnabled } from './config';
 import { bindingSchema, ClueraBillingError, eventSchema, orderId, paymentId } from './contracts';
 import { clueraRazorpayAdapter } from './adapter';
+import { applyClueraNativeRecurringEvent } from './nativeRecurring';
 
 /** One separately leased event. Shared SQL owner/epoch and immutable source IDs prevent double financial writers. */
 export async function reconcileClueraPayment(rpc: PaymentRpc, env = process.env, request: typeof fetch = fetch) {
@@ -52,6 +53,8 @@ export async function reconcileClueraPayment(rpc: PaymentRpc, env = process.env,
     const projected = {...rawBinding as Record<string,unknown>};delete projected.legacy;
     const binding = bindingSchema.parse(projected);
     const evidence = await gateway.inspect(binding,eventSchema.parse(Object.fromEntries(Object.entries(claimed).filter(([key])=>!['code','claimId','legacy'].includes(key)))));
+    if(binding.revision.kind==='RECURRING'&&env.CLUERA_RECURRING_SCHEDULE_ENABLED==='true')
+      return await applyClueraNativeRecurringEvent(rpc,{eventId:claimed.eventId,claimId:claimed.claimId,digest:claimed.digest},binding,evidence,env);
     const result = await billingRpc(rpc,'cluera_billing_apply',{p_event:claimed.eventId,p_claim:claimed.claimId,p_digest:claimed.digest,
       p_account_digest:accountDigest,p_epoch:epoch,p_evidence:evidence});
     const code = (result as {code?:unknown})?.code;

@@ -22,6 +22,8 @@ export function relayConfig(env = process.env) {
   const providerMode=env.CLUERA_AI_BOOTSTRAP_MODE??'legacy-environment';
   if(!['legacy-environment','auth-only','admin-vault'].includes(providerMode))fail();
   if(providerMode==='admin-vault')vaultKeyring(env);
+  if(env.CLUERA_PROVIDER_TELEMETRY_ENABLED!==undefined&&!['true','false'].includes(env.CLUERA_PROVIDER_TELEMETRY_ENABLED))fail();
+  if(env.CLUERA_PROVIDER_TELEMETRY_ENABLED==='true'&&providerMode!=='admin-vault')fail();
   // Explicit auth-only bootstrap still requires EVERY infrastructure guard.
   // No fabricated provider key or automatic legacy credential migration.
   return { port, database: STAGING_DATABASE, site: STAGING_SITE, rateKey,

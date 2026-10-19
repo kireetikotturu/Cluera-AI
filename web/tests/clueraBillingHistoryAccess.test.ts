@@ -8,6 +8,7 @@ import {clueraBillingHistoryEnabled,handleClueraBillingHistory} from '../lib/pay
 import ClueraBillingHistory from '../app/account/checkout/ClueraBillingHistory';
 import {GET as historyGet} from '../app/api/account/payments/cluera/history/route';
 import {paymentTestEnvironment} from './helpers/paymentTestMode';
+import {merchantDigest}from'../lib/payments/cluera/config';
 
 const hooks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:hooks.clients}));
@@ -18,6 +19,11 @@ const empty=(userId=user)=>({code:'ACTIVE',userId,payments:[],subscriptions:[],h
 const populated=()=>({...empty(),payments:[{paymentId:'pay_synthetichistory01',invoiceId:null,subscriptionId:null,state:'VERIFIED',
  revision:{revisionId:'00000000-0000-4000-8000-000000000804',offerCode:'cluera_pack_3h_v2',version:1,name:'Synthetic verified pack',kind:'PACK',amountPaise:54900,currency:'INR',allowanceSeconds:10800},
  intentCreatedAt:'2026-10-17T12:00:00.000Z',paidAt:null,periodStart:null,periodEnd:null}]});
+const savedHistory=()=>{const now=Date.now(),revision={...populated().payments[0].revision,offerCode:'cluera_monthly_40h_v2',kind:'RECURRING',amountPaise:549900,allowanceSeconds:144000,name:'Saved Pro 40 Hours'};
+ const saved={invoiceId:'inv_savedhistory0001',subscriptionId:'sub_savedhistory0001',revision,state:'PRESERVED',startsAt:null,endsAt:null,savedWallMilliseconds:20*86400000,allowanceMilliseconds:144000000,spentMilliseconds:3600000,reservedMilliseconds:0,remainingAllowanceMilliseconds:140400000,spendableMilliseconds:0};
+ const queued={...saved,invoiceId:'inv_queuedhistory0001',subscriptionId:'sub_queuedhistory0001',state:'QUEUED',savedWallMilliseconds:30*86400000,spentMilliseconds:0,remainingAllowanceMilliseconds:144000000};
+ const active={...saved,invoiceId:'inv_activehistory0001',subscriptionId:'sub_activehistory0001',revision:{...revision,offerCode:'cluera_monthly_200h_v2',name:'Current Enterprise 200 Hours',amountPaise:1954900,allowanceSeconds:720000},state:'ACTIVE',startsAt:new Date(now-86400000).toISOString(),endsAt:new Date(now+29*86400000).toISOString(),savedWallMilliseconds:null,allowanceMilliseconds:720000000,spentMilliseconds:0,remainingAllowanceMilliseconds:720000000,spendableMilliseconds:720000000};
+ return{...empty(),nativeSchedule:{observedAt:new Date(now).toISOString(),terms:[saved,queued,active],hasMoreTerms:false}};};
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 let rpc:ReturnType<typeof vi.fn>,host:HTMLDivElement,root:Root;
 beforeEach(()=>{
@@ -53,6 +59,11 @@ it('same-owner GET calls exactly one SELECT-only history RPC even when checkout/
  expect(response.status).toBe(200);expect(await response.json()).toEqual({history:empty()});expect(response.headers.get('cache-control')).toBe('no-store');
  expect(rpc).toHaveBeenCalledExactlyOnceWith('cluera_billing_history',{p_user:user,p_session:session});expect(hooks.limit).toHaveBeenCalledOnce();expect(fetch).not.toHaveBeenCalled();
 });
+it('native presentation uses only the separately enabled pinned SELECT RPC while every financial/native execution gate is disabled',async()=>{
+ vi.stubEnv('CLUERA_NATIVE_RECURRING_HISTORY_ENABLED','true');vi.stubEnv('CLUERA_RECURRING_SCHEDULE_ENABLED','false');vi.stubEnv('SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED','true');vi.stubEnv('SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED','false');
+ const digest=merchantDigest(),history=savedHistory();rpc.mockImplementation(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?(args.p_account_digest===digest?{code:'ACTIVE',owner:'cluera',epoch:1}:{code:'CONFLICT'}):name==='cluera_billing_native_history'?history:null,error:null}));
+ const response=await handleClueraBillingHistory(request());expect(response.status).toBe(200);expect(await response.json()).toEqual({history});expect(rpc.mock.calls.map(([name])=>name)).toEqual(['cluera_billing_owner','cluera_billing_owner','cluera_billing_native_history']);expect(rpc.mock.calls[2][1]).toEqual({p_user:user,p_session:session,p_account_digest:digest,p_epoch:1});expect(fetch).not.toHaveBeenCalled();
+});
 it.each(['','expectedAccountId=bad','expectedAccountId='+user+'&expectedAccountId='+user,'expectedAccountId='+user+'&extra=1'])('malformed query never reaches a client %s',async query=>{
  expect((await handleClueraBillingHistory(request(query))).status).toBe(400);expect(hooks.clients).not.toHaveBeenCalled();expect(rpc).not.toHaveBeenCalled();
 });
@@ -79,6 +90,13 @@ it('history is explicit-refresh, single-flight and GET-only; an empty state requ
  await act(async()=>{button().click();button().click();});expect(request).toHaveBeenCalledOnce();expect(button().disabled).toBe(true);expect(host.textContent).toContain('Loading server-confirmed');
  expect(request.mock.calls[0][0]).toBe('/api/account/payments/cluera/history?expectedAccountId='+user);expect(request.mock.calls[0][1]).toMatchObject({method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error'});
  await act(async()=>finish(json({history:empty()})));expect(host.textContent).toContain('No verified payments are recorded');expect(button().disabled).toBe(false);
+});
+it('customer sees saved Pro calendar window and unused allowance separately from current spendable Enterprise, without a renewal promise or mutation',async()=>{
+ const fetcher=vi.fn(async()=>json({history:savedHistory()}));vi.stubGlobal('fetch',fetcher);await render();expect(fetcher).not.toHaveBeenCalled();await act(async()=>button().click());
+ const section=host.querySelector('section[aria-label="Saved and scheduled monthly access"]')!;expect(section).not.toBeNull();expect(section.textContent).toContain('Saved Pro access');expect(section.textContent).toContain('Saved access window: 20 days. Unused allowance: 39h 0m');expect(section.textContent).toContain('Spendable now from this period: 0s');expect(section.textContent).toContain('Queued paid period');expect(section.textContent).toContain('Spendable now from this period: 200h 0m');expect(section.textContent).toContain('Restoring access does not restart billing');expect(section.textContent).not.toContain('Ended period');expect(fetcher).toHaveBeenCalledOnce();expect(fetcher.mock.calls[0][1]).toMatchObject({method:'GET'});
+});
+it('native saved-time history is cleared on account change and never rendered from a late former-owner response',async()=>{
+ let finish!:(response:Response)=>void;const fetcher=vi.fn(()=>new Promise<Response>(resolve=>{finish=resolve;}));vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button().click());await render(foreign);await act(async()=>finish(json({history:savedHistory()})));expect(host.textContent).not.toContain('Saved Pro access');expect(host.textContent).not.toContain('Saved access window');expect(fetcher).toHaveBeenCalledOnce();
 });
 it('malformed, foreign-owner or unavailable history never becomes fake empty or raw error output',async()=>{
  for(const response of [json({history:empty(foreign)}),json({history:{...empty(),secret:'SYNTHETIC_PRIVATE'}}),json({error:'SYNTHETIC_PRIVATE'},503)]){

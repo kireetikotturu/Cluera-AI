@@ -18,6 +18,8 @@ const creditsSchema = z.object({ userId: z.uuid(), displayName: z.string().max(8
     offerCode: z.string().max(80), state: z.enum(['CREATING', 'BOUND', 'UNCERTAIN', 'REJECTED', 'VERIFIED', 'REFUNDED']),
     createdAt: z.iso.datetime({ offset: true }),
   })).max(10),
+  plans:z.array(z.object({state:z.enum(['ACTIVE','QUEUED','PAUSED','ENDED','REFUNDED']),
+    paymentState:z.enum(['ACTIVE','PAST_DUE','CANCELED','PAUSED'])})).max(30).optional(),
 });
 type Credits = z.infer<typeof creditsSchema>;
 type CheckoutInstance = { open(): void; close(): void; on(event: string, callback: () => void): void };
@@ -40,8 +42,8 @@ async function loadSdk(signal: AbortSignal): Promise<void> {
 }
 
 /** Explicit user action only. Browser callbacks never fulfill or grant usage. */
-export default function ClueraCheckoutClient({ enabled, offers = [], historyEnabled = false, cancellationEnabled = false }: {
-  enabled: boolean; offers?: ClueraPublicRevision[]; historyEnabled?: boolean; cancellationEnabled?: boolean;
+export default function ClueraCheckoutClient({ enabled, offers = [], historyEnabled = false, cancellationEnabled = false, firstSubscriptionOnly = false }: {
+  enabled: boolean; offers?: ClueraPublicRevision[]; historyEnabled?: boolean; cancellationEnabled?: boolean; firstSubscriptionOnly?:boolean;
 }) {
   const statusId = useId();
   const [catalog, setCatalog] = useState<ClueraPublicRevision[]>(offers);
@@ -181,9 +183,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     }
   }, [enabled]);
 
+  const monthlyBlocked=firstSubscriptionOnly&&(credits?.plans===undefined||credits.plans.some(plan=>['ACTIVE','PAUSED','QUEUED'].includes(plan.state)||plan.paymentState!=='CANCELED'));
   const buy = async (revision: ClueraPublicRevision, resume = false) => {
     if (!enabledRef.current || (resume ? resumeRevisionId !== revision.revisionId : !eligible || uncertain.current)
-      || busy || !credits || read.current || write.current || binding.current || !revision.enabled || !revision.testPlanValidated) return;
+      || busy || !credits || read.current || write.current || binding.current || !revision.enabled || !revision.testPlanValidated
+      ||(revision.kind==='RECURRING'&&monthlyBlocked)) return;
     const accountId = credits.userId, generation = epoch.current, controller = new AbortController();
     const current = () => alive.current && enabledRef.current && !controller.signal.aborted
       && epoch.current === generation && owner.current === accountId;
@@ -292,6 +296,8 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       <p>Server-owned account, price revision and payment evidence. No customer account-ID entry.</p>
     </header>
     <div className={styles.status} id={statusId} role="status" aria-live="polite"><p>{message}</p></div>
+    {firstSubscriptionOnly?<aside aria-label="Monthly purchase availability"><p>Monthly checkout supports your first subscription only. Additional monthly purchases, queued subscriptions and upgrades are unavailable.</p>
+      {monthlyBlocked&&credits?<p>Your current subscription must be resolved before another monthly checkout. One-time packs remain separate.</p>:null}</aside>:null}
     {selection?<aside className="cluera-plan-handoff" aria-label="Selected Cluera plan"><p>Selected plan: <strong>{checkoutSelectionName(selection)}</strong></p>
       <p>Your selection is not a purchase. Only a fresh verified account, current catalog revision and separately approved availability can enable checkout.</p></aside>:null}
     <div className={styles.accountSummary}>
@@ -303,7 +309,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       }}>Continue existing checkout</button> : null}
     </div>
     <div className={`account-pricing-grid ${styles.grid}`}>{rows ? rows.map(revision => {
-      const canPurchase = enabled && eligible && !busy && revision.enabled && revision.testPlanValidated;
+      const canPurchase = enabled && eligible && !busy && revision.enabled && revision.testPlanValidated&&!(revision.kind==='RECURRING'&&monthlyBlocked);
       const action = canPurchase ? revision.kind === 'PACK' ? 'Buy Now' : 'Subscribe Now' : 'Checkout unavailable';
       return <article key={revision.revisionId} aria-label={revision.name} className={`account-plan-card ${styles.card}${selection?.offerCode===revision.offerCode?' cluera-plan-selected':''}`}>
         {selection?.offerCode===revision.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}

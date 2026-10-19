@@ -52,6 +52,17 @@ const checkoutGet = (url: RequestInfo | URL) => Response.json(String(url).endsWi
       state:'BOUND',kind:createdBinding.kind,revisionId:createdBinding.revisionId,offerCode:createdBinding.offerCode,
       orderId:createdBinding.orderId,subscriptionId:createdBinding.subscriptionId}}} : status : credits);
 
+it.each([undefined,[{state:'ACTIVE',paymentState:'ACTIVE'}]])('first-subscription-only availability blocks unproven or competing monthly access while packs remain available',async plans=>{
+ const request=vi.fn(async(url:RequestInfo|URL)=>String(url).startsWith('/api/account/credits')?Response.json({...credits,plans}):checkoutGet(url));vi.stubGlobal('fetch',request);
+ await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled:true,firstSubscriptionOnly:true})));
+ expect(host.textContent).toContain('first subscription only');expect(host.textContent).toContain('queued subscriptions and upgrades are unavailable');expect(subscribe().disabled).toBe(true);expect(buy().disabled).toBe(false);
+ expect(request.mock.calls.every(([,init])=>!(init as RequestInit|undefined)?.method)).toBe(true);expect(document.querySelector('script')).toBeNull();
+});
+it('an independently loaded empty plan snapshot may show first monthly checkout under the explicit capability',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async(url:RequestInfo|URL)=>String(url).startsWith('/api/account/credits')?Response.json({...credits,plans:[]}):checkoutGet(url)));
+ await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled:true,firstSubscriptionOnly:true})));expect(subscribe().disabled).toBe(false);
+});
+
 it('shows all four approved presentations while migration is unavailable, with no order, SDK, UUID input or recurring-live claim', async () => {
   const request = vi.fn(async (url: RequestInfo | URL) => String(url).endsWith('/catalog')
     ? Response.json({ error: 'synthetic-private-diagnostic' }, { status: 503 }) : Response.json(credits));

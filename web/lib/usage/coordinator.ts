@@ -61,6 +61,7 @@ export function createUsageCoordinator(command:(input:Command)=>Promise<Reply>,
   options.signal?.addEventListener('abort',stop,{once:true});
   if(options.signal?.aborted)stop();
   return {
+    runId,
     signal:abort.signal,
     assertActive,
     stop,

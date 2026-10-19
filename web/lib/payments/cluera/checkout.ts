@@ -3,6 +3,7 @@ import type { PaymentRpc } from '../core/types';
 import { billingOwner, billingRpc, clueraBillingConfig, clueraCheckoutAllowed, merchantDigest } from './config';
 import { bindingSchema, ClueraBillingError, orderId, paymentId, revisionSchema, statusSchema, subscriptionId } from './contracts';
 import { clueraRazorpayAdapter } from './adapter';
+import { clueraNativeRecurringEnabled } from './nativeRecurring';
 
 type Account = { userId: string; sessionId: string };
 type Adapter = ReturnType<typeof clueraRazorpayAdapter>;
@@ -22,6 +23,11 @@ export async function createClueraCheckout(rpc: PaymentRpc, account: Account, re
   if (!clueraCheckoutAllowed(account.userId, env)) throw new ClueraBillingError('CONFIGURATION');
   z.uuid().parse(requestId); z.uuid().parse(revisionId);
   const { epoch, accountDigest } = await billingOwner(rpc, env);
+  if(env.CLUERA_RECURRING_SCHEDULE_ENABLED==='true') {
+    if(!clueraNativeRecurringEnabled(env)||await billingRpc(rpc,'cluera_billing_native_purchase_policy',{
+      p_user:account.userId,p_session:account.sessionId,p_revision:revisionId,p_account_digest:accountDigest,p_epoch:epoch,
+    })!=='ALLOWED')throw new ClueraBillingError('PENDING');
+  }
   const data = await billingRpc(rpc, 'cluera_billing_prepare', { p_user:account.userId, p_session:account.sessionId,
     p_request:requestId, p_revision:revisionId, p_account_digest:accountDigest, p_epoch:epoch });
   // No retry/open on replay or unknown outcomes. Only this fresh leased CLAIMED attempt may POST once.

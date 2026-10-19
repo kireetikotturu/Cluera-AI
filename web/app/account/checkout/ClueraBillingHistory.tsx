@@ -11,6 +11,11 @@ import SubscriptionCancellation from './SubscriptionCancellation';
 const envelope=z.object({history:clueraBillingHistorySchema}).strict();
 const endpoint='/api/account/payments/cluera/history';
 const states={ACTIVE:'Active',PAST_DUE:'Payment overdue',CANCELED:'Canceled',PAUSED:'Paused'} as const;
+const periodStates={ACTIVE:'Paid period',SUSPENDED:'Paused paid period',QUEUED:'Queued paid period',PRESERVED:'Saved Pro access',ENDED:'Ended period',REFUNDED:'Refunded period'}as const;
+function accessWindow(milliseconds:number){
+ const days=Math.floor(milliseconds/86400000),remaining=milliseconds%86400000;
+ return days?`${days} ${days===1?'day':'days'}${remaining>=60000?` ${usageDuration(remaining)}`:''}`:usageDuration(milliseconds);
+}
 
 /** No automatic read, polling or mutation. Owner comes from the parent's
  * logged-in credits snapshot, never an editable customer-ID input. */
@@ -79,6 +84,22 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
     <p>Payment reference: <code>{payment.paymentId}</code>{payment.invoiceId?<> · Invoice reference: <code>{payment.invoiceId}</code></>:null}</p>
    </li>)}</ul>:<p>No verified payments are recorded in this project snapshot.</p>}
    {history.hasMorePayments?<p>Only the latest 50 payments are shown. Contact support for older records.</p>:null}
+   {history.nativeSchedule?<section aria-label="Saved and scheduled monthly access">
+    <h4>Saved and scheduled monthly access</h4>
+    <p>Access windows measure calendar time. Unused allowance measures session time. Saved and queued periods contribute no spendable time until activated.</p>
+    {history.nativeSchedule.terms.length?<ul>{history.nativeSchedule.terms.map(term=><li key={term.invoiceId}>
+     <strong>{term.revision.name}</strong> · {periodStates[term.state]}
+     <p>Spendable now from this period: {usageDuration(term.spendableMilliseconds)}.</p>
+     {term.state==='PRESERVED'||term.state==='QUEUED'?<>
+      <p>{term.state==='PRESERVED'?'Saved':'Queued'} access window: {accessWindow(term.savedWallMilliseconds!)}. Unused allowance: {usageDuration(term.remainingAllowanceMilliseconds)}.</p>
+      <p>{term.state==='PRESERVED'?'Saved Pro access waits for a verified end of the higher-priority plan. Restoring access does not restart billing.':'This paid period waits behind current access. Its future billing schedule requires verification.'}</p>
+     </>:term.startsAt&&term.endsAt?<p>Recorded access window: <time dateTime={term.startsAt}>{new Date(term.startsAt).toLocaleString()}</time> to <time dateTime={term.endsAt}>{new Date(term.endsAt).toLocaleString()}</time>.</p>:null}
+     <p>Allowance used: {usageDuration(term.spentMilliseconds)}. Reserved for current sessions: {usageDuration(term.reservedMilliseconds)}.</p>
+     {term.state==='SUSPENDED'?<p>This paused period currently contributes no spendable time. Its recorded expiry does not restart on resume.</p>:null}
+     <p>Invoice reference: <code>{term.invoiceId}</code></p>
+    </li>)}</ul>:<p>No saved or scheduled monthly periods are shown in this snapshot.</p>}
+    {history.nativeSchedule.hasMoreTerms?<p>Only the latest 50 monthly periods are shown. Contact support for older records.</p>:null}
+   </section>:null}
    <h4>Subscription records</h4>
    <p>A subscription status alone does not prove a paid charge; verified payments determine paid usage.</p>
    {history.subscriptions.length?<ul>{history.subscriptions.map(subscription=><li key={subscription.subscriptionId}>

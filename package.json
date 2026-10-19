@@ -11,6 +11,7 @@
     "build:web": "npm --prefix web run build",
     "build:backend": "npm --prefix backend run build",
     "verify:source": "node scripts/verify-cluera-source.cjs",
-    "verify:staging": "node scripts/verify-cluera-launch-boundaries.cjs"
+    "verify:staging": "node scripts/verify-cluera-launch-boundaries.cjs",
+    "verify:operations": "node scripts/check-cluera-operations.cjs"
   }
 }

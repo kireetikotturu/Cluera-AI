@@ -25,6 +25,12 @@ export function createAppConfig():AppConfig {
  if(createPublicKey(publicKeyPem).asymmetricKeyType!=='ed25519'||createHash('sha256').update(createPublicKey(publicKeyPem).export({type:'spki',format:'der'})).digest('hex')!==CLUERA_UPDATE_KEY_SHA256)throw new Error('Cluera release verification key is invalid.');
  const origins=product.trustedInstallerOrigins,redirects=product.trustedInstallerRedirectOrigins;
  if(!Array.isArray(origins)||origins.length!==1||origins[0]!=='https://github.com'||!Array.isArray(redirects)||redirects.length!==1||redirects[0]!=='https://release-assets.githubusercontent.com')throw new Error('Cluera installer origins are invalid.');
+ // An optional exact Authenticode subject is trusted only from the bundled,
+ // integrity-checked config. Never infer it from the downloaded installer or env.
+ const publisher=product.updatePublisher;
+ if(publisher!==undefined&&(typeof publisher!=='string'||publisher.length>1024||publisher!==publisher.trim()
+  ||/[\u0000-\u001f\u007f-\u009f]/.test(publisher)
+  ||!/(?:^|,\s*)CN=(?:"[^"]+"|[^,\s][^,]*)(?:,|$)/u.test(publisher)))throw new Error('Cluera update publisher pin is invalid.');
  return {
   accountManaged:true,providerMode:'managed',databasePath:path.join(app.getPath('userData'),ACCOUNT_DISTRIBUTION.database),
   isProduction,demoMode:false,debugMode:!isProduction&&process.env.DEBUG_MODE==='true',
@@ -33,6 +39,6 @@ export function createAppConfig():AppConfig {
   retrieval:{chunkSize:850,chunkOverlap:120,topK:5},
   screen:{enabled:true,maxBytes:5000000,maxDimension:2560,model:'gemini-3.5-flash'},
   links:{tutorial:ACCOUNT_DISTRIBUTION.apiOrigin+'/setup',support:ACCOUNT_DISTRIBUTION.apiOrigin+'/support'},
-  licensing:{enforced:false,serverUrl:ACCOUNT_DISTRIBUTION.apiOrigin,publicKeyPem,updateChannel:'cluera-beta',trustedInstallerOrigins:origins as string[],trustedInstallerRedirectOrigins:redirects as string[]},
+  licensing:{enforced:false,serverUrl:ACCOUNT_DISTRIBUTION.apiOrigin,publicKeyPem,updateChannel:'cluera-beta',trustedInstallerOrigins:origins as string[],trustedInstallerRedirectOrigins:redirects as string[],updatePublisher:publisher as string|undefined},
  };
 }

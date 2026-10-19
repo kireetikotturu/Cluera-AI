@@ -14,7 +14,7 @@ it('has no automatic reads/writes and blocks controls when bootstrap is unavaila
  const request=vi.fn(async()=>Response.json({error:'private-value'},{status:503}));vi.stubGlobal('fetch',request);await render();expect(request).not.toHaveBeenCalled();
  await act(async()=>button('Refresh vault').click());expect(request).toHaveBeenCalledOnce();expect(host.textContent).toContain('Vault bootstrap is not complete');expect(host.textContent).not.toContain('private-value');
  expect([...host.querySelectorAll('fieldset')].every(f=>f.disabled)).toBe(true);
- expect(host.textContent).toContain('Usage/cost telemetry: not activated');
+ expect(host.textContent).toContain('Cost unavailable');expect(host.textContent).toContain('no verified provider rate');
 });
 it('clears entry secrets, deduplicates submit, retains unknown operation and verifies by GET without resubmission',async()=>{
  let unknown=true;

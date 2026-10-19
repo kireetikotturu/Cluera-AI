@@ -7,6 +7,7 @@ import { readClueraRawBody } from './events';
 import { reconcileClueraPayment } from './reconciliation';
 import { beginClueraReconciliationObservation } from './reconciliationObservation';
 import { schedulerEnabled } from '../../../../shared/billingDispatch';
+import { dispatchClueraNativeRecurringCommand, observeClueraNativeRecurringCommand } from './nativeRecurringOutbox';
 
 export const CLUERA_WORKER_URL = 'https://cluera-ai-staging.vercel.app/api/internal/billing/cluera/tick';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -60,6 +61,9 @@ export async function handleClueraBillingTick(request: Request, env = process.en
     const observe = beginClueraReconciliationObservation();
     try { observe(await (deps.reconcile ?? reconcileClueraPayment)(rpc, env)); }
     catch { observe('UNAVAILABLE'); throw new Error('Worker unavailable.'); }
+    if(env.CLUERA_RECURRING_SCHEDULE_ENABLED==='true') {
+      if(await observeClueraNativeRecurringCommand(rpc,env)==='EMPTY')await dispatchClueraNativeRecurringCommand(rpc,env);
+    }
     return json({ processed: true });
   } catch { return json({ error: 'Worker unavailable.' }, 503); }
 }

@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -100,6 +100,23 @@ describe('explicit update installation and session exclusion', () => {
     const { updates, actions } = manager(fetcher, 'cluera-beta', true);
     expect((await updates.install()).installPhase).toBe('launching');
     expect(actions).toEqual(['stop', 'publisher', 'launch', 'quit']);
+  });
+  it('rejects installer bytes changed during publisher verification before execution', async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => String(input) === url
+      ? new Response(bytes) : Response.json({ signedManifest: token() }));
+    const { updates, installer } = manager(fetcher, 'cluera-beta', true);
+    installer.verifyPublisher.mockImplementationOnce(async file => { await writeFile(file, Buffer.from('changed after checksum')); });
+    expect((await updates.install()).installError).toBeTruthy();
+    expect(installer.verifyPublisher).toHaveBeenCalledOnce();
+    expect(installer.launch).not.toHaveBeenCalled(); expect(installer.quit).not.toHaveBeenCalled();
+  });
+  it('honors cancellation during publisher verification without executing the installer', async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => String(input) === url
+      ? new Response(bytes) : Response.json({ signedManifest: token() }));
+    const { updates, installer } = manager(fetcher, 'cluera-beta', true);
+    installer.verifyPublisher.mockImplementationOnce(async () => { updates.cancelInstall(); });
+    expect((await updates.install()).installError).toBe('Update cancelled.');
+    expect(installer.launch).not.toHaveBeenCalled(); expect(installer.quit).not.toHaveBeenCalled();
   });
   it('keeps pending session starts protected through stop and failed overlapping starts', async () => {
     const { updates } = manager(vi.fn());
