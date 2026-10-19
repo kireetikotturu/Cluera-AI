@@ -14,20 +14,21 @@ it('binds a browser callback to main-only PKCE/state; rejects foreign and malfor
   const callback=new URL(url.searchParams.get('redirect_to')!);callback.searchParams.set('code','synthetic-one-use-code');
   expect((await fetch(callback,{headers:{origin:'https://untrusted.invalid'}})).status).toBe(400);
   const response=await fetch(callback);expect(response.status).toBe(200);expect(await response.text()).not.toContain('synthetic-one-use-code');
- },new AbortController().signal,{oauthExchange:exchange} as never);
+ },new AbortController().signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never);
  expect(result.accessToken).toBe('synthetic-access');expect(exchange).toHaveBeenCalledOnce();
  const [code,verifier]=exchange.mock.calls[0] as unknown as [string,string];expect(code).toBe('synthetic-one-use-code');
  expect(createHash('sha256').update(verifier).digest('base64url')).toBe(challenge);
 });
 it('cancellation closes the listener and does not exchange or restore late credentials',async()=>{
  const owner=new AbortController(),exchange=vi.fn();
- await expect(googleAccountLogin(async()=>{owner.abort();},owner.signal,{oauthExchange:exchange} as never)).rejects.toThrow();
+ await expect(googleAccountLogin(async()=>{owner.abort();},owner.signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never)).rejects.toThrow();
  expect(exchange).not.toHaveBeenCalled();
 });
 it('a browser callback completes desktop login through the real API parser with an opaque refresh token',async()=>{
  const userId='00000000-0000-4000-8000-000000000001';let saved:unknown=null;
  let challenge='';
  const request=vi.fn(async(url:string|URL|Request,init?:RequestInit)=>{
+  if(String(url).endsWith('/auth-options'))return new Response(JSON.stringify({google:'enabled'}));
   if(String(url).endsWith('/oauth-exchange')){
    const body=JSON.parse(String(init?.body));expect(body.code).toBe('synthetic-one-use-code');
    expect(createHash('sha256').update(body.verifier).digest('base64url')).toBe(challenge);
@@ -47,6 +48,17 @@ it('a browser callback completes desktop login through the real API parser with 
   },signal,api));
   expect(view).toMatchObject({state:'active',userId});expect(saved).toEqual({version:1,userId,refreshToken:'abcdefghijkl'});
   expect(JSON.stringify(view)).not.toMatch(/abcdefghijkl|synthetic-access|synthetic-one-use-code/);
-  expect(request).toHaveBeenCalledTimes(2);
+  expect(request).toHaveBeenCalledTimes(3);
  }finally{manager.dispose();}
+});
+it.each(['disabled','unavailable'])('does not launch a browser or exchange tokens when Google is %s',async google=>{
+ const open=vi.fn(),exchange=vi.fn();
+ await expect(googleAccountLogin(open,new AbortController().signal,{authOptions:async()=>({google}),oauthExchange:exchange} as never)).rejects.toThrow('Account service is unavailable.');
+ expect(open).not.toHaveBeenCalled();expect(exchange).not.toHaveBeenCalled();
+});
+it('cancels while reading Google capability before opening the loopback listener',async()=>{
+ const owner=new AbortController(),open=vi.fn(),exchange=vi.fn();let complete!:(value:{google:string})=>void;
+ const attempt=googleAccountLogin(open,owner.signal,{authOptions:()=>new Promise(resolve=>{complete=resolve;}),oauthExchange:exchange} as never);
+ owner.abort();complete({google:'enabled'});await expect(attempt).rejects.toThrow();
+ expect(open).not.toHaveBeenCalled();expect(exchange).not.toHaveBeenCalled();
 });

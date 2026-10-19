@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ACCOUNT_DISTRIBUTION } from '../../shared/accountDistribution';
 import type {AccountCredits} from '../../shared/accountCredits';
+import type {AccountAuthOptions} from '../../shared/accounts';
 export const ACCOUNT_ORIGIN = ACCOUNT_DISTRIBUTION.apiOrigin;
 export class AccountApiError extends Error {
   constructor(readonly status: number) { super(status === 401 ? 'Sign in with a verified email to continue.'
@@ -16,7 +17,8 @@ const millis = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const accountSnapshot = z.object({ account: z.object({ userId: z.string().uuid(), email: z.string().email().max(254) }).strict(),
   usage: z.object({ code: z.literal('ACTIVE'), availableMilliseconds: millis, reservedMilliseconds: millis, spentMilliseconds: millis }).strict() }).strict();
 export type AccountTokens = z.infer<typeof accountTokens>;
-type AccountAction = 'login'|'refresh'|'session'|'logout'|'oauth-exchange'|'credits';
+type AccountAction = 'login'|'refresh'|'session'|'logout'|'oauth-exchange'|'credits'|'auth-options';
+const authOptionsSchema: z.ZodType<AccountAuthOptions> = z.object({ google: z.enum(['enabled','disabled','unavailable']) }).strict();
 const creditsSchema:z.ZodType<AccountCredits>=z.object({userId:z.string().uuid(),serverTime:z.string().datetime({offset:true}),displayName:z.string().max(80),
  availableMilliseconds:millis,reservedMilliseconds:millis,spentMilliseconds:millis,checkoutAvailable:z.boolean(),
  buckets:z.array(z.object({kind:z.enum(['TRIAL','RECURRING','PACK','TEST','MANUAL']),grantedMilliseconds:millis,spentMilliseconds:millis,
@@ -37,8 +39,8 @@ export class AccountApi {
   }
   private async call(action: AccountAction, input?: object, access?: string, signal?:AbortSignal): Promise<unknown> {
     try {
-      const response = await this.request(`${ACCOUNT_ORIGIN}/api/account/native/${action}`, {
-        method: action === 'session' || action === 'credits' ? 'GET' : 'POST', redirect: 'error', cache: 'no-store', credentials: 'omit',
+      const response = await this.request(`${ACCOUNT_ORIGIN}/api/account/${action === 'auth-options' ? action : `native/${action}`}`, {
+        method: action === 'session' || action === 'credits' || action === 'auth-options' ? 'GET' : 'POST', redirect: 'error', cache: 'no-store', credentials: 'omit',
         signal: signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000), headers: { 'Content-Type': 'application/json', ...(access ? { Authorization: `Bearer ${access}` } : {}) },
         ...(input ? { body: JSON.stringify(input) } : {}),
       });
@@ -65,5 +67,6 @@ export class AccountApi {
   async oauthExchange(code:string,verifier:string) { return this.parse('oauth-exchange',accountTokens,await this.call('oauth-exchange',{code,verifier})); }
   async snapshot(access: string) { return this.parse('session', accountSnapshot, await this.call('session', undefined, access)); }
   async credits(access:string,signal:AbortSignal) { return this.parse('credits',creditsSchema,await this.call('credits',undefined,access,signal)); }
+  async authOptions(signal?:AbortSignal) { return this.parse('auth-options',authOptionsSchema,await this.call('auth-options',undefined,undefined,signal)); }
   async logout(access: string, allDevices: boolean) { await this.call('logout', { allDevices }, access); }
 }

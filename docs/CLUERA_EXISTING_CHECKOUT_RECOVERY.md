@@ -1,0 +1,11 @@
+# Continue an existing Cluera Test checkout
+
+October 19, 2026. The customer page now offers an explicit **Continue existing checkout** action for a new Cluera BOUND pack candidate. This action verifies the original order; it never creates a replacement order, retries a payment, captures a payment, changes an intent or grants credits.
+
+The service derives the original resource from the current authorized account's pending SQL binding. It requires the same enabled immutable pack revision and independently fetches the exact order plus [all associated order payments](https://github.com/razorpay/markdown-docs/blob/master/api/payments.md). Continuation is allowed only for a canonical **created** order with numeric `amount_paid=0`, the exact amount due, zero attempts, matching original receipt/revision/notes and an empty payment collection. Any attempted, failed, authorized, captured, foreign, unknown, malformed or nonnumeric evidence blocks continuation. Legacy Account-era attempts and subscription mandates are not resumed.
+
+After provider verification, the service rechecks the current session, merchant/owner epoch and exact unresolved binding. After SDK loading, the browser again checks the current account/binding and repeats the untouched-order proof before opening that same order. No page-load or status-poll action opens Razorpay. Callback authentication and signed-webhook/independent-capture fulfillment remain unchanged.
+
+The retained October 18 order is **not accepted as resumable by this implementation alone**. Current read-only inventory contains a nonnumeric `amount_paid` warning. That warning is intentionally not normalized or bypassed; the actual order must satisfy the strict deployed verifier. If continuation reports that the existing order cannot safely continue, preserve it and ask support to inspect the original order and its payments. Do not buy another pack, capture an authorization, replay an event, reset the intent or add manual credits to get past the lock.
+
+This is implemented and locally tested. Hosted source/deployment verification and the owner-operated original-order Test payment remain separate acceptance steps. No owner payment was initiated during development.

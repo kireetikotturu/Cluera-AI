@@ -9,7 +9,7 @@ const require=createRequire(import.meta.url);
 const {JSDOM}=require('jsdom');
 let dom:any,root:ReturnType<typeof createRoot>,onState=vi.fn<(state:AccountView)=>void>();
 beforeEach(()=>{dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});vi.stubGlobal('window',dom.window);vi.stubGlobal('document',dom.window.document);vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
- dom.window.accountAPI={login:vi.fn(async()=>({mode:'cluera-staging',state:'signed-out',message:'Synthetic rejected sign-in'})),openWeb:vi.fn(async()=>{}),google:vi.fn(async()=>({mode:'cluera-staging',state:'signed-out'}))};
+ dom.window.accountAPI={authOptions:vi.fn(async()=>({google:'enabled'})),login:vi.fn(async()=>({mode:'cluera-staging',state:'signed-out',message:'Synthetic rejected sign-in'})),openWeb:vi.fn(async()=>{}),google:vi.fn(async()=>({mode:'cluera-staging',state:'signed-out'}))};
  root=createRoot(document.getElementById('root')!);onState=vi.fn();});
 afterEach(()=>{act(()=>root.unmount());dom.window.close();vi.unstubAllGlobals();});
 const button=(text:string)=>Array.from(document.querySelectorAll('button')).find(item=>item.textContent===text)!;
@@ -29,4 +29,18 @@ it('serializes same-tick login and clears password and visibility after completi
 it('disables every authentication action while main is restoring the session',async()=>{
  await render('checking');for(const action of ['Continue with Google','Create account','Forgot password?','Retry saved session'])expect(button(action).disabled).toBe(true);
  expect(dom.window.accountAPI.login).not.toHaveBeenCalled();
+});
+it.each(['disabled','unavailable'])('does not offer Google when the server reports %s',async google=>{
+ dom.window.accountAPI.authOptions.mockResolvedValueOnce({google});await render();
+ expect(button('Continue with Google').disabled).toBe(true);
+ await act(async()=>button('Continue with Google').click());expect(dom.window.accountAPI.google).not.toHaveBeenCalled();
+ expect(document.getElementById('account-google-status')?.textContent).toContain('Use your email and password');
+ expect(button('Sign in').disabled).toBe(false);
+});
+it('enables Google only after capability resolves and keeps it disabled if the read fails',async()=>{
+ let resolve!:(value:{google:string})=>void;
+ dom.window.accountAPI.authOptions.mockImplementationOnce(()=>new Promise(done=>{resolve=done;}));
+ await render();expect(button('Continue with Google').disabled).toBe(true);
+ await act(async()=>resolve({google:'enabled'}));expect(button('Continue with Google').disabled).toBe(false);
+ await act(async()=>button('Continue with Google').click());expect(dom.window.accountAPI.google).toHaveBeenCalledOnce();
 });

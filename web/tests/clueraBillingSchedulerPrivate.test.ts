@@ -1,6 +1,6 @@
 import {afterAll,expect,it,vi} from 'vitest';
 import {createRequire} from 'node:module';
-import {dirname,join,resolve} from 'node:path';
+import {basename,dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {mkdirSync,mkdtempSync,writeFileSync,readFileSync,existsSync,chmodSync,linkSync,symlinkSync,realpathSync,rmSync} from 'node:fs';
 import {execFileSync,spawnSync} from 'node:child_process';
@@ -21,7 +21,16 @@ function output(directory:string){return join(directory,helper.RELATIVE);}
 function parsed(directory:string){return JSON.parse(readFileSync(output(directory),'utf8'));}
 function overwrite(directory:string,data:unknown){writeFileSync(output(directory),typeof data==='string'?data:JSON.stringify(data),{mode:0o600});}
 function refused(work:()=>unknown){expect(work).toThrow(helper.FAILURE);}
-afterAll(()=>{for(const directory of fixtures){if(!directory.startsWith(realpathSync(temporary)))throw Error('Unsafe test cleanup');rmSync(directory,{recursive:true,force:true});}});
+afterAll(()=>{
+ const parent=realpathSync(temporary);
+ for(const directory of fixtures){
+  if(dirname(directory)!==parent||!basename(directory).startsWith('scheduler-private-unit-'))throw Error('Unsafe test cleanup');
+  // Windows can briefly retain Git/scanner handles after the synchronous
+  // fixture assertions. Retry only these owned temporary trees, within 1.5s
+  // of bounded linear backoff; security assertions and hook limits stay intact.
+  rmSync(directory,{recursive:true,force:true,maxRetries:5,retryDelay:100});
+ }
+});
 
 it('default check makes no private directory/file and cannot activate or return a value',()=>{
  const directory=fixture(),result=helper.inspectAndPrepare({root:directory});

@@ -46,8 +46,10 @@ export async function handleClueraCheckout(request: Request, callback = false) {
   } catch (error) {
     const status = (error as {status?:unknown})?.status;
     if (status === 401) cookies?.clear();
-    const response = json({error:status === 401 ? 'Sign in with a verified email.' : 'Payment verification is unavailable. Do not retry.'},
-      status === 401 || status === 403 ? status : error instanceof z.ZodError || error instanceof SyntaxError ? 400 : 503);
+    const response = json({error:status === 401 ? 'Sign in with a verified email.'
+      : status === 429 ? 'Too many billing requests. Please wait before checking again. Do not retry a payment.'
+        : 'Payment verification is unavailable. Do not retry.'},
+      status === 401 || status === 403 || status === 429 ? status : error instanceof z.ZodError || error instanceof SyntaxError ? 400 : 503);
     return cookies ? cookies.apply(response) : response;
   }
 }

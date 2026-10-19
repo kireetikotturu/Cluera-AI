@@ -5,7 +5,10 @@ const root=path.resolve(__dirname,'..'),{detectSecrets,loadKnownSecrets}=require
 const {verifyProxyFork,PREFIX}=require('./verify-cluera-proxy-fork.cjs');
 function isReviewedVendorRuntime(name,pins){return name.startsWith(PREFIX+'dist/')&&pins.has(name);}
 function reviewFile(base,name,known,pins){
- if(typeof name!=='string'||name.includes('\\')||path.isAbsolute(name))throw Error('Publication path refused.');
+ // Reject traversal before resolution: at a Windows drive/filesystem root,
+ // resolve('../file') cannot move higher and would erase the unsafe segment.
+ if(typeof name!=='string'||name.includes('\\')||name.includes(':')||name.includes('\0')||path.isAbsolute(name)
+  ||name.split('/').some(segment=>!segment||segment==='.'||segment==='..'))throw Error('Publication path refused.');
  const target=path.resolve(base,name),relative=path.relative(base,target);
  const blocked=/(?:^|\/)(?:node_modules|\.git|\.local-secrets|\.test-output|\.build-cache|\.migration-source|dist|release|release-[^/]*)\//.test(name);
  if(relative.startsWith('..')||path.isAbsolute(relative)||(blocked&&!isReviewedVendorRuntime(name,pins))

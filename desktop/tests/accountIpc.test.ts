@@ -12,7 +12,7 @@ function fixture(active=true){
  registerAccountIpc(window as never,account as never,options as never);return {window,event,account,options};
 }
 it('rejects another renderer or subframe on every account action',async()=>{
- const f=fixture();for(const name of ['account:status','account:login','account:google','account:retry','account:logout','account:open-web']){
+ const f=fixture();for(const name of ['account:status','account:auth-options','account:login','account:google','account:retry','account:logout','account:open-web']){
   for(const event of [{...f.event,senderFrame:{}},{...f.event,sender:{}}]){
    await expect(Promise.resolve().then(()=>mocks.handlers.get(name)!(event,{}))).rejects.toThrow('Unauthorized');
   }

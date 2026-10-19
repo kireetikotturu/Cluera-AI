@@ -81,3 +81,9 @@ it('unauthenticated/cross-origin rejects before any financial RPC, without refle
   const denied=await handleClueraCheckout(request(`checkout?expectedAccountId=${actor}`));expect(denied.status).toBe(401);expect(await denied.json()).toEqual({error:'Sign in with a verified email.'});
   expect((await handleClueraCheckout(request('checkout',{expectedAccountId:actor,requestId:crypto.randomUUID(),revisionId},{origin:'https://foreign.invalid'}))).status).toBe(403);expect(rpc).not.toHaveBeenCalled();
 });
+it('billing throttling retains HTTP429 and safe guidance before any financial operation',async()=>{
+  mocks.limit.mockRejectedValue(new (await import('../lib/accounts/config')).AccountError('RATE_LIMITED',429));
+  const response=await handleClueraCheckout(request(`checkout?expectedAccountId=${actor}`));
+  expect(response.status).toBe(429);expect(await response.json()).toEqual({error:'Too many billing requests. Please wait before checking again. Do not retry a payment.'});
+  expect(rpc).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+});

@@ -1,5 +1,13 @@
 # Cluera read-only billing history schema review
 
+## October 19 applied SELECT-only completion
+
+The current owner request authorizes Cluera-only engineering and safe staging completion. The previously tested SELECT-only proposal is now tracked/applied as **20261019085323 / cluera_customer_billing_history** in only `yhnqlfcgrmckhyjdxegg`. Migration SHA-256 **7a0a066b9fd880f6ca9810a728a4048e5874e08c252c7a8f81b50022d38e1406** wraps the unchanged reviewed function/two indexes in bounded atomic DDL. Fresh existing history tests32/32 passed before application; the fixture now executes the tracked migration for final verification. This supersedes the earlier unapplied/approval-only status below.
+
+Independent hosted read-back matches function-body digest **22d7512fcddf9b05783d024d3eb7174b**, STABLE/security-definer/empty-search-path/UTC/2s-lock/5s-statement settings, exactly two indexes, browser EXECUTE=false and service EXECUTE=true. A service-role call with missing identity returns UNAUTHENTICATED. All86 pre-existing function definitions retain digest **c8744d8d00b408a9815be5e1354d5839**. Advisor output remains intentional48RLS/no-policy INFO plus existing leaked-password-protection WARN; no permissive policy or financial writer was added.
+
+Only non-secret **CLUERA_BILLING_HISTORY_ENABLED=true** was added to the existing Cluera Vercel Production-named staging environment. Other settings are preserved; the new value requires the next reviewed deployment before runtime availability is claimed. Customer inbox/login/history acceptance remains owner pending. No receipt, payment, entitlement, worker, provider or release mutation occurred.
+
 October17,2026. Current target only `yhnqlfcgrmckhyjdxegg`. Proposal is NOT applied or authorized by the merchant-pin approval.
 
 Exact [SQL](proposals/cluera-billing-history.sql), SHA-256 **49e093e16308fd68157e0e6ce4ae99991c975322128a2ae749e6f529f71e3383**. It creates only:

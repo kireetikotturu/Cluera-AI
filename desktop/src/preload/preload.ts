@@ -77,6 +77,7 @@ const accountApi: AccountDesktopAPI = {
     ipcRenderer.on('account:credits-state',listener);return()=>ipcRenderer.removeListener('account:credits-state',listener);
   }},
   status: () => ipcRenderer.invoke('account:status'),
+  authOptions: () => ipcRenderer.invoke('account:auth-options'),
   context: {
     list:()=>ipcRenderer.invoke('account:context-list'),
     select:ids=>ipcRenderer.invoke('account:context-select',ids),

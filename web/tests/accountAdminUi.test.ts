@@ -4,12 +4,14 @@ import {createRoot,type Root} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {AccountAdmin} from '../app/account/admin/AccountAdmin';
 import {AccountReleases} from '../app/account/admin/AccountReleases';
+const role=vi.hoisted(()=>({recheck:vi.fn()}));
+vi.mock('../app/account/AdminRoleNavigation',()=>({useAdminAccessRecheck:()=>role.recheck}));
 
 const a='00000000-0000-4000-8000-000000000001',b='00000000-0000-4000-8000-000000000002';
 const users=[{userId:a,email:'a@example.invalid',state:'ACTIVE'},{userId:b,email:'b@example.invalid',state:'ACTIVE'}];
 const view=(id?:string)=>({users:id?users.filter(u=>u.userId===id):users,grants:[],models:[],audit:[],testEntitlementsEnabled:true});
 let host:HTMLDivElement,root:Root;
-beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);host=document.createElement('div');document.body.append(host);root=createRoot(host);});
+beforeEach(()=>{role.recheck.mockClear();vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();});
 const button=(name:string)=>Array.from(host.querySelectorAll('button')).find(v=>v.textContent===name)!;
 const pending=()=>{let resolve!:(r:Response)=>void;const promise=new Promise<Response>(r=>{resolve=r;});return {promise,resolve};};
@@ -23,6 +25,19 @@ it('explains denied/expired/invalid/unavailable reads safely without displaying 
  }
 });
 async function render(){await act(async()=>root.render(createElement(AccountAdmin)));}
+it('rechecks the protected assurance fence before loading controls after verified MFA',async()=>{
+ const factor='00000000-0000-4000-8000-000000000003';let verified=false;
+ const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>{
+  if(init?.method==='POST'){verified=true;return Response.json({ok:true});}
+  if(verified){expect(role.recheck).toHaveBeenCalledOnce();return Response.json(view());}
+  return Response.json({needsMfa:true,factors:[{id:factor,status:'verified'}]});
+ });
+ vi.stubGlobal('fetch',fetcher);await render();
+ const select=host.querySelector('select')!;await act(async()=>{select.value=factor;select.dispatchEvent(new Event('change',{bubbles:true}));});
+ const form=host.querySelector('form')!;(form.elements.namedItem('code') as HTMLInputElement).value='123456';
+ await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(role.recheck).toHaveBeenCalledOnce();expect(host.textContent).toContain('AI model registry');
+});
 function submit(){const form=host.querySelector('select[name="action"]')!.closest('form')!;
  (form.querySelector('[name="reason"]') as HTMLTextAreaElement).value='Synthetic staging test reason';
  form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));}

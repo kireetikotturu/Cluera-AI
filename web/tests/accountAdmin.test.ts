@@ -1,16 +1,18 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {accountAdminRequest} from '../lib/accounts/admin';
-const mocks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn(),providerStatus:vi.fn()}));
+import {AccountError,accountConfig} from '../lib/accounts/config';
+import {unseal} from '../lib/accounts/cookies';
+const mocks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn(),providerStatus:vi.fn(),authorize:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 vi.mock('../lib/accounts/providerStatus',()=>({readProviderStatus:mocks.providerStatus}));
-vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:mocks.session,rateLimit:mocks.limit}));
+vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:mocks.session,rateLimit:mocks.limit,authorizeCustomer:mocks.authorize}));
 const origin='https://cluera-ai-staging.vercel.app';
 const actor='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002',factor='00000000-0000-4000-8000-000000000003';
 let rpc:ReturnType<typeof vi.fn>,mfa:ReturnType<typeof makeMfa>;
 function makeMfa(){return {
  listFactors:vi.fn(async()=>({data:{all:[] as Array<{id:string;status:string;factor_type:string}>},error:null})),
  enroll:vi.fn(async()=>({data:{id:factor,totp:{qr_code:'<svg/>',secret:'synthetic-totp-secret'}},error:null})),
- challengeAndVerify:vi.fn(async()=>({data:{access_token:'synthetic-mfa-access',refresh_token:'synthetic-mfa-refresh',expires_in:3600},error:null})),
+ challengeAndVerify:vi.fn(async()=>({data:{access_token:`header.${Buffer.from(JSON.stringify({aal:'aal2'})).toString('base64url')}.synthetic-mfa-access`,refresh_token:'synthetic-mfa-refresh',expires_in:3600},error:null})),
  unenroll:vi.fn(async()=>({error:null})),
 };}
 beforeEach(()=>{
@@ -22,9 +24,10 @@ beforeEach(()=>{
  vi.stubEnv('SIGMAROUND_ACCOUNT_TEST_ENTITLEMENTS_ENABLED','false');
  mocks.session.mockResolvedValue({account:{userId:actor,sessionId:sid,email:'admin@example.invalid'},session:{access_token:`header.${Buffer.from(JSON.stringify({aal:'aal2'})).toString('base64url')}.synthetic`,refresh_token:'synthetic-refresh'}});
  mocks.limit.mockResolvedValue(undefined);mfa=makeMfa();
+ mocks.authorize.mockResolvedValue({userId:actor,sessionId:sid,email:'admin@example.invalid',trialSecondsGranted:900,remoteDesktop:false});
  mocks.providerStatus.mockResolvedValue({observedAt:'2026-10-08T00:00:00.000Z',providers:[]});
  rpc=vi.fn(async(name:string,args:any)=>({data:name==='account_admin_check'?true:name==='account_admin_read_v2'?{code:'ACTIVE',users:[],catalog:[]}:['account_admin_mutate','account_admin_adjust'].includes(name)?{code:'APPLIED'}:null,error:null,status:200}));
- mocks.clients.mockReturnValue({service:{rpc},auth:{auth:{setSession:vi.fn(async()=>({error:null})),mfa}}});
+ mocks.clients.mockReturnValue({service:{rpc},auth:{auth:{setSession:vi.fn(async(session)=>({data:{session},error:null})),mfa}}});
 });
 afterEach(()=>{vi.unstubAllEnvs();vi.clearAllMocks();vi.restoreAllMocks();});
 const request=(body?:object)=>new Request(`${origin}/api/account/admin`,body?{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
@@ -88,6 +91,38 @@ it('challenge/verifies the selected factor and returns tokens only as encrypted 
  expect(response.status).toBe(200);expect(mfa.challengeAndVerify).toHaveBeenCalledWith({factorId:factor,code:'123456'});
  expect(await response.text()).toBe('{"ok":true}');const cookies=response.headers.get('set-cookie')!;
  expect(cookies).toContain('HttpOnly');expect(cookies).toContain('Secure');expect(cookies).not.toContain('synthetic-mfa-');
+ expect(mocks.authorize).toHaveBeenCalledWith(mocks.clients(),expect.stringContaining('.synthetic-mfa-access'),{userId:actor,sessionId:sid});
+});
+it('persists an SDK restore rotation only after authenticating the original owner and session',async()=>{
+ const rotated={access_token:'synthetic-rotated-access',refresh_token:'synthetic-rotated-refresh',expires_in:3600};
+ mocks.clients().auth.auth.setSession.mockResolvedValueOnce({data:{session:rotated},error:null});
+ const response=await accountAdminRequest(request());expect(response.status).toBe(200);
+ expect(mocks.authorize).toHaveBeenCalledExactlyOnceWith(mocks.clients(),rotated.access_token,{userId:actor,sessionId:sid});
+ const credentials=response.headers.get('set-cookie')!;
+ for(const [kind,value]of [['access',rotated.access_token],['refresh',rotated.refresh_token],['session',{userId:actor,sessionId:sid}]] as const){
+  const encoded=credentials.match(new RegExp(`__Host-sr-account-${kind}=([^;]+)`))![1];
+  expect(unseal(encoded,kind,accountConfig())).toEqual(value);
+ }
+ expect(mocks.authorize.mock.invocationCallOrder[0]).toBeLessThan(rpc.mock.invocationCallOrder.find((_,index)=>rpc.mock.calls[index][0]==='account_admin_read_v2')!);
+});
+it('rejects an absent SDK session and a rotated identity mismatch before MFA or privileged reads',async()=>{
+ const restore=mocks.clients().auth.auth.setSession;
+ restore.mockResolvedValueOnce({data:{session:null},error:null});
+ expect((await accountAdminRequest(request({action:'MFA_ENROLL'}))).status).toBe(401);
+ restore.mockResolvedValueOnce({data:{session:{access_token:'changed-owner-access',refresh_token:'changed-owner-refresh',expires_in:3600}},error:null});
+ mocks.authorize.mockRejectedValueOnce(new AccountError('UNAUTHENTICATED',401));
+ const rejected=await accountAdminRequest(request({action:'MFA_ENROLL'}));expect(rejected.status).toBe(401);
+ expect(rejected.headers.get('set-cookie')).toBeNull();expect(mfa.listFactors).not.toHaveBeenCalled();expect(mfa.enroll).not.toHaveBeenCalled();
+ expect(rpc.mock.calls.some(([name])=>name==='account_admin_read_v2'||name==='account_admin_mutate')).toBe(false);
+});
+it('does not persist a changed identity or an AAL1 result from MFA verification',async()=>{
+ mfa.listFactors.mockResolvedValue({data:{all:[{id:factor,status:'verified',factor_type:'totp'}]},error:null});
+ mocks.authorize.mockRejectedValueOnce(new AccountError('UNAUTHENTICATED',401));
+ const mismatch=await accountAdminRequest(request({action:'MFA_VERIFY',factorId:factor,code:'123456'}));
+ expect(mismatch.status).toBe(401);expect(mismatch.headers.get('set-cookie')).toBeNull();
+ mfa.challengeAndVerify.mockResolvedValueOnce({data:{access_token:`header.${Buffer.from(JSON.stringify({aal:'aal1'})).toString('base64url')}.synthetic`,refresh_token:'unchanged-assurance',expires_in:3600},error:null});
+ const aal1=await accountAdminRequest(request({action:'MFA_VERIFY',factorId:factor,code:'123456'}));
+ expect(aal1.status).toBe(403);expect(aal1.headers.get('set-cookie')).toBeNull();
 });
 it('requires the staging gate and creates only a server-stamped audited test grant',async()=>{
  const body=change();expect((await accountAdminRequest(request(body))).status).toBe(403);

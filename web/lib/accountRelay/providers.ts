@@ -48,7 +48,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
         guard.assertActive();
         if (!response.ok || !response.body) { await response.body?.cancel(); throw unavailable(); }
         reader = response.body.getReader();
-        let buffer = '', totalBytes = 0;
+        let buffer = '', totalBytes = 0, hasAnswer = false;
         const decoder = new TextDecoder('utf-8', { fatal: true });
         const event = (raw: string) => {
           guard.assertActive();
@@ -57,10 +57,16 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
           if (!data || data === '[DONE]') return;
           const value = JSON.parse(data);
           if (value.error) throw unavailable();
-          const parts = value.candidates?.[0]?.content?.parts;
+          // Gemini can return HTTP 200 for blocked prompts/candidates. These are
+          // bounded failures, never a successful empty or policy-blocked answer.
+          if (value.promptFeedback?.blockReason) throw unavailable();
+          const candidate = value.candidates?.[0];
+          if (candidate?.finishReason && !['STOP', 'MAX_TOKENS'].includes(candidate.finishReason)) throw unavailable();
+          const parts = candidate?.content?.parts;
           if (!Array.isArray(parts)) return;
           for (const part of parts) {
             if (typeof part.text !== 'string' || part.thought) continue;
+            if (part.text.trim()) hasAnswer = true;
             const text = filter.push(part.text);
             if (text) emit(text);
           }
@@ -86,6 +92,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
         buffer += decoder.decode();
         if (buffer.trim()) event(buffer);
         guard.assertActive();
+        if (!hasAnswer) throw unavailable();
         const final = filter.push('', true); if (final) emit(final);
       } catch { throw unavailable(); }
       finally { clearTimeout(total); clearTimeout(idle); cancel(); await reader?.cancel().catch(() => undefined); }

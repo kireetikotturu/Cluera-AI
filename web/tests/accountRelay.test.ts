@@ -47,6 +47,27 @@ function harness(overrides: Partial<Providers> = {}, duration = 30000) {
 }
 
 describe('staging account relay boundaries', () => {
+  it('acknowledges cancellation during provider preparation without starting or charging work', async () => {
+    let prepared!: () => void;
+    const prepare = vi.fn(() => new Promise<void>(resolve => { prepared = resolve; }));
+    const h = harness({ prepare }); await h.login();
+    h.peer.input({ type: 'generate', id: 'cancel-before-start', prompt: 'synthetic' }); await tick();
+    h.peer.input({ type: 'cancelGeneration' }); prepared(); await tick();
+    expect(h.command).not.toHaveBeenCalled(); expect(h.providers.generate).not.toHaveBeenCalled();
+    expect(h.peer.readyState).toBe(WebSocket.OPEN);
+    expect(h.peer.sent).toEqual([{ type: 'ready', protocol: 1 }, { type: 'answerDone', id: 'cancel-before-start' }]);
+    h.session.stop();
+  });
+  it('rechecks token expiry after provider preparation before starting a usage reservation', async () => {
+    let prepared!: () => void;
+    const h = harness({ prepare: () => new Promise<void>(resolve => { prepared = resolve; }) }); await h.login();
+    h.peer.input({ type: 'generate', id: 'expired-before-start', prompt: 'synthetic' }); await tick();
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 3600001);
+    try { prepared(); await tick(); }
+    finally { clock.mockRestore(); }
+    expect(h.command).not.toHaveBeenCalled(); expect(h.providers.generate).not.toHaveBeenCalled();
+    expect(h.peer.readyState).toBe(WebSocket.CLOSED);
+  });
   it('does not announce audio readiness until the upstream callback, or after cancellation', async () => {
     let ready!: () => void;
     const audio = { write: vi.fn(), forceEndTurn: vi.fn(), close: vi.fn() };
@@ -209,6 +230,27 @@ describe('staging account relay boundaries', () => {
 });
 
 describe('managed account provider adapters', () => {
+  it.each([
+    '',
+    'data: [DONE]\n\n',
+    'data: {"usageMetadata":{"totalTokenCount":10}}\n\n',
+    'data: {"promptFeedback":{"blockReason":"SAFETY"}}\n\n',
+    'data: {"candidates":[{"finishReason":"SAFETY","content":{"parts":[{"text":"blocked content"}]}}]}\n\n',
+    'data: {"candidates":[{"content":{"parts":[{"text":"private thought","thought":true},{"text":"  "}]}}]}\n\n',
+  ])('does not report empty, metadata-only or blocked Gemini streams as successful answers', async body => {
+    const emit = vi.fn();
+    const adapter = providerAdapters(secrets, { fetch: async () => new Response(body) });
+    await expect(adapter.generate({ type: 'generate', id: 'empty', prompt: 'synthetic' },
+      { signal: new AbortController().signal, assertActive() {} }, emit)).rejects.toThrow('Provider unavailable.');
+    expect(emit.mock.calls.map(([text]) => text).join('').trim()).toBe('');
+  });
+  it.each(['STOP', 'MAX_TOKENS'])('accepts Gemini text with the supported %s terminal reason', async finishReason => {
+    const emit = vi.fn();
+    const body = `data: ${JSON.stringify({ candidates: [{ finishReason, content: { parts: [{ text: 'A valid answer.' }] } }] })}\n\n`;
+    await providerAdapters(secrets, { fetch: async () => new Response(body) }).generate(
+      { type: 'generate', id: 'answer', prompt: 'synthetic' }, { signal: new AbortController().signal, assertActive() {} }, emit);
+    expect(emit).toHaveBeenCalledWith('A valid answer.');
+  });
   it('reports readiness only once after an authenticated upstream open, never for a late open after abort', () => {
     vi.useFakeTimers();
     class Upstream extends EventEmitter { readyState: number = WebSocket.CONNECTING; bufferedAmount = 0; send = vi.fn(); terminate = vi.fn(); }

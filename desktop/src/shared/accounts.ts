@@ -10,6 +10,7 @@ export interface AccountView {
   message?: string;
 }
 export interface AccountLogin { email: string; password: string }
+export interface AccountAuthOptions { google: 'enabled' | 'disabled' | 'unavailable' }
 export type AccountWebAction = 'signup' | 'reset-password' | 'dashboard' | 'credits';
 export interface AccountDesktopAPI {
   credits: {
@@ -25,6 +26,7 @@ export interface AccountDesktopAPI {
     importFile(kind:import('./accountContext').ContextDocument['kind']):Promise<import('./accountContext').ContextSnapshot|null>;
   };
   status(): Promise<AccountView>;
+  authOptions(): Promise<AccountAuthOptions>;
   login(input: AccountLogin): Promise<AccountView>;
   google():Promise<AccountView>;
   retry(): Promise<AccountView>;

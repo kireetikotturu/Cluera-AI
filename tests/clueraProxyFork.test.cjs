@@ -81,3 +81,12 @@ test('only exact manifest-bound vendor runtime escapes generated-output denial a
     assert.equal(crypto.createHash('sha256').update(b).digest('hex'), pins.get(file).sha256);
   }
 });
+test('publication refuses noncanonical path segments before filesystem reads, including at a drive root', () => {
+  const pins = new Map();
+  for (const base of [root, path.parse(root).root]) {
+    for (const name of ['../never-created.js', 'desktop/../never-created.js', './never-created.js',
+      'desktop/./never-created.js', 'desktop//never-created.js', 'desktop/', '', 'Q:never-created.js', 'never-created.js:private', 'never-created\0.js']) {
+      assert.throws(() => reviewFile(base, name, [], pins), /Publication path refused/);
+    }
+  }
+});

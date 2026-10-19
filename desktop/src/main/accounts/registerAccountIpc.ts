@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { IPC } from '../../shared/ipc';
 import type { AccountView } from '../../shared/accounts';
 import type { AccountSessionManager } from './AccountSessionManager';
-import { ACCOUNT_ORIGIN } from './AccountApi';
+import { AccountApi, ACCOUNT_ORIGIN } from './AccountApi';
 import type { UpdateManager } from '../updates/UpdateManager';
 import {googleAccountLogin} from './GoogleAccountLogin';
 import type {AccountContextManager} from './AccountContextManager';
@@ -25,6 +25,11 @@ export function registerAccountIpc(window: BrowserWindow, account?: AccountSessi
     return safeView(view);
   };
   ipcMain.handle('account:status', event => { trusted(event); return account ? safeView(account.status()) : { mode: 'legacy', state: 'signed-out' }; });
+  ipcMain.handle('account:auth-options', async event => {
+    trusted(event); requireAccount();
+    try { return await new AccountApi().authOptions(); }
+    catch { return { google: 'unavailable' }; }
+  });
   ipcMain.handle('account:login', async (event, input: unknown) => {
     trusted(event); const owner = requireAccount();
     const parsed = z.object({ email: z.string().trim().email().max(254), password: z.string().min(1).max(128) }).strict().safeParse(input);

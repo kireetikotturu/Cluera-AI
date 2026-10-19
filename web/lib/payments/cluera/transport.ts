@@ -9,7 +9,11 @@ export function clueraRazorpayTransport(env = process.env, request: typeof fetch
   return async (path: string, body?: Record<string, unknown>): Promise<unknown> => {
     const resource = /^\/(orders(?:\/order_[A-Za-z0-9]{8,64})?|subscriptions(?:\/sub_[A-Za-z0-9]{8,64})?|plans\/plan_[A-Za-z0-9]{8,64}|payments\/pay_[A-Za-z0-9]{8,64}|invoices\/inv_[A-Za-z0-9]{8,64}|refunds\/rfnd_[A-Za-z0-9]{8,64})$/;
     const invoiceList = /^\/invoices\?subscription_id=sub_[A-Za-z0-9]{8,64}&count=100&skip=\d{1,3}$/;
-    if ((!resource.test(path) && !invoiceList.test(path)) || (body && !['/orders', '/subscriptions'].includes(path)))
+    const orderPayments = /^\/orders\/order_[A-Za-z0-9]{8,64}\/payments$/.test(path);
+    const cancel = /^\/subscriptions\/sub_[A-Za-z0-9]{8,64}\/cancel$/.test(path);
+    if ((!resource.test(path) && !invoiceList.test(path) && !cancel && !orderPayments)
+      || (cancel && (!body || Object.keys(body).length !== 1 || body.cancel_at_cycle_end !== true))
+      || (body && !cancel && !['/orders', '/subscriptions'].includes(path)))
       throw new ClueraBillingError('INVALID');
     const remaining = Math.min(10000,chainDeadline-monotonicNow());
     if (remaining <= 0) throw new ClueraBillingError('UNAVAILABLE');

@@ -7,6 +7,7 @@ import {ModelPolicyEditor,type ModelPolicy} from './ModelPolicyEditor';
 import {AccountReleases} from './AccountReleases';
 import {BillingCatalog} from './BillingCatalog';
 import {adminReadError} from '../../../lib/accounts/adminReadErrors';
+import {useAdminAccessRecheck} from '../AdminRoleNavigation';
 import '../account-ui.css';
 import './admin-navigation.css';
 type Factor={id:string;status:string};
@@ -20,6 +21,7 @@ interface State {needsMfa?:boolean;factors?:Factor[];testEntitlementsEnabled?:bo
  models?:ModelPolicy[];
 }
 export function AccountAdmin(){
+ const recheckAccess=useAdminAccessRecheck();
  const [state,setState]=useState<State|null>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[subject,setSubject]=useState('');
  const [enrollment,setEnrollment]=useState<{id:string;qr:string;secret:string}|null>(null),[factorId,setFactorId]=useState('');
  const [pendingMutation,setPendingMutation]=useState<object|null>(null);
@@ -75,6 +77,12 @@ export function AccountAdmin(){
    if('operationId' in body&&data?.code!=='APPLIED')throw new Error();
    if(!alive.current)return;
    if('operationId' in body){pendingOperation.current=null;pendingUncertain.current=false;setPendingMutation(null);}
+   if('action' in body&&body.action==='MFA_VERIFY'){
+    if(data?.ok!==true||Object.keys(data).length!==1)throw new Error();
+    // Refresh the role fence immediately. A later focus must not be the first
+    // assurance check after new privileged controls have become actionable.
+    recheckAccess();
+   }
    if(data.enrollment){setEnrollment(data.enrollment);setFactorId(data.enrollment.id);}
    else{setEnrollment(null);await load();}
   }catch{if('operationId' in body)pendingUncertain.current=true;if(alive.current)setMessage('Action failed or requires MFA. Refresh to verify its state; do not repeat a financial operation blindly.');}

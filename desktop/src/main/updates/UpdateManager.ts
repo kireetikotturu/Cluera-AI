@@ -18,6 +18,9 @@ export interface UpdateManagerOptions {
   fetcher?: typeof fetch;
   channel?: 'stable' | 'beta' | 'cluera-beta';
   redirectOrigins?: string[];
+  /** The Cluera TEST channel is unsigned. A pinned publisher opts into the
+   * independent Authenticode gate; release hashes/signatures still apply. */
+  requirePublisherVerification?: boolean;
   installer?: {
     supported(): boolean;
     stopProviderWork(): Promise<void>;
@@ -131,6 +134,12 @@ export class UpdateManager {
       abort.signal.throwIfAborted();
       await this.options.installer.stopProviderWork();
       await verifyInstallerFile(artifact.file, release);
+      if (this.options.requirePublisherVerification || this.options.channel === 'stable') {
+        await this.options.installer.verifyPublisher(artifact.file);
+        // Publisher verification may invoke an external OS process. Recheck the
+        // approved bytes afterwards before handing the same file to Windows.
+        await verifyInstallerFile(artifact.file, release);
+      }
       abort.signal.throwIfAborted();
       this.installPhase = 'launching';
       this.installAbort = null;

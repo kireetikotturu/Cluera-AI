@@ -10,6 +10,9 @@ const roleSchema=z.object({admin:z.literal(true),mfaVerified:z.boolean(),navigat
 type Access={admin:boolean;navigationSession:string|null;checking:boolean;result:'unresolved'|'allowed'|'denied'|'signin'|'unavailable';recheck:()=>void};
 const RoleContext=createContext<Access>({admin:false,navigationSession:null,checking:true,result:'unresolved',recheck:()=>{}});
 
+/** Revalidate assurance before showing controls after an explicit MFA change. */
+export function useAdminAccessRecheck(){return useContext(RoleContext).recheck;}
+
 /** Opaque invalidation only. Never persist identity, role, tokens or credentials. */
 export function notifyAccountSessionChanged():void{
  if(typeof window==='undefined')return;

@@ -73,17 +73,34 @@ describe('verified installer download', () => {
   });
 });
 
-function manager(fetcher: typeof fetch, channel: 'stable' | 'beta' | 'cluera-beta' = 'cluera-beta') {
+function manager(fetcher: typeof fetch, channel: 'stable' | 'beta' | 'cluera-beta' = 'cluera-beta', requirePublisherVerification = false) {
   const actions: string[] = [];
   const installer = { supported: () => true, stopProviderWork: vi.fn(async () => { actions.push('stop'); }),
     verifyPublisher: vi.fn(async (_file: string) => { actions.push('publisher'); }),
     launch: vi.fn(async (_file: string) => { actions.push('launch'); }), quit: vi.fn(() => { actions.push('quit'); }) };
   const updates = new UpdateManager({ enforced: true, serverUrl: 'https://sigma.example', channel, publicKeyPem,
     trustedInstallerOrigins: ['https://github.com'], appVersion: '1.0.5', userDataPath: directory, fetcher,
-    store: { read: async () => null, write: async () => undefined }, installer });
+    store: { read: async () => null, write: async () => undefined }, installer, requirePublisherVerification });
   return { updates, installer, actions };
 }
 describe('explicit update installation and session exclusion', () => {
+  it('enforces configured publisher verification before launching an otherwise valid Cluera update', async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => String(input) === url
+      ? new Response(bytes) : Response.json({ signedManifest: token() }));
+    const { updates, installer, actions } = manager(fetcher, 'cluera-beta', true);
+    installer.verifyPublisher.mockRejectedValue(new Error('synthetic publisher mismatch'));
+    expect((await updates.install()).installError).toBeTruthy();
+    expect(installer.verifyPublisher).toHaveBeenCalledOnce();
+    expect(installer.launch).not.toHaveBeenCalled(); expect(installer.quit).not.toHaveBeenCalled();
+    expect(actions).toEqual(['stop']);
+  });
+  it('launches after configured publisher acceptance, with approved bytes rechecked', async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => String(input) === url
+      ? new Response(bytes) : Response.json({ signedManifest: token() }));
+    const { updates, actions } = manager(fetcher, 'cluera-beta', true);
+    expect((await updates.install()).installPhase).toBe('launching');
+    expect(actions).toEqual(['stop', 'publisher', 'launch', 'quit']);
+  });
   it('keeps pending session starts protected through stop and failed overlapping starts', async () => {
     const { updates } = manager(vi.fn());
     const finish = updates.beginSessionStart();

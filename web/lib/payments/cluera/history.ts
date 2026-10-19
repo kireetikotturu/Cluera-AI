@@ -57,7 +57,7 @@ export async function handleClueraBillingHistory(request: Request): Promise<Resp
 /** Prepared service read, not a public handler. Caller must first validate its
  * live BFF session; SQL independently checks the same user/session. Pausing
  * checkout never hides already recorded customer payment/subscription history.
- * Requires the separately reviewed history RPC proposal, which is NOT applied.
+ * Requires the separately tracked history RPC migration and read-capability flag.
  */
 export async function readClueraBillingHistory(rpc: PaymentRpc,
   account: { userId: string; sessionId: string }, env = process.env) {

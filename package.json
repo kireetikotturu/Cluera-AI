@@ -10,6 +10,7 @@
     "build:desktop": "npm --prefix desktop run build:code",
     "build:web": "npm --prefix web run build",
     "build:backend": "npm --prefix backend run build",
-    "verify:source": "node scripts/verify-cluera-source.cjs"
+    "verify:source": "node scripts/verify-cluera-source.cjs",
+    "verify:staging": "node scripts/verify-cluera-launch-boundaries.cjs"
   }
 }

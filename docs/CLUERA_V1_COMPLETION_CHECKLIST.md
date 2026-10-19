@@ -1,6 +1,12 @@
 # Cluera V1 completion and controlled acceptance
 
+## October 19 current consolidated handoff
+
+See [CLUERA_FINAL_LAUNCH_CHECKLIST.md](CLUERA_FINAL_LAUNCH_CHECKLIST.md) for the current code fixes, exact verification/publication evidence, remaining engineering and one consolidated owner checklist. Do not repeat completed SMTP, key/URL, Admin or MFA setup. Reconcile the retained BOUND Test order before another payment action. Monthly queuing/pause/resume, provider custody and acceptance, Windows distribution and commercial operations are not accepted merely because source/tests exist. Commercial launch remains NO-GO. The dated paragraphs below retain historical evidence.
+
 ## Current October19 — authentication repair and existing-attempt safety
+
+Auth repair **deployed f7ea42ff /READY dpl_Cm2mdQbj91wYtDDwtLrmGSExsYom**; complete [CI39192000601](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39192000601) passes1874web/22skips,366desktop/1skip,136preparation/alltypechecks-builds-audits. Fresh15Auth+40financial public checks+relayhealth pass;46business snapshots/40originalnonces/85functionpins/49env are preserved. No real private login/password/email/Google/payment/provider/Windows test was performed. **Next is existing-email workspace/login + reload, not another purchase.** Google remains independently disabled; real consent and the pending bound order remain unaccepted. Final evidence is in execution status; this result addition is local documentation, not a second publication.
 
 [The consolidated authentication acceptance checklist](CLUERA_AUTHENTICATION_ACCEPTANCE.md) is current. Existing identities/MFA/Test merchant/destination/processor/₹549revision are preserved. Auth/session/password/Google-state/Admin-navigation and server routing repairs must pass automated and private acceptance before another owner payment step. October19 read-only baseline contains one already BOUND intent/order; do not create another or infer settlement from zero local receipts. Earlier immediate-purchase instructions are held, not renewed setup/approval. Live/monthly/Paddle/provider spend and public unapproved installer remain disabled. Exact new CI/deployment evidence belongs in execution status, never inferred from old results. Commercial launch remains NO-GO.
 

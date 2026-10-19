@@ -1,13 +1,22 @@
 import {ArrowRight, Eye, EyeOff, ShieldCheck, X} from 'lucide-react';
 import {useEffect, useRef, useState} from 'react';
-import type {AccountView, AccountWebAction} from '../../shared/accounts';
+import type {AccountAuthOptions, AccountView, AccountWebAction} from '../../shared/accounts';
 
 /** Credentials live only in this form; main still owns all authentication. */
 export function AccountLogin({state,onState}:{state:AccountView;onState(state:AccountView):void}):JSX.Element {
   const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [visible,setVisible]=useState(false),[operation,setOperation]=useState('');
+  const [google,setGoogle]=useState<AccountAuthOptions['google']>('unavailable');
   const working=useRef(false),mounted=useRef(true);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+  useEffect(()=>{
+    let current=true;
+    void (async()=>{
+      try { const options=await window.accountAPI!.authOptions(); if(current)setGoogle(options.google==='enabled'?'enabled':options.google==='disabled'?'disabled':'unavailable'); }
+      catch { if(current)setGoogle('unavailable'); }
+    })();
+    return()=>{current=false;};
+  },[]);
   const run=async(label:string,action:()=>Promise<AccountView>)=>{
     if(working.current||state.state==='checking')return;
     working.current=true;setBusy(true);setOperation(label);setError('');
@@ -37,7 +46,8 @@ export function AccountLogin({state,onState}:{state:AccountView;onState(state:Ac
         </form>
         <p role="status" className="activation-message">{error||state.message}</p>
         <div className="account-auth-divider"><span>or continue securely</span></div>
-        <button className="ghost account-google" disabled={locked} onClick={()=>void run('Waiting for Google…',()=>window.accountAPI!.google())}>Continue with Google</button>
+        <button className="ghost account-google" disabled={locked||google!=='enabled'} aria-describedby={google!=='enabled'?'account-google-status':undefined} onClick={()=>void run('Waiting for Google…',()=>window.accountAPI!.google())}>Continue with Google</button>
+        {google!=='enabled'&&<p id="account-google-status" className="account-auth-note">{google==='disabled'?'Google sign-in is not enabled. Use your email and password.':'Google sign-in is temporarily unavailable. Use your email and password.'}</p>}
         <div className="account-auth-links"><button disabled={locked} onClick={()=>void web('signup')}>Create account</button><button disabled={locked} onClick={()=>void web('reset-password')}>Forgot password?</button></div>
         <button className="account-retry" disabled={locked} onClick={()=>void run('Restoring session…',()=>window.accountAPI!.retry())}>Retry saved session</button>
         <p className="account-auth-note">Account creation, email verification and recovery open in your browser. AI credentials stay on the server.</p>

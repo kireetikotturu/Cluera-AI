@@ -108,6 +108,7 @@ async function createWindow(): Promise<void> {
     userDataPath: app.getPath('userData'),
     channel: ACCOUNT_DISTRIBUTION.channel,
     redirectOrigins: config.licensing.trustedInstallerRedirectOrigins,
+    requirePublisherVerification: Boolean(config.licensing.updatePublisher),
     installer: {
       supported: () => app.isPackaged && process.platform === 'win32' && process.arch === 'x64',
       stopProviderWork: () => stopAccountWork(),

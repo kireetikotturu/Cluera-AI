@@ -85,7 +85,7 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
     awaitingPong = false; clearTimeout(pongDeadline); schedulePing();
   });
   async function ensureStarted() {
-    if (!authorization || ended) throw Error('Session unavailable.');
+    if (!authorization || ended || performance.now() >= tokenDeadline) throw Error('Session unavailable.');
     if (!run) {
       run = authorization.createRun();
       run.signal.addEventListener('abort', () => end(), { once: true });
@@ -166,6 +166,9 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
       void (async () => {
         try {
           await dependencies.providers.prepare?.('gemini',command);
+          // Cancellation during a vault/model lookup must not start a paid run.
+          // Existing audio keeps its own shared run; this question emits no work.
+          if (abort.signal.aborted || ended) return;
           await ensureStarted(); touch();
           if (abort.signal.aborted) return;
           const signal = AbortSignal.any([run!.signal, abort.signal]);
@@ -179,7 +182,12 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
           if (generation === abort) generation = undefined;
           // A cancelled generation is settled before a client may submit a new
           // one on this audio session. No cancelled answer content is emitted.
-          if (abort.signal.aborted && !ended) send({ type:'answerDone', id:command.id });
+          if (abort.signal.aborted && !ended) {
+            // A pre-start cancellation has no usage grant. Its fixed, content-free
+            // acknowledgement is safe without one and must never reject this task.
+            try { send({ type:'answerDone', id:command.id }, false); }
+            catch { end(); }
+          }
         }
       })();
     } catch { end('protocol_rejected'); }

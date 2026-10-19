@@ -7,6 +7,12 @@ export const NATIVE_GOOGLE_CALLBACK='http://127.0.0.1:43822/cluera/callback';
  * user content or external scripts are returned to the browser. */
 export async function googleAccountLogin(open:(url:string)=>Promise<void>,signal:AbortSignal,
   api=new AccountApi()):Promise<AccountTokens>{
+ if(signal.aborted)throw new AccountApiError(401);
+ // Renderer capability is display-only. Recheck the fixed server capability on
+ // every deliberate attempt before opening a browser or binding the callback.
+ const options=await api.authOptions(signal);
+ if(signal.aborted)throw new AccountApiError(401);
+ if(options.google!=='enabled')throw new AccountApiError(503);
  const verifier=randomBytes(48).toString('base64url'),state=randomBytes(32).toString('hex');
  const challenge=createHash('sha256').update(verifier).digest('base64url');
  const authorize=new URL('https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize');

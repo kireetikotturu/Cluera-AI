@@ -148,3 +148,14 @@ it('invalid Auth credentials remain signed-out rather than a service failure', a
   expect(await manager.login(input)).toMatchObject({ state: 'signed-out', message: 'Sign in with a verified email to continue.' });
   expect(diagnostic).not.toHaveBeenCalled(); expect(f.saved()).toBeNull();
 });
+it('reads only the bounded public capability endpoint and rejects extra or malformed fields', async () => {
+  const request=vi.fn(async(_input:string|URL|Request,_init?:RequestInit)=>Response.json({google:'enabled'})),diagnostic=vi.fn();
+  const api=new AccountApi(request as typeof fetch,diagnostic);
+  expect(await api.authOptions()).toEqual({google:'enabled'});
+  expect(request).toHaveBeenCalledWith('https://cluera-ai-staging.vercel.app/api/account/auth-options',expect.objectContaining({method:'GET',credentials:'omit',redirect:'error',cache:'no-store'}));
+  expect(request.mock.calls[0][1]).not.toHaveProperty('body');
+  expect(request.mock.calls[0][1]?.headers).not.toHaveProperty('Authorization');
+  request.mockResolvedValueOnce(Response.json({google:'enabled',accessToken:'private'}));
+  await expect(api.authOptions()).rejects.toThrow('Account service is unavailable.');
+  expect(diagnostic).toHaveBeenCalledWith({operation:'auth-options',cause:'response_schema_invalid',status:503});
+});

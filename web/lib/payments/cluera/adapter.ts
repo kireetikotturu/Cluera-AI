@@ -51,17 +51,59 @@ export function verifyClueraPlan(revision: Revision, raw: unknown) {
 
 export function clueraRazorpayAdapter(env = process.env, request: typeof fetch = fetch) {
   const api = clueraRazorpayTransport(env, request), config = clueraBillingConfig(env);
-  const verifySubscription = async (binding: Binding) => {
-    const subscription = subscriptionSchema.parse(await api(`/subscriptions/${binding.subscriptionId}`));
+  const parseSubscription = (binding: Binding, raw: unknown) => {
+    const subscription = subscriptionSchema.parse(raw);
     if (subscription.id !== binding.subscriptionId || subscription.plan_id !== binding.revision.razorpayPlanId
       || subscription.total_count !== binding.revision.totalCount || subscription.notes.cluera_intent !== binding.intentId
       || subscription.notes.cluera_revision !== binding.revision.revisionId) throw new ClueraBillingError('PENDING');
+    return subscription;
+  };
+  const verifySubscription = async (binding: Binding) => {
+    const subscription = parseSubscription(binding, await api(`/subscriptions/${binding.subscriptionId}`));
     await verifyPlan(binding.revision);
     return subscription;
   };
   const verifyPlan = async (revision: Revision) => verifyClueraPlan(revision, await api(`/plans/${revision.razorpayPlanId}`));
+  const cancellationEvidence = (subscription: z.infer<typeof subscriptionSchema>) => {
+    if (['cancelled','completed','expired'].includes(subscription.status)
+      && (!subscription.ended_at || subscription.ended_at * 1000 > Date.now() + 5000)) throw new ClueraBillingError('PENDING');
+    return { subscriptionId: subscription.id, providerState: subscription.status, observedAt: new Date().toISOString() };
+  };
   return {
     verifyPlan,
+    async resumeUntouchedPack(binding: Binding) {
+      if (binding.revision.kind !== 'PACK' || binding.code !== 'BOUND' || !binding.orderId || binding.subscriptionId !== null)
+        throw new ClueraBillingError('INVALID');
+      const order = orderSchema.parse(await api(`/orders/${binding.orderId}`)), notes = noteSchema.parse(order.notes);
+      if (order.id !== binding.orderId || order.receipt !== binding.intentId || order.amount !== binding.revision.amountPaise
+        || order.status !== 'created' || order.amount_paid !== 0 || order.amount_due !== binding.revision.amountPaise || order.attempts !== 0
+        || notes.cluera_intent !== binding.intentId || notes.cluera_revision !== binding.revision.revisionId)
+        throw new ClueraBillingError('PENDING');
+      // Any associated payment, including authorized/failed/unknown, requires
+      // reconciliation. Continuing an untouched order never means retrying one.
+      z.object({ entity: z.literal('collection'), count: z.literal(0), items: z.array(z.unknown()).length(0) })
+        .parse(await api(`/orders/${binding.orderId}/payments`));
+      return { orderId: order.id, subscriptionId: null };
+    },
+    async cancellationStatus(binding: Binding) {
+      if (binding.revision.kind !== 'RECURRING' || binding.code !== 'VERIFIED') throw new ClueraBillingError('INVALID');
+      // A retired catalog/provider plan must not prevent ending its existing
+      // subscription. The exact server-bound plan, notes and resource still match.
+      return cancellationEvidence(parseSubscription(binding, await api(`/subscriptions/${binding.subscriptionId}`)));
+    },
+    async cancelFuture(binding: Binding) {
+      if (binding.revision.kind !== 'RECURRING' || binding.code !== 'VERIFIED') throw new ClueraBillingError('INVALID');
+      const current = parseSubscription(binding, await api(`/subscriptions/${binding.subscriptionId}`));
+      if (['cancelled','completed','expired'].includes(current.status))
+        return cancellationEvidence(current);
+      if (!['active','pending','halted','paused'].includes(current.status)) throw new ClueraBillingError('PENDING');
+      // Only a separately leased cancellation command may call this method.
+      // End-of-cycle cancellation preserves already funded usage. The resource
+      // may remain active until then; ACK is not a terminal lifecycle event.
+      const result = parseSubscription(binding, await api(`/subscriptions/${binding.subscriptionId}/cancel`, { cancel_at_cycle_end: true }));
+      if (!['active','pending','halted','paused','cancelled','completed','expired'].includes(result.status)) throw new ClueraBillingError('PENDING');
+      return cancellationEvidence(result);
+    },
     async create(intentId: string, revision: Revision) {
       z.uuid().parse(intentId); revisionSchema.parse(revision);
       const notes = { cluera_intent: intentId, cluera_revision: revision.revisionId, cluera_environment: 'test' };

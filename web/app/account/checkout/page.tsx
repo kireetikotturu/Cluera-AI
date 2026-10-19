@@ -11,6 +11,7 @@ import {STAGING_DATABASE,STAGING_SITE} from '../../../lib/accountRelay/config';
 import ClueraCheckoutClient from './ClueraCheckoutClient';
 import {clueraCheckoutEnabled} from '../../../lib/payments/cluera/config';
 import {clueraBillingHistoryEnabled} from '../../../lib/payments/cluera/history';
+import {clueraCancellationEnabled} from '../../../lib/payments/cluera/cancellation';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Cluera sandbox checkout', robots: { index: false, follow: false } };
@@ -22,7 +23,7 @@ export default async function CheckoutPage() {
       ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
     return <main className="account-page"><h1>Buy Cluera credits</h1>
       <p>Razorpay Test only. Checkout requires a separately approved rollout and the existing verified tester gate. No Live payments or Stripe.</p>
-      <ClueraCheckoutClient enabled={clueraCheckoutEnabled()} historyEnabled={clueraBillingHistoryEnabled()}/>
+      <ClueraCheckoutClient enabled={clueraCheckoutEnabled()} historyEnabled={clueraBillingHistoryEnabled()} cancellationEnabled={clueraCancellationEnabled()}/>
       <a href="/account">Return to your account</a></main>;
   }
   // Presentation only: a paused new Cluera rollout must not need old Paddle

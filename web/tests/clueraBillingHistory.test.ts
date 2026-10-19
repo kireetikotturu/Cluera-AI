@@ -7,9 +7,9 @@ import { clueraBillingHistorySchema } from '../lib/payments/cluera/historyContra
 import { paymentTestEnvironment } from './helpers/paymentTestMode';
 import type { PaymentRpc } from '../lib/payments/core/types';
 
-// Exact applied-clean source plus UNAPPLIED read-only proposal, in-memory only.
+// Exact applied-clean source plus tracked read-only history migration, in-memory only.
 // No hosted Auth, customer, provider, financial or schema request is made.
-const proposal = readFileSync('../docs/proposals/cluera-billing-history.sql', 'utf8');
+const proposal = readFileSync('../supabase/migrations/20261019085323_cluera_customer_billing_history.sql', 'utf8');
 const env = { ...paymentTestEnvironment, CLUERA_BILLING_V2_ENABLED: 'true',
   CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED: 'false', SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED: 'true',
   SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED: 'false', SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED: 'false' };

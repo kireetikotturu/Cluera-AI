@@ -97,7 +97,7 @@ export async function rateLimit(request: Request, config: AccountConfig, clients
     if (data !== true) throw new AccountError('RATE_LIMITED', 429);
   }
 }
-function saveSession(cookies: AccountCookies, session: Session, account:SessionIdentity) {
+export function saveSession(cookies: AccountCookies, session: Session, account:SessionIdentity) {
   cookies.set('access', session.access_token, Math.max(1, Math.min(session.expires_in - 30, 3570)));
   cookies.set('refresh', session.refresh_token, 30 * 86400);
   cookies.set('session', {userId:account.userId,sessionId:account.sessionId}, 30 * 86400);

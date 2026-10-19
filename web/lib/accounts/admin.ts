@@ -2,7 +2,7 @@ import {z} from 'zod';
 import {accountClients} from './clients';
 import {AccountCookies} from './cookies';
 import {AccountError} from './config';
-import {activeSession,assertAccountOrigin,rateLimit,authFailure} from './handler';
+import {activeSession,assertAccountOrigin,rateLimit,authFailure,authorizeCustomer,saveSession} from './handler';
 import {stagingAccountConfig} from './workspace';
 import {apiError,json,readJsonBody} from '../http';
 import {SupabaseOperationError} from '../supabase/diagnostics';
@@ -31,7 +31,15 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
   };
   const adminArgs={p_actor:account.userId,p_session:account.sessionId};
   stage='admin_check';if(await rpc('account_admin_check',{...adminArgs,p_require_mfa:false})!==true)throw new AccountError('FORBIDDEN',403);
-  stage='session_restore';const restored=await clients.auth.auth.setSession(session);if(restored.error)throw authFailure(restored.error);
+  stage='session_restore';const restored=await clients.auth.auth.setSession(session);
+  if(restored.error||!restored.data?.session)throw authFailure(restored.error);
+  // setSession may refresh across the expiry boundary. Persist that rotation
+  // only after validating the original owner/session, before any MFA action.
+  const current=restored.data.session;
+  if(current.access_token!==session.access_token||current.refresh_token!==session.refresh_token){
+   const restoredAccount=await authorizeCustomer(clients,current.access_token,{userId:account.userId,sessionId:account.sessionId});
+   saveSession(cookies,current,restoredAccount);
+  }
   // activeSession already validates the token with Auth. Require this token's
   // AAL2 claim as well as the live database session: an older AAL1 token must
   // not gain admin access merely because the same session completed MFA later.
@@ -69,7 +77,7 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
    return cookies.apply(json({...data,catalog,providers:[{provider:'gemini',state:'EXTERNAL_MANAGED',rotationAvailable:false},{provider:'deepgram',state:'EXTERNAL_MANAGED',rotationAvailable:false}],
     testEntitlementsEnabled:process.env.SIGMAROUND_ACCOUNT_TEST_ENTITLEMENTS_ENABLED==='true'}));
   }
-  if(request.method!=='POST')return json({error:'Not found.'},404);
+  if(request.method!=='POST')return cookies.apply(json({error:'Not found.'},404));
   await rateLimit(request,config,clients,account.email);
   stage='read_body';const raw=await readJsonBody(request,8192);
   const action=z.object({action:z.string()}).parse(raw).action;
@@ -92,13 +100,16 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
    }
    if(!input.code)throw new AccountError('FORBIDDEN',403);
    const verified=await clients.auth.auth.mfa.challengeAndVerify({factorId:factor.id,code:input.code});
-   if(verified.error)throw new AccountError('FORBIDDEN',403);
-   cookies.set('access',verified.data.access_token,Math.max(1,Math.min(verified.data.expires_in-30,3570)));
-   cookies.set('refresh',verified.data.refresh_token,30*86400);
+   if(verified.error||!verified.data)throw new AccountError('FORBIDDEN',403);
+   const verifiedAccount=await authorizeCustomer(clients,verified.data.access_token,{userId:account.userId,sessionId:account.sessionId});
+   let verifiedAal2=false;
+   try{verifiedAal2=JSON.parse(Buffer.from(verified.data.access_token.split('.')[1],'base64url').toString()).aal==='aal2';}catch{/* fail closed */}
+   if(!verifiedAal2)throw new AccountError('FORBIDDEN',403);
+   saveSession(cookies,verified.data,verifiedAccount);
    // The following GET revalidates both JWT/session and SQL AAL2 before exposing admin data.
    return cookies.apply(json({ok:true}));
   }
-  if(!allowed){if(releaseAction){logReleaseDiagnostic('authorization',releaseAction,'FORBIDDEN');return json({error:'RELEASE_MFA_REQUIRED'},403);}throw new AccountError('FORBIDDEN',403);}
+  if(!allowed){if(releaseAction){logReleaseDiagnostic('authorization',releaseAction,'FORBIDDEN');return cookies.apply(json({error:'RELEASE_MFA_REQUIRED'},403));}throw new AccountError('FORBIDDEN',403);}
   stage='validation';
   const input=mutation.parse(raw);let values:object;
   if(input.action.startsWith('RELEASE_')){
@@ -145,10 +156,11 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
   }
   if(request.method==='POST')logReleaseDiagnostic(stage,releaseAction,undefined,error);
   if(releaseAction){
-   if(error instanceof z.ZodError)return json({error:releaseValidationCode(error)},400);
-   if(error instanceof ReleaseInputError)return json({error:error.code},400);
-   if(error instanceof AccountError)return json({error:error.code==='UNAVAILABLE'?'RELEASE_SERVICE_UNAVAILABLE':error.code},error.status);
-   return json({error:'RELEASE_SERVICE_UNAVAILABLE'},503);
+   const response=error instanceof z.ZodError?json({error:releaseValidationCode(error)},400)
+    :error instanceof ReleaseInputError?json({error:error.code},400)
+    :error instanceof AccountError?json({error:error.code==='UNAVAILABLE'?'RELEASE_SERVICE_UNAVAILABLE':error.code},error.status)
+    :json({error:'RELEASE_SERVICE_UNAVAILABLE'},503);
+   return cookies?cookies.apply(response):response;
   }
   const response=error instanceof AccountError?json({error:error.code},error.status):apiError(error);
   return cookies?cookies.apply(response):response;

@@ -1,0 +1,23 @@
+# Cluera subscription cancellation — implemented, disabled, schema unapplied
+
+October 19, 2026. This is an additive Test-only completion slice, not financial activation or monthly-plan acceptance.
+
+The authenticated customer can explicitly confirm cancellation of future renewal at the current term's end. Server authorization checks the current verified account, recovery state, existing Test tester restriction and exact merchant/project. PostgreSQL independently checks the live session, account ownership, immutable subscription binding and current processing owner/epoch. Ordinary customer cancellation does not require Admin privileges or an Admin MFA code.
+
+The [additive SQL proposal](proposals/cluera-subscription-cancellation.sql) adds two private RLS tables and four service-only command RPCs. One durable command is allowed per subscription. Concurrent requests, repeated operation IDs and different replacement operation IDs cannot obtain a second provider lease. A lost response remains uncertain. Later checks use GET against the original operation and never resend the cancellation POST. An immutable audit failure rolls back the corresponding command-state transition.
+
+The adapter sends only `POST /subscriptions/{server-bound-id}/cancel` with `cancel_at_cycle_end: true`. It independently checks the bound subscription identity and notes before sending. Catalog availability does not prevent cancellation of a previously purchased plan. Every provider read/write retains the existing Test merchant, fixed destination, response-size and deadline protections.
+
+Razorpay may leave the subscription active until term end after accepting this request. The UI therefore reports **request accepted, final cancellation pending**, never an immediate refund or definitive stopped renewal. Only a subsequently fetched terminal subscription, including a valid nonfuture end timestamp, confirms the command. The command functions never modify a paid grant, usage reservation, expiry, subscription financial record, payment, receipt or entitlement. Genuine signed webhooks and existing independent reconciliation remain responsible for financial lifecycle state.
+
+Provider behavior follows the official [Razorpay subscription SDK documentation](https://github.com/razorpay/razorpay-node/blob/master/documents/subscription.md) and [subscription API reference](https://d6xcmfyh68wv8.cloudfront.net/docs/api/payments/subscriptions/). The separate command state avoids inventing an undocumented scheduled-cancellation marker.
+
+The UI is absent unless `CLUERA_SUBSCRIPTION_CANCELLATION_ENABLED=true`. That setting remains absent/false. Its history surface additionally requires the separately reviewed billing-history schema and flag. Pausing new purchases does not disable an already approved cancellation capability. No schema, flag, subscription or provider configuration was changed by this implementation.
+
+Before enablement, review and accept the exact additive SQL in the isolated Cluera project; preserve existing rows and verify table/RPC privileges, empty command tables and all current financial snapshots. Review and accept the independent history proposal if that surface is required. Only after hosted regression checks and owner acceptance may the new cancellation flag be enabled for the existing Test tester scope. Do not enable monthly checkout or Live charging as a side effect.
+
+Owner acceptance must exercise an actual approved Test subscription separately: confirm exactly one end-of-cycle command, accepted/pending wording, unchanged existing paid expiry and spent/reserved usage, same-operation GET verification, ordinary terminal webhook processing and no subsequent renewal. Failed or uncertain requests require support review of the original command and provider resource. A preflight/network failure can intentionally leave a command locked; neither the customer nor support should clear it or create a replacement command to force a retry.
+
+Rollback disables only the new capability flag and retains the command/audit history. It does not undo an already accepted provider cancellation, extend a paid term, fabricate a grant, reset an uncertain command or replay a financial event.
+
+Still incomplete: customer pause/resume, refunds and their financial authorization, same-tier purchases across subscriptions, automatic Pro-to-Enterprise pause and exact restoration, provider rescheduling/outbox handling, and the remaining monthly lifecycle acceptance. Existing monthly checkout restrictions remain necessary. This slice is implemented and locally tested; it is not deployed, owner accepted or commercially ready merely because this document exists.
