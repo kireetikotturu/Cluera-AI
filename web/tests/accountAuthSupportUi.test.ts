@@ -19,14 +19,14 @@ function fixture(post:(url:string,init:RequestInit)=>Promise<Response>=async()=>
 it('forgot-password requests are email-only, qualified and cooled down without automatic or duplicate sends',async()=>{
  vi.useFakeTimers();const fetcher=fixture();await render('#forgot-password');email();await submit();
  const posts=()=>fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts()).toHaveLength(1);expect(posts()[0][0]).toBe('/api/account/forgot-password');expect(JSON.parse(posts()[0][1]!.body as string)).toEqual({email:'fixture@example.invalid'});
- expect(host.querySelector('input[name="password"]')).toBeNull();expect(host.textContent).toContain('latest reset link in this browser');expect(host.textContent).toContain('does not confirm whether an account exists');
- expect(host.querySelector<HTMLButtonElement>('form button')!.disabled).toBe(true);await submit();expect(posts()).toHaveLength(1);
- await act(async()=>vi.advanceTimersByTimeAsync(60000));expect(posts()).toHaveLength(1);expect(host.querySelector<HTMLButtonElement>('form button')!.disabled).toBe(false);await submit();expect(posts()).toHaveLength(2);
+ expect(host.querySelector('input[name="password"]')).toBeNull();expect(host.textContent).toContain('latest link in this browser');expect(host.textContent).toContain('If an account uses this email');expect(host.querySelector('form')).toBeNull();
+ const resend=host.querySelector<HTMLButtonElement>('.account-auth-resend .button')!;expect(resend.disabled).toBe(true);await act(async()=>resend.click());expect(posts()).toHaveLength(1);
+ await act(async()=>vi.advanceTimersByTimeAsync(60000));expect(posts()).toHaveLength(1);expect(resend.disabled).toBe(false);await act(async()=>resend.click());expect(posts()).toHaveLength(2);expect(posts()[1][0]).toBe('/api/account/forgot-password');
 });
 it('forgot-password rate limits retain a shared mail cooldown across form navigation while login remains available',async()=>{
  vi.useFakeTimers();const fetcher=fixture(async()=>Response.json({error:'private-upstream'},{status:429}));await render('#forgot-password');email();await submit();
  await act(async()=>button('Back to sign in').click());expect(host.querySelector<HTMLButtonElement>('form button[type="submit"]')!.disabled).toBe(false);
- await act(async()=>button('Resend verification').click());expect(host.querySelector<HTMLButtonElement>('form button[type="submit"]')!.disabled).toBe(true);
+ await act(async()=>button('Verify signup email').click());expect(host.querySelector<HTMLButtonElement>('form button[type="submit"]')!.disabled).toBe(true);
  expect(host.textContent).not.toContain('private-upstream');expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
 });
 it('an unknown recovery email outcome starts a deliberate wait and a late success cannot overwrite the timeout',async()=>{
@@ -40,7 +40,7 @@ it.each(['forgot-password','resend-verification'])('email-only %s validation exp
 });
 it('wrong-password sign-in gives neutral actionable help without echoing provider details',async()=>{
  fixture(async()=>Response.json({error:'private-upstream-user-exists'},{status:401}));await render();email();(host.querySelector('input[name="password"]')as HTMLInputElement).value='fixture-password';await submit();
- expect(host.querySelector('#account-auth-feedback')?.textContent).toContain('Check your email and password');expect(host.querySelector('#account-auth-feedback')?.textContent).toContain('Resend verification');expect(host.textContent).not.toContain('private-upstream-user-exists');
+ expect(host.querySelector('#account-auth-feedback')?.textContent).toContain('Incorrect email or password');expect(host.querySelector('#account-auth-feedback')?.textContent).toContain('reset your password');expect(host.textContent).not.toContain('private-upstream-user-exists');
 });
 it('explicit status check preserves the typed email and reads no mail, password or provider endpoint',async()=>{
  const fetcher=fixture();await render('#forgot-password');email();await act(async()=>button('Check sign-in status').click());
@@ -66,7 +66,7 @@ it('expired recovery rejection explains the explicit recovery exit without signi
   ?Response.json({accountId:account.userId,passwordRecovery:true,recoveryExpired:false,needsMfa:false,factors:[]}):init?.method==='POST'
   ?Response.json({code:'RECOVERY_SESSION_REQUIRED',error:'private-expired-recovery-details'},{status:403}):Response.json({account,passwordRecovery:true}));vi.stubGlobal('fetch',fetcher);await render('#reset-password');
  (host.querySelector('input[name="password"]')as HTMLInputElement).value='fixture-new-password';await submit();
- expect(host.querySelector('#account-auth-feedback')?.textContent).toContain('latest password-reset email');expect(host.textContent).toContain('sign out of this browser and explicitly request a new password-reset email');
+ expect(host.querySelector('#account-auth-feedback')?.textContent).toContain('latest password-reset email');expect(host.textContent).toContain('An expired reset link needs a new recovery request');
  expect(host.textContent).not.toContain('private-expired-recovery-details');expect(host.textContent).not.toContain('Synthetic workspace');expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST').map(([url])=>url)).toEqual(['/api/account/reset-password']);
 });
 it('the read-only status control cannot bypass a pending sign-in write',async()=>{
@@ -76,13 +76,13 @@ it('the read-only status control cannot bypass a pending sign-in write',async()=
 });
 it('support contact carries no account/query/secret data and opening help sends no requests',async()=>{
  const fetcher=fixture();await render('#signup');const count=fetcher.mock.calls.length,help=host.querySelector('aside[aria-label="Account access help"]')!;
- expect(help.querySelector('a')?.getAttribute('href')).toBe('mailto:clueraaisupport@gmail.com');expect(help.textContent).toContain('Never send passwords, verification codes, email links');
- await act(async()=>{help.querySelector('details')!.open=true;});expect(fetcher).toHaveBeenCalledTimes(count);expect(help.textContent).toContain('same browser');
+ expect(help.querySelector('a')?.getAttribute('href')).toBe('mailto:clueraaisupport@gmail.com');expect(help.textContent).toContain('Never share passwords, codes or email links');
+ await act(async()=>{help.querySelector('details')!.open=true;});expect(fetcher).toHaveBeenCalledTimes(count);expect(help.textContent).toContain('browser where you requested it');
 });
 it('a timed-out explicit session read unlocks the form and cannot overwrite a later form result',async()=>{
  vi.useFakeTimers();let reads=0,finish!:(response:Response)=>void;const fetcher=fixture();const original=fetcher.getMockImplementation()!;
  fetcher.mockImplementation(async(url,init)=>{if(url==='/api/account/session'&&++reads===2)return new Promise(resolve=>{finish=resolve;});return original(url,init);});
  await render('#signup');await act(async()=>button('Check sign-in status').click());expect(host.querySelector<HTMLButtonElement>('form button[type="submit"]')!.disabled).toBe(true);
  await act(async()=>vi.advanceTimersByTimeAsync(15001));expect(host.querySelector<HTMLButtonElement>('form button[type="submit"]')!.disabled).toBe(false);email();(host.querySelector('input[name="password"]')as HTMLInputElement).value='fixture-password';await submit();
- await act(async()=>finish(Response.json({account,passwordRecovery:false})));expect(host.textContent).toContain('Verification email sent!');expect(host.textContent).not.toContain('Signed in as');
+ await act(async()=>finish(Response.json({account,passwordRecovery:false})));expect(host.textContent).toContain('Check your email for the next step');expect(host.textContent).not.toContain('Signed in as');
 });

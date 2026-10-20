@@ -42,6 +42,14 @@ Resend verification now uses neutral request-received feedback and explains that
 
 The installed-Supabase-SDK regressions exercise recovery email preparation → PKCE callback → MFA-required rejection → existing authenticator verification → same-session AAL2 rotation → separate password submission → sign-out. They also cover a near-expiry token: factor, password and reauthentication calls can proactively refresh the SDK session, so newly rotated credentials are independently authorized and sealed before returning or reporting a later failure. The original recovery deadline remains unchanged. A confirmed password update remains successful even if subsequent credential capture or global sign-out cannot be confirmed; the app never repeats the write. All transport in these regressions is intercepted; no real email, password change or MFA verification is performed by the agent.
 
+## October 20 simplified account flow and OAuth review
+
+The account page now presents the current task: Sign in, Create account, Reset your password or Check your email. Verification resend is contextual; detailed help is collapsed. Disabled Google controls and implementation explanations are removed from the form. Successful email requests show a masked recipient and explicit cooldown without promising delivery. Explicit provider duplicate errors return to sign-in; an unverified-login error offers verification without sending email. Neutral provider responses remain neutral.
+
+Google PKCE now rejects duplicate authorization/callback parameters on both server and browser. An intercepted installed-SDK regression covers Google authorization through callback and session restoration. Admin factor operations preserve independently authorized session refreshes, including later provider failures; restored token assurance and the original owner/session remain mandatory. All **337 focused Auth/authorization tests** and the web typecheck pass. Browser checks exercise signup/reset, explicit duplicate/unverified responses, preserved email and mobile layout without real Auth writes.
+
+Follow [the concise Google setup and account-flow guide](CLUERA_GOOGLE_SIGN_IN.md) for the remaining private Web OAuth client, consent audience and Supabase provider setup. Google is still disabled; real consent and inbox acceptance remain pending. No SMTP/key/Admin/MFA setup was repeated, and no Windows installer was rebuilt. Exact publication/deployment evidence is recorded after hosted checks; this source note is not proof of deployment.
+
 ## Verified October 19 deployment checkpoint
 
 | Component | Independently verified evidence |

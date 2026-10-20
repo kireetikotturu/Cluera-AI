@@ -12,7 +12,7 @@ import { checkoutService } from '../billing/checkout/service';
 import { resumeSandboxCheckout } from '../billing/checkout/resume';
 import {CLUERA_AUTH_ISSUER,CLUERA_SUPABASE_URL,CLUERA_SITE_ORIGIN} from '../supabase/target';
 import {MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH,weakPasswordNotice} from './passwordPolicy';
-import {emailNotice,emailDeliveryNotice} from './publicAuth';
+import {emailNotice,emailDeliveryNotice,safeGoogleRedirect} from './publicAuth';
 import {readAuthOptions} from './authOptions';
 
 const emailSchema = z.string().trim().email().max(254);
@@ -320,6 +320,10 @@ export async function handleAccount(request: Request, action: string): Promise<R
     await rateLimit(request, config, clients, email);
     if (action === 'login') {
       const { data, error } = await clients.auth.auth.signInWithPassword(input as { email: string; password: string });
+      if(error?.code==='email_not_confirmed'){
+        cookies.clearSession();cookies.retainPendingFlow();
+        return cookies.apply(json({code:'EMAIL_NOT_VERIFIED',error:'Verify your email to finish signing in.'},403));
+      }
       if (error || !data.session) throw authFailure(error);
       const account = await authorizeCustomer(clients, data.session.access_token);
       saveSession(cookies, data.session,account); cookies.set('recovery', null, 0); cookies.set('recovery-lock',null,0); cookies.set('flow', null, 0);
@@ -330,10 +334,10 @@ export async function handleAccount(request: Request, action: string): Promise<R
       if(options.google!=='enabled')return cookies.apply(json({code:'GOOGLE_UNAVAILABLE',error:'Google sign-in is not available. Use email sign-in.'},503));
       const { data, error } = await clients.auth.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: callback, skipBrowserRedirect: true } });
       if (error || !data.url) throw new AccountError('UNAVAILABLE', 503);
-      const target = new URL(data.url);
-      if (target.origin !== config.url || target.pathname !== '/auth/v1/authorize') throw new AccountError('UNAVAILABLE', 503);
+      let redirectUrl:string;
+      try{redirectUrl=safeGoogleRedirect({redirectUrl:data.url});}catch{throw new AccountError('UNAVAILABLE',503);}
       cookies.set('flow', clients.flow(), 600);
-      return cookies.apply(json({ redirectUrl: target.href }));
+      return cookies.apply(json({ redirectUrl }));
     }
     const result = action === 'signup'
       ? await clients.auth.auth.signUp({ ...(input as { email: string; password: string }), options: { emailRedirectTo: callback } })
@@ -343,6 +347,12 @@ export async function handleAccount(request: Request, action: string): Promise<R
     // Avoid account enumeration; delivery/account-existence responses never reach the browser.
     // Service failures are distinct from account-specific rejections.
     rejectMailFailure(result.error);
+    // Surface only the provider's explicit duplicate-signup result. Never query
+    // the user directory or infer existence from an obfuscated success response.
+    if(action==='signup'&&['user_already_exists','email_exists'].includes(result.error?.code??'')){
+      cookies.retainPendingFlow();
+      return cookies.apply(json({code:'ACCOUNT_EXISTS',error:'An account already exists with this email. Sign in or reset your password.'},409));
+    }
     // Rejected eligibility must not overwrite a previously valid pending verifier.
     if(result.error){cookies.retainPendingFlow();return cookies.apply(json({message:emailNotice}));}
     // The installed SDK creates a NEW PKCE verifier for resend. Export that

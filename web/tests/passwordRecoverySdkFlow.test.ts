@@ -22,6 +22,7 @@ beforeEach(()=>{
   const authorization=new Headers(init?.headers).get('authorization')??'';
   let aal:string|undefined;try{aal=JSON.parse(Buffer.from(authorization.split('.')[1],'base64url').toString()).aal;}catch{}
   calls.push({path:url.pathname,method,aal});
+  if(url.pathname==='/auth/v1/settings')return Response.json({external:{google:true}});
   if(url.pathname==='/rest/v1/rpc/customer_auth_rate_limit')return Response.json(true);
   if(url.pathname==='/rest/v1/rpc/customer_authorize')return Response.json({code:'ACTIVE',userId:uid,trialSecondsGranted:900,remoteDesktop:false});
   if(url.pathname==='/auth/v1/recover')return Response.json({});
@@ -37,6 +38,21 @@ beforeEach(()=>{
   if(url.pathname==='/auth/v1/logout'){expect(url.searchParams.get('scope')).toBe('global');expect(aal).toBe('aal2');return new Response(null,{status:204});}
   throw Error('Unexpected synthetic SDK endpoint');
  }));
+});
+it('uses real SDK Google PKCE and binds its callback to an ordinary verified session without email or password writes',async()=>{
+ const started=await request('google');expect(started.status).toBe(200);
+ const redirect=new URL((await started.json()).redirectUrl);
+ expect(redirect.origin).toBe(authOrigin);expect(redirect.searchParams.get('provider')).toBe('google');
+ expect(redirect.searchParams.get('redirect_to')).toBe(origin+'/api/account/callback');
+ expect(redirect.searchParams.get('code_challenge_method')).toBe('s256');
+ expect(redirect.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
+ expect(jar.has('__Host-sr-account-access')).toBe(false);
+ const callback=await request('callback',{},'GET','?code=synthetic-google-code');expect(callback.status).toBe(303);
+ const session=await request('session',{},'GET');expect(session.status).toBe(200);
+ expect(await session.json()).toMatchObject({account:{userId:uid,email:user.email},passwordRecovery:false});
+ expect(calls.filter(x=>x.path==='/auth/v1/token')).toHaveLength(1);
+ expect(calls.some(x=>x.path==='/auth/v1/recover'||x.method==='PUT'||x.path.includes('/factors/'))).toBe(false);
+ expect(jar.get('__Host-sr-account-flow')).toBe('');
 });
 it('persists a proactive SDK refresh during a read-only factor preflight without sending a password',async()=>{
  initialLifetime=60;

@@ -21,6 +21,7 @@ beforeEach(()=>{
   email:'synthetic@example.invalid',email_confirmed_at:'2026-10-01T00:00:00Z',is_anonymous:false}},error:null}));
  auth={getUser,setSession:vi.fn(async()=>({data:{session:session(uid,sid,'rotated')},error:null})),refreshSession:vi.fn(),
   mfa:{listFactors:vi.fn(),enroll:vi.fn(),challengeAndVerify:vi.fn()}};
+ auth.getSession=vi.fn(async()=>await auth.setSession.mock.results.at(-1).value);
  rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='customer_authorize'
   ?{code:'ACTIVE',userId:args.p_user_id,trialSecondsGranted:900,remoteDesktop:false}
   :name==='account_admin_read_v2'?{code:'ACTIVE',users:[],catalog:[]}:true,error:null,status:200}));
@@ -49,4 +50,35 @@ it('retains the already rotated credentials when a later release validation is r
  const response=await accountAdminRequest(request({action:'RELEASE_DRAFT',operationId:other,subjectId:null,reason:'Reviewed synthetic invalid release input',input:{}}));
  expect(response.status).toBe(400);expect(response.headers.get('set-cookie')).toContain('__Host-sr-account-refresh=');
  expect(rpc.mock.calls.some(([name])=>name==='cluera_release_admin')).toBe(false);
+});
+it.each([false,true])('retains a same-owner SDK refresh during factor lookup, including provider failure (%s)',async failed=>{
+ rpc.mockImplementation(async(name,args)=>({data:name==='customer_authorize'?{code:'ACTIVE',userId:args.p_user_id,trialSecondsGranted:900,remoteDesktop:false}
+  :name==='account_admin_check'?!args.p_require_mfa:true,error:null,status:200}));
+ auth.mfa.listFactors.mockImplementation(async()=>{
+  auth.getSession.mockResolvedValue({data:{session:session(uid,sid,'factor-refresh')},error:null});
+  return failed?{data:null,error:{status:503}}:{data:{all:[]},error:null};
+ });
+ const response=await accountAdminRequest(request());expect(response.status).toBe(failed?503:200);
+ const headers=response.headers.getSetCookie().filter(value=>value.startsWith('__Host-sr-account-refresh='));
+ const encoded=headers.at(-1)!.match(/__Host-sr-account-refresh=([^;]+)/)![1];
+ expect(unseal(encoded,'refresh',accountConfig())).toBe('synthetic-refresh-factor-refresh');
+ expect(rpc.mock.calls.some(([name])=>name==='account_admin_read_v2')).toBe(false);
+ expect(auth.mfa.enroll).not.toHaveBeenCalled();expect(auth.mfa.challengeAndVerify).not.toHaveBeenCalled();
+});
+it('rejects a factor-operation refresh into another owner before continuing an Admin write',async()=>{
+ auth.mfa.listFactors.mockImplementation(async()=>{
+  auth.getSession.mockResolvedValue({data:{session:session(other,sid,'wrong-owner')},error:null});
+  return {data:{all:[]},error:null};
+ });
+ const response=await accountAdminRequest(request({action:'MFA_ENROLL'}));expect(response.status).toBe(401);
+ expect(auth.mfa.enroll).not.toHaveBeenCalled();
+ const encoded=response.headers.get('set-cookie')!.match(/__Host-sr-account-refresh=([^;]+)/)![1];
+ expect(unseal(encoded,'refresh',accountConfig())).toBe('synthetic-refresh-rotated');
+});
+it('uses the restored token assurance and refuses an AAL1 downgrade for privileged writes',async()=>{
+ const downgraded=session(uid,sid,'downgraded'),claims=JSON.parse(Buffer.from(downgraded.access_token.split('.')[1],'base64url').toString());
+ downgraded.access_token=`header.${Buffer.from(JSON.stringify({...claims,aal:'aal1'})).toString('base64url')}.downgraded`;
+ auth.setSession.mockResolvedValueOnce({data:{session:downgraded},error:null});
+ const response=await accountAdminRequest(request({action:'RELEASE_DRAFT',operationId:other,subjectId:null,reason:'Synthetic downgrade denial',input:{}}));
+ expect(response.status).toBe(403);expect(rpc.mock.calls.some(([name])=>name==='cluera_release_admin'||name==='account_admin_mutate')).toBe(false);
 });

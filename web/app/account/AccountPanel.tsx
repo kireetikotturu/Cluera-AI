@@ -32,6 +32,7 @@ export function AccountPanel() {
   const [selection,setSelection]=useState<CheckoutSelection|null>(null);
   const [resendSeconds,setResendSeconds]=useState(0);
   const [verificationReady,setVerificationReady]=useState(false);
+  const [emailDraft,setEmailDraft]=useState('');
   const [google,setGoogle]=useState<'enabled'|'disabled'|'unavailable'>('unavailable');
   const [reauthSeconds,setReauthSeconds]=useState(0);
   const [passwordSecurity,setPasswordSecurity]=useState<PasswordSecurityState|null>(null),[securityRefresh,setSecurityRefresh]=useState(0);
@@ -51,8 +52,9 @@ export function AccountPanel() {
   const recoveryExpired=currentSecurity?.status==='expired';
   const busy=baseBusy||currentSecurity?.status==='checking';
   const securityChanged=useCallback((state:PasswordSecurityState)=>{if(currentAccount.current?.userId===state.accountId){securityState.current=state;setPasswordSecurity(state);}},[]);
-  const securityVerified=useCallback(()=>{setFeedback({tone:'success',message:'Authenticator verified. Enter and submit your password update explicitly.'});notifyAccountSessionChanged();},[]);
+  const securityVerified=useCallback(()=>{setFeedback({tone:'success',message:'Authenticator verified. Choose your new password.'});notifyAccountSessionChanged();},[]);
   const emailOnly=mode==='forgot-password'||mode==='resend-verification';
+  const emailPending=verificationReady&&emailAction(mode);
   const emailCoolingDown=emailAction(mode)&&resendSeconds>0;
   const cooldownActive=resendSeconds>0;
   function startResendCooldown(){resendUntil.current=Date.now()+60_000;setResendSeconds(60);}
@@ -64,7 +66,7 @@ export function AccountPanel() {
     try{clearCheckoutSelection(window.sessionStorage);}catch{/* Storage is optional. */}
     window.history.replaceState(null,'',`${window.location.pathname}#login`);
     selected.current=null;setSelection(null);clearSessionView();verificationEmail.current='';
-    setVerificationReady(false);resendUntil.current=0;setResendSeconds(0);setReauthSeconds(0);
+    setVerificationReady(false);setEmailDraft('');resendUntil.current=0;setResendSeconds(0);setReauthSeconds(0);
     reauthUntil.current=0;setMode('login');setFeedback(message);notifyAccountSessionChanged();
   }
   function chooseMode(value:FormMode){
@@ -230,6 +232,12 @@ export function AccountPanel() {
       if (!current() || controller.signal.aborted) return;
       if (!response.ok) {
         if(response.status===429&&emailAction(action))startResendCooldown();
+        if(action==='signup'&&response.status===409&&data?.code==='ACCOUNT_EXISTS'
+          ||action==='login'&&response.status===403&&data?.code==='EMAIL_NOT_VERIFIED'){
+          const next=action==='signup'?'login':'resend-verification';
+          setMode(next);setVerificationReady(false);verificationEmail.current='';
+          window.history.replaceState(null,'',`${window.location.pathname}${window.location.search}#${next}`);
+        }
         setFeedback({tone:'error',message:authFailure(response.status,action,data?.code)});
         if(['reset-password','change-password','reauthenticate'].includes(action)&&
           (data?.code==='MFA_REQUIRED'||response.status===401||data?.code==='RECOVERY_SESSION_REQUIRED'))refreshPasswordSecurity();
@@ -262,14 +270,12 @@ export function AccountPanel() {
       if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).length!==1||data.message!==emailNotice)throw new Error('Invalid response.');
       const email='email' in values?values.email:undefined,masked=maskedEmail(email);
       if(emailAction(action))startResendCooldown();
-      if(verificationAction(action)){
+      if(emailAction(action)){
         verificationEmail.current=typeof email==='string'?email.trim():'';setVerificationReady(Boolean(masked));
       }
-      setFeedback({tone:action==='resend-verification'?'info':'success',message:action==='signup'?signupNotice:action==='resend-verification'?resendNotice:emailNotice,maskedEmail:masked,
-        ...(emailAction(action)?{detail:action==='forgot-password'
-          ?'This does not confirm whether an account exists or guarantee delivery. Check your inbox and spam folder. Open the latest reset link in this browser, then choose a new password.'
-          :action==='resend-verification'?'This does not confirm whether an account exists or guarantee delivery. Already verified? Sign in. If you forgot your password, use Forgot password instead. Open the latest eligible verification link in this same browser.'
-          :'For eligible requests only. This does not confirm whether an account exists or guarantee inbox delivery. Open the latest link in this same browser.'}:{})});
+      setFeedback({tone:'success',message:action==='signup'?signupNotice:action==='resend-verification'?resendNotice
+        :'If an account uses this email, you’ll receive a password-reset link.',maskedEmail:masked,
+        detail:'Check your inbox and spam folder. Open the latest link in this browser.'});
     } catch { if (current()&&!controller.signal.aborted){if(emailAction(action))startResendCooldown();setFeedback({tone:'error',message:failureNotice});} }
     finally {
       if(action==='logout')restartRecovery.current=false;
@@ -295,10 +301,9 @@ export function AccountPanel() {
     </aside>:null}
     {account ? <>
       <p>Signed in as <strong>{account.email}</strong></p>
-      <p>Email verified. Your balances and plans are loaded from the account service below.</p>
       {!recovery ? <><h2>Your workspace</h2><AccountWorkspace key={`workspace:${account.userId}`}/>
         <details key={`security:${account.userId}`} className="account-security"><summary>Account security · Change password</summary>
-          <p>Changing a password is optional. A successful update signs you out; a failed update does not. Never share your password or reauthentication code.</p>
+          <p>After changing your password, sign in again with the new one.</p>
           {passwordSecurityPanel}
           <form aria-label="Change password" aria-describedby="account-auth-feedback" onSubmit={event=>{
             event.preventDefault();const form=event.currentTarget,data=new FormData(form);
@@ -315,52 +320,49 @@ export function AccountPanel() {
           <button className="button secondary" type="button" disabled={busy||!passwordReady||reauthSeconds>0}
             onClick={()=>void submit('reauthenticate',{expectedAccountId:account.userId})}>
             {reauthSeconds>0?`Request another code in ${reauthSeconds}s`:'Email a reauthentication code'}
-          </button><p>No code is requested automatically. Email sending and server rate limits still apply.</p>
+          </button>
         </details></> : null}
-      {recovery ? <>{passwordSecurityPanel}{recoveryExpired?<div><h2>Password recovery expired</h2><p>Sign out and restart recovery to request a new link explicitly. No password was submitted by this security check.</p></div>:<form key={account.userId} aria-describedby="account-auth-feedback" onSubmit={event => {
+      {recovery ? <>{passwordSecurityPanel}{recoveryExpired?<div><h2>Password recovery expired</h2><p>Request a new reset link to continue.</p></div>:<form key={account.userId} aria-describedby="account-auth-feedback" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget;
         const password = String(new FormData(form).get('password') ?? '');
         form.reset();void submit('reset-password', { password,expectedAccountId:account.userId });
       }}>
-        <h2>Choose a new password</h2><p>{passwordReady?'Password recovery and security are verified. Update your password, then sign in again.':'Verify password security and any required authenticator before submitting a new password.'}</p>
+        <h2>Choose a new password</h2><p>{passwordReady?'Use at least 8 characters. You’ll sign in again after updating.':'Complete the security check above to continue.'}</p>
         <label>New password<input name="password" type="password" minLength={MIN_PASSWORD_LENGTH} maxLength={MAX_PASSWORD_LENGTH} autoComplete="new-password" required disabled={busy}/></label>
         <button className="button" type="submit" disabled={busy||!passwordReady}>Update password and sign out</button>
       </form>}</> : null}
       {feedbackRegion}
       <button className="button secondary" type="button" disabled={busy} onClick={() => void submit('logout',{expectedAccountId:account.userId})}>Sign out of this browser</button>
     </> : <>
-      <div className="account-auth-brand" aria-hidden="true">C</div><p className="account-ui-kicker">CLUERA AI · TEST WORKSPACE</p>
-      <h2>{mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create an account' : mode==='resend-verification'?'Resend verification':'Reset your password'}</h2>
-      <p className="account-auth-description">{mode === 'signup' ? 'One account for your desktop workspace and shared credits.' : mode === 'forgot-password' ? 'Request a recovery link for your email. Open the latest eligible link in this browser.' : mode==='resend-verification'?'For unverified signups only. Already verified? Sign in, or use Forgot password if you need a new password.':'Welcome back. Continue to your workspace securely.'}</p>
-      <form aria-describedby="account-auth-feedback" onSubmit={event => {
+      <div className="account-auth-heading"><div className="account-auth-brand" aria-hidden="true">C</div><span className="account-ui-kicker">CLUERA AI</span><span className="account-test-badge">Test workspace</span></div>
+      <h2>{emailPending?'Check your email':mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create an account' : mode==='resend-verification'?'Verify your email':'Reset your password'}</h2>
+      {!emailPending?<p className="account-auth-description">{mode === 'signup' ? 'One account for Cluera on the web and desktop.' : mode === 'forgot-password' ? 'Enter your email and we’ll help you reset your password.' : mode==='resend-verification'?'Send a new verification link to finish creating your account.':'Welcome back to Cluera.'}</p>:null}
+      {!emailPending&&!emailOnly&&google==='enabled'?<><button className="button secondary" type="button" disabled={busy} onClick={() => void submit('google')}>Continue with Google</button><div className="account-auth-divider"><span>or continue with email</span></div></>:null}
+      {!emailPending?<form key={mode} aria-describedby="account-auth-feedback" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
         const values={email:String(data.get('email')??''),...(!emailOnly?{password:String(data.get('password')??'')}:{})};
+        setEmailDraft(values.email);
         const password=form.elements.namedItem('password');if(password instanceof HTMLInputElement)password.value='';
         void submit(mode,values);
       }}>
-        <label>Email<input name="email" type="email" maxLength={254} autoComplete="email" required disabled={busy}/></label>
-        {!emailOnly ? <label>Password<span className="account-auth-password"><input key={mode} name="password" type={visible ? 'text' : 'password'} minLength={mode === 'signup' ? MIN_PASSWORD_LENGTH : 1} maxLength={MAX_PASSWORD_LENGTH}
+        <label>Email<input name="email" type="email" maxLength={254} autoComplete="email" defaultValue={emailDraft} onChange={event=>setEmailDraft(event.target.value)} required disabled={busy}/></label>
+        {!emailOnly ? <label>Password<span className="account-auth-password"><input key={mode} aria-label="Password" name="password" type={visible ? 'text' : 'password'} minLength={mode === 'signup' ? MIN_PASSWORD_LENGTH : 1} maxLength={MAX_PASSWORD_LENGTH}
           autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} required disabled={busy}/><button type="button" disabled={busy} aria-pressed={visible} aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(value => !value)}>{visible ? 'Hide' : 'Show'}</button></span></label> : null}
-        {mode === 'signup' ? <p>Use at least {MIN_PASSWORD_LENGTH} characters. Verify your email before signing in.</p> : null}
+        {mode === 'signup' ? <p className="account-auth-hint">Use at least {MIN_PASSWORD_LENGTH} characters.</p> : null}
         <button className="button" type="submit" disabled={busy||emailCoolingDown}>{busy ? verificationAction(pendingAction??'')?'Sending verification email…':'Please wait…'
-          : emailCoolingDown?`Wait at least ${resendSeconds}s before another request`:mode === 'login' ? 'Sign in' : mode === 'signup'||mode==='resend-verification' ? 'Send verification email' : 'Send reset email'}</button>
-      </form>
+          : emailCoolingDown?`Try again in ${resendSeconds}s`:mode === 'login' ? 'Sign in' : mode === 'signup'?'Create account':mode==='resend-verification' ? 'Send verification email' : 'Send reset link'}</button>
+      </form>:null}
       {feedbackRegion}
-      {verificationReady&&verificationAction(mode)?<div className="account-auth-resend">
-        <button className="button secondary" type="button" data-resend-verification disabled={busy||resendSeconds>0}
-          onClick={()=>void submit('resend-verification',{email:verificationEmail.current})}>
-          {resendSeconds>0?`Resend verification email — wait at least ${resendSeconds}s`:'Resend verification email'}
-        </button><p>No email is resent automatically. Server sending limits may require a longer wait.</p>
+      {emailPending?<div className="account-auth-resend">
+        <button className="button secondary" type="button" data-resend-verification={verificationAction(mode)||undefined} disabled={busy||resendSeconds>0}
+          onClick={()=>void submit(mode==='forgot-password'?'forgot-password':'resend-verification',{email:verificationEmail.current})}>
+          {resendSeconds>0?`Resend link in ${resendSeconds}s`:'Resend link'}
+        </button><button className="account-text-button" type="button" disabled={busy} onClick={()=>chooseMode(mode)}>Use a different email</button>
       </div>:null}
-      {!emailOnly?<><button className="button secondary" type="button" disabled={busy||google!=='enabled'} aria-describedby="account-google-status" onClick={() => void submit('google')}>Continue with Google</button>
-      <p id="account-google-status">{google==='enabled'?'Google sign-in is configured. You choose whether to continue.':google==='disabled'?'Google sign-in is not enabled for this deployment. Use email sign-in.':'Google sign-in availability could not be verified. Email sign-in remains available.'}</p></>:null}
-      {mode==='resend-verification'?<p>Open the latest verification link in this same browser. This does not reset your password.</p>:null}
-      <div className="account-actions">{(['login', 'signup', 'forgot-password','resend-verification'] as const).filter(value => value !== mode).map(value =>
-        <button type="button" disabled={busy} key={value} onClick={() => chooseMode(value)}>
-          {value === 'login' ? 'Back to sign in' : value === 'signup' ? 'Create account' : value==='resend-verification'?'Resend verification':'Forgot password?'}</button>)}</div>
-      <p className="account-auth-safety">Verify your email before desktop sign-in. Provider credentials remain server-side; this is isolated staging, not a production release.</p>
+      <div className="account-actions">{mode==='login'?<><button type="button" disabled={busy} onClick={()=>chooseMode('signup')}>Create account</button><button type="button" disabled={busy} onClick={()=>chooseMode('forgot-password')}>Forgot password?</button></>
+        :<button type="button" disabled={busy} onClick={()=>chooseMode('login')}>Back to sign in</button>}</div>
     </>}
     <AccountAuthHelp signedIn={Boolean(account)} recovery={recovery} busy={busy} checking={checkingSession}
-      onCheckStatus={()=>void restoreSession.current(undefined,()=>true,true)}/>
+      onCheckStatus={()=>void restoreSession.current(undefined,()=>true,true)} onVerifyEmail={()=>chooseMode('resend-verification')}/>
   </section>;
 }

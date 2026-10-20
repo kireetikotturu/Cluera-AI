@@ -51,9 +51,9 @@ export function AccountPasswordSecurity({accountId,passwordRecovery,refresh,disa
    if(value.needsMfa&&!value.factors.length)throw Error('UNAVAILABLE');
    setState(value);setFactorId(value.factors.length===1?value.factors[0].id:'');
    change(value.recoveryExpired?'expired':value.needsMfa?'mfa':'ready');
-   setMessage(value.recoveryExpired?'This password-recovery window has expired. Restart recovery explicitly to request a new link.'
-    :value.needsMfa?'Verify an existing authenticator before updating your password. Use its current six-digit code; an email code will not work here.'
-     :afterMfa?'Authenticator verified. Enter and submit your password update explicitly.':'Password security verified. You can submit your password update.');
+   setMessage(value.recoveryExpired?'This reset link has expired. Request a new one to continue.'
+    :value.needsMfa?'Enter the six-digit code from your authenticator app to continue.'
+     :afterMfa?'Authenticator verified. Choose your new password.':'Ready to update your password.');
    if(afterMfa&&!value.needsMfa&&!value.recoveryExpired)callbacks.current.onVerified();
   }catch(error){if(current()){change('unavailable');setMessage(error instanceof Error&&error.message==='AUTHENTICATION_REQUIRED'
    ?passwordRecovery?'This recovery session is no longer valid. Restart recovery or sign in explicitly.':'Your sign-in must be checked before updating your password.'
@@ -73,19 +73,20 @@ export function AccountPasswordSecurity({accountId,passwordRecovery,refresh,disa
     if(response.status===401||error.success&&error.data.code==='RECOVERY_SESSION_REQUIRED'){request.current=null;await load();return;}
     setMessage(authFailure(response.status,'password-mfa',error.success?error.data.code:undefined));change('mfa');return;}
    verified.parse(response.data);request.current=null;await load(true);
-  }catch{if(current()){change('unavailable');setMessage('Authenticator verification could not be confirmed. Check password security before trying again.');}}
+  }catch{if(current()){setState(null);change('unavailable');setMessage('Authenticator verification could not be confirmed. Check password security before trying again.');}}
   finally{if(current()){request.current=null;setBusy(false);}controller.abort();}
  }
+ if(state&&!state.recoveryExpired&&!state.needsMfa&&!busy)return null;
  return <section className="account-password-security" aria-label="Password security verification" aria-busy={busy}>
   <p role="status" aria-live="polite">{message}</p>
   {state?.needsMfa&&!state.recoveryExpired?<form aria-label="Verify password authenticator" onSubmit={event=>{event.preventDefault();void verify(event.currentTarget);}}>
    <fieldset disabled={disabled||busy}><legend>Existing authenticator</legend>
-    <label>Authenticator<select value={factorId} onChange={event=>setFactorId(event.target.value)} required><option value="">Choose authenticator</option>{state.factors.map((factor,index)=><option key={factor.id}value={factor.id}>Authenticator {index+1}</option>)}</select></label>
+    {state.factors.length>1?<label>Authenticator<select value={factorId} onChange={event=>setFactorId(event.target.value)} required><option value="">Choose authenticator</option>{state.factors.map((factor,index)=><option key={factor.id}value={factor.id}>Authenticator {index+1}</option>)}</select></label>:null}
     <label>Six-digit authenticator code<input name="code" type="text" inputMode="numeric" pattern="[0-9]{6}" minLength={6}maxLength={6}autoComplete="one-time-code" required/></label>
     <button type="submit">Verify authenticator</button>
    </fieldset>
   </form>:null}
-  <button className="button secondary" type="button" disabled={disabled||busy} onClick={()=>void load()}>Check password security</button>
-  {passwordRecovery?<button className="button secondary" type="button" disabled={disabled||busy} onClick={onRestartRecovery}>Sign out and restart recovery</button>:null}
+  {!state?<button className="button secondary" type="button" disabled={disabled||busy} onClick={()=>void load()}>Check password security</button>:null}
+  {passwordRecovery&&(state?.recoveryExpired||!state&&!busy)?<button className="button secondary" type="button" disabled={disabled||busy} onClick={onRestartRecovery}>Sign out and restart recovery</button>:null}
  </section>;
 }

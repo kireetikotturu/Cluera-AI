@@ -11,7 +11,7 @@ vi.mock('../app/account/AccountWorkspace',()=>({AccountWorkspace:()=>createEleme
 let host:HTMLDivElement,root:ReturnType<typeof createRoot>;
 beforeEach(()=>{vi.mocked(replaceAccountLocation).mockClear();vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);sessionStorage.clear();host=document.createElement('div');document.body.append(host);root=createRoot(host);history.replaceState(null,'','/account');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({},{status:401})));});
 afterEach(()=>{act(()=>root.unmount());host.remove();vi.useRealTimers();vi.unstubAllGlobals();});
-const requestedSignupNotice='Verification email sent! Please check your inbox and click the verification link to activate your Cluera AI account.';
+const requestedSignupNotice='Check your email for the next step. If you already have an account, sign in instead.';
 function fillSignup(email='synthetic@example.invalid',password='12345678'){
  (host.querySelector('input[name="email"]') as HTMLInputElement).value=email;
  (host.querySelector('input[name="password"]') as HTMLInputElement).value=password;
@@ -37,12 +37,11 @@ it('keeps qualified signup success beside the form, masks the submitted address 
  const region=host.querySelector<HTMLElement>('#account-auth-feedback');expect(region).not.toBeNull();
  expect(region!.getAttribute('aria-live')).toBe('polite');expect(region!.getAttribute('aria-atomic')).toBe('true');
  fillSignup('synthetic@example.invalid');await sendForm();
- expect(region!.textContent).toContain(requestedSignupNotice);expect(region!.textContent).toMatch(/eligible/i);
- expect(region!.textContent).toMatch(/does not confirm.*account/i);expect(region!.textContent).toContain('s***@example.invalid');
+ expect(region!.textContent).toContain(requestedSignupNotice);expect(region!.textContent).toContain('If you already have an account');
+ expect(region!.textContent).not.toContain('Verification email sent!');expect(region!.textContent).toContain('s***@example.invalid');
  expect(region!.textContent).not.toContain('synthetic@example.invalid');
- expect(host.querySelector('form')!.nextElementSibling).toBe(region);
- expect(document.activeElement).toBe(region);expect((host.querySelector('input[name="password"]') as HTMLInputElement).value).toBe('');
- (host.querySelector('input[name="email"]') as HTMLInputElement).value='other@example.invalid';
+ expect(host.querySelector('form')).toBeNull();expect(host.querySelector('h2')?.textContent).toBe('Check your email');
+ expect(document.activeElement).toBe(region);expect(host.querySelector('input[name="password"]')).toBeNull();
  await act(async()=>window.dispatchEvent(new Event('resize')));expect(region!.textContent).toContain('s***@example.invalid');
  expect(region!.classList.contains('account-auth-feedback')).toBe(true);expect(region!.classList.contains('account-auth-feedback-success')).toBe(true);
 });
@@ -95,8 +94,8 @@ it('applies the resend cooldown after rate limiting, including mode changes, wit
  await act(async()=>root.render(createElement(AccountPanel)));(host.querySelector('input[name="email"]') as HTMLInputElement).value='synthetic@example.invalid';await sendForm();
  const button=host.querySelector<HTMLButtonElement>('form button[type="submit"]')!;expect(button.disabled).toBe(true);expect(host.textContent).toMatch(/too many|wait/i);
  await sendForm();expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
- await act(async()=>{Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Create account')!.click();});
- await act(async()=>{Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Resend verification')!.click();});
+ await act(async()=>{Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Back to sign in')!.click();});
+ await act(async()=>{Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Verify signup email')!.click();});
  expect((host.querySelector('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
  await act(async()=>{await vi.advanceTimersByTimeAsync(60000);});expect((host.querySelector('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
  expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
@@ -145,7 +144,7 @@ it('rejects malformed account snapshots rather than entering the workspace',asyn
 });
 it('offers explicit email-only verification resend with no automatic request',async()=>{
  history.replaceState(null,'','/account#resend-verification');const fetcher=vi.fn(async(_url:any,init?:RequestInit)=>init?.method==='POST'?Response.json({message:emailNotice}):Response.json({},{status:401}));vi.stubGlobal('fetch',fetcher);
- await act(async()=>root.render(createElement(AccountPanel)));expect(host.querySelector('h2')?.textContent).toBe('Resend verification');expect(host.querySelector('input[name="password"]')).toBeNull();expect(fetcher.mock.calls.filter(([url])=>url==='/api/account/session')).toHaveLength(1);
+ await act(async()=>root.render(createElement(AccountPanel)));expect(host.querySelector('h2')?.textContent).toBe('Verify your email');expect(host.querySelector('input[name="password"]')).toBeNull();expect(fetcher.mock.calls.filter(([url])=>url==='/api/account/session')).toHaveLength(1);
  (host.querySelector('input[name="email"]') as HTMLInputElement).value='fixture@example.invalid';await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
  const post=fetcher.mock.calls.find(([,init])=>init?.method==='POST')!;expect(post[0]).toBe('/api/account/resend-verification');expect(JSON.parse(post[1]!.body as string)).toEqual({email:'fixture@example.invalid'});expect(host.textContent).toContain(resendNotice);
 });
@@ -159,6 +158,27 @@ it('retains the selected plan through signup and email/Google return without req
  expect(location.search).toBe('?offer=cluera_monthly_100h_v2');
 });
 const syntheticAccount={userId:'00000000-0000-4000-8000-000000000801',email:'fixture@example.invalid',trialSecondsGranted:900,remoteDesktop:false};
+it('keeps the initial sign-in concise with contextual verification and help collapsed',async()=>{
+ await act(async()=>root.render(createElement(AccountPanel)));
+ const actions=host.querySelector('.account-actions')!;
+ expect([...actions.querySelectorAll('button')].map(b=>b.textContent)).toEqual(['Create account','Forgot password?']);
+ expect(host.querySelector<HTMLDetailsElement>('.account-auth-help details')?.open).toBe(false);
+ expect(host.querySelector('#account-google-status')).toBeNull();
+ expect(host.textContent).not.toContain('Provider credentials remain server-side');
+ expect(host.querySelector('[data-resend-verification]')).toBeNull();
+ expect(vi.mocked(fetch).mock.calls.every(([,init])=>!init?.method)).toBe(true);
+});
+it.each([['signup',409,'ACCOUNT_EXISTS','Sign in','login'],['login',403,'EMAIL_NOT_VERIFIED','Verify your email','resend-verification']]as const)(
+ 'routes explicit %s outcome to the next step, preserves email and never resubmits credentials or mail',
+ async(mode,status,code,title,hash)=>{
+  history.replaceState(null,'',`/account#${mode}`);
+  const fetcher=vi.fn(async(_url:any,init?:RequestInit)=>init?.method==='POST'?Response.json({code,error:'PRIVATE_PROVIDER_MESSAGE'},{status}):Response.json({},{status:401}));
+  vi.stubGlobal('fetch',fetcher);await act(async()=>root.render(createElement(AccountPanel)));fillSignup('fixture@example.invalid','synthetic-password');await sendForm();
+  expect(host.querySelector('h2')?.textContent).toBe(title);expect(location.hash).toBe('#'+hash);
+  expect(host.querySelector<HTMLInputElement>('input[name="email"]')?.value).toBe('fixture@example.invalid');
+  expect(host.querySelector<HTMLInputElement>('input[name="password"]')?.value??'').toBe('');
+  expect(host.textContent).not.toContain('PRIVATE_PROVIDER_MESSAGE');expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+});
 it('a restored verified session returns only to the remembered plan without starting a purchase',async()=>{
  resolveCheckoutSelection('?offer=cluera_monthly_40h_v2',sessionStorage);
  const request=vi.fn(async(url:unknown)=>String(url).startsWith('/api/account/password-security?')?Response.json({accountId:syntheticAccount.userId,passwordRecovery:false,recoveryExpired:false,needsMfa:false,factors:[]}):Response.json({account:syntheticAccount,passwordRecovery:false}));vi.stubGlobal('fetch',request);

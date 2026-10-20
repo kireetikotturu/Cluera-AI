@@ -35,20 +35,36 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
   if(restored.error||!restored.data?.session)throw authFailure(restored.error);
   // setSession may refresh across the expiry boundary. Persist that rotation
   // only after validating the original owner/session, before any MFA action.
-  const current=restored.data.session;
+  let current=restored.data.session;
   if(current.access_token!==session.access_token||current.refresh_token!==session.refresh_token){
    const restoredAccount=await authorizeCustomer(clients,current.access_token,{userId:account.userId,sessionId:account.sessionId});
    saveSession(cookies,current,restoredAccount);
   }
+  const sessionCookies=cookies;
+  const captureSession=async()=>{
+   const captured=await clients.auth.auth.getSession();
+   if(captured.error||!captured.data?.session)throw authFailure(captured.error);
+   const latest=captured.data.session;
+   if(latest.access_token!==current.access_token||latest.refresh_token!==current.refresh_token){
+    const latestAccount=await authorizeCustomer(clients,latest.access_token,{userId:account.userId,sessionId:account.sessionId});
+    saveSession(sessionCookies,latest,latestAccount);current=latest;
+   }
+  };
+  // Factor operations can proactively refresh a near-expiry SDK session,
+  // including when the subsequent operation fails. Preserve only credentials
+  // independently authorized against the original owner and session.
+  const withSessionCapture=async<T,>(operation:()=>Promise<T>):Promise<T>=>{
+   try{return await operation();}finally{await captureSession();}
+  };
   // activeSession already validates the token with Auth. Require this token's
   // AAL2 claim as well as the live database session: an older AAL1 token must
   // not gain admin access merely because the same session completed MFA later.
   let tokenAal2=false;
-  try{tokenAal2=JSON.parse(Buffer.from(session.access_token.split('.')[1],'base64url').toString()).aal==='aal2';}catch{/* fail closed */}
+  try{tokenAal2=JSON.parse(Buffer.from(current.access_token.split('.')[1],'base64url').toString()).aal==='aal2';}catch{/* fail closed */}
   stage='mfa_check';const allowed=tokenAal2&&await rpc('account_admin_check',{...adminArgs,p_require_mfa:true})===true;
   if(request.method==='GET'){
    if(!allowed){
-    const factors=await clients.auth.auth.mfa.listFactors();if(factors.error)throw new AccountError('UNAVAILABLE',503);
+    const factors=await withSessionCapture(()=>clients.auth.auth.mfa.listFactors());if(factors.error)throw new AccountError('UNAVAILABLE',503);
     return cookies.apply(json({needsMfa:true,factors:factors.data.all.filter(f=>f.factor_type==='totp').map(f=>({id:f.id,status:f.status}))}));
    }
    const params=new URL(request.url).searchParams;
@@ -83,23 +99,23 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
   const action=z.object({action:z.string()}).parse(raw).action;
   if(['RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW'].includes(action))releaseAction=action;
   if(['MFA_ENROLL','MFA_VERIFY','MFA_CANCEL'].includes(action)){
-   const factors=await clients.auth.auth.mfa.listFactors();if(factors.error)throw new AccountError('UNAVAILABLE',503);
+   const factors=await withSessionCapture(()=>clients.auth.auth.mfa.listFactors());if(factors.error)throw new AccountError('UNAVAILABLE',503);
    const totp=factors.data.all.filter(f=>f.factor_type==='totp');
    if(action==='MFA_ENROLL'){
     z.object({action:z.literal('MFA_ENROLL')}).strict().parse(raw);
     if(totp.length)throw new AccountError('FORBIDDEN',403); // explicit recovery, never render-driven duplicate enrollment
-    const enrolled=await clients.auth.auth.mfa.enroll({factorType:'totp'});if(enrolled.error)throw new AccountError('UNAVAILABLE',503);
+    const enrolled=await withSessionCapture(()=>clients.auth.auth.mfa.enroll({factorType:'totp'}));if(enrolled.error)throw new AccountError('UNAVAILABLE',503);
     return cookies.apply(json({enrollment:{id:enrolled.data.id,qr:enrolled.data.totp.qr_code,secret:enrolled.data.totp.secret}}));
    }
    const input=z.object({action:z.enum(['MFA_VERIFY','MFA_CANCEL']),factorId:z.uuid(),code:z.string().regex(/^\d{6}$/).optional()}).strict().parse(raw);
    const factor=totp.find(f=>f.id===input.factorId);if(!factor)throw new AccountError('FORBIDDEN',403);
    if(action==='MFA_CANCEL'){
     if(factor.status!=='unverified')throw new AccountError('FORBIDDEN',403);
-    const removed=await clients.auth.auth.mfa.unenroll({factorId:factor.id});if(removed.error)throw new AccountError('UNAVAILABLE',503);
+    const removed=await withSessionCapture(()=>clients.auth.auth.mfa.unenroll({factorId:factor.id}));if(removed.error)throw new AccountError('UNAVAILABLE',503);
     return cookies.apply(json({ok:true}));
    }
    if(!input.code)throw new AccountError('FORBIDDEN',403);
-   const verified=await clients.auth.auth.mfa.challengeAndVerify({factorId:factor.id,code:input.code});
+   const verified=await withSessionCapture(()=>clients.auth.auth.mfa.challengeAndVerify({factorId:factor.id,code:input.code!}));
    if(verified.error||!verified.data)throw new AccountError('FORBIDDEN',403);
    const verifiedAccount=await authorizeCustomer(clients,verified.data.access_token,{userId:account.userId,sessionId:account.sessionId});
    let verifiedAal2=false;

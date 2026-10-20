@@ -15,11 +15,12 @@ function makeAuth() {
   return { mfa:{listFactors:vi.fn(async()=>({data:{all:[]},error:null}))},getUser: vi.fn(async () => ({ data: { user }, error: null })),
     signInWithPassword: vi.fn(async () => ({ data: { session }, error: null })),
     setSession: vi.fn(async () => ({ data: { session }, error: null })),
+    getSession: vi.fn(async () => ({ data: { session }, error: null })),
     refreshSession: vi.fn(async () => ({ data: { session }, error: null })),
     exchangeCodeForSession: vi.fn(async () => ({ data: { session }, error: null })),
     signUp: vi.fn(async () => ({ error: null })), resend:vi.fn(async()=>({error:null})), resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     updateUser: vi.fn(async () => ({ data:{user},error: null })),
-    signInWithOAuth: vi.fn(async () => ({ data: { url: 'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google' }, error: null })) };
+    signInWithOAuth: vi.fn(async () => ({ data: { url: 'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google&redirect_to=https%3A%2F%2Fcluera-ai-staging.vercel.app%2Fapi%2Faccount%2Fcallback' }, error: null })) };
 }
 beforeEach(() => {
   vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED', 'true'); vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN', 'https://cluera-ai-staging.vercel.app');
@@ -43,6 +44,23 @@ function cookiePair(kind: 'access' | 'refresh' | 'recovery' | 'flow', value: unk
 }
 const login = () => handleAccount(request('login', { email: user.email, password: 'synthetic-password' }), 'login');
 describe('customer BFF authentication', () => {
+  it('returns a contextual unverified sign-in result without sending mail or replacing a pending verifier',async()=>{
+    const pending={'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier':'pending-signup'};
+    auth.signInWithPassword.mockResolvedValueOnce({data:{session:null},error:{status:400,code:'email_not_confirmed',message:'PRIVATE_AUTH_DETAIL'}} as never);
+    const r=await handleAccount(request('login',{email:user.email,password:'synthetic-password'},cookiePair('flow',pending)),'login');
+    expect(r.status).toBe(403);expect(await r.json()).toEqual({code:'EMAIL_NOT_VERIFIED',error:'Verify your email to finish signing in.'});
+    const cookie=r.headers.getSetCookie().find(x=>x.startsWith('__Host-sr-account-flow='))!;
+    expect(unseal(cookie.split(';')[0].split('=')[1],'flow',accountConfig())).toEqual(pending);
+    expect(auth.resend).not.toHaveBeenCalled();expect(auth.signUp).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.every(([name])=>name==='customer_auth_rate_limit')).toBe(true);
+  });
+  it('does not infer a duplicate from an obfuscated successful signup response',async()=>{
+    auth.signUp.mockResolvedValueOnce({data:{user:{id:uid,identities:[]},session:null},error:null} as never);
+    const r=await handleAccount(request('signup',{email:user.email,password:'synthetic-password'}),'signup');
+    expect(r.status).toBe(200);expect(await r.json()).toEqual({message:'If this request is eligible, check your email. Open the link in this browser.'});
+    expect(rpc.mock.calls.every(([name])=>name==='customer_auth_rate_limit')).toBe(true);
+    expect(r.headers.getSetCookie().some(x=>x.startsWith('__Host-sr-account-access='))).toBe(false);
+  });
   it.each(['session','login'])('keeps a pending email verifier through an unauthenticated %s response and a later callback',async action=>{
     const pending={'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier':'synthetic-pending-email-verifier'};
     const jar=new Map([['__Host-sr-account-flow',seal(pending,'flow',accountConfig(),60)]]);
@@ -113,10 +131,12 @@ describe('customer BFF authentication', () => {
     expect(response.status).toBe(503);expect(await response.json()).toEqual({code:'EMAIL_DELIVERY_FAILED',error:'Email delivery could not be confirmed. Check your inbox before using resend, or contact Cluera AI support.'});
     expect(response.headers.get('set-cookie')).toBeNull();
   });
-  it.each(['email_exists','user_already_exists','user_not_found'])('keeps %s indistinguishable from eligible email responses without overwriting the verifier',async code=>{
+  it.each(['email_exists','user_already_exists','user_not_found'])('maps only explicit duplicate signup %s while preserving the verifier',async code=>{
     auth.signUp.mockResolvedValueOnce({error:{status:400,code,message:'PRIVATE_ACCOUNT_EXISTENCE'}} as never);
     const r=await handleAccount(request('signup',{email:user.email,password:'1234!Abc'}),'signup');
-    expect(r.status).toBe(200);expect(await r.json()).toEqual({message:'If this request is eligible, check your email. Open the link in this browser.'});
+    if(code==='user_not_found'){expect(r.status).toBe(200);expect(await r.json()).toEqual({message:'If this request is eligible, check your email. Open the link in this browser.'});}
+    else{expect(r.status).toBe(409);expect(await r.json()).toEqual({code:'ACCOUNT_EXISTS',error:'An account already exists with this email. Sign in or reset your password.'});}
+    expect(rpc.mock.calls.every(([name])=>name==='customer_auth_rate_limit')).toBe(true);
     expect(r.headers.get('set-cookie')).toContain('__Host-sr-account-flow=');
   });
   it('normalizes generic email cookie headers and preserves the original pending verifier and expiry',async()=>{
@@ -129,7 +149,7 @@ describe('customer BFF authentication', () => {
     expect(unseal(encoded,'flow',accountConfig(),Date.now()+61_000)).toBeNull();
     const accepted=await handleAccount(request('signup',{email:user.email,password:'1234!Abc'}),'signup');
     expect(denied.headers.get('set-cookie')!.length).toBe(accepted.headers.get('set-cookie')!.length);
-    expect(await denied.json()).toEqual(await accepted.json());
+    expect(denied.status).toBe(409);expect((await denied.json()).code).toBe('ACCOUNT_EXISTS');expect(accepted.status).toBe(200);expect(await accepted.json()).toHaveProperty('message');
   });
   it.each([{iss:'https://dwqltsqumiwsxtkzdoaa.supabase.co/auth/v1'},{iss:'https://foreign.supabase.co/auth/v1'},
     {role:'service_role'},{role:'anon'},{aud:'anon'},{aud:['authenticated','service_role']},{iss:undefined},{exp:1}])

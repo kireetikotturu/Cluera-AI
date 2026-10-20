@@ -32,9 +32,9 @@ it('existing TOTP is verified explicitly, then a fresh security read permits a s
   if(url.startsWith('/api/account/password-security?'))return Response.json(security(!elevated));
   if(url==='/api/account/password-mfa'){elevated=true;return Response.json({ok:true});}
   if(url==='/api/account/reset-password')return Response.json({ok:true,sessionsRevoked:true,message:'Password updated. Sign in again.'});return undefined as never;
- });await render();expect(button('Update password and sign out').disabled).toBe(true);expect(host.textContent).toContain('an email code will not work');
+ });await render();expect(button('Update password and sign out').disabled).toBe(true);expect(host.textContent).toContain('code from your authenticator app');
  const form=host.querySelector<HTMLFormElement>('form[aria-label="Verify password authenticator"]')!;(form.elements.namedItem('code')as HTMLInputElement).value='123456';await submit(form);
- expect((form.elements.namedItem('code')as HTMLInputElement).value).toBe('');expect(button('Update password and sign out').disabled).toBe(false);expect(host.textContent).toContain('submit your password update explicitly');
+ expect((form.elements.namedItem('code')as HTMLInputElement).value).toBe('');expect(button('Update password and sign out').disabled).toBe(false);expect(host.textContent).toContain('Choose your new password');
  const firstPosts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(firstPosts.map(([url])=>url)).toEqual(['/api/account/password-mfa']);expect(JSON.parse(firstPosts[0][1]!.body as string)).toEqual({expectedAccountId:first.userId,factorId:factor,code:'123456'});
  (resetForm().elements.namedItem('password')as HTMLInputElement).value='fixture-new-password';await submit(resetForm());
  const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts.map(([url])=>url)).toEqual(['/api/account/password-mfa','/api/account/reset-password']);expect(JSON.parse(posts[1][1]!.body as string)).toEqual({expectedAccountId:first.userId,password:'fixture-new-password'});expect(host.textContent).toContain('Password updated. Sign in again.');
@@ -60,7 +60,7 @@ it('a later insufficient-AAL password rejection opens the authenticator prompt w
 });
 it('expired recovery requires an explicit local sign-out/restart and never sends another email automatically',async()=>{
  const fetcher=fixture((url)=>url.startsWith('/api/account/password-security?')?Response.json(security(false,true)):url==='/api/account/logout'?Response.json({ok:true}):undefined as never);await render();
- expect(host.textContent).toContain('window has expired');expect(host.querySelector('input[name="password"]')).toBeNull();expect(host.textContent).not.toContain('security are verified');expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
+ expect(host.textContent).toContain('reset link has expired');expect(host.querySelector('input[name="password"]')).toBeNull();expect(host.textContent).not.toContain('security are verified');expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
  await act(async()=>button('Sign out and restart recovery').click());expect(host.querySelector('h2')?.textContent).toBe('Reset your password');expect(host.querySelector('input[name="email"]')).not.toBeNull();expect(location.hash).toBe('#forgot-password');
  expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST').map(([url])=>url)).toEqual(['/api/account/logout']);
 });
@@ -69,7 +69,7 @@ it('recovery expiring during authenticator entry re-reads security and hides sta
   if(url.startsWith('/api/account/password-security?'))return Response.json(security(!expired,expired));
   if(url==='/api/account/password-mfa'){expired=true;return Response.json({code:'RECOVERY_SESSION_REQUIRED',error:'fixed'},{status:403});}return undefined as never;
  });await render();const form=host.querySelector<HTMLFormElement>('form[aria-label="Verify password authenticator"]')!;(form.elements.namedItem('code')as HTMLInputElement).value='123456';await submit(form);
- expect(host.textContent).toContain('window has expired');expect(host.querySelector('input[name="password"]')).toBeNull();expect(host.querySelector('form[aria-label="Verify password authenticator"]')).toBeNull();expect(button('Sign out and restart recovery')).toBeTruthy();
+ expect(host.textContent).toContain('reset link has expired');expect(host.querySelector('input[name="password"]')).toBeNull();expect(host.querySelector('form[aria-label="Verify password authenticator"]')).toBeNull();expect(button('Sign out and restart recovery')).toBeTruthy();
  expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST').map(([url])=>url)).toEqual(['/api/account/password-mfa']);
 });
 it.each([[401,'AUTHENTICATION_REQUIRED'],[401,undefined],[503,'PASSWORD_UPDATE_UNCERTAIN']]as const)('reset HTTP%i %s does not claim a password changed or sign out automatically',async(status,code)=>{
@@ -98,7 +98,7 @@ it('a hung security stream is bounded and leaves password update locked without 
 it('resend receipt is neutral info and points verified users to sign-in/reset without an account lookup or promised delivery',async()=>{
  history.replaceState(null,'','/account#resend-verification');const fetcher=vi.fn(async(url:string,init?:RequestInit)=>url==='/api/account/auth-options'?Response.json({google:'disabled'}):init?.method==='POST'?Response.json({message:emailNotice}):Response.json({},{status:401}));vi.stubGlobal('fetch',fetcher);await render();
  (host.querySelector('input[name="email"]')as HTMLInputElement).value=first.email;await submit(host.querySelector('form')!);const feedback=host.querySelector('#account-auth-feedback')!;
- expect(feedback.textContent).toContain(resendNotice);expect(feedback.className).toContain('account-auth-feedback-info');expect(feedback.textContent).toContain('Already verified? Sign in.');expect(feedback.textContent).not.toContain('Verification email sent!');expect(button('Back to sign in')).toBeTruthy();expect(button('Forgot password?')).toBeTruthy();
+ expect(feedback.textContent).toContain(resendNotice);expect(feedback.className).toContain('account-auth-feedback-success');expect(feedback.textContent).toContain('If your signup needs verification');expect(feedback.textContent).not.toContain('Verification email sent!');expect(button('Back to sign in')).toBeTruthy();expect(host.querySelector('form')).toBeNull();
  expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST').map(([url])=>url)).toEqual(['/api/account/resend-verification']);
 });
 it.each(['forgot-password','resend-verification'])('%s offers email recovery/resend without an unrelated Google action',async(mode)=>{

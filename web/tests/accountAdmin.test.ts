@@ -28,6 +28,7 @@ beforeEach(()=>{
  mocks.providerStatus.mockResolvedValue({observedAt:'2026-10-08T00:00:00.000Z',providers:[]});
  rpc=vi.fn(async(name:string,args:any)=>({data:name==='account_admin_check'?true:name==='account_admin_read_v2'?{code:'ACTIVE',users:[],catalog:[]}:['account_admin_mutate','account_admin_adjust'].includes(name)?{code:'APPLIED'}:null,error:null,status:200}));
  mocks.clients.mockReturnValue({service:{rpc},auth:{auth:{setSession:vi.fn(async(session)=>({data:{session},error:null})),mfa}}});
+ mocks.clients().auth.auth.getSession=vi.fn(async()=>await mocks.clients().auth.auth.setSession.mock.results.at(-1).value);
 });
 afterEach(()=>{vi.unstubAllEnvs();vi.clearAllMocks();vi.restoreAllMocks();});
 const request=(body?:object)=>new Request(`${origin}/api/account/admin`,body?{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
@@ -94,7 +95,7 @@ it('challenge/verifies the selected factor and returns tokens only as encrypted 
  expect(mocks.authorize).toHaveBeenCalledWith(mocks.clients(),expect.stringContaining('.synthetic-mfa-access'),{userId:actor,sessionId:sid});
 });
 it('persists an SDK restore rotation only after authenticating the original owner and session',async()=>{
- const rotated={access_token:'synthetic-rotated-access',refresh_token:'synthetic-rotated-refresh',expires_in:3600};
+ const rotated={access_token:`header.${Buffer.from(JSON.stringify({aal:'aal2'})).toString('base64url')}.synthetic-rotated-access`,refresh_token:'synthetic-rotated-refresh',expires_in:3600};
  mocks.clients().auth.auth.setSession.mockResolvedValueOnce({data:{session:rotated},error:null});
  const response=await accountAdminRequest(request());expect(response.status).toBe(200);
  expect(mocks.authorize).toHaveBeenCalledExactlyOnceWith(mocks.clients(),rotated.access_token,{userId:actor,sessionId:sid});
