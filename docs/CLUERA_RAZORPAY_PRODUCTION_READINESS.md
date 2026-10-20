@@ -51,7 +51,23 @@ Same-order continuation is offered only after independent checks prove an untouc
 
 The focused local billing suite passes **210 tests** across 11 files, including PostgreSQL financial fixtures, signed receipts, preserved legacy ingestion, shared grants, native lifecycle, unknown-outcome handling, history isolation, exact success proof and blocked monthly creation. Web and desktop typechecks pass. All **154 preparation tests** pass with one worker and normal filesystem access; the sandboxed run failed before several assertions because esbuild could not resolve parent directories. The local web production build and artifact scan passed before the final sign-in-link refinement; exact-source hosted CI is the final build authority. Synthetic tests use intercepted provider requests; no customer payment or mandate was performed.
 
-Publication/deployment evidence is recorded below after exact-source CI and canonical checks. Until that record is filled, local test success is **not DEPLOYED** evidence. Full Test acceptance is still **OWNER ACCEPTANCE PENDING**.
+**DEPLOYED / AUTOMATED TESTED checkpoint, October 20 at 07:12 UTC (12:42 IST):**
+
+| Evidence | Verified result |
+| --- | --- |
+| Runtime source | [`fc0e35a7eeaf8a97d21b4dfcf792b63c09ff9f84`](https://github.com/kireetikotturu/Cluera-AI/commit/fc0e35a7eeaf8a97d21b4dfcf792b63c09ff9f84), staging only; 26 explicit reviewed files; 801 total source blobs; no deletions or unrelated drafts |
+| Website | Vercel `dpl_HAR2wGjrACqqEbz7CGsBytki8q25`, READY; exact source; canonical alias assigned and independently read back |
+| Relay | Render `dep-dbbh5j3m8hqs738u6s0g`, LIVE; same exact source; health revision verified |
+| Hosted CI | [Run 39384325767](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39384325767): **2,281 web passed / 22 opt-in skipped**, **417 desktop passed / 1 opt-in skipped**, **154 preparation passed**; all typechecks, web/relay/desktop code builds and dependency audits passed |
+| Source/artifacts | Exact hosted source: **801 files / 0 findings**; web artifact scan passed; Vercel's bounded 98 build events contained no error-level event |
+| Public boundaries | **16/16 credential-free GET checks passed** at `2026-10-20T07:12:32.762Z`; Google enabled; anonymous credits/checkout/history/Admin denied; monthly catalog disabled; release still unapproved |
+| Browser | Deployed pricing, real narrow SDK CSP and intercepted synthetic checkout/callback/history: no automatic order, one explicit mocked create, one mocked callback, exact verified-payment success, automatic balance to 3h 15m, three disabled monthly offers, no page errors |
+| Signed-out/mobile/Auth | Selected pack returns through `/account?offer=cluera_pack_3h_v2#login`; Google visible on Create Account; 390px viewport has no horizontal overflow; no credential submission |
+| Preserved boundary | Main remains `3d813f8f88cb3adacffe9afb889efa8ce07476bc`. No financial/SQL/environment/provider activation, real payment, mandate or binary publication |
+
+The browser used an isolated context with all financial requests intercepted. Its displayed balance is synthetic, not a real paid grant. The actual database remains subject to the retained-order blocker. Skipped service/device tests remain skipped. Full genuine Test acceptance is **OWNER ACCEPTANCE PENDING**.
+
+A documentation-only staging follow-up may advance the branch and deployment revision while preserving all runtime blobs from this checkpoint. The measured runtime/CI evidence above remains pinned to the exact feature commit; it is not inferred from a later documentation commit.
 
 ## One owner checklist
 

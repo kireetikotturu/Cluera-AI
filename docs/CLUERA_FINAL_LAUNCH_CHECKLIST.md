@@ -6,6 +6,8 @@ This is the single owner checklist. Supporting documents contain technical evide
 
 The October 20 billing follow-up is documented in [Razorpay readiness and the consolidated billing guide](CLUERA_RAZORPAY_PRODUCTION_READINESS.md). The owner confirmed **staging only**. The plans page now uses the guarded checkout directly; public purchase buttons remain disabled, history loads automatically after account verification, and exact payment success requires validated server history. Monthly creation additionally requires native lifecycle and cancellation capability; Enterprise has a separate default-off acceptance flag. The retained Test order remains unresolved. Live runtime/storage separation is still required before any future Live cutover; replacing keys is not sufficient.
 
+Billing deployment checkpoint: [`fc0e35a7eeaf8a97d21b4dfcf792b63c09ff9f84`](https://github.com/kireetikotturu/Cluera-AI/commit/fc0e35a7eeaf8a97d21b4dfcf792b63c09ff9f84); Vercel `dpl_HAR2wGjrACqqEbz7CGsBytki8q25` READY/canonical and Render `dep-dbbh5j3m8hqs738u6s0g` LIVE. [CI 39384325767](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39384325767) passed 2,281 web tests, 417 desktop tests and 154 preparation tests; 22 web and one desktop opt-in tests remain skipped. Typechecks/builds/audits and the 801-file hosted source scan passed. Public boundaries passed 16/16 at 07:12:32 UTC; browser verification used intercepted synthetic financial requests and did not accept a real payment. The guide records exact evidence and remaining private steps. Later documentation-only revisions may retain this same runtime.
+
 ## What is complete and what is gated
 
 | Area | Evidence and current limit |
