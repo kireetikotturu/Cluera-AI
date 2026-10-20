@@ -26,14 +26,18 @@ export async function googleAccountLogin(open:(url:string)=>Promise<void>,signal
  const server=createServer({maxHeaderSize:4096,requestTimeout:5000,headersTimeout:5000},(request,response)=>{
   response.setHeader('Cache-Control','no-store');response.setHeader('Referrer-Policy','no-referrer');
   response.setHeader('Content-Security-Policy',"default-src 'none'; frame-ancestors 'none'");response.setHeader('Connection','close');
-  const url=new URL(request.url??'/',NATIVE_GOOGLE_CALLBACK),received=url.searchParams.get('state')??'';
+  let url:URL;
+  try{url=new URL(request.url??'/',NATIVE_GOOGLE_CALLBACK);}
+  catch{response.writeHead(400);response.end('Invalid sign-in callback.');return;}
+  const received=url.searchParams.get('state')??'';
   const valid=request.method==='GET'&&request.socket.remoteAddress==='127.0.0.1'&&request.headers.host==='127.0.0.1:43822'
-   &&!request.headers.origin&&url.pathname==='/cluera/callback'&&/^[a-f0-9]{64}$/.test(received)
+   &&!request.headers.origin&&request.url?.startsWith('/cluera/callback?')&&url.origin===new URL(NATIVE_GOOGLE_CALLBACK).origin
+   &&url.pathname==='/cluera/callback'&&url.searchParams.getAll('state').length===1&&/^[a-f0-9]{64}$/.test(received)
    &&timingSafeEqual(Buffer.from(received),Buffer.from(state))&&!accepted;
   const code=url.searchParams.get('code');
   if(!valid){response.writeHead(400);response.end('Invalid sign-in callback.');return;}
   accepted=true;
-  if(!code||code.length>1024||url.searchParams.has('error')){response.writeHead(400);response.end('Sign-in was not completed. Return to Cluera.');abort();return;}
+  if(!code||code.length>1024||url.searchParams.getAll('code').length!==1||url.searchParams.has('error')){response.writeHead(400);response.end('Sign-in was not completed. Return to Cluera.');abort();return;}
   response.writeHead(200,{'Content-Type':'text/plain; charset=utf-8'});response.end('Return to Cluera to finish signing in. You can close this tab.');complete(code);
  });
  server.maxConnections=4;server.on('error',()=>fail(new AccountApiError(503)));
@@ -42,8 +46,10 @@ export async function googleAccountLogin(open:(url:string)=>Promise<void>,signal
   if(signal.aborted)throw new AccountApiError(401);
   await new Promise<void>((resolve,reject)=>{server.once('error',()=>reject(new AccountApiError(503)));server.listen(43822,'127.0.0.1',()=>resolve());});
   if(signal.aborted)throw new AccountApiError(401);
-  await open(authorize.toString());
+  // The OS opener may never settle. Cancellation/deadline and a valid callback
+  // still finish this attempt and release the single loopback listener.
+  await Promise.race([open(authorize.toString()),callback.then(()=>undefined)]);
   const code=await callback;if(signal.aborted)throw new AccountApiError(401);
-  return await api.oauthExchange(code,verifier);
+  return await api.oauthExchange(code,verifier,signal);
  }finally{clearTimeout(timer);signal.removeEventListener('abort',abort);server.close();server.closeAllConnections();}
 }

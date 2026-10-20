@@ -1,6 +1,6 @@
 # Cluera AI final launch checklist
 
-Updated October 19, 2026 (IST). **Full commercial launch: NO-GO.** Remote Desktop is explicitly excluded from launch at the owner's request. Existing SMTP, Supabase keys/URLs, registration, Admin role and MFA enrollment are complete; do not repeat them.
+Updated October 20, 2026 (IST). **Full commercial launch: NO-GO.** Remote Desktop is explicitly excluded from launch at the owner's request. Existing SMTP, Supabase keys/URLs, registration, Admin role and MFA enrollment are complete; do not repeat them.
 
 This is the single owner checklist. Supporting documents contain technical evidence, not additional setup approvals. Older next-action instructions elsewhere are historical.
 
@@ -22,7 +22,17 @@ No label above establishes **PRODUCTION READY**. Source, synthetic tests, hosted
 
 Concrete repairs include rotated Admin/MFA session retention, assurance refresh before Admin controls, payment 429 handling, bounded pending polling, same-order recovery without CREATE/retry, cancellation during provider preparation without a usage START, token expiry rechecks, rejection of empty/blocked/thought-only Gemini answers, configured Authenticode enforcement plus post-verification rehash, publication traversal rejection, bounded private reports and durable metadata uncertainty.
 
-## Verified deployment checkpoint
+## October 20 account-flow follow-up
+
+Signup, sign-in, verification resend, forgot/reset password and support were reviewed again. Failed sign-in and ordinary signed-out session checks now preserve the pending email link's sealed verifier and original expiry; explicit logout and completed callbacks still clear it. Upstream sign-in throttling remains HTTP 429 with a bounded retry delay for both web and native clients.
+
+Password-recovery requests now share the email cooldown after success, throttling or an unknown outcome. Email-only forms explain email validation, sign-in failures give neutral next steps, and inline help explains latest-link/same-browser recovery and provides the fixed support address. The explicit **Check sign-in status** action reads the existing session without resending credentials or email and stays disabled during writes.
+
+Desktop source now exposes support before sign-in, rejects malformed Google loopback callbacks, bounds unresponsive account requests/cleanup and browser-opening waits, and fences late initialization errors. These desktop changes are **source fixes**: the retained immutable **1.0.7 installer predates this follow-up** and has not been rebuilt or redistributed.
+
+Local verification: **198 focused web/Auth/installed-SDK tests**, **57 focused desktop tests**, web and desktop typechecks, and the web production build/artifact scan pass. These checks use synthetic identities and intercepted requests. Actual inbox delivery, one real signup/verification/sign-in/reload and a controlled reset/new-password sign-in still need the owner's private acceptance. Follow [the existing acceptance procedure](CLUERA_AUTHENTICATION_ACCEPTANCE.md); do not repeat completed SMTP/key/Admin/MFA setup. Commercial launch and the Remote Desktop exclusion are unchanged.
+
+## Verified October 19 deployment checkpoint
 
 | Component | Independently verified evidence |
 | --- | --- |

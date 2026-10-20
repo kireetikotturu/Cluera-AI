@@ -32,6 +32,12 @@ function request(action: string, body: object = {}, headers: Record<string,strin
     headers: { 'Content-Type':'application/json',...headers }, ...(action === 'session' ? {} : { body:JSON.stringify(body) }) });
 }
 const login = () => handleNativeAccount(request('login',{email:user.email,password:'synthetic-password'}),'login');
+it.each([{status:429},{status:400,code:'over_request_rate_limit'}])('returns a bounded retry delay for upstream native sign-in throttling %j',async error=>{
+ auth.signInWithPassword.mockResolvedValueOnce({data:{session:null},error:{...error,message:'PRIVATE_AUTH_RATE_DETAIL'}} as never);
+ const response=await login();expect(response.status).toBe(429);expect(response.headers.get('retry-after')).toBe('60');
+ expect(await response.json()).toEqual({error:'RATE_LIMITED'});expect(auth.signInWithPassword).toHaveBeenCalledOnce();
+ expect(rpc.mock.calls.every(([name])=>name==='customer_auth_rate_limit')).toBe(true);
+});
 it('context commands bind verified account/session and reject browser, missing auth and caller identities',async()=>{
  expect((await handleNativeAccount(request('context',{action:'LIST'}),'context')).status).toBe(401);
  expect((await handleNativeAccount(request('context',{action:'LIST'},{origin,authorization:`Bearer ${token}`}),'context')).status).toBe(403);

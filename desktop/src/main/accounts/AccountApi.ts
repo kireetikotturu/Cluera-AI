@@ -38,23 +38,39 @@ export class AccountApi {
     try { this.diagnostic({ operation, cause, status: 503 }); } catch { /* logging cannot change auth */ }
   }
   private async call(action: AccountAction, input?: object, access?: string, signal?:AbortSignal): Promise<unknown> {
+    const controller = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let rejectInterrupted!: (reason: AccountApiError) => void;
+    const interrupted = new Promise<never>((_resolve, reject) => { rejectInterrupted = reject; });
+    void interrupted.catch(() => undefined);
+    const interrupt = () => { controller.abort(); rejectInterrupted(new AccountApiError(503)); };
+    const timer = setTimeout(interrupt, 15000); timer.unref?.();
+    signal?.addEventListener('abort', interrupt, { once: true });
+    // Cleanup is best effort: an unresponsive transport must not keep the UI busy.
+    const discard = (body: ReadableStream<Uint8Array> | null) => {
+      try { void body?.cancel().catch(() => undefined); } catch { /* already locked/closed */ }
+    };
     try {
-      const response = await this.request(`${ACCOUNT_ORIGIN}/api/account/${action === 'auth-options' ? action : `native/${action}`}`, {
+      if (signal?.aborted) throw new AccountApiError(503);
+      const pending = this.request(`${ACCOUNT_ORIGIN}/api/account/${action === 'auth-options' ? action : `native/${action}`}`, {
         method: action === 'session' || action === 'credits' || action === 'auth-options' ? 'GET' : 'POST', redirect: 'error', cache: 'no-store', credentials: 'omit',
-        signal: signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000), headers: { 'Content-Type': 'application/json', ...(access ? { Authorization: `Bearer ${access}` } : {}) },
+        signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(access ? { Authorization: `Bearer ${access}` } : {}) },
         ...(input ? { body: JSON.stringify(input) } : {}),
       });
-      if (!response.ok) { await response.body?.cancel(); throw new AccountApiError([401,403,429].includes(response.status) ? response.status : 503); }
-      const reader = response.body?.getReader(); if (!reader) throw new AccountApiError(503);
+      void pending.then(response => { if (controller.signal.aborted) discard(response.body); }, () => undefined);
+      const response = await Promise.race([pending, interrupted]);
+      if (!response.ok) { discard(response.body); throw new AccountApiError([401,403,429].includes(response.status) ? response.status : 503); }
+      reader = response.body?.getReader(); if (!reader) throw new AccountApiError(503);
       const chunks: Uint8Array[] = []; let size = 0;
-      try {
-        while (true) { const result = await reader.read(); if (result.done) break;
-          size += result.value.length; if (size > 40000) throw new AccountApiError(503); chunks.push(result.value); }
-      } finally { await reader.cancel().catch(() => undefined); }
+      while (true) { const result = await Promise.race([reader.read(), interrupted]); if (result.done) break;
+        size += result.value.length; if (size > 40000) throw new AccountApiError(503); chunks.push(result.value); }
       return JSON.parse(Buffer.concat(chunks).toString('utf8'));
     } catch (error) {
       if (!(error instanceof AccountApiError) || error.status === 503) this.report(action, 'request_or_response_failed');
       throw error instanceof AccountApiError ? error : new AccountApiError(503);
+    } finally {
+      clearTimeout(timer); signal?.removeEventListener('abort', interrupt); controller.abort();
+      try { void reader?.cancel().catch(() => undefined); } catch { /* cleanup cannot block auth */ }
     }
   }
   private parse<T>(operation: AccountAction, schema: z.ZodType<T>, value: unknown): T {
@@ -64,7 +80,7 @@ export class AccountApi {
   }
   async login(input: { email: string; password: string }) { return this.parse('login', accountTokens, await this.call('login', input)); }
   async refresh(refreshToken: string) { return this.parse('refresh', accountTokens, await this.call('refresh', { refreshToken })); }
-  async oauthExchange(code:string,verifier:string) { return this.parse('oauth-exchange',accountTokens,await this.call('oauth-exchange',{code,verifier})); }
+  async oauthExchange(code:string,verifier:string,signal?:AbortSignal) { return this.parse('oauth-exchange',accountTokens,await this.call('oauth-exchange',{code,verifier},undefined,signal)); }
   async snapshot(access: string) { return this.parse('session', accountSnapshot, await this.call('session', undefined, access)); }
   async credits(access:string,signal:AbortSignal) { return this.parse('credits',creditsSchema,await this.call('credits',undefined,access,signal)); }
   async authOptions(signal?:AbortSignal) { return this.parse('auth-options',authOptionsSchema,await this.call('auth-options',undefined,undefined,signal)); }

@@ -53,7 +53,8 @@ type Clients = ReturnType<typeof accountClients>;
 type Account = { userId: string; email: string; trialSecondsGranted: number; remoteDesktop: false };
 const identitySchema=z.object({userId:z.uuid(),sessionId:z.uuid()}).strict();
 type SessionIdentity=z.infer<typeof identitySchema>;
-export function authFailure(error: { status?: number } | null | undefined): AccountError {
+export function authFailure(error: { status?: number; code?:string } | null | undefined): AccountError {
+  if(error?.status===429||error?.code==='over_request_rate_limit')return new AccountError('RATE_LIMITED',429);
   return error && (!error.status || error.status >= 500)
     ? new AccountError('UNAVAILABLE', 503) : new AccountError('UNAUTHENTICATED', 401);
 }
@@ -345,7 +346,7 @@ export async function handleAccount(request: Request, action: string): Promise<R
     if (error instanceof AccountError) {
       const messages = { UNAVAILABLE: 'Account service is unavailable.', UNAUTHENTICATED: 'Sign in with a verified email to continue.',
         FORBIDDEN: 'This action is not allowed.', INVALID_INPUT: 'The request could not be accepted.', RATE_LIMITED: 'Too many attempts. Try again later.' };
-      if (error.status === 401&&!passwordActions.includes(action)) cookies?.clear();
+      if (error.status === 401&&!passwordActions.includes(action)) cookies?.clearSession();
       const response = json({ error: messages[error.code] }, error.status);
       if(error.code==='RATE_LIMITED')response.headers.set('Retry-After','60');
       return cookies ? cookies.apply(response) : response;

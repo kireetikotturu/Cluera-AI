@@ -1,11 +1,13 @@
 import {ArrowRight, Eye, EyeOff, ShieldCheck, X} from 'lucide-react';
 import {useEffect, useRef, useState} from 'react';
 import type {AccountAuthOptions, AccountView, AccountWebAction} from '../../shared/accounts';
+import {SupportDialog} from './SupportDialog';
 
 /** Credentials live only in this form; main still owns all authentication. */
 export function AccountLogin({state,onState}:{state:AccountView;onState(state:AccountView):void}):JSX.Element {
   const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [visible,setVisible]=useState(false),[operation,setOperation]=useState('');
+  const [supportOpen,setSupportOpen]=useState(false);
   const [google,setGoogle]=useState<AccountAuthOptions['google']>('unavailable');
   const working=useRef(false),mounted=useRef(true);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
@@ -49,10 +51,12 @@ export function AccountLogin({state,onState}:{state:AccountView;onState(state:Ac
         <button className="ghost account-google" disabled={locked||google!=='enabled'} aria-describedby={google!=='enabled'?'account-google-status':undefined} onClick={()=>void run('Waiting for Google…',()=>window.accountAPI!.google())}>Continue with Google</button>
         {google!=='enabled'&&<p id="account-google-status" className="account-auth-note">{google==='disabled'?'Google sign-in is not enabled. Use your email and password.':'Google sign-in is temporarily unavailable. Use your email and password.'}</p>}
         <div className="account-auth-links"><button disabled={locked} onClick={()=>void web('signup')}>Create account</button><button disabled={locked} onClick={()=>void web('reset-password')}>Forgot password?</button></div>
-        <button className="account-retry" disabled={locked} onClick={()=>void run('Restoring session…',()=>window.accountAPI!.retry())}>Retry saved session</button>
+        <div className="account-auth-links"><button className="account-retry" disabled={locked} onClick={()=>void run('Restoring session…',()=>window.accountAPI!.retry())}>Retry saved session</button>
+          <button type="button" className="account-retry" onClick={()=>setSupportOpen(true)}>Contact support</button></div>
         <p className="account-auth-note">Account creation, email verification and recovery open in your browser. AI credentials stay on the server.</p>
       </section>
       <p className="account-login-footnote">Isolated Cluera TEST edition · not a production release</p>
     </div>
+    {supportOpen&&<SupportDialog onClose={()=>setSupportOpen(false)}/>}
   </main>;
 }

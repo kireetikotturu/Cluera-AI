@@ -29,10 +29,11 @@ export function authFailure(status:number,action?:string,code?:unknown){
   if(typeof code==='string'&&Object.hasOwn(messages,code))return messages[code];
  }
  if(status===503&&code==='EMAIL_DELIVERY_FAILED'&&['signup','resend-verification','forgot-password'].includes(action??''))return emailDeliveryNotice;
- if(status===401)return 'Sign in with a verified email to continue.';
+ if(status===401)return action==='login'?'Sign-in was not accepted. Check your email and password. If your signup is unverified, use Resend verification.':'Sign in with a verified email to continue.';
  if(status===403)return 'This account request is not permitted.';
  if(status===429)return 'Too many requests. Please wait before trying again.';
  if(status===400&&['change-password','reauthenticate'].includes(action??''))return 'Check the account security fields and try again.';
+ if(status===400&&['forgot-password','resend-verification'].includes(action??''))return 'Check the email address and request a new link only when needed.';
  if(status===400)return ['signup','reset-password'].includes(action??'')?`Check your email and password. ${passwordRequirement}`:'Check the email and password requirements before continuing.';
  return 'Account service is unavailable.';
 }

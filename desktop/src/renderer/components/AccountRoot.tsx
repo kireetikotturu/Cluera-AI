@@ -18,7 +18,7 @@ export function AccountRoot(): JSX.Element {
     };
     const remove = api.onStatus(state => { eventSeen = true; update(state); });
     void api.status().then(state => { if (!eventSeen) update(state); }).catch(() => {
-      update({mode:'cluera-staging',state:'unavailable',message:'Desktop account initialization failed. Restart the app.'});
+      if (!eventSeen) update({mode:'cluera-staging',state:'unavailable',message:'Desktop account initialization failed. Restart the app.'});
     });
     return () => { alive = false; remove(); };
   }, []);

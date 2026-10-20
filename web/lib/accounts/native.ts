@@ -69,7 +69,11 @@ export async function handleNativeAccount(request: Request, action: string): Pro
     // Safe DTO only: do not return auth.sessions IDs, user_metadata or credentials.
     return json({ account: { userId: account.userId, email: account.email }, usage });
   } catch (error) {
-    if (error instanceof AccountError) return json({ error: error.code }, error.status);
+    if (error instanceof AccountError) {
+      const response=json({ error: error.code }, error.status);
+      if(error.code==='RATE_LIMITED')response.headers.set('Retry-After','60');
+      return response;
+    }
     return apiError(error);
   }
 }

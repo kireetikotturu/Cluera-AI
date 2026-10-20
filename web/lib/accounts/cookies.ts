@@ -74,7 +74,12 @@ export class AccountCookies {
     const encoded=prior?seal(prior.value,'flow',this.config,0,prior.exp):seal({},'flow',this.config,3600);
     this.queue('flow',encoded,3600);
   }
-  clear(): void { for (const kind of ['access', 'refresh', 'flow', 'recovery', 'session', 'recovery-lock'] as const) this.set(kind, null, 0); }
+  clearSession(): void {
+    // A failed session read/login does not invalidate a separate pending email
+    // attempt. Keep its sealed PKCE verifier and original deadline intact.
+    for (const kind of ['access', 'refresh', 'recovery', 'session', 'recovery-lock'] as const) this.set(kind, null, 0);
+  }
+  clear(): void { this.clearSession(); this.set('flow', null, 0); }
   apply(response: Response): Response {
     for (const cookie of this.outgoing) response.headers.append('Set-Cookie', cookie);
     response.headers.set('Cache-Control', 'no-store');

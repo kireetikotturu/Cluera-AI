@@ -4,24 +4,29 @@ import { SUPPORT_EMAIL, type SupportDestination } from '../../shared/supportLink
 
 export function SupportDialog({ onClose, account=false }: { onClose(): void; account?:boolean }): JSX.Element {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const working = useRef(false), mounted = useRef(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    mounted.current = true;
     const dialog = dialogRef.current;
     dialog?.showModal();
-    return () => { if (dialog?.open) dialog.close(); };
+    return () => { mounted.current = false; if (dialog?.open) dialog.close(); };
   }, []);
 
   const openEmail = async (kind: SupportDestination): Promise<void> => {
+    if (working.current) return;
+    working.current = true;
     setBusy(true);
     setError('');
     try {
       await window.electronAPI.openExternal(kind);
     } catch {
-      setError('Your email app could not be opened. Please write to the support address shown above.');
+      if (mounted.current) setError('Your email app could not be opened. Please write to the support address shown above.');
     } finally {
-      setBusy(false);
+      working.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
 

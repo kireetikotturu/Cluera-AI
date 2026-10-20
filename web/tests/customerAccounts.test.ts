@@ -43,6 +43,34 @@ function cookiePair(kind: 'access' | 'refresh' | 'recovery' | 'flow', value: unk
 }
 const login = () => handleAccount(request('login', { email: user.email, password: 'synthetic-password' }), 'login');
 describe('customer BFF authentication', () => {
+  it.each(['session','login'])('keeps a pending email verifier through an unauthenticated %s response and a later callback',async action=>{
+    const pending={'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier':'synthetic-pending-email-verifier'};
+    const jar=new Map([['__Host-sr-account-flow',seal(pending,'flow',accountConfig(),60)]]);
+    if(action==='login')auth.signInWithPassword.mockResolvedValueOnce({data:{session:null},error:{status:400,code:'invalid_credentials',message:'PRIVATE_AUTH_DETAIL'}} as never);
+    const rejected=await handleAccount(request(action,{email:user.email,password:'wrong-synthetic-password'},
+      [...jar].map(([name,value])=>`${name}=${value}`).join('; '),action==='session'?'GET':'POST'),action);
+    expect(rejected.status).toBe(401);expect(await rejected.text()).not.toContain('PRIVATE_AUTH_DETAIL');
+    for(const header of rejected.headers.getSetCookie()){
+      const pair=header.split(';')[0],at=pair.indexOf('=');jar.set(pair.slice(0,at),pair.slice(at+1));
+    }
+    const verifier=jar.get('__Host-sr-account-flow');
+    expect(unseal(verifier,'flow',accountConfig())).toEqual(pending);
+    expect(unseal(verifier,'flow',accountConfig(),Date.now()+61_000)).toBeNull();
+    const callback=new Request('https://cluera-ai-staging.vercel.app/api/account/callback?code=synthetic-email-code',{
+      headers:{cookie:[...jar].map(([name,value])=>`${name}=${value}`).join('; ')}});
+    const completed=await handleAccount(callback,'callback');
+    expect(mocks.clients).toHaveBeenLastCalledWith(expect.anything(),pending);
+    expect(completed.status).toBe(303);expect(completed.headers.get('location')).toBe('https://cluera-ai-staging.vercel.app/account');
+    expect(auth.exchangeCodeForSession).toHaveBeenCalledExactlyOnceWith('synthetic-email-code',undefined);
+    expect(completed.headers.get('set-cookie')).toContain('__Host-sr-account-flow=;');
+  });
+  it.each([{status:429},{status:400,code:'over_request_rate_limit'}])('preserves upstream sign-in throttling %j without discarding a pending email link',async error=>{
+    auth.signInWithPassword.mockResolvedValueOnce({data:{session:null},error:{...error,message:'PRIVATE_RATE_DETAIL'}} as never);
+    const response=await handleAccount(request('login',{email:user.email,password:'synthetic-password'},cookiePair('flow',{'synthetic-code-verifier':'pending'})),'login');
+    expect(response.status).toBe(429);expect(response.headers.get('retry-after')).toBe('60');
+    expect(await response.text()).not.toContain('PRIVATE_RATE_DETAIL');expect(response.headers.get('set-cookie')).toBeNull();
+    expect(auth.signInWithPassword).toHaveBeenCalledOnce();expect(auth.exchangeCodeForSession).not.toHaveBeenCalled();
+  });
   it.each([8,12,64,128])('accepts a %i-character signup password without creating a session or allowance',async length=>{
     const response=await handleAccount(request('signup',{email:user.email,password:'x'.repeat(length)}),'signup');
     expect(response.status).toBe(200);expect(auth.signUp).toHaveBeenCalledOnce();

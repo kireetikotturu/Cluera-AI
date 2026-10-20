@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { AccountWorkspace } from './AccountWorkspace';
+import {AccountAuthHelp} from './AccountAuthHelp';
 import {notifyAccountSessionChanged,ACCOUNT_SESSION_STORAGE_KEY} from './AdminRoleNavigation';
 import {selectedPlanReturn,replaceAccountLocation} from '../../lib/accounts/browserNavigation';
 import {authFailure,emailNotice,signupNotice,publicLoginSchema,publicSessionSchema,safeGoogleRedirect,type PublicAccount} from '../../lib/accounts/publicAuth';
@@ -12,6 +13,7 @@ type FormMode = 'login' | 'signup' | 'forgot-password' | 'resend-verification';
 type Feedback = {tone:'success'|'error'|'info';message:string;detail?:string;maskedEmail?:string};
 const uncertainNotice='Connection failed or timed out. Check your account or email before submitting again.';
 const verificationAction=(action:string)=>action==='signup'||action==='resend-verification';
+const emailAction=(action:string)=>verificationAction(action)||action==='forgot-password';
 function maskedEmail(value:unknown):string {
   if(typeof value!=='string'||value.length>254)return '';
   const parts=value.trim().split('@');
@@ -22,6 +24,7 @@ export function AccountPanel() {
   const [mode, setMode] = useState<FormMode>('login');
   const [recovery, setRecovery] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [checkingSession,setCheckingSession]=useState(false);
   const [pendingAction,setPendingAction]=useState<string|null>(null);
   const [feedback,setFeedback]=useState<Feedback|null>(null);
   const [visible, setVisible] = useState(false);
@@ -38,10 +41,10 @@ export function AccountPanel() {
   const selected=useRef<CheckoutSelection|null>(null),currentAccount=useRef<PublicAccount|null>(null);
   const reauthUntil=useRef(0),lastSessionCheck=useRef(0),returned=useRef(false);
   const callbackFeedback=useRef<Feedback|null>(null);
-  const restoreSession=useRef<(expectedAccountId?:string,writeCurrent?:()=>boolean)=>Promise<boolean>>(async()=>false);
-  const busy=pendingAction!==null;
+  const restoreSession=useRef<(expectedAccountId?:string,writeCurrent?:()=>boolean,explicit?:boolean)=>Promise<boolean>>(async()=>false);
+  const busy=pendingAction!==null||checkingSession;
   const emailOnly=mode==='forgot-password'||mode==='resend-verification';
-  const verificationCoolingDown=verificationAction(mode)&&resendSeconds>0;
+  const emailCoolingDown=emailAction(mode)&&resendSeconds>0;
   const cooldownActive=resendSeconds>0;
   function startResendCooldown(){resendUntil.current=Date.now()+60_000;setResendSeconds(60);}
   function clearSessionView(){currentAccount.current=null;setAccount(null);setRecovery(false);setVisible(false);}
@@ -100,13 +103,14 @@ export function AccountPanel() {
       window.history.replaceState(null,'',`${window.location.pathname}${remaining?`?${remaining}`:''}${window.location.hash}`);
     }
     window.addEventListener('hashchange', selectMode);
-    const readSession=async(expectedAccountId?:string,writeCurrent:()=>boolean=()=>true):Promise<boolean>=>{
+    const readSession=async(expectedAccountId?:string,writeCurrent:()=>boolean=()=>true,explicit=false):Promise<boolean>=>{
       if(!alive.current||sessionController.current||(!expectedAccountId&&inFlight.current))return false;
       const controller=new AbortController(),epoch=++sessionEpoch.current;
       sessionController.current=controller;lastSessionCheck.current=Date.now();
+      setCheckingSession(true);if(explicit)setFeedback({tone:'info',message:'Checking your current sign-in status…'});
       const current=()=>alive.current&&!controller.signal.aborted&&sessionEpoch.current===epoch&&writeCurrent();
       const deadline=setTimeout(()=>{if(current()){
-        controller.abort();setLoading(false);setFeedback({tone:'error',message:'Account service is unavailable.'});
+        controller.abort();setLoading(false);setCheckingSession(false);setFeedback({tone:'error',message:'Account service is unavailable.'});
         if(expectedAccountId)clearSessionView();
         if(sessionController.current===controller)sessionController.current=null;
       }},15000);
@@ -116,7 +120,8 @@ export function AccountPanel() {
         if(!response.ok){
           if(response.status===401||response.status===403){const hadAccount=Boolean(currentAccount.current);clearSessionView();
             if(expectedAccountId)setFeedback({tone:'error',message:'Sign-in could not be confirmed. Please sign in again.'});
-            else if(hadAccount)setFeedback({tone:'error',message:'Your session ended. Sign in again.'});}
+            else if(hadAccount)setFeedback({tone:'error',message:'Your session ended. Sign in again.'});
+            else if(explicit)setFeedback({tone:'info',message:'You are signed out. Sign in, or open the latest verification or password-reset link in this browser.'});}
           else setFeedback({tone:'error',message:authFailure(response.status)});
           return false;
         }
@@ -127,6 +132,8 @@ export function AccountPanel() {
         const changed=currentAccount.current?.userId!==session.account.userId;
         currentAccount.current=session.account;setAccount(session.account);setRecovery(session.passwordRecovery);
         if(changed||expectedAccountId){setFeedback(expectedAccountId?null:callbackFeedback.current);callbackFeedback.current=null;setReauthSeconds(0);reauthUntil.current=0;}
+        if(explicit){callbackFeedback.current=null;setFeedback({tone:'success',message:session.passwordRecovery
+          ?'Password-recovery session verified. Choose a new password below.':'Your current sign-in is verified.'});}
         const destination=selectedPlanReturn(selected.current,session.account.userId,session.passwordRecovery);
         const sensitiveHandoff=['#forgot-password','#reset-password'].includes(window.location.hash);
         if(destination&&!returned.current&&!sensitiveHandoff){
@@ -141,7 +148,7 @@ export function AccountPanel() {
         return false;
       }finally{
         clearTimeout(deadline);if(current())setLoading(false);
-        if(sessionController.current===controller)sessionController.current=null;
+        if(sessionController.current===controller){sessionController.current=null;if(alive.current)setCheckingSession(false);}
       }
     };
     restoreSession.current=readSession;void readSession();
@@ -176,19 +183,22 @@ export function AccountPanel() {
     };
   }, []);
   async function submit(action: string, values: object = {}) {
-    if(inFlight.current||(verificationAction(action)&&resendUntil.current>Date.now())
+    if(inFlight.current||(emailAction(action)&&resendUntil.current>Date.now())
       ||(action==='google'&&google!=='enabled')||(action==='reauthenticate'&&reauthUntil.current>Date.now()))return;
     if('expectedAccountId' in values&&values.expectedAccountId!==currentAccount.current?.userId)return;
     callbackFeedback.current=null;if(action==='login')returned.current=false;
     const failureNotice=['change-password','reset-password'].includes(action)?'Password update could not be confirmed. Do not repeat it automatically. Check sign-in with the new password or use the explicit recovery flow.':uncertainNotice;
     // A restoration read may not replace a newer explicit submission's feedback.
     ++sessionEpoch.current;sessionController.current?.abort();sessionController.current=null;
+    setCheckingSession(false);
     const epoch=++writeEpoch.current,current=()=>alive.current&&writeEpoch.current===epoch;
     inFlight.current = true;setPendingAction(action);setLoading(false);
     setFeedback({tone:'info',message:verificationAction(action)?'Sending verification email…':'Please wait…'});
     const controller=new AbortController();writeController.current=controller;
     const deadline=setTimeout(()=>{
       controller.abort();if(current()){
+        ++sessionEpoch.current;sessionController.current?.abort();sessionController.current=null;setCheckingSession(false);
+        if(emailAction(action))startResendCooldown();
         setFeedback({tone:'error',message:failureNotice});setPendingAction(null);setVisible(false);
         inFlight.current=false;if(writeController.current===controller)writeController.current=null;
       }
@@ -200,7 +210,7 @@ export function AccountPanel() {
       const data = await response.json();
       if (!current() || controller.signal.aborted) return;
       if (!response.ok) {
-        if(response.status===429&&verificationAction(action))startResendCooldown();
+        if(response.status===429&&emailAction(action))startResendCooldown();
         setFeedback({tone:'error',message:authFailure(response.status,action,data?.code)});return;
       }
       if(action==='google'){window.location.assign(safeGoogleRedirect(data));return;}
@@ -227,12 +237,15 @@ export function AccountPanel() {
       }
       if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).length!==1||data.message!==emailNotice)throw new Error('Invalid response.');
       const email='email' in values?values.email:undefined,masked=maskedEmail(email);
+      if(emailAction(action))startResendCooldown();
       if(verificationAction(action)){
-        startResendCooldown();verificationEmail.current=typeof email==='string'?email.trim():'';setVerificationReady(Boolean(masked));
+        verificationEmail.current=typeof email==='string'?email.trim():'';setVerificationReady(Boolean(masked));
       }
       setFeedback({tone:'success',message:action==='signup'?signupNotice:emailNotice,maskedEmail:masked,
-        ...(verificationAction(action)?{detail:'For eligible requests only. This does not confirm whether an account exists or guarantee inbox delivery. Open the latest link in this same browser.'}:{})});
-    } catch { if (current()&&!controller.signal.aborted) setFeedback({tone:'error',message:failureNotice}); }
+        ...(emailAction(action)?{detail:action==='forgot-password'
+          ?'This does not confirm whether an account exists or guarantee delivery. Check your inbox and spam folder. Open the latest reset link in this browser, then choose a new password.'
+          :'For eligible requests only. This does not confirm whether an account exists or guarantee inbox delivery. Open the latest link in this same browser.'}:{})});
+    } catch { if (current()&&!controller.signal.aborted){if(emailAction(action))startResendCooldown();setFeedback({tone:'error',message:failureNotice});} }
     finally {
       clearTimeout(deadline);if(writeDeadline.current===deadline)writeDeadline.current=null;
       if(writeController.current===controller)writeController.current=null;
@@ -288,7 +301,7 @@ export function AccountPanel() {
     </> : <>
       <div className="account-auth-brand" aria-hidden="true">C</div><p className="account-ui-kicker">CLUERA AI · TEST WORKSPACE</p>
       <h2>{mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create an account' : mode==='resend-verification'?'Resend verification':'Reset your password'}</h2>
-      <p className="account-auth-description">{mode === 'signup' ? 'One account for your desktop workspace and shared credits.' : mode === 'forgot-password' ? 'We’ll send a recovery link to your verified email.' : mode==='resend-verification'?'Request a new verification link for your pending signup.':'Welcome back. Continue to your workspace securely.'}</p>
+      <p className="account-auth-description">{mode === 'signup' ? 'One account for your desktop workspace and shared credits.' : mode === 'forgot-password' ? 'Request a recovery link for your email. Open the latest eligible link in this browser.' : mode==='resend-verification'?'Request a new verification link for your pending signup.':'Welcome back. Continue to your workspace securely.'}</p>
       <form aria-describedby="account-auth-feedback" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
         const values={email:String(data.get('email')??''),...(!emailOnly?{password:String(data.get('password')??'')}:{})};
@@ -299,8 +312,8 @@ export function AccountPanel() {
         {!emailOnly ? <label>Password<span className="account-auth-password"><input key={mode} name="password" type={visible ? 'text' : 'password'} minLength={mode === 'signup' ? MIN_PASSWORD_LENGTH : 1} maxLength={MAX_PASSWORD_LENGTH}
           autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} required disabled={busy}/><button type="button" disabled={busy} aria-pressed={visible} aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(value => !value)}>{visible ? 'Hide' : 'Show'}</button></span></label> : null}
         {mode === 'signup' ? <p>Use at least {MIN_PASSWORD_LENGTH} characters. Verify your email before signing in.</p> : null}
-        <button className="button" type="submit" disabled={busy||verificationCoolingDown}>{busy ? verificationAction(pendingAction??'')?'Sending verification email…':'Please wait…'
-          : verificationCoolingDown?`Wait at least ${resendSeconds}s before another request`:mode === 'login' ? 'Sign in' : mode === 'signup'||mode==='resend-verification' ? 'Send verification email' : 'Send reset email'}</button>
+        <button className="button" type="submit" disabled={busy||emailCoolingDown}>{busy ? verificationAction(pendingAction??'')?'Sending verification email…':'Please wait…'
+          : emailCoolingDown?`Wait at least ${resendSeconds}s before another request`:mode === 'login' ? 'Sign in' : mode === 'signup'||mode==='resend-verification' ? 'Send verification email' : 'Send reset email'}</button>
       </form>
       {feedbackRegion}
       {verificationReady&&verificationAction(mode)?<div className="account-auth-resend">
@@ -317,5 +330,7 @@ export function AccountPanel() {
           {value === 'login' ? 'Back to sign in' : value === 'signup' ? 'Create account' : value==='resend-verification'?'Resend verification':'Forgot password?'}</button>)}</div>
       <p className="account-auth-safety">Verify your email before desktop sign-in. Provider credentials remain server-side; this is isolated staging, not a production release.</p>
     </>}
+    <AccountAuthHelp signedIn={Boolean(account)} recovery={recovery} busy={busy} checking={checkingSession}
+      onCheckStatus={()=>void restoreSession.current(undefined,()=>true,true)}/>
   </section>;
 }

@@ -1,8 +1,16 @@
 import {createHash} from 'node:crypto';
-import {expect,it,vi} from 'vitest';
+import {request as httpRequest} from 'node:http';
+import {afterEach,expect,it,vi} from 'vitest';
 import {googleAccountLogin,NATIVE_GOOGLE_CALLBACK} from '../src/main/accounts/GoogleAccountLogin';
 import {AccountApi} from '../src/main/accounts/AccountApi';
 import {AccountSessionManager} from '../src/main/accounts/AccountSessionManager';
+afterEach(()=>vi.useRealTimers());
+function callbackStatus(path:string):Promise<number|undefined>{
+ return new Promise((resolve,reject)=>{
+  const request=httpRequest({host:'127.0.0.1',port:43822,method:'GET',path},response=>{response.resume();response.on('end',()=>resolve(response.statusCode));});
+  request.on('error',reject);request.end();
+ });
+}
 it('binds a browser callback to main-only PKCE/state; rejects foreign and malformed callbacks',async()=>{
  const exchange=vi.fn(async()=>({accessToken:'synthetic-access',refreshToken:'synthetic-refresh',userId:'synthetic-user',validForMilliseconds:3600000}));
  let challenge='';
@@ -12,6 +20,10 @@ it('binds a browser callback to main-only PKCE/state; rejects foreign and malfor
   expect((await fetch(`${NATIVE_GOOGLE_CALLBACK}?state=${'x'.repeat(64)}&code=bad`)).status).toBe(400);
   expect((await fetch(`${NATIVE_GOOGLE_CALLBACK}?state=${encodeURIComponent('é'.repeat(64))}&code=bad`)).status).toBe(400);
   const callback=new URL(url.searchParams.get('redirect_to')!);callback.searchParams.set('code','synthetic-one-use-code');
+  expect(await callbackStatus('//[')).toBe(400);
+  expect(await callbackStatus(callback.toString())).toBe(400);
+  const duplicate=new URL(callback);duplicate.searchParams.append('state',duplicate.searchParams.get('state')!);
+  expect((await fetch(duplicate)).status).toBe(400);
   expect((await fetch(callback,{headers:{origin:'https://untrusted.invalid'}})).status).toBe(400);
   const response=await fetch(callback);expect(response.status).toBe(200);expect(await response.text()).not.toContain('synthetic-one-use-code');
  },new AbortController().signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never);
@@ -23,6 +35,32 @@ it('cancellation closes the listener and does not exchange or restore late crede
  const owner=new AbortController(),exchange=vi.fn();
  await expect(googleAccountLogin(async()=>{owner.abort();},owner.signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never)).rejects.toThrow();
  expect(exchange).not.toHaveBeenCalled();
+});
+it('cancels and releases the listener when the OS browser opener never settles',async()=>{
+ const owner=new AbortController(),exchange=vi.fn();let started!:()=>void;
+ const opened=new Promise<void>(resolve=>{started=resolve;});
+ const attempt=googleAccountLogin(()=>{started();return new Promise<void>(()=>undefined);},owner.signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never);
+ const rejected=expect(attempt).rejects.toThrow();await opened;owner.abort();await rejected;
+ expect(exchange).not.toHaveBeenCalled();
+});
+it('enforces the browser deadline even if the OS opener ignores it',async()=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+ const exchange=vi.fn();let started!:()=>void;
+ const opened=new Promise<void>(resolve=>{started=resolve;});
+ const attempt=googleAccountLogin(()=>{started();return new Promise<void>(()=>undefined);},new AbortController().signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never);
+ const rejected=expect(attempt).rejects.toThrow();await opened;await vi.advanceTimersByTimeAsync(300000);await rejected;
+ expect(exchange).not.toHaveBeenCalled();
+});
+it('accepts a valid callback while the OS opener remains pending and forwards owner cancellation to exchange',async()=>{
+ const owner=new AbortController();
+ const exchange=vi.fn(async()=>({accessToken:'synthetic-access',refreshToken:'synthetic-refresh',userId:'synthetic-user',validForMilliseconds:3600000}));
+ const attempt=googleAccountLogin(target=>{
+  const callback=new URL(new URL(target).searchParams.get('redirect_to')!);callback.searchParams.set('code','synthetic-code');
+  void fetch(callback).then(response=>response.body?.cancel());
+  return new Promise<void>(()=>undefined);
+ },owner.signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never);
+ expect((await attempt).accessToken).toBe('synthetic-access');
+ expect(exchange).toHaveBeenCalledWith('synthetic-code',expect.any(String),owner.signal);
 });
 it('a browser callback completes desktop login through the real API parser with an opaque refresh token',async()=>{
  const userId='00000000-0000-4000-8000-000000000001';let saved:unknown=null;
