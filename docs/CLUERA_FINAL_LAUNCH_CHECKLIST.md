@@ -2,11 +2,52 @@
 
 Updated October 20, 2026 (IST). **Full commercial launch: NO-GO.** Remote Desktop is explicitly excluded from launch at the owner's request. Existing SMTP, Supabase keys/URLs, registration, Admin role and MFA enrollment are complete; do not repeat them.
 
-This is the overall launch checklist. For the latest billing status and the minimal payment setup sequence, use [Billing final setup](CLUERA_BILLING_FINAL_SETUP.md). Older next-action instructions below are historical where superseded by that guide.
+This is the overall launch checklist. Use [Windows V1 release and acceptance](CLUERA_WINDOWS_V1_RELEASE.md) for the new installer and GitHub distribution, and [Billing final setup](CLUERA_BILLING_FINAL_SETUP.md) for payment acceptance. Older next-action instructions below are historical where superseded by those guides.
 
 The latest October 20 billing follow-up is documented in [Billing final setup](CLUERA_BILLING_FINAL_SETUP.md). **Test remains active; Live charging stays off.** The configured merchant diagnostic verified the retained order as untouched and eligible for same-order recovery at 07:57:30 UTC. The application rechecks eligibility before resuming. Cancellation/native recurring dependencies are now installed but disabled. Separate Live runtime, schema proposal, grant provenance, spending-bank controls, worker and Admin paths are implemented for review; the Live schema/profile and charging are not activated. Replacing keys is insufficient.
 
 Latest billing runtime checkpoint: [`39d35d92e5c7dce038d73eb93ec1eecaf55f0a53`](https://github.com/kireetikotturu/Cluera-AI/commit/39d35d92e5c7dce038d73eb93ec1eecaf55f0a53); Vercel `dpl_A4rwpPsXbGyLUfzzpm7MAivApgZr` READY/canonical and Render `dep-dbbit567bikc73aob0a0` LIVE. [CI 39397995331](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39397995331) passed **2,369 web, 417 desktop and 154 preparation tests**; 22 web and one desktop opt-in tests remain skipped. Typechecks/builds/audits and the 828-file source scan pass. Public boundaries passed 16/16 at 09:10:51 UTC plus 10/10 Live-disabled route checks. Browser financial requests were synthetic and intercepted. [The final billing guide](CLUERA_BILLING_FINAL_SETUP.md) records exact evidence and remaining private steps. Later documentation-only revisions may preserve this exact runtime.
+
+## Windows V1: new immutable 1.0.8 candidate
+
+**BUILT / STATICALLY VERIFIED / UNSIGNED TEST. Real-device acceptance and public distribution are pending.** This replaces 1.0.7 as the current candidate; all older installers remain preserved.
+
+~~~text
+desktop/release-cluera-staging/1.0.8/ClueraAITestSetup-1.0.8.exe
+Product: Cluera AI
+Version / FileVersion: 1.0.8
+Bytes: 121923717
+SHA-256: f8a4536fd130f7c6f7675207d1ea738e9f74c5cdd4703542d3c9f695b39c3927
+Authenticode: NotSigned — unsigned TEST only
+
+Blockmap: ClueraAITestSetup-1.0.8.exe.blockmap
+Bytes: 128256
+SHA-256: b76540696ae508670124f1c65b7f1e1a5c6f6f5154c8c06d32b3be7fdb51e581
+~~~
+
+The candidate contains the latest account/Google/session fixes, shared trial/paid-balance integration and existing Gemini/Deepgram, audio, screenshots, context, history, settings and shortcut functionality. New repairs add bounded post-checkout balance observation, hard update transport/body deadlines, safe workspace-initialization retry and fencing of late account responses. Clean builds remove only generated `desktop/dist`, preventing stale renderer assets in the package. Provider gates remain enforced; Remote Desktop remains excluded.
+
+Local verification: **426 desktop tests passed / one opt-in live test skipped**, both TypeScript checks, clean production code build, **154 preparation tests**, desktop npm audit **zero vulnerabilities**, artifact scan **209 files / zero findings**. The actual package passes **2,268 ASAR entries, 97 compiled-file comparisons, three trust-resource comparisons and six security fuses**. The Windows executable's embedded ASAR-header hash and **all 1,937 archive-file hashes/block hashes** match. Its extracted manifest verifier passes **10 offline synthetic/adversarial cases**, with no application or installer execution.
+
+Built-renderer browser checks passed login at 420×360, 800×600 and 1280×800, simulated balance updates, session-editor/footer at 420×360 and 800×600, settings and logout. No horizontal overflow or page errors were observed. These used synthetic IPC and blocked external service requests, not real credentials, payments or hardware. The first expanded archive check failed because its ASAR lookup used POSIX paths on Windows; the checker was corrected and the **same unchanged installer** then passed. That failed check is not relabelled a pass.
+
+Reviewed Windows source: [`bf3e35646ebf25144c0fb278e9e56ecd1ed75ca2`](https://github.com/kireetikotturu/Cluera-AI/commit/bf3e35646ebf25144c0fb278e9e56ecd1ed75ca2), tree `4a2f12af2679a34aa05f354d3ba6a26f83d72070`: **15 explicitly reviewed paths, 831 blobs, 816 prior blobs retained unchanged, no deletions**. Web/backend runtime source is unchanged. Unrelated local drafts are excluded.
+
+**Hosted checkpoint, October 20, 10:10–10:14 UTC / 15:40–15:44 IST:**
+
+| Evidence | Result |
+| --- | --- |
+| Exact-source CI | [Run 39405727874](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39405727874), **success**, source `bf3e35646ebf25144c0fb278e9e56ecd1ed75ca2`: **2,369 web passed / 22 skipped; 426 desktop passed / one skipped; 154 preparation passed**. All web/relay/desktop typechecks, code builds and dependency audits pass. Exact hosted source scan: **831 files / zero findings**; hosted web artifact scan passes. |
+| Website | Existing Vercel `dpl_a2i6sMcSGQBW67YubcositDXTVCz`, **READY**, source `b766b0641e4dfe2eb7b44f2f614c52523784b4c7`; canonical alias independently read back. No web runtime file changed in this Windows release, so no unnecessary website redeployment or environment change was made. |
+| Relay | Render `dep-dbbjqujm8hqs739147bg`, **LIVE**, source `bf3e35646ebf25144c0fb278e9e56ecd1ed75ca2`; health revision checked. No error-level entries in the bounded 10:07:45–10:09:10 UTC rollout window; this is not long-term uptime evidence. |
+| Public boundaries | **16/16 credential-free GET checks passed** at `2026-10-20T10:10:06.054Z`, including enabled Google, anonymous account/credits/checkout/history/Admin denials, unapproved-release 404 and exact relay revision. |
+| Preservation | All **275 desktop source blobs** match the reviewed tree. All **12 retained EXE/blockmap artifacts** rehash unchanged. Main remains `3d813f8f88cb3adacffe9afb889efa8ce07476bc`. |
+
+A subsequent documentation-only staging commit may advance the branch and relay revision while preserving every runtime blob above. The exact Windows source and accepted CI remain pinned here. The installer hash identifies the built bytes; a hosted code build alone is not an installer build or a device acceptance.
+
+At **10:02:24 UTC / 15:32:24 IST**, the read-only database check found **2 customers, 2 original trials, 0 release records, 0 provider records/enabled providers and 0 active usage runs**. No schema, secret, financial flag, provider activation, paid plan or Admin release approval changed. The existing private source repository remains private. No installer was installed, run or uploaded.
+
+**Owner actions:** privately install and accept this exact 1.0.8 hash; finish provider custody and deliberate bounded provider/device testing; accept the retained Test payment and shared-device balance; then explicitly approve distribution. Use the [Windows guide](CLUERA_WINDOWS_V1_RELEASE.md) to publish the accepted EXE/blockmap/checksums in a separate Cluera-only GitHub binary repository, independently download/rehash, and approve the exact release through existing fresh-MFA Admin. Public download remains unavailable until those steps pass. The owner chose unsigned TEST distribution for now; later Authenticode signing uses a new immutable version.
 
 ## What is complete and what is gated
 
@@ -19,7 +60,7 @@ Latest billing runtime checkpoint: [`39d35d92e5c7dce038d73eb93ec1eecaf55f0a53`](
 | Monthly financial limitation | Internal paid-time preservation does not prove that Razorpay can defer/restart every supported mandate without another charge/refund. A supported method-specific financial design and owner acceptance are required before opening queues/upgrades or restoring future Pro billing. No speculative reschedule PATCH or automatic subscription recreation exists. |
 | History and Admin | Owner-bound customer history is deployed. SELECT-only Admin financial reporting is deployed and its schema/read flag applied; amounts cover validated local records on the current page, never an unresolved order's expected price. It is not settlement proof or a tax invoice. |
 | AI | Server Gemini/Deepgram, encrypted credential vault, model controls, cancellation and shared metering are implemented. No customer BYOK. Provider metadata START/terminal recording and Admin reads are deployed; schema/read flag applied, **collection and providers remain off**. Costs remain explicitly unknown without verified rates/invoices. |
-| Windows | Account isolation, secure token storage, existing transcription/screenshots/context/settings, update trust and packaged publisher-pin validation are implemented. Immutable 1.0.7 unsigned TEST candidate built/static-verified. Real device acceptance and approved distribution remain pending. |
+| Windows | Account isolation, secure token storage, existing transcription/screenshots/context/settings, update trust and packaged publisher-pin validation are implemented. New immutable **1.0.8 unsigned TEST candidate built/static-verified**, including later Auth and Windows fixes. Real device acceptance and approved distribution remain pending. |
 | Operations | SELECT-only health RPC applied; bounded fixed-target monitor reports stale admission, backlogs, quarantine and unsettled usage. It never performs recovery. Reliable independent scheduling, alert delivery, retention, restore drill and capacity acceptance remain gates. |
 
 No label above establishes **PRODUCTION READY**. Source, synthetic tests, hosted deployment and owner acceptance are distinct.
@@ -98,9 +139,9 @@ The existing order is `order_TpRplT79SeFnTp`. A protected GET-only diagnostic us
 
 Technical evidence: [history](CLUERA_BILLING_HISTORY_REVIEW.md), [same-order recovery](CLUERA_EXISTING_CHECKOUT_RECOVERY.md), [Admin report](cluera-admin-financial-report-review-2026-10-19.md), [provider metadata](CLUERA_PROVIDER_TELEMETRY_REVIEW.md), [operations](CLUERA_OPERATIONS_HEALTH.md), [native recurring limitation](CLUERA_NATIVE_RECURRING_REVIEW.md).
 
-## Windows candidate and automated verification
+## Historical Windows 1.0.7 checkpoint
 
-Current immutable candidate:
+Retained historical candidate; use 1.0.8 above for new acceptance:
 
 ~~~text
 desktop/release-cluera-staging/1.0.7/ClueraAITestSetup-1.0.7.exe
@@ -140,7 +181,7 @@ Do these in order when the stated prerequisites are satisfied. Never paste passw
 
 7. **Provision disabled providers, then deliberately authorize bounded spending.** After custody/synthetic verification, enable Vercel `CLUERA_PROVIDER_VAULT_ENABLED=true` and Render `CLUERA_AI_BOOTSTRAP_MODE=admin-vault`, reload the reviewed services and verify metadata/denials. Use existing [Admin/MFA](https://cluera-ai-staging.vercel.app/account/admin) to save Gemini/Deepgram keys disabled, test metadata and approve compatible default models while providers remain disabled. Before enabling a provider or starting the first accepted request, deliberately accept bounded spending and enable Render `CLUERA_PROVIDER_TELEMETRY_ENABLED=true` only with its applied schema and accepted vault mode, so the first accepted operation is recorded. Then deliberately enable the intended provider. Test text, screenshot, both audio channels, cancel/interruption, expiry, disable/outage, exhausted balance and shared devices. Verify durable START/terminal or truthful UNCONFIRMED metadata without content/secrets. Cost remains unavailable until accepted rates/invoices exist. If custody/verification fails, return to auth-only and preserve receipts.
 
-8. **Accept the exact Windows candidate on a real device.** Verify the 1.0.7 hash using `Get-FileHash -Algorithm SHA256`, install normally, sign in/restart, verify secure restoration, logout/A-B isolation and shared trial/paid balances. Check high-DPI/bottom controls, shortcuts, files/context/screenshots, both audio channels, assist/cancel and usage settlement. Use a genuinely newer approved version for update acceptance. Remote Desktop is excluded. This candidate is unsigned TEST software.
+8. **Accept the exact Windows candidate on a real device.** Verify the 1.0.8 hash using `Get-FileHash -Algorithm SHA256`, install normally, sign in/restart, verify secure restoration, logout/A-B isolation and shared trial/paid balances. Check high-DPI/bottom controls, shortcuts, files/context/screenshots, both audio channels, assist/cancel and usage settlement. Use a genuinely newer approved version for update acceptance. Remote Desktop is excluded. This candidate is unsigned TEST software.
 
 9. **Approve immutable distribution after device acceptance.** Choose Cluera-only asset hosting, independently download and rehash exact bytes/size, then deliberately approve that release in fresh-MFA Admin. Verify product/audience/channel/version/origin/hash and download/update behavior. Commercial certificate custody, exact bundled publisher pin and a new signed immutable build require a separate owner decision. No public binary was uploaded or approved.
 
