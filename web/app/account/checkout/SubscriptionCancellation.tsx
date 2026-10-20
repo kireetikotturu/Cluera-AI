@@ -3,16 +3,17 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { z } from 'zod';
 import { cancellationResource, cancellationResult, type CancellationCommand } from '../../../lib/payments/cluera/cancellationContracts';
+import { checkoutRequest } from '../../../lib/payments/cluera/checkoutRequest';
 
-const endpoint = '/api/account/payments/cluera/cancellation';
 /** Only explicit customer confirmation creates a command. Once sent, every
  * subsequent action verifies the same operation using GET; no mutation retry. */
-export default function SubscriptionCancellation({ accountId, subscriptionId, enabled = false, disabled = false }: {
-  accountId: string; subscriptionId: string; enabled?: boolean; disabled?: boolean;
+export default function SubscriptionCancellation({ accountId, subscriptionId, enabled = false, disabled = false, mode='test' }: {
+  accountId: string; subscriptionId: string; enabled?: boolean; disabled?: boolean; mode?:'test'|'live';
 }) {
+  const endpoint=mode==='live'?'/api/account/payments/cluera/live/cancellation':'/api/account/payments/cluera/cancellation';
   const statusId = useId(), generation = useRef(0), pending = useRef<AbortController | null>(null);
-  const identity = useRef({ accountId, subscriptionId, enabled, disabled });
-  identity.current = { accountId, subscriptionId, enabled, disabled };
+  const identity = useRef({ accountId, subscriptionId, enabled, disabled, mode });
+  identity.current = { accountId, subscriptionId, enabled, disabled, mode };
   const operation = useRef<string | null>(null);
   const [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CancellationCommand | null>(null), [message, setMessage] = useState('');
@@ -21,7 +22,7 @@ export default function SubscriptionCancellation({ accountId, subscriptionId, en
     generation.current++; pending.current?.abort(); pending.current = null; operation.current = null;
     setConfirming(false); setBusy(false); setResult(null); setMessage('');
     return () => { generation.current++; pending.current?.abort(); pending.current = null; };
-  }, [accountId, subscriptionId, enabled]);
+  }, [accountId, subscriptionId, enabled, mode]);
 
   async function submit(check: boolean) {
     if (!valid || !enabled || disabled || pending.current || (!check && operation.current)) return;
@@ -30,9 +31,9 @@ export default function SubscriptionCancellation({ accountId, subscriptionId, en
     operation.current ??= crypto.randomUUID(); const id = operation.current;
     pending.current = controller; setBusy(true); setConfirming(false);
     const current = () => generation.current === epoch && !controller.signal.aborted && identity.current.accountId === owner
-      && identity.current.subscriptionId === resource && identity.current.enabled && !identity.current.disabled;
+      && identity.current.mode===mode && identity.current.subscriptionId === resource && identity.current.enabled && !identity.current.disabled;
     try {
-      const response = await fetch(check ? `${endpoint}?expectedAccountId=${encodeURIComponent(owner)}&operationId=${encodeURIComponent(id)}` : endpoint,
+      const response = await checkoutRequest(check ? `${endpoint}?expectedAccountId=${encodeURIComponent(owner)}&operationId=${encodeURIComponent(id)}` : endpoint,
         { method: check ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
           ...(check ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedAccountId: owner, operationId: id, subscriptionId: resource }) }) });

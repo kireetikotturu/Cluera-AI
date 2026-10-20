@@ -1,5 +1,7 @@
 # Cluera Razorpay billing: staging readiness and owner guide
 
+**Superseded setup instructions:** use [CLUERA_BILLING_FINAL_SETUP.md](CLUERA_BILLING_FINAL_SETUP.md) for the latest October 20 engineering, database and owner steps. The configured-merchant diagnostic subsequently verified the retained order as untouched and eligible at 07:57:30 UTC. Monthly dependency SQL is now applied with processing disabled. An isolated Live implementation and unapplied schema proposal are prepared; charging remains off. The older observations and deployment checkpoint below remain historical evidence for their exact source.
+
 Updated October 20, 2026 (IST). **STAGING ONLY**, as confirmed by the owner during this review. **LIVE READY: NO.** No payment, mandate, capture, refund, replay, credit grant, financial migration, flag activation or public release is authorized by this document.
 
 Use only [Cluera staging](https://cluera-ai-staging.vercel.app/pricing), [Cluera Supabase](https://supabase.com/dashboard/project/yhnqlfcgrmckhyjdxegg), the existing Cluera Vercel project and the Cluera Render relay. Signup, email/password and Google OAuth remain in place. Existing SMTP, application keys, Admin role and MFA enrollment do not need repeating. Remote Desktop is excluded.

@@ -4,11 +4,13 @@ import type { PaymentRpc } from '../core/types';
 import { billingOwner, billingRpc, clueraIntakeEnabled } from './config';
 import { bindingSchema, ClueraBillingError, type BillingEvidence, type Binding } from './contracts';
 import { clueraRecurringScheduleSchema, ClueraScheduleError, planClueraRecurringEvent } from './recurringSchedule';
+import { liveBillingProfile } from './modeProfile';
 
 export function clueraNativeRecurringEnabled(env=process.env) {
   return env.CLUERA_RECURRING_SCHEDULE_ENABLED==='true'&&clueraIntakeEnabled(env)&&schedulerEnabled(env)&&env.SIGMAROUND_PAYMENT_PROVIDER==='razorpay';
 }
 export function clueraNativeRecurringUserAllowed(userId:string,env=process.env) {
+  if (liveBillingProfile(env)) return clueraNativeRecurringEnabled(env) && z.uuid().safeParse(userId).success;
   const ids=(env.SIGMAROUND_PAYMENT_TESTER_IDS??'').split(',').map(value=>value.trim());
   return clueraNativeRecurringEnabled(env)&&ids.length<=50&&ids.every(value=>z.uuid().safeParse(value).success)&&ids.includes(userId);
 }

@@ -5,7 +5,9 @@ COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY backend/main.ts backend/build.mjs backend/tsconfig.json ./
 COPY backend/billingTransport.ts ./
+COPY backend/liveBillingTransport.ts ./
 COPY shared/billingDispatch.ts /app/shared/billingDispatch.ts
+COPY shared/liveBillingDispatch.ts /app/shared/liveBillingDispatch.ts
 COPY web/lib /app/web/lib
 COPY desktop/src/shared /app/desktop/src/shared
 RUN npm run typecheck && npm run build

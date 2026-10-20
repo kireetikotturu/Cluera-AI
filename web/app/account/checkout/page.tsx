@@ -9,9 +9,8 @@ import RazorpayCheckout from './RazorpayCheckout';
 import { razorpayCheckoutEnabled } from '../../../lib/payments/core/config';
 import {STAGING_DATABASE,STAGING_SITE} from '../../../lib/accountRelay/config';
 import ClueraCheckoutClient from './ClueraCheckoutClient';
-import {clueraCheckoutEnabled} from '../../../lib/payments/cluera/config';
 import {clueraBillingHistoryEnabled} from '../../../lib/payments/cluera/history';
-import {clueraCancellationEnabled} from '../../../lib/payments/cluera/cancellation';
+import {billingUiCapabilities} from '../../../lib/payments/cluera/billingUi';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Cluera sandbox checkout', robots: { index: false, follow: false } };
@@ -21,9 +20,10 @@ export default async function CheckoutPage() {
   if(process.env.CLUERA_BILLING_V2_ENABLED==='true'){
     if(process.env.SIGMAROUND_ACCOUNTS_ENABLED!=='true'||process.env.SIGMAROUND_ACCOUNT_ORIGIN!==STAGING_SITE
       ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
+    const billing=billingUiCapabilities();
     return <main className="account-page"><h1>Buy Cluera credits</h1>
-      <p>Test workspace. Purchases are limited to approved Test accounts.</p>
-      <ClueraCheckoutClient enabled={clueraCheckoutEnabled()} historyEnabled={clueraBillingHistoryEnabled()} cancellationEnabled={clueraCancellationEnabled()} firstSubscriptionOnly/>
+      <p>{billing.mode==='test'?'Test workspace. Purchases are limited to approved Test accounts.':'Review the price and renewal terms before continuing to payment.'}</p>
+      <ClueraCheckoutClient key={billing.mode} {...billing} firstSubscriptionOnly/>
       <a href="/account">Return to your account</a></main>;
   }
   // Presentation only: a paused new Cluera rollout must not need old Paddle

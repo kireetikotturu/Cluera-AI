@@ -11,6 +11,7 @@ import { activeSession, assertAccountOrigin, rateLimit } from '../../accounts/ha
 import { stagingAccountConfig } from '../../accounts/workspace';
 import { readClueraRawBody } from './events';
 import { json } from '../../http';
+import { liveBillingProfile, liveRuntimeApproved } from './modeProfile';
 
 export { cancellationInput } from './cancellationContracts';
 type Account = { userId: string; sessionId: string };
@@ -20,6 +21,8 @@ type Gateway = Pick<ReturnType<typeof clueraRazorpayAdapter>, 'cancelFuture' | '
  * purchase pauses must not disable an already approved cancellation facility. */
 export function clueraCancellationEnabled(env = process.env) {
   try { clueraBillingConfig(env); } catch { return false; }
+  if (liveBillingProfile(env)) return clueraBillingV2Enabled(env)
+    && env.CLUERA_SUBSCRIPTION_CANCELLATION_ENABLED === 'true' && liveRuntimeApproved(env, 'intake');
   return clueraBillingV2Enabled(env) && env.CLUERA_SUBSCRIPTION_CANCELLATION_ENABLED === 'true'
     && env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED === 'true' && env.SIGMAROUND_PAYMENT_PROVIDER === 'razorpay'
     && (!env.VERCEL_ENV || env.VERCEL_ENV === 'production')
@@ -28,6 +31,7 @@ export function clueraCancellationEnabled(env = process.env) {
     && (!env.VERCEL_ORG_ID || env.VERCEL_ORG_ID === 'team_AksnPXhi2VBXI5UsY2xBIakc');
 }
 function allowed(user: string, env: NodeJS.ProcessEnv) {
+  if (liveBillingProfile(env)) return clueraCancellationEnabled(env) && z.uuid().safeParse(user).success;
   const ids = (env.SIGMAROUND_PAYMENT_TESTER_IDS ?? '').split(',').map(value => value.trim());
   return clueraCancellationEnabled(env) && ids.length <= 50 && ids.every(value => z.uuid().safeParse(value).success) && ids.includes(user);
 }

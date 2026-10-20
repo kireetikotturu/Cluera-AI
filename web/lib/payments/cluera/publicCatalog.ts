@@ -48,6 +48,15 @@ export const clueraBoundCheckout = z.object({ payment: z.object({
 }).strict().refine(row => row.kind === 'PACK'
   ? row.orderId !== null && row.subscriptionId === null
   : row.subscriptionId !== null && row.orderId === null) }).strict();
+/** The Test contract remains Test-only. A server-selected Live page opts into
+ * its own key-prefix validator; a response cannot switch the browser's mode. */
+export function clueraBoundCheckoutForMode(mode: 'test' | 'live') {
+  return mode === 'test' ? clueraBoundCheckout : z.object({
+    payment: clueraBoundCheckout.shape.payment.safeExtend({
+      keyId: z.string().regex(/^rzp_live_[A-Za-z0-9]{8,64}$/),
+    }),
+  }).strict();
+}
 export type ClueraBoundCheckout = z.infer<typeof clueraBoundCheckout>['payment'];
 
 export function clueraPrice(amountPaise: number): string {

@@ -17,6 +17,7 @@ export function razorpayConfig(env = process.env) {
   return { keyId, keySecret, webhookSecret, accountId };
 }
 export function razorpayCheckoutEnabled(env = process.env): boolean {
+  if (env.CLUERA_BILLING_UI_MODE === 'live') return false;
   try { razorpayConfig(env); } catch { return false; }
   return env.CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED === 'true' && env.SIGMAROUND_PAYMENT_PROVIDER === 'razorpay' && env.SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED === 'true'
     && env.SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED === 'false';

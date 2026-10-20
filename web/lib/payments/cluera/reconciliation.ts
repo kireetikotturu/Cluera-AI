@@ -6,6 +6,7 @@ import { billingOwner, billingRpc, clueraIntakeEnabled } from './config';
 import { bindingSchema, ClueraBillingError, eventSchema, orderId, paymentId } from './contracts';
 import { clueraRazorpayAdapter } from './adapter';
 import { applyClueraNativeRecurringEvent } from './nativeRecurring';
+import { liveBillingProfile } from './modeProfile';
 
 /** One separately leased event. Shared SQL owner/epoch and immutable source IDs prevent double financial writers. */
 export async function reconcileClueraPayment(rpc: PaymentRpc, env = process.env, request: typeof fetch = fetch) {
@@ -19,6 +20,7 @@ export async function reconcileClueraPayment(rpc: PaymentRpc, env = process.env,
     const claimed = z.object({code:z.literal('CLAIMED'),claimId:z.uuid(),legacy:z.boolean(), ...eventSchema.shape}).strict()
       .parse({subscriptionId:null,invoiceId:null,...rawClaim});
     if (claimed.legacy) {
+      if (liveBillingProfile(env)) throw new ClueraBillingError('INVALID');
       if (!claimed.paymentId) throw new ClueraBillingError('PENDING');
       const canonicalOrder = claimed.orderId ?? z.object({id:z.literal(claimed.paymentId),order_id:orderId})
         .parse(await razorpayTransport(env,request)(`/payments/${claimed.paymentId}`)).order_id;
@@ -39,6 +41,7 @@ export async function reconcileClueraPayment(rpc: PaymentRpc, env = process.env,
     if (!resource) throw new ClueraBillingError('PENDING');
     const rawBinding = await billingRpc(rpc,'cluera_billing_binding',{p_resource:resource,p_account_digest:accountDigest});
     if ((rawBinding as {legacy?:unknown})?.legacy === true) {
+      if (liveBillingProfile(env)) throw new ClueraBillingError('INVALID');
       if (!claimed.paymentId) throw new ClueraBillingError('PENDING');
       const legacy = z.object({legacy:z.literal(true),code:z.enum(['BOUND','VERIFIED','REFUNDED']),intentId:z.uuid(),userId:z.uuid(),
         orderId:orderId,offerCode:z.literal('pro_3_hours')}).strict().parse(rawBinding);

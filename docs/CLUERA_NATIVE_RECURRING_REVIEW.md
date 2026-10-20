@@ -1,6 +1,6 @@
 # Cluera native recurring preparation
 
-Status: implemented and locally tested preparation; not activated. Neither financial SQL proposal has been applied. `CLUERA_RECURRING_SCHEDULE_ENABLED` is absent/default false, and the new SQL `native_config.enabled` defaults false. There is no activation RPC. No merchant subscription, charge, capture, refund, plan, credential or production flag was changed by this work.
+Status, October 20 follow-up: implemented; not activated. Cancellation, native recurring, usage-refresh and native history dependencies were applied atomically as `20261020080539_cluera_recurring_dependencies_disabled`, with prior business rows preserved. `CLUERA_RECURRING_SCHEDULE_ENABLED` remains absent/default false and SQL `native_config.enabled` remains false. There is no activation RPC. No merchant subscription, charge, capture, refund, plan, credential or activation flag was changed. Do not reapply these dependencies. Follow [Billing final setup](CLUERA_BILLING_FINAL_SETUP.md) for current acceptance steps and the separate, unapplied Live proposal.
 
 ## Actual runtime path
 
@@ -13,7 +13,7 @@ Status: implemented and locally tested preparation; not activated. Neither finan
 
 ## Database proposals
 
-Review/apply order for a future explicitly accepted rollout:
+Historical dependency order (now installed in the atomic migration above):
 
 1. Existing clean foundation, with customer history/cancellation proposals reviewed separately.
 2. `proposals/cluera-native-recurring.sql`: private RLS schedule/config/outbox/audit tables, service-only receipt snapshot/settlement/commit, pre-purchase check and durable cancellation command RPCs.

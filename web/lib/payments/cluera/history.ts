@@ -10,6 +10,7 @@ import { AccountError } from '../../accounts/config';
 import { activeSession, rateLimit } from '../../accounts/handler';
 import { stagingAccountConfig } from '../../accounts/workspace';
 import { json } from '../../http';
+import { liveBillingProfile } from './modeProfile';
 
 /** Read-only history has a separate, default-disabled schema-readiness gate.
  * It never enables checkout, intake, scheduling or provider spending. */
@@ -62,7 +63,7 @@ export async function handleClueraBillingHistory(request: Request): Promise<Resp
 export async function readClueraBillingHistory(rpc: PaymentRpc,
   account: { userId: string; sessionId: string }, env = process.env) {
   if (!clueraBillingV2Enabled(env)) throw new ClueraBillingError('CONFIGURATION');
-  assertPaymentStaging(env);
+  if (!liveBillingProfile(env)) assertPaymentStaging(env);
   z.uuid().parse(account.userId); z.uuid().parse(account.sessionId);
   const native=env.CLUERA_NATIVE_RECURRING_HISTORY_ENABLED==='true';
   const owner=native?await billingOwner(rpc,env):null;

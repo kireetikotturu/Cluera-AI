@@ -12,6 +12,8 @@ import {razorpayCheckoutAllowed} from '../payments/core/config';
 import {paymentStatus} from '../payments/checkout/service';
 import {clueraBillingStatus} from '../payments/cluera/checkout';
 import {clueraCheckoutAllowed} from '../payments/cluera/config';
+import {billingUiEnvironment} from '../payments/cluera/billingUi';
+import {liveBillingProfile,liveBillingRpc} from '../payments/cluera/modeProfile';
 const ms=z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const schema=z.object({userId:z.uuid(),serverTime:z.iso.datetime({offset:true}),displayName:z.string().max(80),
  availableMilliseconds:ms,reservedMilliseconds:ms,spentMilliseconds:ms,
@@ -32,7 +34,9 @@ const lockSchema=z.union([
 type Rpc=(name:string,args:Record<string,unknown>)=>PromiseLike<{data:unknown;error:unknown;status?:number}>;
 export async function readCredits(rpc:Rpc,account:{userId:string;sessionId:string}):Promise<AccountCredits>{
  const clueraV2=process.env.CLUERA_BILLING_V2_ENABLED==='true';
- const {data,error,status}=await rpc(clueraV2?'cluera_credits_read':'customer_credits_read',{p_user:account.userId,p_session:account.sessionId});
+ const env=clueraV2?billingUiEnvironment():process.env,live=clueraV2?liveBillingProfile(env):undefined;
+ const {data,error,status}=await rpc(live?'cluera_billing_credits_for_mode':clueraV2?'cluera_credits_read':'customer_credits_read',
+  {p_user:account.userId,p_session:account.sessionId,...(live?{p_mode:'live'}:{})});
  if(error)throw new SupabaseOperationError('account.usage',error,status);
  const code=(data as {code?:string}|null)?.code;
  if(code==='UNAUTHENTICATED')throw new AccountError('UNAUTHENTICATED',401);
@@ -40,8 +44,8 @@ export async function readCredits(rpc:Rpc,account:{userId:string;sessionId:strin
  const parsed=schema.safeParse(data);
  if(!parsed.success||parsed.data.userId!==account.userId)throw new AccountError('UNAVAILABLE',503);
  if(clueraV2){
-  const eligible=clueraCheckoutAllowed(account.userId);
-  const payment=eligible?await clueraBillingStatus(rpc,account):null;
+  const eligible=clueraCheckoutAllowed(account.userId,env);
+  const payment=eligible?await clueraBillingStatus(live?liveBillingRpc(rpc):rpc,account):null;
   return {...parsed.data,checkoutAvailable:eligible&&payment?.code==='AVAILABLE'};
  }
  if(process.env.SIGMAROUND_PAYMENT_PROVIDER==='razorpay'){

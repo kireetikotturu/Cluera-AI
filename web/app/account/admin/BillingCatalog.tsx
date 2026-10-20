@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
+import { checkoutRequest } from '../../../lib/payments/cluera/checkoutRequest';
 import { clueraPublicCatalog, clueraPublicRevision, clueraPrice, clueraAllowance,
   type ClueraPublicRevision,
 } from '../../../lib/payments/cluera/publicCatalog';
 
-const endpoint = '/api/account/payments/cluera/admin';
 const listSchema = z.object({ code: z.literal('ACTIVE'), catalog: clueraPublicCatalog }).strict();
 const appliedSchema = z.object({ code: z.literal('APPLIED'), revision: clueraPublicRevision }).strict();
 const factorsSchema = z.object({ factors: z.array(z.object({ id: z.uuid(), status: z.literal('verified') }).strict()).max(20) }).strict();
@@ -20,7 +20,9 @@ function money(value: string): number | null {
 }
 
 /** Immutable future catalog revisions only; never changes an existing paid snapshot. */
-export function BillingCatalog({ disabled = false }: { disabled?: boolean }) {
+export function BillingCatalog({ disabled = false, mode = 'test' }: { disabled?: boolean; mode?: 'test' | 'live' }) {
+  const endpoint = mode === 'live' ? '/api/account/payments/cluera/live/admin' : '/api/account/payments/cluera/admin';
+  const modeName = mode === 'live' ? 'Live' : 'Test';
   const [catalog, setCatalog] = useState<ClueraPublicRevision[]>([]);
   const [factors, setFactors] = useState<Factor[]>([]), [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false), [pending, setPending] = useState(false);
@@ -49,7 +51,7 @@ export function BillingCatalog({ disabled = false }: { disabled?: boolean }) {
   const deny = () => { setAvailable(false); setCatalog([]); setFactors([]); setMessage('Verified Admin authorization and MFA are required. Sign in privately; do not submit another change.'); };
   const refresh = () => perform(async (signal, current) => {
     setAvailable(false);
-    const response = await fetch(endpoint, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
+    const response = await checkoutRequest(endpoint, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
     if (!current()) return;
     if (response.status === 401 || response.status === 403) { deny(); return; }
     if (!response.ok) { setMessage('The reviewed Cluera billing schema is not available. No catalog or payment activation was performed.'); return; }
@@ -60,7 +62,7 @@ export function BillingCatalog({ disabled = false }: { disabled?: boolean }) {
   });
   const loadFactors = () => perform(async (signal, current) => {
     if (!available || operation.current) return;
-    const response = await fetch(`${endpoint}?factors=1`, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
+    const response = await checkoutRequest(`${endpoint}?factors=1`, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
     if (!current()) return;
     if (response.status === 401 || response.status === 403) { deny(); return; }
     if (!response.ok) throw new Error();
@@ -91,14 +93,14 @@ export function BillingCatalog({ disabled = false }: { disabled?: boolean }) {
       if (amountPaise === null || !Number.isInteger(allowanceMinutes) || allowanceMinutes < 1 || allowanceMinutes > 60_000
         || name.length < 2 || name.length > 80 || (row.kind === 'RECURRING'
           && (!/^plan_[A-Za-z0-9]{8,64}$/.test(razorpayPlanId!) || !Number.isInteger(totalCount) || totalCount! < 1 || totalCount! > 120))) {
-        setMessage('Check the future price, whole-minute allowance, display name and exact separately prepared Test plan. Monthly subscriptions require 1–120 charges.'); return;
+        setMessage(`Check the future price, whole-minute allowance, display name and exact separately prepared ${modeName} plan. Monthly subscriptions require 1–120 charges.`); return;
       }
       input = { name, amountPaise, allowanceSeconds: allowanceMinutes * 60, razorpayPlanId, totalCount };
     } else if (action === 'SET_ENABLED') input = { enabled: values.get('enabled') === 'on' };
     else { setMessage('Choose a supported catalog action.'); return; }
     const operationId = crypto.randomUUID(); operation.current = operationId; setPending(true);
     void perform(async (signal, current) => {
-      const response = await fetch(endpoint, { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+      const response = await checkoutRequest(endpoint, { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
         signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
           action, offerCode: row.offerCode, expectedRevisionId: row.revisionId,
           operationId, factorId, code, reason, input,
@@ -118,19 +120,19 @@ export function BillingCatalog({ disabled = false }: { disabled?: boolean }) {
   };
   const verify = () => perform(async (signal, current) => {
     const id = operation.current; if (!id) return;
-    const response = await fetch(`${endpoint}?operation=${encodeURIComponent(id)}`,
+    const response = await checkoutRequest(`${endpoint}?operation=${encodeURIComponent(id)}`,
       { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
     if (!current()) return;
     if (response.status === 401 || response.status === 403) { deny(); return; }
     if (!response.ok) throw new Error();
     const raw = await response.json();
-    if (raw?.code === 'APPLIED') { const data = appliedSchema.parse(raw); if (current()) applyRevision(data.revision); }
+    if ((raw as {code?:unknown}|null)?.code === 'APPLIED') { const data = appliedSchema.parse(raw); if (current()) applyRevision(data.revision); }
     else if (current()) setMessage('The original operation is not confirmed. Keep this page locked; no retry or replacement operation was sent.');
   });
 
   return <section className="ai-provider-console" aria-label="Cluera financial catalog" aria-busy={busy}>
     <p className="account-ui-kicker">IMMUTABLE FINANCIAL CATALOG</p>
-    <h2>Billing plans &amp; future prices</h2>
+    <h2>{modeName} billing plans &amp; future prices</h2>
     <p>Cluera owns future billing. New revisions never rewrite a paid order, a current subscription or the preserved Account/Paddle history.</p>
     <p role="status" aria-live="polite">{message}</p>
     <div className="ai-provider-actions">
@@ -143,8 +145,8 @@ export function BillingCatalog({ disabled = false }: { disabled?: boolean }) {
       <p>{clueraPrice(row.amountPaise)}{row.kind === 'RECURRING' ? ' / month' : ''} · {clueraAllowance(row.allowanceSeconds)}</p>
       <p>Revision {row.version} · {row.kind === 'PACK' ? 'Non-expiring, stackable pack' : `Monthly, no rollover, at most ${row.totalCount} charges`}</p>
       <p>{row.kind === 'PACK' ? 'No provider subscription plan required.' : row.testPlanValidated
-        ? 'Exact Test plan verified for this revision; lifecycle acceptance is still separate.'
-        : 'Test plan verification required before catalog enablement.'}</p>
+        ? `Exact ${modeName} plan verified for this revision; lifecycle acceptance is still separate.`
+        : `${modeName} plan verification required before catalog enablement.`}</p>
       <form key={row.revisionId} onSubmit={event => { event.preventDefault(); submit(row, event.currentTarget); }}>
         <fieldset disabled={disabled || busy || !available || pending || !factors.length}>
           <legend>Audited future configuration</legend>
@@ -154,7 +156,7 @@ export function BillingCatalog({ disabled = false }: { disabled?: boolean }) {
           <label>Future allowance (whole minutes)<input name="minutes" type="number" min={1} max={60_000} step={1} defaultValue={row.allowanceSeconds / 60} /></label>
           {row.kind === 'RECURRING' ? <>
             <label>Maximum monthly charges<input name="totalCount" type="number" min={1} max={120} step={1} defaultValue={row.totalCount ?? 120} /></label>
-            <label>Separately prepared Razorpay Test plan ID<input name="plan" autoComplete="off" spellCheck={false} maxLength={69} placeholder="plan_…" /></label>
+            <label>Separately prepared Razorpay {modeName} plan ID<input name="plan" autoComplete="off" spellCheck={false} maxLength={69} placeholder="plan_…" /></label>
           </> : null}
           <label><input name="enabled" type="checkbox" defaultChecked={row.enabled} /> Catalog enabled (availability action only)</label>
           <label>Reason<textarea name="reason" minLength={10} maxLength={500} required placeholder="Why is this future change needed?" /></label>

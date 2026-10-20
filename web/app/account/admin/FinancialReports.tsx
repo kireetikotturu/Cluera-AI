@@ -3,7 +3,6 @@ import {useEffect,useRef,useState} from 'react';
 import {z} from 'zod';
 import {financialReportSchema,type FinancialReport} from '../../../lib/payments/cluera/adminReportContracts';
 
-const endpoint='/api/account/admin/billing/cluera/report';
 const capability=z.object({code:z.literal('ACTIVE'),viewer:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
 const price=(paise:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(paise/100);
 const dateInput=(at:number)=>new Date(at).toISOString().slice(0,16);
@@ -30,7 +29,8 @@ async function read(path:string,controller:AbortController):Promise<{status:numb
  }finally{clearTimeout(timer);void reader?.cancel().catch(()=>{});try{reader?.releaseLock();}catch{/* Never await cancellation. */}}
 }
 
-export function FinancialReports({disabled=false}:{disabled?:boolean}){
+export function FinancialReports({disabled=false,mode='test'}:{disabled?:boolean;mode?:'test'|'live'}){
+ const endpoint=mode==='live'?'/api/account/payments/cluera/live/report':'/api/account/admin/billing/cluera/report';
  const [report,setReport]=useState<FinancialReport|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState('Refresh to read current recorded payments and unresolved requests.');
  const alive=useRef(true),generation=useRef(0),reading=useRef<AbortController|null>(null);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;++generation.current;reading.current?.abort();};},[]);
@@ -59,8 +59,8 @@ export function FinancialReports({disabled=false}:{disabled?:boolean}){
   :status===404?'Financial reporting is awaiting read-only database approval.'
   :status===429?'Please wait before refreshing financial reports.':'Financial reports are unavailable.');}
  return <section className="ai-provider-console" aria-label="Cluera financial reports" aria-busy={busy}>
-  <p className="account-ui-kicker">READ-ONLY FINANCIAL RECORDS</p><h2>Payments &amp; unresolved requests</h2>
-  <p>Choose a purchase-request creation window in UTC, up to 31 days. Each page contains at most 50 records from the pinned Cluera Test ledger.</p>
+  <p className="account-ui-kicker">READ-ONLY {mode.toUpperCase()} FINANCIAL RECORDS</p><h2>Payments &amp; unresolved requests</h2>
+  <p>Choose a purchase-request creation window in UTC, up to 31 days. Each page contains at most 50 records from the pinned Cluera {mode==='live'?'Live':'Test'} ledger.</p>
   <form onSubmit={event=>{event.preventDefault();const data=new FormData(event.currentTarget);try{
    const from=new Date(`${String(data.get('from'))}:00Z`).toISOString(),to=new Date(`${String(data.get('to'))}:00Z`).toISOString();
    const subject=String(data.get('subject')??'').trim()||null;void load({from,to,subject});

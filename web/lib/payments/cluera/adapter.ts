@@ -4,10 +4,11 @@ import { clueraBillingConfig } from './config';
 import { ClueraBillingError, invoiceId, orderId, paymentId, planId, revisionSchema, subscriptionId,
   type Binding, type BillingEvent, type BillingEvidence, type Revision } from './contracts';
 import { clueraRazorpayTransport } from './transport';
+import { liveBillingProfile } from './modeProfile';
 
 const timestamp = z.number().int().positive().max(8640000000000);
 const subscriptionStates = z.enum(['created','authenticated','active','pending','halted','paused','cancelled','completed','expired']);
-const noteSchema = z.object({ cluera_intent: z.uuid(), cluera_revision: z.uuid(), cluera_environment: z.literal('test') });
+const noteSchema = z.object({ cluera_intent: z.uuid(), cluera_revision: z.uuid(), cluera_environment: z.enum(['test','live']) });
 const orderSchema = z.object({ id: orderId, entity: z.literal('order'), amount: z.number().int().positive(), currency: z.literal('INR'),
   status: z.enum(['created','attempted','paid']), amount_paid: z.number().int().nonnegative(), amount_due: z.number().int().nonnegative(),
   receipt: z.string().nullable(), notes: z.unknown(), attempts: z.number().int().nonnegative(),
@@ -51,8 +52,15 @@ export function verifyClueraPlan(revision: Revision, raw: unknown) {
 
 export function clueraRazorpayAdapter(env = process.env, request: typeof fetch = fetch) {
   const api = clueraRazorpayTransport(env, request), config = clueraBillingConfig(env);
+  const mode = liveBillingProfile(env) ? 'live' : 'test';
+  const parseNotes = (raw: unknown) => {
+    const notes = noteSchema.parse(raw);
+    if (notes.cluera_environment !== mode) throw new ClueraBillingError('PENDING');
+    return notes;
+  };
   const parseSubscription = (binding: Binding, raw: unknown) => {
     const subscription = subscriptionSchema.parse(raw);
+    parseNotes(subscription.notes);
     if (subscription.id !== binding.subscriptionId || subscription.plan_id !== binding.revision.razorpayPlanId
       || subscription.total_count !== binding.revision.totalCount || subscription.notes.cluera_intent !== binding.intentId
       || subscription.notes.cluera_revision !== binding.revision.revisionId) throw new ClueraBillingError('PENDING');
@@ -74,7 +82,7 @@ export function clueraRazorpayAdapter(env = process.env, request: typeof fetch =
     async resumeUntouchedPack(binding: Binding) {
       if (binding.revision.kind !== 'PACK' || binding.code !== 'BOUND' || !binding.orderId || binding.subscriptionId !== null)
         throw new ClueraBillingError('INVALID');
-      const order = orderSchema.parse(await api(`/orders/${binding.orderId}`)), notes = noteSchema.parse(order.notes);
+      const order = orderSchema.parse(await api(`/orders/${binding.orderId}`)), notes = parseNotes(order.notes);
       if (order.id !== binding.orderId || order.receipt !== binding.intentId || order.amount !== binding.revision.amountPaise
         || order.status !== 'created' || order.amount_paid !== 0 || order.amount_due !== binding.revision.amountPaise || order.attempts !== 0
         || notes.cluera_intent !== binding.intentId || notes.cluera_revision !== binding.revision.revisionId)
@@ -106,11 +114,11 @@ export function clueraRazorpayAdapter(env = process.env, request: typeof fetch =
     },
     async create(intentId: string, revision: Revision) {
       z.uuid().parse(intentId); revisionSchema.parse(revision);
-      const notes = { cluera_intent: intentId, cluera_revision: revision.revisionId, cluera_environment: 'test' };
+      const notes = { cluera_intent: intentId, cluera_revision: revision.revisionId, cluera_environment: mode };
       if (revision.kind === 'PACK') {
         const order = orderSchema.parse(await api('/orders', { amount: revision.amountPaise, currency: 'INR', receipt: intentId,
           partial_payment: false, notes }));
-        const resultNotes = noteSchema.parse(order.notes);
+        const resultNotes = parseNotes(order.notes);
         if (order.status !== 'created' || order.receipt !== intentId || order.amount !== revision.amountPaise || order.amount_paid !== 0
           || order.amount_due !== revision.amountPaise || order.attempts !== 0 || resultNotes.cluera_intent !== intentId
           || resultNotes.cluera_revision !== revision.revisionId) throw new ClueraBillingError('PENDING');
@@ -120,6 +128,7 @@ export function clueraRazorpayAdapter(env = process.env, request: typeof fetch =
       await verifyPlan(revision);
       const subscription = subscriptionSchema.parse(await api('/subscriptions', { plan_id: revision.razorpayPlanId,
         quantity: 1, total_count: revision.totalCount, customer_notify: true, notes }));
+      parseNotes(subscription.notes);
       if (subscription.status !== 'created' || subscription.paid_count !== 0 || subscription.customer_id !== null
         || subscription.plan_id !== revision.razorpayPlanId || subscription.total_count !== revision.totalCount
         || subscription.notes.cluera_intent !== intentId || subscription.notes.cluera_revision !== revision.revisionId)
@@ -170,7 +179,7 @@ export function clueraRazorpayAdapter(env = process.env, request: typeof fetch =
           || order.amount_paid !== revision.amountPaise || order.amount_due !== 0) throw new ClueraBillingError('PENDING');
         let recurring: { periodStart: string; periodEnd: string; invoiceId: string; paidAt:string; cancellationAt:string|null; subscriptionState: BillingEvidence['subscriptionState'] } | undefined;
         if (revision.kind === 'PACK') {
-          const notes = noteSchema.parse(order.notes);
+          const notes = parseNotes(order.notes);
           if (binding.orderId !== order.id || order.receipt !== binding.intentId || notes.cluera_intent !== binding.intentId
             || notes.cluera_revision !== revision.revisionId || payment.invoice_id !== null || event.subscriptionId !== null)
             throw new ClueraBillingError('PENDING');

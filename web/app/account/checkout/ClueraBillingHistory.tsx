@@ -9,7 +9,6 @@ import styles from '../../cluera-commerce.module.css';
 import SubscriptionCancellation from './SubscriptionCancellation';
 
 const envelope=z.object({history:clueraBillingHistorySchema}).strict();
-const endpoint='/api/account/payments/cluera/history';
 const states={ACTIVE:'Active',PAST_DUE:'Payment overdue',CANCELED:'Canceled',PAUSED:'Paused'} as const;
 const periodStates={ACTIVE:'Paid period',SUSPENDED:'Paused paid period',QUEUED:'Queued paid period',PRESERVED:'Saved Pro access',ENDED:'Ended period',REFUNDED:'Refunded period'}as const;
 function accessWindow(milliseconds:number){
@@ -19,7 +18,9 @@ function accessWindow(milliseconds:number){
 
 /** Optional automatic GET on a verified parent snapshot; never a mutation. Owner comes from the parent's
  * logged-in credits snapshot, never an editable customer-ID input. */
-export default function ClueraBillingHistory({accountId,enabled=false,disabled=false,cancellationEnabled=false,autoLoad=false,refreshKey=0,onLoaded}:{accountId:string|null;enabled?:boolean;disabled?:boolean;cancellationEnabled?:boolean;autoLoad?:boolean;refreshKey?:number;onLoaded?:(history:History)=>void}){
+export default function ClueraBillingHistory({accountId,enabled=false,disabled=false,cancellationEnabled=false,autoLoad=false,refreshKey=0,onLoaded,mode='test'}:{accountId:string|null;enabled?:boolean;disabled?:boolean;cancellationEnabled?:boolean;autoLoad?:boolean;refreshKey?:number;onLoaded?:(history:History)=>void;mode?:'test'|'live'}){
+ const endpoint=mode==='live'?'/api/account/payments/cluera/live/history':'/api/account/payments/cluera/history';
+ const modeRef=useRef(mode);modeRef.current=mode;
  const statusId=useId(),alive=useRef(false),pending=useRef<AbortController|null>(null);
  const identity=useRef(accountId),availability=useRef(enabled),blocked=useRef(disabled);
  identity.current=accountId;availability.current=enabled;blocked.current=disabled;
@@ -30,14 +31,14 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
   alive.current=true;pending.current?.abort();pending.current=null;setResult(null);setBusy(false);
   setMessage('History is not loaded. Refresh to read the current server records.');
   return()=>{alive.current=false;pending.current?.abort();pending.current=null;};
- },[accountId,enabled]);
+ },[accountId,enabled,mode]);
  useEffect(()=>{if(disabled){pending.current?.abort();pending.current=null;setResult(null);setBusy(false);
   setMessage('History is not loaded. Refresh to read the current server records.');}},[disabled]);
 
  async function refresh(){
   if(!enabled||disabled||!validOwner||!accountId||pending.current)return;
   const owner=accountId,controller=new AbortController();pending.current=controller;setBusy(true);setResult(null);
-  const owned=()=>alive.current&&pending.current===controller&&identity.current===owner&&availability.current&&!blocked.current;
+  const owned=()=>alive.current&&modeRef.current===mode&&pending.current===controller&&identity.current===owner&&availability.current&&!blocked.current;
   const current=()=>owned()&&!controller.signal.aborted;
   let reader:ReadableStreamDefaultReader<Uint8Array>|undefined,timer:ReturnType<typeof setTimeout>|undefined;
   let abort=()=>{};
@@ -66,7 +67,7 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
   }
  }
  const refreshRef=useRef(refresh);refreshRef.current=refresh;
- useEffect(()=>{if(autoLoad&&enabled&&!disabled&&validOwner)void refreshRef.current();},[autoLoad,enabled,disabled,validOwner,accountId,refreshKey]);
+ useEffect(()=>{if(autoLoad&&enabled&&!disabled&&validOwner)void refreshRef.current();},[autoLoad,enabled,disabled,validOwner,accountId,refreshKey,mode]);
  const history=enabled&&!disabled&&validOwner&&result?.owner===accountId?result.history:null;
  const notice=!enabled?'Billing history is unavailable while its read-only setup awaits approval.'
   :!validOwner?'Sign in with a verified Cluera account to read its history.'
@@ -109,7 +110,7 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
     {subscription.paidThrough?<p>Paid through <time dateTime={subscription.paidThrough}>{new Date(subscription.paidThrough).toLocaleString()}</time>.</p>:null}
     {subscription.graceUntil?<p>Recorded grace ends <time dateTime={subscription.graceUntil}>{new Date(subscription.graceUntil).toLocaleString()}</time>.</p>:null}
     {subscription.cancelFuture?<p>Renewal is stopped in the current server record.</p>:null}
-    {cancellationEnabled&&!subscription.cancelFuture&&subscription.state!=='CANCELED'&&accountId?<SubscriptionCancellation accountId={accountId} subscriptionId={subscription.subscriptionId} enabled={cancellationEnabled} disabled={disabled||busy}/>:null}
+    {cancellationEnabled&&!subscription.cancelFuture&&subscription.state!=='CANCELED'&&accountId?<SubscriptionCancellation mode={mode} accountId={accountId} subscriptionId={subscription.subscriptionId} enabled={cancellationEnabled} disabled={disabled||busy}/>:null}
    </li>)}</ul>:<p>No subscription records are displayed in this project snapshot.</p>}
    {history.hasMoreSubscriptions?<p>Only the latest 50 subscriptions are shown. Contact support for older records.</p>:null}
   </>:null}

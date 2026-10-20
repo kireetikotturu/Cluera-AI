@@ -22,7 +22,7 @@ interface State {needsMfa?:boolean;factors?:Factor[];testEntitlementsEnabled?:bo
  audit?:Array<{id:string;action:string;reason:string;createdAt:string}>;
  models?:ModelPolicy[];
 }
-export function AccountAdmin(){
+export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean}){
  const recheckAccess=useAdminAccessRecheck();
  const [state,setState]=useState<State|null>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[subject,setSubject]=useState('');
  const [enrollment,setEnrollment]=useState<{id:string;qr:string;secret:string}|null>(null),[factorId,setFactorId]=useState('');
@@ -136,7 +136,9 @@ export function AccountAdmin(){
    {grant.kind!=='TRIAL'&&['ACTIVE','PAUSED'].includes(grant.state)?<form onSubmit={event=>{event.preventDefault();const v=new FormData(event.currentTarget);mutate('REMOVE_MINUTES',{grantId:grant.id,minutes:Number(v.get('minutes'))},String(v.get('reason')));}}><label>Unused minutes to remove<input name="minutes" type="number" required min={1} max={60000}/></label><label>Adjustment reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Remove unused minutes</button></form>:null}
    {grant.testGrant&&grant.state==='ACTIVE'?<form onSubmit={event=>{event.preventDefault();mutate('REVOKE_TEST',{grantId:grant.id},String(new FormData(event.currentTarget).get('reason')));}}><label>Revocation reason<input name="reason" minLength={10} maxLength={500} required disabled={busy}/></label><button disabled={busy}>Revoke unused test access</button></form>:null}</div>)}</div>:null}
   </fieldset></section>
-  <section id="account-admin-billing" className="account-admin-section" aria-label="Cluera billing"><FinancialReports disabled={locked}/><NativeCommandReview disabled={locked}/><BillingCatalog disabled={locked}/></section>
+  <section id="account-admin-billing" className="account-admin-section" aria-label="Cluera billing"><FinancialReports disabled={locked}/><NativeCommandReview disabled={locked}/><BillingCatalog disabled={locked}/>
+   {liveBillingAdmin&&<><FinancialReports key="live-report" mode="live" disabled={locked}/><BillingCatalog key="live-catalog" mode="live" disabled={locked}/></>}
+  </section>
   <section id="account-admin-catalog" className="account-admin-section" aria-labelledby="account-admin-catalog-heading"><fieldset disabled={locked} style={{border:0,padding:0,margin:0,minWidth:0}}>
   <p className="account-ui-kicker">APPROVED OFFER POLICIES</p><h2 id="account-admin-catalog-heading">Plan catalog</h2><p>These controls change display, order and catalog eligibility only. The selected Test gateway, tester restriction and checkout switches still apply. Prices, provider mappings and purchased allowances remain locked; recurring checkout is unavailable.</p>
   {state.catalog?.map(offer=><form key={`${offer.code}:${offer.name}:${offer.enabled}:${offer.priority}`} onSubmit={event=>{event.preventDefault();const v=new FormData(event.currentTarget);mutate('CATALOG',{code:offer.code,name:String(v.get('name')),enabled:v.get('enabled')==='on',priority:Number(v.get('priority'))},String(v.get('reason')),null);}}>

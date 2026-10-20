@@ -52,6 +52,23 @@ const checkoutGet = (url: RequestInfo | URL) => Response.json(String(url).endsWi
       state:'BOUND',kind:createdBinding.kind,revisionId:createdBinding.revisionId,offerCode:createdBinding.offerCode,
       orderId:createdBinding.orderId,subscriptionId:createdBinding.subscriptionId}}} : status : credits);
 
+it.each(['rzp_live_synthetic123456', 'rzp_test_synthetic123456'])('Live checkout uses only Live routes and rejects the wrong key mode: %s', async keyId => {
+  const open = vi.fn(); let options: Record<string, unknown> = {};
+  window.Razorpay = class { constructor(value: Record<string, unknown>) { options = value; } open = open; close = vi.fn(); on = vi.fn(); };
+  const request = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).includes('/payments/')) expect(String(url)).toContain('/payments/cluera/live/');
+    if (init?.method === 'POST') { const result = bound(); return Response.json({ payment: { ...result.payment, keyId } }); }
+    return checkoutGet(url);
+  });
+  vi.stubGlobal('fetch', request);
+  await act(async () => root.render(createElement(ClueraCheckoutClient, { enabled: true, mode: 'live' })));
+  expect(request.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+  await act(async () => buy().click());
+  expect(request.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+  if (keyId.startsWith('rzp_live_')) { expect(open).toHaveBeenCalledOnce(); expect(options.key).toBe(keyId); }
+  else expect(open).not.toHaveBeenCalled();
+});
+
 it.each([undefined,[{state:'ACTIVE',paymentState:'ACTIVE'}]])('first-subscription-only availability blocks unproven or competing monthly access while packs remain available',async plans=>{
  const request=vi.fn(async(url:RequestInfo|URL)=>String(url).startsWith('/api/account/credits')?Response.json({...credits,plans}):checkoutGet(url));vi.stubGlobal('fetch',request);
  await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled:true,firstSubscriptionOnly:true})));
@@ -180,7 +197,7 @@ it('never opens SDK for an unverified monthly Test plan even when stale catalog 
   const request = vi.fn(async (url: RequestInfo | URL) => String(url).endsWith('/catalog') ? Response.json({ catalog: unverified }) : checkoutGet(url));
   vi.stubGlobal('fetch', request); await renderCheckout(); expect(subscribe().disabled).toBe(true);
   await act(async () => subscribe().click()); expect(document.querySelector('script')).toBeNull();
-  expect(host.textContent).toContain('Test plan and lifecycle acceptance pending');
+  expect(host.textContent).toContain('Plan and lifecycle acceptance pending');
 });
 
 it('does not trust a browser-supplied foreign resource in callback and does not echo it', async () => {

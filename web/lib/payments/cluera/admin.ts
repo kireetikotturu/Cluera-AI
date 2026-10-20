@@ -9,6 +9,7 @@ import { billingRpc, merchantDigest, clueraBillingV2Enabled } from './config';
 import { offerCode, planId, revisionSchema, type Revision } from './contracts';
 import { clueraRazorpayAdapter } from './adapter';
 import { readClueraRawBody } from './events';
+import { liveBillingProfile, liveBillingRpc } from './modeProfile';
 
 const common = { operationId:z.uuid(), offerCode, expectedRevisionId:z.uuid(), reason:z.string().trim().min(10).max(500),
   factorId:z.uuid(), code:z.string().regex(/^\d{6}$/) };
@@ -21,20 +22,24 @@ export const catalogMutationSchema = z.discriminatedUnion('action',[
 function claims(token:string) { try { return JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString('utf8')); } catch { return {}; } }
 const publicRevision = (revision:Revision) => { const {razorpayPlanId:_plan,...value}=revision;return value; };
 /** Catalog mutations require current Admin+AAL2, fresh same-session MFA and an immutable operation/revision CAS. */
-export async function clueraBillingAdminRequest(request:Request):Promise<Response> {
+export async function clueraBillingAdminRequest(request:Request, env = process.env):Promise<Response> {
   let cookies:AccountCookies|undefined;
   try {
     const config = stagingAccountConfig();
+    const live = liveBillingProfile(env);
+    if (live && (env.CLUERA_LIVE_ADMIN_ENABLED !== 'true' || live.origin !== config.origin))
+      return json({error:'Not found.'},404);
     if (request.method !== 'GET') assertAccountOrigin(request,config.origin);
     else if (request.headers.get('sec-fetch-site') === 'cross-site' || (request.headers.has('origin') && request.headers.get('origin') !== config.origin)) throw new AccountError('FORBIDDEN',403);
     const clients = accountClients(config); cookies = new AccountCookies(request,config);
     const {account,session} = await activeSession(clients,cookies);
     if (cookies.get('recovery') === account.sessionId) throw new AccountError('FORBIDDEN',403);
-    const rpc = (name:string,args:Record<string,unknown>) => clients.service.rpc(name,args);
+    const rawRpc = (name:string,args:Record<string,unknown>) => clients.service.rpc(name,args);
+    const rpc = live ? liveBillingRpc(rawRpc) : rawRpc;
     const admin = {p_actor:account.userId,p_session:account.sessionId};
-    if (claims(session.access_token).aal !== 'aal2' || await billingRpc(rpc,'account_admin_check',{...admin,p_require_mfa:true}) !== true) throw new AccountError('FORBIDDEN',403);
+    if (claims(session.access_token).aal !== 'aal2' || await billingRpc(rawRpc,'account_admin_check',{...admin,p_require_mfa:true}) !== true) throw new AccountError('FORBIDDEN',403);
     await rateLimit(request,config,clients,account.email);
-    if (!clueraBillingV2Enabled()) return cookies.apply(json({error:'BILLING_SCHEMA_APPROVAL_REQUIRED'},503));
+    if (!clueraBillingV2Enabled(env)) return cookies.apply(json({error:'BILLING_SCHEMA_APPROVAL_REQUIRED'},503));
     if (request.method === 'GET') {
       const params = new URL(request.url).searchParams;
       if (params.size > 1 || [...params.keys()].some(key=>!['factors','operation'].includes(key))) throw new AccountError('INVALID_INPUT',400);
@@ -69,14 +74,14 @@ export async function clueraBillingAdminRequest(request:Request):Promise<Respons
     cookies.set('access',step.data.access_token,Math.max(1,Math.min(step.data.expires_in-30,3570)));
     cookies.set('refresh',step.data.refresh_token,30*86400);
     const gateway = input.action === 'CREATE_REVISION' && current.kind === 'RECURRING' || input.action === 'SET_ENABLED' && input.input.enabled && current.kind === 'RECURRING'
-      ? clueraRazorpayAdapter() : null;
+      ? clueraRazorpayAdapter(env) : null;
     if (input.action === 'CREATE_REVISION' && gateway) {
       // Read-only compatibility preflight. No plan creation/update and no subscription changes.
       await gateway.verifyPlan({...current,...input.input} as Revision);
     }
     if (input.action === 'SET_ENABLED' && gateway) {
       const evidence = await gateway.verifyPlan(current);
-      if (await billingRpc(rpc,'cluera_billing_plan_verify',{p_revision:current.revisionId,p_account_digest:merchantDigest(),p_evidence:evidence}) !== 'VERIFIED')
+      if (await billingRpc(rpc,'cluera_billing_plan_verify',{p_revision:current.revisionId,p_account_digest:merchantDigest(env),p_evidence:evidence}) !== 'VERIFIED')
         return cookies.apply(json({error:'PLAN_REQUIRES_REVIEW'},409));
     }
     const result = await billingRpc(rpc,'cluera_billing_admin_mutate',{...admin,p_operation:input.operationId,p_action:input.action,p_offer:input.offerCode,

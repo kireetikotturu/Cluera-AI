@@ -4,10 +4,12 @@
 !backend/package-lock.json
 !backend/main.ts
 !backend/billingTransport.ts
+!backend/liveBillingTransport.ts
 !backend/build.mjs
 !backend/tsconfig.json
 !shared/
 !shared/billingDispatch.ts
+!shared/liveBillingDispatch.ts
 !web/
 !web/lib/
 !web/lib/**

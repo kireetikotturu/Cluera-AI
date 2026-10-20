@@ -25,7 +25,7 @@ it('aborts rejected upstream headers even when its body was never read; no retry
 it('provider overflow rejects without awaiting an uncooperative cancellation',async()=>{
  const cancel=vi.fn(()=>new Promise<void>(()=>{}));let signal:AbortSignal|null|undefined;
  const body=new ReadableStream<Uint8Array>({start(controller){controller.enqueue(new Uint8Array(256*1024+1));},cancel});
- const request=vi.fn(async(_input:RequestInfo|URL,init?:RequestInit)=>{signal=init?.signal;return new Response(body);});
+ const request=vi.fn(async(_input:RequestInfo|URL,init?:RequestInit)=>{signal=init?.signal;return new Response(body,{headers:{'content-type':'application/json'}});});
  const result=outcome(clueraRazorpayTransport(paymentTestEnvironment,request as typeof fetch)('/orders'));
  await vi.advanceTimersByTimeAsync(0);
  expect(result.state).toBe('rejected');expect(result.error).toMatchObject({code:'UNAVAILABLE'});
@@ -35,12 +35,20 @@ it('provider overflow rejects without awaiting an uncooperative cancellation',as
 it('provider body timeout retains its10s bound despite a never-settled cancel',async()=>{
  const cancel=vi.fn(()=>new Promise<void>(()=>{}));let signal:AbortSignal|null|undefined;
  const request=vi.fn(async(_input:RequestInfo|URL,init?:RequestInit)=>{
-  signal=init?.signal;return new Response(new ReadableStream<Uint8Array>({start(){},cancel}));
+  signal=init?.signal;return new Response(new ReadableStream<Uint8Array>({start(){},cancel}),{headers:{'content-type':'application/json'}});
  });
  const result=outcome(clueraRazorpayTransport(paymentTestEnvironment,request as typeof fetch)('/orders'));
- await vi.advanceTimersByTimeAsync(10000);
+ await vi.advanceTimersByTimeAsync(9999);expect(result.state).toBe('pending');
+ await vi.advanceTimersByTimeAsync(1);
  expect(result.state).toBe('rejected');expect(result.error).toMatchObject({code:'UNAVAILABLE'});
  expect(cancel).toHaveBeenCalledOnce();expect(signal?.aborted).toBe(true);expect(request).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+});
+
+it.each([{'content-type':'text/html'},{'content-type':'application/json','content-length':'262145'},
+ {'content-type':'application/json','content-length':'-1'}])('rejects invalid upstream headers without reading or retrying %j',async headers=>{
+ const pull=vi.fn(),request=vi.fn(async()=>new Response(new ReadableStream<Uint8Array>({pull},{highWaterMark:0}),{headers}));
+ await expect(clueraRazorpayTransport(paymentTestEnvironment,request)('/orders')).rejects.toMatchObject({code:'UNAVAILABLE'});
+ expect(pull).not.toHaveBeenCalled();expect(request).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
 });
 
 it('raw body overflow rejects without waiting for hostile cancellation',async()=>{

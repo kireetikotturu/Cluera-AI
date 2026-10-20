@@ -11,6 +11,6 @@ export default async function AccountAdminPage(){
  if(access.status===403)notFound();
  if(access.status!==200)return <main className="account-page"><AdminAccessGate/></main>;
  return <main className="account-page account-admin-page"><AdminProtectedContent>
-  <header className="account-admin-heading"><p>ACCOUNT CONTROL CENTER</p><h1>Account administration <span>Staging</span></h1><p>Customers, policies and releases. Every change stays verified and audited.</p></header><AccountAdmin/>
+  <header className="account-admin-heading"><p>ACCOUNT CONTROL CENTER</p><h1>Account administration <span>Staging</span></h1><p>Customers, policies and releases. Every change stays verified and audited.</p></header><AccountAdmin liveBillingAdmin={process.env.CLUERA_LIVE_ADMIN_ENABLED==='true'}/>
  </AdminProtectedContent></main>;
 }
