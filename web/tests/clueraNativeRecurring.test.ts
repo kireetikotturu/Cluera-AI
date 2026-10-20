@@ -6,6 +6,7 @@ import { applyClueraNativeRecurringEvent, clueraNativeRecurringEnabled } from '.
 import { dispatchClueraNativeRecurringCommand, observeClueraNativeRecurringCommand } from '../lib/payments/cluera/nativeRecurringOutbox';
 import { advanceClueraRecurringSchedule } from '../lib/payments/cluera/recurringSchedule';
 import { createClueraCheckout } from '../lib/payments/cluera/checkout';
+import { seedHistoricalClueraCheckout } from './helpers/historicalClueraCheckout';
 import { clueraRazorpayAdapter } from '../lib/payments/cluera/adapter';
 import { handleClueraWebhook } from '../lib/payments/cluera/events';
 import { reconcileClueraPayment } from '../lib/payments/cluera/reconciliation';
@@ -15,7 +16,7 @@ import type { Binding, BillingEvidence } from '../lib/payments/cluera/contracts'
 import type { PaymentRpc } from '../lib/payments/core/types';
 import { paymentTestEnvironment } from './helpers/paymentTestMode';
 
-const env={...paymentTestEnvironment,CLUERA_BILLING_V2_ENABLED:'true',CLUERA_RECURRING_SCHEDULE_ENABLED:'true',CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED:'true'};
+const env={...paymentTestEnvironment,CLUERA_BILLING_V2_ENABLED:'true',CLUERA_RECURRING_SCHEDULE_ENABLED:'true',CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED:'true',CLUERA_SUBSCRIPTION_CANCELLATION_ENABLED:'true'};
 const userId=paymentTestEnvironment.SIGMAROUND_PAYMENT_TESTER_IDS,sessionId=randomUUID(),digest=merchantDigest(env),day=86400000;
 let db:PGlite,catalog:Binding['revision'][];
 const rpc:PaymentRpc=async(name,args)=>{const entries=Object.entries(args);await db.exec('savepoint synthetic_rpc');try{const data=(await db.query<{v:unknown}>(`select public.${name}(${entries.map(([key],i)=>`${key}=>$${i+1}`).join(',')}) v`,entries.map(([,value])=>value))).rows[0].v;await db.exec('release savepoint synthetic_rpc');return {data,error:null};}catch(error){await db.exec('rollback to savepoint synthetic_rpc');await db.exec('release savepoint synthetic_rpc');throw Error(`${(error as Error).message}\n${(error as {where?:string}).where??''}`);}};
@@ -215,7 +216,13 @@ it.each([true,false])('actual checkout → signed webhook → signed worker reta
  line_items:[{type:'plan',amount:549900,unit_amount:549900,gross_amount:549900,net_amount:549900,tax_amount:0,currency:'INR',quantity:1,taxes:[]}]});
  throw Error('Unexpected synthetic native provider path');}) as typeof fetch;
  vi.stubGlobal('fetch',provider);
- const bound=await createClueraCheckout(flowRpc,{userId,sessionId},randomUUID(),revisionId,testEnv,clueraRazorpayAdapter(testEnv,provider));expect(bound.code).toBe('BOUND');expect(await rows('public.customer_usage_grants')).toEqual([]);
+ if(!native){
+  await expect(createClueraCheckout(flowRpc,{userId,sessionId},randomUUID(),revisionId,testEnv,clueraRazorpayAdapter(testEnv,provider))).rejects.toThrow();
+  expect(provider).not.toHaveBeenCalled();expect(await rows('cluera_billing_private.intents')).toEqual([]);
+ }
+ const bound=native?await createClueraCheckout(flowRpc,{userId,sessionId},randomUUID(),revisionId,testEnv,clueraRazorpayAdapter(testEnv,provider))
+  :await seedHistoricalClueraCheckout(flowRpc,{userId,sessionId},randomUUID(),revisionId,testEnv,clueraRazorpayAdapter(testEnv,provider));
+ expect(bound.code).toBe('BOUND');expect(await rows('public.customer_usage_grants')).toEqual([]);
  captured=true;const raw=Buffer.from(JSON.stringify({entity:'event',account_id:env.RAZORPAY_TEST_ACCOUNT_ID,event:'subscription.charged',created_at:seconds,payload:{subscription:{entity:{id:subscriptionId}},payment:{entity:{id:paymentId,order_id:orderId,invoice_id:invoiceId}}}}));
  const webhook=new Request('https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook',{method:'POST',headers:{'content-type':'application/json','x-razorpay-event-id':'evt_nativeactualflow01','x-razorpay-signature':createHmac('sha256',env.RAZORPAY_TEST_WEBHOOK_SECRET).update(raw).digest('hex')},body:raw});
  expect((await handleClueraWebhook(webhook,testEnv,flowRpc)).status).toBe(200);expect(await rows('public.customer_usage_grants')).toEqual([]);

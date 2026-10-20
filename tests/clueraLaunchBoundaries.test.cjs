@@ -5,7 +5,7 @@ const { run, inspect, checks } = require('../scripts/verify-cluera-launch-bounda
 const revision = 'a'.repeat(40);
 const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'x-cluera-revision': revision };
 const html = content => `<!DOCTYPE html><html><body><main>${content}</main></body></html>`;
-const pages = { home: html('Your interview workspace. One Cluera account.'), pricing: html('Your time. One shared balance.'),
+const pages = { home: html('Your interview workspace. One Cluera account.'), pricing: html('Cluera plans and pricing. Time for your next session'),
   account: html('Your Cluera account. Checking your account'), checkout: html('Buy Cluera credits'),
   download: html('Download Cluera AI. Cluera TEST installer awaiting approval'),
   'admin-page': html('<h1>Verify access to continue</h1><p>Checking your current session...</p><a href="/account#login">Go to your account</a>') };

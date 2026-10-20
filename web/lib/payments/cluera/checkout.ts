@@ -4,6 +4,7 @@ import { billingOwner, billingRpc, clueraBillingConfig, clueraCheckoutAllowed, m
 import { bindingSchema, ClueraBillingError, orderId, paymentId, revisionSchema, statusSchema, subscriptionId } from './contracts';
 import { clueraRazorpayAdapter } from './adapter';
 import { clueraNativeRecurringEnabled } from './nativeRecurring';
+import { approvedPurchaseCatalog } from './purchaseAvailability';
 
 type Account = { userId: string; sessionId: string };
 type Adapter = ReturnType<typeof clueraRazorpayAdapter>;
@@ -23,6 +24,8 @@ export async function createClueraCheckout(rpc: PaymentRpc, account: Account, re
   if (!clueraCheckoutAllowed(account.userId, env)) throw new ClueraBillingError('CONFIGURATION');
   z.uuid().parse(requestId); z.uuid().parse(revisionId);
   const { epoch, accountDigest } = await billingOwner(rpc, env);
+  const revision = approvedPurchaseCatalog(await clueraBillingCatalog(rpc),env).find(row=>row.revisionId===revisionId);
+  if(!revision?.enabled||(revision.kind==='RECURRING'&&!revision.testPlanValidated))throw new ClueraBillingError('CONFIGURATION');
   if(env.CLUERA_RECURRING_SCHEDULE_ENABLED==='true') {
     if(!clueraNativeRecurringEnabled(env)||await billingRpc(rpc,'cluera_billing_native_purchase_policy',{
       p_user:account.userId,p_session:account.sessionId,p_revision:revisionId,p_account_digest:accountDigest,p_epoch:epoch,

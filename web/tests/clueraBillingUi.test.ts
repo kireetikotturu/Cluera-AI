@@ -93,6 +93,17 @@ it('duplicate desktop owner hints fail closed before any account/catalog reads',
  expect(host.querySelectorAll('.account-plan-card button')).toHaveLength(4);
  expect([...host.querySelectorAll<HTMLButtonElement>('.account-plan-card button')].every(b=>b.disabled)).toBe(true);
 });
+it('signed-out pricing preserves the selected purchasable plan through sign-in without creating an order',async()=>{
+ history.replaceState(null,'','/pricing');
+ const request=vi.fn(async(url:RequestInfo|URL)=>String(url).endsWith('/catalog')?Response.json({catalog}):new Response(null,{status:401}));
+ vi.stubGlobal('fetch',request);
+ await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled:true,offers:catalog})));
+ const link=host.querySelector<HTMLAnchorElement>('a[aria-label="Sign in to buy: Cluera 3 Hours"]')!;
+ expect(link.getAttribute('href')).toBe('/account?offer=cluera_pack_3h_v2#login');
+ expect(host.querySelector('a[aria-label="Sign in to subscribe: Cluera Pro 100 Hours"]')).toBeNull();
+ expect(request.mock.calls.every(([,init])=>!(init as RequestInit|undefined)?.method)).toBe(true);
+ expect(document.querySelector('script[src*="razorpay"]')).toBeNull();
+});
 
 it('retains historical Paddle rows without using them as a new binding or automatically opening checkout', async () => {
   const request = vi.fn(async (url: RequestInfo | URL) => checkoutGet(url)); vi.stubGlobal('fetch', request);
@@ -274,6 +285,37 @@ it('bounds automatic checks to four and never clears an unknown create or retrie
     expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);expect(buy().disabled).toBe(true);
     const count=request.mock.calls.length;await act(async()=>{await vi.advanceTimersByTimeAsync(300_000);});expect(request).toHaveBeenCalledTimes(count);
   } finally {visibility.mockRestore();vi.useRealTimers();}
+});
+it.each(['VERIFIED','REFUNDED','unrelated'] as const)('success requires exact callback payment plus authoritative %s history and a refreshed balance',async proof=>{
+ vi.useFakeTimers();const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');
+ try{
+  let options:Record<string,any>={},resolved=false,settled=false;
+  window.Razorpay=class{constructor(value:Record<string,unknown>){options=value;}open=vi.fn();close=vi.fn();on=vi.fn();};
+  const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+   const path=String(url);
+   if(path.endsWith('/callback'))return Response.json({payment:{code:'AWAITING_WEBHOOK'}});
+   if(init?.method==='POST')return Response.json(bound());
+   if(path.includes('/history?'))return Response.json({history:{code:'ACTIVE',userId,payments:createdBinding?[{
+    paymentId:proof==='unrelated'?'pay_other000001':'pay_callback0001',invoiceId:null,subscriptionId:null,
+    state:proof==='REFUNDED'?'REFUNDED':'VERIFIED',revision:{revisionId:catalog[0].revisionId,offerCode:catalog[0].offerCode,version:1,
+     name:catalog[0].name,kind:'PACK',amountPaise:54900,currency:'INR',allowanceSeconds:10800},
+    intentCreatedAt:'2026-10-20T00:00:00Z',paidAt:null,periodStart:null,periodEnd:null}]:[],subscriptions:[],hasMorePayments:false,hasMoreSubscriptions:false}},
+    {headers:{'cache-control':'no-store','x-content-type-options':'nosniff'}});
+   if(path.includes('/checkout?')&&resolved){settled=true;return Response.json({payment:{...status.payment,resolvedOrderIds:[orderId]}});}
+   if(path.startsWith('/api/account/credits'))return Response.json({...credits,availableMilliseconds:settled?11700000:900000});
+   return checkoutGet(url);
+  });
+  vi.stubGlobal('fetch',request);
+  await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled:true,historyEnabled:true})));
+  await act(async()=>buy().click());
+  await act(async()=>options.handler({razorpay_payment_id:'pay_callback0001',razorpay_order_id:orderId,razorpay_signature:'a'.repeat(64)}));
+  expect(host.textContent).not.toContain('Payment verified.');
+  resolved=true;await act(async()=>{await vi.advanceTimersByTimeAsync(30000);});
+  expect(host.textContent).toContain('3h 15m');
+  if(proof==='VERIFIED')expect(host.textContent).toContain('Payment verified. Your available time and billing history are up to date.');
+  else expect(host.textContent).not.toContain('Payment verified.');
+  expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(2);
+ }finally{visibility.mockRestore();vi.useRealTimers();}
 });
 it('automatic checks stop after a definitive owner denial and keep the previous overlay closed',async()=>{
   vi.useFakeTimers();const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');

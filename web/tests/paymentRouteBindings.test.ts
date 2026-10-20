@@ -36,6 +36,15 @@ it('missing keys/Live mode do not grant checkout SDK permissions',async()=>{
  vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','razorpay');vi.stubEnv('RAZORPAY_ENVIRONMENT','live');
  const headers=await config.headers!();expect(headers.some(h=>h.source==='/account/checkout')).toBe(false);
 });
+it('the direct plans page gets the exact Razorpay policy only under the approved V2 Test gate',async()=>{
+ for(const [key,value] of Object.entries(paymentTestEnvironment))vi.stubEnv(key,value);
+ vi.stubEnv('SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED','false');vi.stubEnv('CLUERA_BILLING_V2_ENABLED','true');
+ const rules=await config.headers!();
+ expect(rules.find(rule=>rule.source==='/pricing')?.headers).toEqual(rules.find(rule=>rule.source==='/account/checkout')?.headers);
+ expect(rules[0].headers.find(header=>header.key==='Content-Security-Policy')?.value).not.toContain('razorpay.com');
+ vi.stubEnv('SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED','false');
+ expect((await config.headers!()).some(rule=>rule.source==='/pricing')).toBe(false);
+});
 const schedulerSecret='synthetic-worker-secret-not-a-real-key-0000';
 const schedulerRequest=()=>new Request('https://cluera-ai-staging.vercel.app/api/internal/billing/tick',
  {method:'POST',headers:{authorization:`Bearer ${schedulerSecret}`},body:'{}'});
@@ -64,12 +73,10 @@ it('disabled or wrong-target Razorpay cannot claim events when no valid provider
 it('Cluera target pricing is explicitly unavailable and never loads a payment SDK',()=>{
  const html=renderToStaticMarkup(AccountPricing());
  for(const price of ['₹549','₹5,499','₹9,599','₹19,549'])expect(html).toContain(price);
- expect(html).toContain('100 hours per month');expect(html).toContain('not active payment offers');
- expect(html).toContain('No card, UPI or QR method is claimed accepted yet');
+ expect(html).toContain('100 hours per month');expect(html).toContain('Paid plans are not yet available');
+ expect(html).toContain('Public purchasing is not yet available');
  expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
- for(const code of ['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2']){
-  expect(html).toContain(`href="/account/checkout?offer=${code}"`);
- }
+ expect((html.match(/disabled=""/g)??[])).toHaveLength(4);expect(html).not.toContain('View availability');
 });
 it('Cluera presentation is independent of old provider selection and does not alter financial policies',()=>{
  vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','razorpay');const first=renderToStaticMarkup(AccountPricing());

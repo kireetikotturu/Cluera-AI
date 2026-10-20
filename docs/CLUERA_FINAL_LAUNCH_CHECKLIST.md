@@ -4,6 +4,8 @@ Updated October 20, 2026 (IST). **Full commercial launch: NO-GO.** Remote Deskto
 
 This is the single owner checklist. Supporting documents contain technical evidence, not additional setup approvals. Older next-action instructions elsewhere are historical.
 
+The October 20 billing follow-up is documented in [Razorpay readiness and the consolidated billing guide](CLUERA_RAZORPAY_PRODUCTION_READINESS.md). The owner confirmed **staging only**. The plans page now uses the guarded checkout directly; public purchase buttons remain disabled, history loads automatically after account verification, and exact payment success requires validated server history. Monthly creation additionally requires native lifecycle and cancellation capability; Enterprise has a separate default-off acceptance flag. The retained Test order remains unresolved. Live runtime/storage separation is still required before any future Live cutover; replacing keys is not sufficient.
+
 ## What is complete and what is gated
 
 | Area | Evidence and current limit |

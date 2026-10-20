@@ -3,7 +3,8 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { clueraRazorpayAdapter } from '../lib/payments/cluera/adapter';
-import { createClueraCheckout, verifyClueraCallback } from '../lib/payments/cluera/checkout';
+import { createClueraCheckout as createCurrentCheckout, verifyClueraCallback } from '../lib/payments/cluera/checkout';
+import { seedHistoricalClueraCheckout } from './helpers/historicalClueraCheckout';
 import { handleClueraWebhook } from '../lib/payments/cluera/events';
 import { reconcileClueraPayment } from '../lib/payments/cluera/reconciliation';
 import { merchantDigest } from '../lib/payments/cluera/config';
@@ -14,6 +15,14 @@ import { paymentTestEnvironment } from './helpers/paymentTestMode';
 // Full synthetic server -> actual PostgreSQL RPC -> HTTP test-double -> raw signed
 // receipt -> independent reads -> shared ledger. No hosted query or provider call.
 const env={...paymentTestEnvironment,CLUERA_BILLING_V2_ENABLED:'true'};
+// These legacy receipt tests retain historical recurring fixtures. New pack
+// purchases still exercise the real guarded checkout; new monthly sales are
+// covered by clueraNativeRecurring and purchase-availability tests.
+const createClueraCheckout:typeof createCurrentCheckout=async(rpc,account,requestId,revisionId,testEnv=process.env,adapter=clueraRazorpayAdapter(testEnv))=>{
+  const revision=await catalog('cluera_pack_3h_v2');
+  if(revisionId===revision.revisionId)return createCurrentCheckout(rpc,account,requestId,revisionId,testEnv,adapter);
+  return await seedHistoricalClueraCheckout(rpc,account,requestId,revisionId,testEnv,adapter) as Awaited<ReturnType<typeof createCurrentCheckout>>;
+};
 const accountDigest=merchantDigest(env),admin=randomUUID(),adminSession=randomUUID(),legacyUser=randomUUID(),legacySession=randomUUID();
 const oldOrder='order_originalflow0001',oldPayment='pay_originalflow0001',oldRefund='rfnd_originalflow0001';
 const baseline=['20261004024730_customer_account_foundation','20261004025407_paddle_sandbox_inbox','20261004064105_shared_usage_reservations',

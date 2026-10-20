@@ -28,7 +28,7 @@ const expectedCatalog = Object.freeze({
 });
 const pageMarkers = Object.freeze({
   home: ['Your interview workspace.', 'One Cluera account.'],
-  pricing: ['Your time. One shared balance.'],
+  pricing: ['Cluera plans and pricing', 'Time for your next session'],
   account: ['Your Cluera account', 'Checking your account'],
   checkout: ['Buy Cluera credits'],
   download: ['Download Cluera AI.', 'Cluera TEST installer awaiting approval'],

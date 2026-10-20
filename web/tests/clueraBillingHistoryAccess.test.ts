@@ -119,3 +119,23 @@ it('a current-owner timeout aborts the request and shows a persistent understand
  await render();await act(async()=>button().click());await act(async()=>{await vi.advanceTimersByTimeAsync(10000);});
  expect(signal?.aborted).toBe(true);expect(host.textContent).toContain('Billing history is unavailable');expect(button().disabled).toBe(false);expect(request).toHaveBeenCalledOnce();
 });
+it('checkout history loads automatically only after owner verification, then refreshes once per snapshot without a write',async()=>{
+ const request=vi.fn(async()=>json({history:populated()}));vi.stubGlobal('fetch',request);
+ const automatic=async(disabled:boolean,refreshKey:number)=>{await act(async()=>root.render(createElement(ClueraBillingHistory,{accountId:user,enabled:true,disabled,autoLoad:true,refreshKey})));};
+ await automatic(true,0);expect(request).not.toHaveBeenCalled();
+ await automatic(false,1);expect(request).toHaveBeenCalledOnce();expect(host.textContent).toContain('Synthetic verified pack');
+ await automatic(false,1);expect(request).toHaveBeenCalledOnce();
+ await automatic(true,1);expect(host.textContent).not.toContain('Synthetic verified pack');
+ await automatic(false,2);expect(request).toHaveBeenCalledTimes(2);
+ expect(request.mock.calls.every(([,init])=>init?.method==='GET')).toBe(true);
+});
+it('automatic history cannot display a late response belonging to the previous account',async()=>{
+ let finish!:(response:Response)=>void;
+ const request=vi.fn((_url:RequestInfo|URL)=>new Promise<Response>(resolve=>{finish=resolve;}));vi.stubGlobal('fetch',request);
+ await act(async()=>root.render(createElement(ClueraBillingHistory,{accountId:user,enabled:true,autoLoad:true})));
+ const old=finish;
+ await act(async()=>root.render(createElement(ClueraBillingHistory,{accountId:foreign,enabled:true,autoLoad:true})));
+ await act(async()=>old(json({history:populated()})));
+ expect(host.textContent).not.toContain('Synthetic verified pack');expect(request).toHaveBeenCalledTimes(2);
+ await act(async()=>finish(json({history:empty(foreign)})));expect(host.textContent).toContain('No verified payments');
+});

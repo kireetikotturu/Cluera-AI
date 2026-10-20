@@ -17,9 +17,9 @@ function accessWindow(milliseconds:number){
  return days?`${days} ${days===1?'day':'days'}${remaining>=60000?` ${usageDuration(remaining)}`:''}`:usageDuration(milliseconds);
 }
 
-/** No automatic read, polling or mutation. Owner comes from the parent's
+/** Optional automatic GET on a verified parent snapshot; never a mutation. Owner comes from the parent's
  * logged-in credits snapshot, never an editable customer-ID input. */
-export default function ClueraBillingHistory({accountId,enabled=false,disabled=false,cancellationEnabled=false}:{accountId:string|null;enabled?:boolean;disabled?:boolean;cancellationEnabled?:boolean}){
+export default function ClueraBillingHistory({accountId,enabled=false,disabled=false,cancellationEnabled=false,autoLoad=false,refreshKey=0,onLoaded}:{accountId:string|null;enabled?:boolean;disabled?:boolean;cancellationEnabled?:boolean;autoLoad?:boolean;refreshKey?:number;onLoaded?:(history:History)=>void}){
  const statusId=useId(),alive=useRef(false),pending=useRef<AbortController|null>(null);
  const identity=useRef(accountId),availability=useRef(enabled),blocked=useRef(disabled);
  identity.current=accountId;availability.current=enabled;blocked.current=disabled;
@@ -57,7 +57,7 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
    const body=new Uint8Array(bytes);let offset=0;for(const chunk of chunks){body.set(chunk,offset);offset+=chunk.byteLength;}
    const history=envelope.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(body))).history;
    if(!current())return;if(history.userId!==owner)throw Error('History unavailable.');
-   setResult({owner,history});setMessage('Server-confirmed history loaded. This read makes no payment or subscription change.');
+   setResult({owner,history});setMessage('Your billing history is up to date.');onLoaded?.(history);
   }catch{if(owned())setMessage('Billing history is unavailable. No payment action was taken; refresh later.');}
   finally{
    clearTimeout(timer);controller.signal.removeEventListener('abort',abort);controller.abort();void reader?.cancel().catch(()=>{});
@@ -65,6 +65,8 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
    if(pending.current===controller){pending.current=null;if(alive.current)setBusy(false);}
   }
  }
+ const refreshRef=useRef(refresh);refreshRef.current=refresh;
+ useEffect(()=>{if(autoLoad&&enabled&&!disabled&&validOwner)void refreshRef.current();},[autoLoad,enabled,disabled,validOwner,accountId,refreshKey]);
  const history=enabled&&!disabled&&validOwner&&result?.owner===accountId?result.history:null;
  const notice=!enabled?'Billing history is unavailable while its read-only setup awaits approval.'
   :!validOwner?'Sign in with a verified Cluera account to read its history.'

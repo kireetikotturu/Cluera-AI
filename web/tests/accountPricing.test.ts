@@ -10,15 +10,13 @@ afterEach(()=>vi.unstubAllEnvs());
 it('shows four reviewed prices/hours, honest terms and no payment SDK or promised Remote Desktop',()=>{
  const html=renderToStaticMarkup(AccountPricing());
  for(const offer of clueraTargetPlans){const display=offerDisplay(offer);expect(html).toContain(offer.name);expect(html).toContain(display.price);expect(html).toContain(`${display.hours} hours`);expect(html).toContain(display.terms);}
- expect(html).toContain('do not roll over');expect(html).toContain('before packs');expect(html).toContain('not active payment offers');
+ expect(html).toContain('do not roll over');expect(html).toContain('before packs');expect(html).toContain('Paid plans are not yet available');
  expect(html).toContain('Remote Desktop and Mobile are not included');expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
- for(const code of ['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2']){
-  expect(html).toContain(`href="/account/checkout?offer=${code}"`);
- }
+ expect((html.match(/disabled=""/g)??[])).toHaveLength(4);expect(html).not.toContain('View availability');
  expect(html).toContain('Checkout unavailable');expect(html).toContain('100 hours per month');
 });
 it('always presents Cluera pricing without enabling a financial route',()=>{
- vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','false');const html=renderToStaticMarkup(PricingPage());expect(html).toContain('Cluera 3 Hours');expect(html).toContain('not active payment offers');expect(html).not.toMatch(/<form|<script|<iframe/);
+ vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','false');const html=renderToStaticMarkup(PricingPage());expect(html).toContain('Cluera 3 Hours');expect(html).toContain('Paid plans are not yet available');expect(html).not.toMatch(/<form|<script|<iframe/);
 });
 it('uses current immutable Admin revisions for future presentation without changing target/history aliases or starting checkout',()=>{
  const codes=['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2'] as const;
@@ -26,7 +24,7 @@ it('uses current immutable Admin revisions for future presentation without chang
   amountPaise:59900+index*10000,currency:'INR',allowanceSeconds:14400,kind:index?'RECURRING':'PACK',interval:index?'MONTH':null,totalCount:index?120:null,
   enabled:false,version:2,testPlanValidated:!index}));
  const html=renderToStaticMarkup(AccountPricing({catalog}));
- expect(html).toContain('₹599');expect(html).toContain('4 hours');expect(html).toContain('Revision 2');
+ expect(html).toContain('₹599');expect(html).toContain('4 hours');expect(html).toContain('Future revision 0');
  expect(html).toContain('historical prices never change');expect(html).not.toContain('₹549');expect(html).not.toMatch(/<script|<iframe|<form/);
  expect(clueraTargetPlans[0].amount).toBe('54900');
 });

@@ -7,13 +7,14 @@ import { json } from '../../http';
 import { clueraBillingV2Enabled, clueraCheckoutAllowed, clueraCheckoutEnabled } from './config';
 import { callbackSchema, clueraBillingCatalog, clueraBillingStatus, createClueraCheckout, verifyClueraCallback } from './checkout';
 import { readClueraRawBody } from './events';
+import { approvedPurchaseCatalog } from './purchaseAvailability';
 
 export async function handleClueraCatalog(request: Request) {
   try {
     if (request.method !== 'GET' || new URL(request.url).searchParams.size) return json({error:'Not found.'},404);
     if (!clueraBillingV2Enabled()) return json({error:'Billing catalog awaits schema approval.'},503);
     const config = stagingAccountConfig(), clients = accountClients(config);
-    return json({catalog:await clueraBillingCatalog((name,args)=>clients.service.rpc(name,args))});
+    return json({catalog:approvedPurchaseCatalog(await clueraBillingCatalog((name,args)=>clients.service.rpc(name,args)))});
   } catch { return json({error:'Billing catalog is unavailable.'},503); }
 }
 export async function handleClueraCheckout(request: Request, callback = false) {
