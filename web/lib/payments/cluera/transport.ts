@@ -21,14 +21,22 @@ export function clueraRazorpayTransport(env = process.env, request: typeof fetch
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     const expired = new Promise<never>((_,reject) => { timer = setTimeout(() => { controller.abort();reject(new ClueraBillingError('UNAVAILABLE'));void reader?.cancel().catch(()=>undefined); },remaining); });
     try {
-      const response = await Promise.race([request(`https://api.razorpay.com/v1${path}`, { method: body ? 'POST' : 'GET',
+      const url = `https://api.razorpay.com/v1${path}`;
+      const response = await Promise.race([request(url, { method: body ? 'POST' : 'GET',
         redirect: 'error', cache: 'no-store', signal: controller.signal,
         headers: { Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`, 'Content-Type': 'application/json' },
         ...(body ? { body: JSON.stringify(body) } : {}) }),expired]);
       if (!response.ok || !response.body) throw new ClueraBillingError('UNAVAILABLE', response.status);
+      if (response.redirected || (response.url && response.url !== url)
+        || response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json')
+        throw new ClueraBillingError('UNAVAILABLE');
+      const length = response.headers.get('content-length');
+      if (length !== null && (!/^(?:0|[1-9][0-9]*)$/.test(length) || Number(length) > 256 * 1024))
+        throw new ClueraBillingError('UNAVAILABLE');
       reader = response.body.getReader(); const chunks: Uint8Array[] = []; let bytes = 0;
       for (;;) { const { done, value } = await Promise.race([reader.read(),expired]); if (done) break;
         bytes += value.byteLength; if (bytes > 256 * 1024) throw new ClueraBillingError('UNAVAILABLE'); chunks.push(value); }
+      if (monotonicNow() > chainDeadline) throw new ClueraBillingError('UNAVAILABLE');
       return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
     } catch (error) { throw error instanceof ClueraBillingError ? error : new ClueraBillingError('UNAVAILABLE'); }
     finally {
