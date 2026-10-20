@@ -10,6 +10,11 @@ const other='00000000-0000-4000-8000-000000000003',TOKEN_EXP=Math.floor(Date.now
 function token(userId=uid,sessionId=sid,expired=false){return 'header.'+Buffer.from(JSON.stringify({sub:userId,session_id:sessionId,
  iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:expired?1:TOKEN_EXP})).toString('base64url')+'.synthetic';}
 function session(userId=uid,sessionId=sid){return {access_token:token(userId,sessionId),refresh_token:'synthetic-refresh-'+userId,expires_in:3600};}
+function rotatedSession(userId=uid,sessionId=sid){return {...session(userId,sessionId),access_token:token(userId,sessionId)+'-rotated',refresh_token:'synthetic-rotated-refresh-'+userId};}
+function responseCookie(response:Response,kind:'access'|'refresh'|'session'|'recovery-lock'){
+ const prefix=`__Host-sr-account-${kind}=`,header=response.headers.getSetCookie().filter(value=>value.startsWith(prefix)).at(-1);
+ return unseal(header?.slice(prefix.length).split(';')[0],kind,accountConfig());
+}
 function cookie(kind:'access'|'refresh'|'session'|'recovery',value:unknown){return `__Host-sr-account-${kind}=${seal(value,kind,accountConfig(),3600)}`;}
 function cookies(recovery=false,anchor=true){return [cookie('access',token()),cookie('refresh',session().refresh_token),
  ...(anchor?[cookie('session',{userId:uid,sessionId:sid})]:[]),...(recovery?[cookie('recovery',sid)]:[])].join('; ');}
@@ -20,6 +25,7 @@ function makeAuth(){return {
  getUser:vi.fn(async(access:string)=>{const claims=JSON.parse(Buffer.from(access.split('.')[1],'base64url').toString());
   return claims.exp<=Math.floor(Date.now()/1000)?{data:{user:null},error:{status:401}}:{data:{user:{id:claims.sub,email:'synthetic@example.invalid',email_confirmed_at:'2026-10-01T00:00:00Z',is_anonymous:false}},error:null};}),
  refreshSession:vi.fn(async()=>({data:{session:session()},error:null})),setSession:vi.fn(async()=>({data:{session:session()},error:null})),
+ getSession:vi.fn(async()=>({data:{session:session()},error:null})),
  updateUser:vi.fn(async()=>({data:{user:{id:uid}},error:null})),reauthenticate:vi.fn(async()=>({data:{user:null,session:null},error:null})),
  };}
 let auth:ReturnType<typeof makeAuth>,rpc:ReturnType<typeof vi.fn>,signOut:ReturnType<typeof vi.fn>;
@@ -85,6 +91,59 @@ it('known password success followed by revoke failure is reported truthfully and
 it('explicit reauthentication sends only once and never updates a password or creates a login session',async()=>{
  const response=await handleAccount(request('reauthenticate',{expectedAccountId:uid}),'reauthenticate');expect(response.status).toBe(200);
  expect(await response.json()).toEqual({ok:true,message:emailNotice});expect(auth.reauthenticate).toHaveBeenCalledOnce();expect(auth.updateUser).not.toHaveBeenCalled();expect(signOut).not.toHaveBeenCalled();
+});
+it.each(['success','returned-error','throw'])('reauthentication %s preserves an authorized SDK rotation without replaying email',async outcome=>{
+ const latest=rotatedSession();auth.getSession.mockResolvedValueOnce({data:{session:latest},error:null});
+ if(outcome==='returned-error')auth.reauthenticate.mockResolvedValueOnce({data:{user:null,session:null},error:{status:503}} as never);
+ if(outcome==='throw')auth.reauthenticate.mockRejectedValueOnce(Error('DO_NOT_ECHO_EMAIL_TRANSPORT'));
+ const response=await handleAccount(request('reauthenticate',{expectedAccountId:uid}),'reauthenticate');
+ expect(response.status).toBe(outcome==='success'?200:503);
+ expect(await response.json()).toEqual(outcome==='success'?{ok:true,message:emailNotice}
+  :{code:'REAUTHENTICATION_UNAVAILABLE',error:'A verification code could not be sent. Try again later.'});
+ expect(responseCookie(response,'refresh')).toBe(latest.refresh_token);expect(responseCookie(response,'session')).toEqual({userId:uid,sessionId:sid});
+ expect(auth.getUser).toHaveBeenCalledWith(latest.access_token);expect(auth.reauthenticate).toHaveBeenCalledOnce();expect(auth.getSession).toHaveBeenCalledOnce();
+ expect(auth.updateUser).not.toHaveBeenCalled();expect(signOut).not.toHaveBeenCalled();
+});
+it.each(['returned-error','throw'])('recovery password %s preserves SDK rotation and the exact original reset deadline',async outcome=>{
+ const latest=rotatedSession(),lock={sessionId:sid,resetUntil:Date.now()+120000};
+ auth.getSession.mockResolvedValueOnce({data:{session:latest},error:null});
+ if(outcome==='returned-error')auth.updateUser.mockResolvedValueOnce({data:{user:null},error:{status:401,code:'insufficient_aal'}} as never);
+ else auth.updateUser.mockRejectedValueOnce(Error('DO_NOT_ECHO_PASSWORD_TRANSPORT'));
+ const credentials=cookies()+`; __Host-sr-account-recovery-lock=${seal(lock,'recovery-lock',accountConfig(),30*86400)}`;
+ const response=await handleAccount(request('reset-password',{expectedAccountId:uid,password:'new-test-passphrase'},credentials),'reset-password');
+ expect(response.status).toBe(outcome==='returned-error'?403:503);const body=await response.json();
+ expect(body.code).toBe(outcome==='returned-error'?'MFA_REQUIRED':'PASSWORD_UPDATE_UNCERTAIN');expect(JSON.stringify(body)).not.toContain('synthetic-rotated');
+ expect(responseCookie(response,'refresh')).toBe(latest.refresh_token);expect(responseCookie(response,'recovery-lock')).toEqual(lock);
+ expect(auth.updateUser).toHaveBeenCalledOnce();expect(signOut).not.toHaveBeenCalled();expect(response.headers.get('set-cookie')).not.toContain('Max-Age=0');
+});
+it.each([[other,sid],[uid,other]])('post-operation capture refuses changed owner/session %s %s before unrelated customer RPC or sealing',async(userId,sessionId)=>{
+ const latest=rotatedSession(userId,sessionId);auth.getSession.mockResolvedValueOnce({data:{session:latest},error:null});
+ auth.updateUser.mockResolvedValueOnce({data:{user:null},error:{status:400,code:'same_password'}} as never);
+ const response=await handleAccount(request('change-password',{expectedAccountId:uid,password:'new-test-passphrase'}),'change-password');
+ expect(response.status).toBe(400);expect((await response.json()).code).toBe('SAME_PASSWORD');expect(response.headers.get('set-cookie')).toBeNull();
+ expect(rpc.mock.calls.filter(([name])=>name==='customer_authorize')).toEqual([
+  ['customer_authorize',{p_user_id:uid,p_session_id:sid}],['customer_authorize',{p_user_id:uid,p_session_id:sid}]]);
+ expect(auth.updateUser).toHaveBeenCalledOnce();expect(signOut).not.toHaveBeenCalled();
+});
+it('known password success revokes the latest Auth-validated SDK access token without exposing captured credentials',async()=>{
+ const latest=rotatedSession();auth.getSession.mockResolvedValueOnce({data:{session:latest},error:null});
+ const response=await handleAccount(request('change-password',{expectedAccountId:uid,password:'new-test-passphrase'}),'change-password');
+ expect(response.status).toBe(200);expect(await response.json()).toEqual({ok:true,sessionsRevoked:true,message:'Password updated. Sign in again.'});
+ expect(signOut).toHaveBeenCalledExactlyOnceWith(latest.access_token,'global');expect(auth.getUser).toHaveBeenCalledWith(latest.access_token);
+ expect(responseCookie(response,'access')).toBeNull();expect(responseCookie(response,'refresh')).toBeNull();expect(auth.updateUser).toHaveBeenCalledOnce();
+});
+it.each(['missing','malformed','error','throw','wrong-owner','rejected-token'])('known password success stays truthful when SDK capture is %s',async outcome=>{
+ const latest=rotatedSession(outcome==='wrong-owner'?other:uid);
+ if(outcome==='throw')auth.getSession.mockRejectedValueOnce(Error('DO_NOT_ECHO_CAPTURE'));
+ else auth.getSession.mockResolvedValueOnce({data:{session:outcome==='missing'?null:outcome==='malformed'?{...latest,expires_in:Infinity}:latest},error:outcome==='error'?{status:503}:null} as never);
+ if(outcome==='rejected-token'){
+  const original=auth.getUser.getMockImplementation()!;
+  auth.getUser.mockImplementation(async access=>access===latest.access_token?{data:{user:null},error:{status:401}} as never:original(access));
+ }
+ const response=await handleAccount(request('change-password',{expectedAccountId:uid,password:'new-test-passphrase'}),'change-password');
+ expect(response.status).toBe(200);expect(await response.json()).toEqual({ok:true,sessionsRevoked:true,message:'Password updated. Sign in again.'});
+ expect(signOut).toHaveBeenCalledExactlyOnceWith(token(),'global');expect(responseCookie(response,'access')).toBeNull();expect(responseCookie(response,'refresh')).toBeNull();
+ expect(auth.updateUser).toHaveBeenCalledOnce();expect(response.headers.get('set-cookie')).not.toContain(latest.refresh_token);
 });
 it('rate-limited reauthentication never sends an email or updates/signs out',async()=>{
  const original=rpc.getMockImplementation()!;

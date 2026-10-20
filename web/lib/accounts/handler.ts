@@ -27,6 +27,8 @@ class PasswordChangeError extends Error {
  constructor(readonly code:PasswordCode,readonly status:400|401|403|503){super(code);}
 }
 const passwordActions=['reset-password','change-password','reauthenticate'];
+const passwordSessionSchema=z.object({access_token:z.string().min(1).max(16000),refresh_token:z.string().min(1).max(16000),
+ expires_in:z.number().finite().positive()}).passthrough();
 function rejectPasswordFailure(error:{status?:number;code?:string}|null|undefined){
  if(!error)return;
  if(error.code==='insufficient_aal')throw new PasswordChangeError('MFA_REQUIRED',403);
@@ -269,11 +271,27 @@ export async function handleAccount(request: Request, action: string): Promise<R
       await rateLimit(request, config, clients, account.email);
       const restored = await clients.auth.auth.setSession(session);
       if(restored.error||!restored.data.session)throw new PasswordChangeError('AUTHENTICATION_REQUIRED',restored.error&&(!restored.error.status||restored.error.status>=500)?503:401);
-      const current=restored.data.session;
+      let current=restored.data.session;
       const currentAccount=await authorizeCustomer(clients,current.access_token,{userId:account.userId,sessionId:account.sessionId});
       if(current.access_token!==session.access_token||current.refresh_token!==session.refresh_token)saveSession(cookies,current,currentAccount);
+      const sessionCookies=cookies;
+      const capturePasswordSession=async()=>{
+        // These SDK calls may rotate credentials proactively even when their
+        // eventual operation fails. Validate capture before sealing it, without
+        // replacing a known mutation result with an unrelated capture failure.
+        try{
+          const captured=await clients.auth.auth.getSession();
+          if(captured.error||!passwordSessionSchema.safeParse(captured.data?.session).success)return;
+          const latest=captured.data.session!;
+          if(latest.access_token!==current.access_token||latest.refresh_token!==current.refresh_token){
+            const latestAccount=await authorizeCustomer(clients,latest.access_token,{userId:account.userId,sessionId:account.sessionId});
+            saveSession(sessionCookies,latest,latestAccount);current=latest;
+          }
+        }catch{/* Preserve the actual password/email operation outcome below. */}
+      };
       if(action==='reauthenticate'){
         let result;try{result=await clients.auth.auth.reauthenticate();}catch{throw new PasswordChangeError('REAUTHENTICATION_UNAVAILABLE',503);}
+        finally{await capturePasswordSession();}
         if(result.error?.status===429)throw new AccountError('RATE_LIMITED',429);
         if(result.error)throw new PasswordChangeError('REAUTHENTICATION_UNAVAILABLE',503);
         return cookies.apply(json({ok:true,message:emailNotice}));
@@ -283,6 +301,7 @@ export async function handleAccount(request: Request, action: string): Promise<R
       try{result=await clients.auth.auth.updateUser({password:input.password,...(input.nonce?{nonce:input.nonce}:{}),
         ...('currentPassword' in input&&typeof input.currentPassword==='string'&&input.currentPassword?{current_password:input.currentPassword}:{})});}
       catch{throw new PasswordChangeError('PASSWORD_UPDATE_UNCERTAIN',503);}
+      finally{await capturePasswordSession();}
       rejectPasswordFailure(result.error);
       if(result.data?.user?.id!==account.userId)throw new PasswordChangeError('PASSWORD_UPDATE_UNCERTAIN',503);
       // Do not misreport an already successful update when later revocation fails.

@@ -49,6 +49,18 @@ it('persists a proactive SDK refresh during a read-only factor preflight without
  expect(unseal(jar.get('__Host-sr-account-recovery-lock'),'recovery-lock',accountConfig())).toEqual(before);
  expect(calls.filter(x=>x.path==='/auth/v1/user'&&x.method==='PUT')).toHaveLength(0);
 });
+it('preserves SDK rotation when the password write returns MFA_REQUIRED without replaying that write',async()=>{
+ initialLifetime=60;
+ expect((await request('forgot-password',{email:user.email})).status).toBe(200);
+ expect((await request('callback',{},'GET','?code=synthetic-near-expiry-password-code')).status).toBe(303);
+ const before=unseal(jar.get('__Host-sr-account-recovery-lock'),'recovery-lock',accountConfig());
+ const failed=await request('reset-password',{expectedAccountId:uid,password:'synthetic-new-passphrase'});
+ expect(failed.status).toBe(403);expect((await failed.json()).code).toBe('MFA_REQUIRED');
+ expect(unseal(jar.get('__Host-sr-account-refresh'),'refresh',accountConfig())).toBe('synthetic-proactive-rotation');
+ expect(unseal(jar.get('__Host-sr-account-recovery-lock'),'recovery-lock',accountConfig())).toEqual(before);
+ expect(calls.filter(x=>x.path==='/auth/v1/user'&&x.method==='PUT')).toHaveLength(1);
+ expect(calls.filter(x=>x.path.endsWith('/challenge')||x.path==='/auth/v1/logout')).toHaveLength(0);
+});
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 async function request(action:string,input:object={},method='POST',query=''){
  const response=await handleAccount(new Request(origin+'/api/account/'+action+query,{method,headers:{origin,'Content-Type':'application/json',
