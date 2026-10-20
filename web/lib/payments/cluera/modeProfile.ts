@@ -76,6 +76,11 @@ export function billingModeProfile(mode: BillingMode, env = process.env) {
   const live = mode === 'live';
   if (env.SIGMAROUND_ACCOUNTS_ENABLED !== 'true' || env.NEXT_PUBLIC_SUPABASE_URL !== CLUERA_SUPABASE_URL)
     throw new ClueraBillingError('CONFIGURATION');
+  if (live && (env.VERCEL_ENV && env.VERCEL_ENV !== 'production'
+    || env.VERCEL_TARGET_ENV && env.VERCEL_TARGET_ENV !== 'production'
+    || env.VERCEL_PROJECT_ID && env.VERCEL_PROJECT_ID !== 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B'
+    || env.VERCEL_ORG_ID && env.VERCEL_ORG_ID !== 'team_AksnPXhi2VBXI5UsY2xBIakc'))
+    throw new ClueraBillingError('CONFIGURATION');
   const credentials = live ? {
     keyId: z.string().regex(/^rzp_live_[A-Za-z0-9]{8,64}$/).parse(env.RAZORPAY_LIVE_KEY_ID),
     keySecret: secret.parse(env.RAZORPAY_LIVE_KEY_SECRET),

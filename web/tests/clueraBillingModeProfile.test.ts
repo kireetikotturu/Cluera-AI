@@ -67,3 +67,8 @@ it('requires database and runtime capabilities independently for checkout and in
   expect(() => assertBillingProfileProof(profile, { ...proof(), checkoutEnabled: false }, 'checkout', accepted)).toThrow();
   expect(() => assertBillingProfileProof(profile, proof(), 'intake', { ...accepted, CLUERA_LIVE_INTAKE_ENABLED: 'false' })).toThrow();
 });
+it.each([
+  {VERCEL_ENV:'preview'}, {VERCEL_TARGET_ENV:'preview'}, {VERCEL_PROJECT_ID:'foreign-project'}, {VERCEL_ORG_ID:'foreign-team'},
+])('refuses Live credentials in a foreign or preview deployment: %j', platform => {
+  expect(()=>billingModeProfile('live',{...env,...platform})).toThrow();
+});
