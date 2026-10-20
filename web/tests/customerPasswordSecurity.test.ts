@@ -23,11 +23,13 @@ function request(action:'password-security'|'password-mfa',options:{body?:unknow
  return new Request(origin+'/api/account/'+action+query,{method,headers:{origin:options.requestOrigin??origin,
   cookie:options.cookie??credentials(),'Content-Type':'application/json'},...(method==='POST'?{body:JSON.stringify(options.body??{expectedAccountId:uid,factorId:fid,code:'123456'})}:{})});
 }
-function makeAuth(){return {
+function makeAuth(){
+ const setSession=vi.fn(async()=>({data:{session:session()},error:null}));
+ return {
  getUser:vi.fn(async(access:string)=>{const claims=JSON.parse(Buffer.from(access.split('.')[1],'base64url').toString());
   return {data:{user:{id:claims.sub,email:'synthetic@example.invalid',email_confirmed_at:'2026-10-01T00:00:00Z',is_anonymous:false}},error:null};}),
  refreshSession:vi.fn(async()=>({data:{session:session()},error:null})),
- setSession:vi.fn(async()=>({data:{session:session()},error:null})),
+ setSession,getSession:vi.fn(async()=>await setSession.mock.results.at(-1)!.value),
  mfa:{listFactors:vi.fn(async()=>({data:{all:[{id:fid,status:'verified',factor_type:'totp',secret:'DO_NOT_ECHO_SECRET',friendly_name:'DO_NOT_ECHO_NAME'}]},error:null})),
   challengeAndVerify:vi.fn(async()=>({data:session(uid,sid,'aal2','mfa'),error:null})),enroll:vi.fn(),unenroll:vi.fn()},
  updateUser:vi.fn(),reauthenticate:vi.fn(),signOut:vi.fn(),
@@ -84,6 +86,65 @@ it('uses the Auth-validated restored JWT assurance level and seals legitimate ro
  const header=response.headers.getSetCookie().find(value=>value.startsWith('__Host-sr-account-refresh='))!;
  expect(unseal(header.split(';')[0].split('=')[1],'refresh',accountConfig())).toBe(rotated.refresh_token);
  expect(auth.getUser).toHaveBeenCalledWith(rotated.access_token);expect(auth.mfa.challengeAndVerify).not.toHaveBeenCalled();
+});
+it('captures SDK rotation after listing factors, authorizes its AAL and preserves the exact recovery deadline',async()=>{
+ const latest=session(uid,sid,'aal2','proactive'),deadline=Date.now()+120000;
+ auth.getSession.mockResolvedValueOnce({data:{session:latest},error:null});
+ const response=await handlePasswordSecurity(request('password-security',{cookie:credentials(true,deadline)}),'password-security');
+ expect(response.status).toBe(200);expect(await response.json()).toMatchObject({passwordRecovery:true,recoveryExpired:false,needsMfa:false});
+ const value=(kind:CookieKind)=>response.headers.getSetCookie().find(header=>header.startsWith('__Host-sr-account-'+kind+'='))!.split(';')[0].split('=')[1];
+ expect(unseal(value('access'),'access',accountConfig())).toBe(latest.access_token);
+ expect(unseal(value('refresh'),'refresh',accountConfig())).toBe(latest.refresh_token);
+ expect(unseal(value('recovery-lock'),'recovery-lock',accountConfig())).toEqual({sessionId:sid,resetUntil:deadline});
+ expect(auth.getUser).toHaveBeenCalledWith(latest.access_token);expect(auth.mfa.challengeAndVerify).not.toHaveBeenCalled();
+});
+it('preserves an authorized proactive rotation even when later MFA verification rejects the code',async()=>{
+ const latest=session(uid,sid,'aal1','proactive');auth.getSession.mockResolvedValue({data:{session:latest},error:null});
+ auth.mfa.challengeAndVerify.mockResolvedValueOnce({data:null,error:{status:401,code:'mfa_verification_failed'}} as never);
+ const response=await handlePasswordSecurity(request('password-mfa'),'password-mfa');await failure(response,'MFA_CODE_INVALID',400);
+ const header=response.headers.getSetCookie().find(value=>value.startsWith('__Host-sr-account-refresh='))!;
+ expect(unseal(header.split(';')[0].split('=')[1],'refresh',accountConfig())).toBe(latest.refresh_token);
+ expect(auth.getUser).toHaveBeenCalledWith(latest.access_token);expect(auth.mfa.challengeAndVerify).toHaveBeenCalledOnce();
+});
+it('captures a rotation inside a failed MFA challenge without replaying it or extending recovery',async()=>{
+ const latest=session(uid,sid,'aal1','challenge-rotation'),deadline=Date.now()+120000;
+ auth.getSession.mockResolvedValueOnce({data:{session:session()},error:null}).mockResolvedValueOnce({data:{session:latest},error:null});
+ auth.mfa.challengeAndVerify.mockResolvedValueOnce({data:null,error:{status:403,code:'mfa_verification_failed'}} as never);
+ const response=await handlePasswordSecurity(request('password-mfa',{cookie:credentials(true,deadline)}),'password-mfa');
+ await failure(response,'MFA_CODE_INVALID',400);
+ const value=(kind:CookieKind)=>response.headers.getSetCookie().filter(header=>header.startsWith('__Host-sr-account-'+kind+'=')).at(-1)!.split(';')[0].split('=')[1];
+ expect(unseal(value('access'),'access',accountConfig())).toBe(latest.access_token);
+ expect(unseal(value('refresh'),'refresh',accountConfig())).toBe(latest.refresh_token);
+ expect(unseal(value('recovery-lock'),'recovery-lock',accountConfig())).toEqual({sessionId:sid,resetUntil:deadline});
+ expect(auth.getUser).toHaveBeenCalledWith(latest.access_token);expect(auth.mfa.challengeAndVerify).toHaveBeenCalledOnce();
+ expect(auth.getSession).toHaveBeenCalledTimes(2);
+});
+it('captures a safe rotation before reporting an SDK factor-list failure',async()=>{
+ const latest=session(uid,sid,'aal1','proactive');auth.getSession.mockResolvedValueOnce({data:{session:latest},error:null});
+ auth.mfa.listFactors.mockResolvedValueOnce({data:null,error:{status:503,message:'DO_NOT_ECHO_LIST'}} as never);
+ const response=await handlePasswordSecurity(request('password-security'),'password-security');await failure(response,'MFA_UNAVAILABLE',503);
+ const header=response.headers.getSetCookie().find(value=>value.startsWith('__Host-sr-account-refresh='))!;
+ expect(unseal(header.split(';')[0].split('=')[1],'refresh',accountConfig())).toBe(latest.refresh_token);
+ expect(auth.mfa.challengeAndVerify).not.toHaveBeenCalled();
+});
+it.each([[other,sid],[uid,other]])('rejects SDK-captured owner/session changes before sealing or challenging',async(userId,sessionId)=>{
+ auth.getSession.mockResolvedValueOnce({data:{session:session(userId,sessionId,'aal2','foreign')},error:null});
+ const response=await handlePasswordSecurity(request('password-mfa'),'password-mfa');await failure(response,'AUTHENTICATION_REQUIRED',401);
+ expect(response.headers.get('set-cookie')).toBeNull();expect(auth.mfa.challengeAndVerify).not.toHaveBeenCalled();
+ expect(rpc.mock.calls.filter(([name])=>name==='customer_authorize')).toHaveLength(2);
+});
+it('does not trust an SDK-captured AAL2 JWT when live Auth rejects it',async()=>{
+ const latest=session(uid,sid,'aal2','unverified'),original=auth.getUser.getMockImplementation()!;
+ auth.getSession.mockResolvedValueOnce({data:{session:latest},error:null});
+ auth.getUser.mockImplementation(async access=>access===latest.access_token?{data:{user:null},error:{status:401}} as never:original(access));
+ const response=await handlePasswordSecurity(request('password-security'),'password-security');await failure(response,'AUTHENTICATION_REQUIRED',401);
+ expect(response.headers.get('set-cookie')).toBeNull();expect(auth.mfa.challengeAndVerify).not.toHaveBeenCalled();
+});
+it.each([{data:{session:null},error:null},{data:{session:session()},error:{status:503}}])('fails closed when SDK session capture is missing or unavailable',async captured=>{
+ auth.getSession.mockResolvedValueOnce(captured as never);
+ const response=await handlePasswordSecurity(request('password-security'),'password-security');
+ await failure(response,captured.error?'MFA_UNAVAILABLE':'AUTHENTICATION_REQUIRED',captured.error?503:401);
+ expect(response.headers.get('set-cookie')).toBeNull();expect(auth.mfa.challengeAndVerify).not.toHaveBeenCalled();
 });
 it.each(['?expectedAccountId='+uid+'&extra=1','?expectedAccountId='+uid+'&expectedAccountId='+uid,'','?expectedAccountId=invalid'])('rejects non-exact GET query %s before MFA',async query=>{
  await failure(await handlePasswordSecurity(request('password-security',{query}),'password-security'),'FORBIDDEN',403);

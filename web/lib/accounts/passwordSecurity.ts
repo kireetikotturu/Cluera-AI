@@ -63,10 +63,24 @@ export async function handlePasswordSecurity(request:Request,action:'password-se
   }
   const parsedSession=sessionData.safeParse(restored.data?.session);
   if(!parsedSession.success)throw new SecurityError('AUTHENTICATION_REQUIRED');
-  const current=restored.data.session!;
+  let current=restored.data.session!;
   const currentAccount=await authorizeCustomer(clients,current.access_token,{userId:account.userId,sessionId:account.sessionId});
   if(current.access_token!==session.access_token||current.refresh_token!==session.refresh_token)saveSession(cookies,current,currentAccount);
+  const sessionCookies=cookies;
+  const captureSession=async()=>{
+   // SDK operations may proactively rotate a near-expiry session. Storage is
+   // capture only: validate changed credentials before sealing or using AAL.
+   const captured=await clients.auth.auth.getSession();
+   if(captured.error)upstreamFailure(captured.error);
+   if(!sessionData.safeParse(captured.data?.session).success)throw new SecurityError('AUTHENTICATION_REQUIRED');
+   const latest=captured.data.session!;
+   if(latest.access_token!==current.access_token||latest.refresh_token!==current.refresh_token){
+    const latestAccount=await authorizeCustomer(clients,latest.access_token,{userId:account.userId,sessionId:account.sessionId});
+    saveSession(sessionCookies,latest,latestAccount);current=latest;
+   }
+  };
   const listed=await clients.auth.auth.mfa.listFactors();
+  await captureSession();
   if(listed.error)upstreamFailure(listed.error);
   const parsedFactors=factorList.safeParse(listed.data?.all);
   if(!parsedFactors.success||new Set(parsedFactors.data.map(factor=>factor.id)).size!==parsedFactors.data.length)throw new SecurityError('MFA_UNAVAILABLE');
@@ -77,7 +91,7 @@ export async function handlePasswordSecurity(request:Request,action:'password-se
   if(!('factorId' in input)||typeof input.factorId!=='string'||!('code' in input)||typeof input.code!=='string'
    ||!factors.some(factor=>factor.id===input.factorId))throw new SecurityError('FORBIDDEN');
   const checked=await clients.auth.auth.mfa.challengeAndVerify({factorId:input.factorId,code:input.code});
-  if(checked.error)upstreamFailure(checked.error,true);
+  if(checked.error){await captureSession();upstreamFailure(checked.error,true);}
   const parsedVerified=sessionData.safeParse(checked.data);
   if(!parsedVerified.success)throw new SecurityError('MFA_UNAVAILABLE');
   const next=checked.data!;

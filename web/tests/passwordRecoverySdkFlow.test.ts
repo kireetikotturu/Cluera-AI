@@ -5,18 +5,18 @@ import {unseal} from '../lib/accounts/cookies';
 
 const origin='https://cluera-ai-staging.vercel.app',authOrigin='https://yhnqlfcgrmckhyjdxegg.supabase.co';
 const uid='00000000-0000-4000-8000-000000000931',sid='00000000-0000-4000-8000-000000000932',factor='00000000-0000-4000-8000-000000000933';
-const token=(aal:string)=>Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')+'.'+Buffer.from(JSON.stringify({
- sub:uid,session_id:sid,iss:authOrigin+'/auth/v1',aud:'authenticated',role:'authenticated',aal,exp:Math.floor(Date.now()/1000)+3600,
+const token=(aal:string,lifetime=3600)=>Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')+'.'+Buffer.from(JSON.stringify({
+ sub:uid,session_id:sid,iss:authOrigin+'/auth/v1',aud:'authenticated',role:'authenticated',aal,exp:Math.floor(Date.now()/1000)+lifetime,
 })).toString('base64url')+'.c3ludGhldGlj';
 const user={id:uid,email:'sdk-recovery@example.invalid',aud:'authenticated',email_confirmed_at:'2026-10-01T00:00:00Z',
  factors:[{id:factor,factor_type:'totp',status:'verified'}]};
-const credentials=(aal:string)=>({access_token:token(aal),refresh_token:aal==='aal2'?'synthetic-rotated-refresh':'synthetic-recovery-refresh',expires_in:3600,token_type:'bearer',user});
-let jar:Map<string,string>,calls:{path:string;method:string;aal?:string}[];
+const credentials=(aal:string,lifetime=3600)=>({access_token:token(aal,lifetime),refresh_token:aal==='aal2'?'synthetic-rotated-refresh':'synthetic-recovery-refresh',expires_in:lifetime,token_type:'bearer',user});
+let jar:Map<string,string>,calls:{path:string;method:string;aal?:string}[],initialLifetime:number;
 beforeEach(()=>{
  for(const [key,value]of Object.entries({SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:origin,NEXT_PUBLIC_SUPABASE_URL:authOrigin,
   NEXT_PUBLIC_SUPABASE_ANON_KEY:'sb_publishable_synthetic_public_key_00000000000',SUPABASE_SERVICE_ROLE_KEY:'sb_secret_synthetic_private_test_double',
   SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64:Buffer.alloc(32,3).toString('base64'),SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64:Buffer.alloc(32,4).toString('base64')}))vi.stubEnv(key,value);
- jar=new Map();calls=[];
+ jar=new Map();calls=[];initialLifetime=3600;
  vi.stubGlobal('fetch',vi.fn(async(input:string|URL|Request,init?:RequestInit)=>{
   const url=new URL(String(input));expect(url.origin).toBe(authOrigin);const method=init?.method??'GET';
   const authorization=new Headers(init?.headers).get('authorization')??'';
@@ -25,7 +25,10 @@ beforeEach(()=>{
   if(url.pathname==='/rest/v1/rpc/customer_auth_rate_limit')return Response.json(true);
   if(url.pathname==='/rest/v1/rpc/customer_authorize')return Response.json({code:'ACTIVE',userId:uid,trialSecondsGranted:900,remoteDesktop:false});
   if(url.pathname==='/auth/v1/recover')return Response.json({});
-  if(url.pathname==='/auth/v1/token'){expect(url.searchParams.get('grant_type')).toBe('pkce');return Response.json(credentials('aal1'));}
+  if(url.pathname==='/auth/v1/token'){
+   if(url.searchParams.get('grant_type')==='refresh_token')return Response.json({...credentials('aal1'),refresh_token:'synthetic-proactive-rotation'});
+   expect(url.searchParams.get('grant_type')).toBe('pkce');return Response.json(credentials('aal1',initialLifetime));
+  }
   if(url.pathname==='/auth/v1/user'&&method==='GET')return Response.json(user);
   if(url.pathname==='/auth/v1/user'&&method==='PUT')return aal==='aal2'?Response.json(user)
    :Response.json({code:'insufficient_aal',msg:'PRIVATE_AUTH_REASON'},{status:401,headers:{'x-supabase-api-version':'2024-01-01'}});
@@ -34,6 +37,17 @@ beforeEach(()=>{
   if(url.pathname==='/auth/v1/logout'){expect(url.searchParams.get('scope')).toBe('global');expect(aal).toBe('aal2');return new Response(null,{status:204});}
   throw Error('Unexpected synthetic SDK endpoint');
  }));
+});
+it('persists a proactive SDK refresh during a read-only factor preflight without sending a password',async()=>{
+ initialLifetime=60;
+ expect((await request('forgot-password',{email:user.email})).status).toBe(200);
+ expect((await request('callback',{},'GET','?code=synthetic-short-lived-code')).status).toBe(303);
+ const before=unseal(jar.get('__Host-sr-account-recovery-lock'),'recovery-lock',accountConfig());
+ const security=await request('password-security',{},'GET',`?expectedAccountId=${uid}`);
+ expect(security.status).toBe(200);
+ expect(unseal(jar.get('__Host-sr-account-refresh'),'refresh',accountConfig())).toBe('synthetic-proactive-rotation');
+ expect(unseal(jar.get('__Host-sr-account-recovery-lock'),'recovery-lock',accountConfig())).toEqual(before);
+ expect(calls.filter(x=>x.path==='/auth/v1/user'&&x.method==='PUT')).toHaveLength(0);
 });
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 async function request(action:string,input:object={},method='POST',query=''){

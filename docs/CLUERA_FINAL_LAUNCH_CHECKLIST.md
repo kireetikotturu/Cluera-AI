@@ -40,7 +40,7 @@ Password security now checks the current recovery deadline and existing factors 
 
 Resend verification now uses neutral request-received feedback and explains that it applies only to an **unverified signup**. Already verified users choose **Sign in**; a forgotten password uses **Forgot password**. Signup verification, password-reset email, authenticator code and optional reauthentication email code are separate steps. Google sign-in is shown only on signup/sign-in screens. Existing SMTP, confirmation requirements and MFA enrollment are retained.
 
-The installed-Supabase-SDK regression exercises recovery email preparation → PKCE callback → MFA-required rejection → existing authenticator verification → same-session AAL2 rotation → separate password submission → sign-out. It verifies that MFA preserves recovery restrictions and never submits the password automatically. All transport in that regression is intercepted; no real email, password change or MFA verification is performed by the operator.
+The installed-Supabase-SDK regressions exercise recovery email preparation → PKCE callback → MFA-required rejection → existing authenticator verification → same-session AAL2 rotation → separate password submission → sign-out. They also cover a near-expiry token: a factor lookup can proactively refresh the SDK session, so newly rotated credentials are independently authorized and sealed before returning or reporting a later MFA failure. The original recovery deadline remains unchanged. All transport in these regressions is intercepted; no real email, password change or MFA verification is performed by the agent.
 
 ## Verified October 19 deployment checkpoint
 
