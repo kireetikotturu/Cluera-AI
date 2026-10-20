@@ -8,6 +8,7 @@ export class AccountCreditsManager {
  private view=emptyCredits();private user?:string;private epoch=0;private closed=false;
  private pending?:Promise<CreditsView>;private request?:AbortController;
  private timer?:ReturnType<typeof setTimeout>;private settle?:ReturnType<typeof setTimeout>;
+ private purchase?:ReturnType<typeof setTimeout>;private purchaseUntil=0;
  private last=-Infinity;private since=0;
  constructor(private readonly account:Authority,private readonly api=new AccountApi(),
   private readonly changed:(view:CreditsView)=>void=()=>undefined,private readonly clock=()=>performance.now()){}
@@ -18,8 +19,24 @@ export class AccountCreditsManager {
   if(user===this.user)return;
   ++this.epoch;this.request?.abort();this.pending=undefined;clearTimeout(this.timer);clearTimeout(this.settle);
   this.timer=undefined;this.settle=undefined;
+  clearTimeout(this.purchase);this.purchase=undefined;this.purchaseUntil=0;
   this.user=user;this.last=-Infinity;this.view=emptyCredits();this.publish();
   if(user)void this.refresh();
+ }
+ /** A deliberate browser checkout opens a bounded observation window. Focus
+  * starts it, so time spent in the browser does not consume the refresh budget.
+  * These are authenticated reads only; they never create or retry a purchase. */
+ checkoutOpened(){if(!this.closed&&this.user)this.purchaseUntil=-1;}
+ foreground(){
+  if(this.closed||!this.user)return;
+  if(this.purchaseUntil===-1){this.purchaseUntil=this.clock()+120000;this.observePurchase();}
+  void this.refresh();
+ }
+ private observePurchase(){
+  clearTimeout(this.purchase);this.purchase=undefined;
+  if(this.closed||!this.user||this.purchaseUntil<=this.clock())return;
+  this.purchase=setTimeout(()=>{this.purchase=undefined;void this.refresh().finally(()=>this.observePurchase());},5000);
+  this.purchase.unref?.();
  }
  activity(active:boolean){
   if(this.closed||!this.user||this.view.active===active)return;
@@ -62,5 +79,5 @@ export class AccountCreditsManager {
   })().finally(()=>{if(this.pending===pending)this.pending=undefined;});
   this.pending=pending;return pending;
  }
- dispose(){this.closed=true;++this.epoch;this.request?.abort();clearTimeout(this.timer);clearTimeout(this.settle);this.view=emptyCredits();}
+ dispose(){this.closed=true;++this.epoch;this.request?.abort();clearTimeout(this.timer);clearTimeout(this.settle);clearTimeout(this.purchase);this.purchaseUntil=0;this.view=emptyCredits();}
 }

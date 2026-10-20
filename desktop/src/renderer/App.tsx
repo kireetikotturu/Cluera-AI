@@ -34,6 +34,8 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
   const [dashboardCollapsed, setDashboardCollapsed] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [workspaceInitialized, setWorkspaceInitialized] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState(false);
+  const [workspaceAttempt, setWorkspaceAttempt] = useState(0);
 
   /*
    * ============================================================
@@ -190,18 +192,22 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
   useEffect(() => {
     const authenticated = account.state === 'active';
     if (!authenticated || !updateStatus || updateStatus.state === 'required' || workspaceInitialized || !window.electronAPI) return;
+    let disposed = false;
+    setWorkspaceError(false);
     void Promise.all([
       window.electronAPI.listSessions(),
       window.electronAPI.getProviderStatus(),
       window.electronAPI.getSettings(),
     ]).then(([sessions, provider, settings]) => {
+      if (disposed) return;
       store.setSessions(sessions);
       store.setProviderStatus(provider);
       store.setSettings(settings);
       document.documentElement.dataset.theme = settings.theme;
       setWorkspaceInitialized(true);
-    }).catch((error: unknown) => store.setError(error instanceof Error ? error.message : 'Application initialization failed.'));
-  }, [account.state, updateStatus?.state, workspaceInitialized]);
+    }).catch(() => { if (!disposed) setWorkspaceError(true); });
+    return () => { disposed = true; };
+  }, [account.state, account.userId, updateStatus?.state, workspaceInitialized, workspaceAttempt]);
 
   useEffect(() => {
     if (account.state !== 'active' || !window.electronAPI) return undefined;
@@ -309,7 +315,9 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
 
   if (!updateStatus) return <div className="startup-error"><h1>Checking updates…</h1><p>Verifying the current release policy.</p></div>;
 
-  if (!workspaceInitialized) return <div className="startup-error"><h1>Opening Cluera AI…</h1><p>Loading your local workspace.</p></div>;
+  if (!workspaceInitialized) return <div className="startup-error"><h1>{workspaceError?'Workspace could not load':'Opening Cluera AI…'}</h1>
+    <p>{workspaceError?'Your saved workspace is retained. Retry loading or restart Cluera.':'Loading your local workspace.'}</p>
+    {workspaceError&&<button className="primary" onClick={()=>setWorkspaceAttempt(value=>value+1)}>Retry workspace</button>}</div>;
 
   /*
    * ============================================================

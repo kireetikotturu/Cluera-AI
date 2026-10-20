@@ -14,6 +14,23 @@ function fixture(){
 }
 afterEach(()=>vi.useRealTimers());
 describe('Account credit reporting ownership and scheduling',()=>{
+ it('observes delayed paid credits after browser return, then stops without idle polling',async()=>{
+  const f=fixture();f.manager.ownerChanged();await f.manager.refresh();
+  f.manager.checkoutOpened();await f.advance(300000);
+  expect(f.credits).toHaveBeenCalledTimes(1);
+  f.manager.foreground();await f.manager.refresh();
+  f.credits.mockResolvedValue({...snapshot,availableMilliseconds:11700000});
+  await f.advance(5000);expect(f.manager.status().snapshot?.availableMilliseconds).toBe(11700000);
+  for(let i=0;i<24;i++)await f.advance(5000);
+  const calls=f.credits.mock.calls.length;await f.advance(300000);
+  expect(f.credits).toHaveBeenCalledTimes(calls);expect(calls).toBeLessThanOrEqual(26);f.manager.dispose();
+ });
+ it('drops checkout observation on logout and does not carry it into another account',async()=>{
+  const f=fixture();f.manager.ownerChanged();await f.manager.refresh();f.manager.checkoutOpened();f.manager.foreground();
+  f.setState({state:'signed-out',userId:uid});f.setState({state:'active',userId:other});await f.manager.refresh();
+  const calls=f.credits.mock.calls.length;await f.advance(300000);expect(f.credits).toHaveBeenCalledTimes(calls);
+  expect(f.manager.status().snapshot?.userId).toBe(other);f.manager.dispose();
+ });
  it('single-flights refresh bursts without provider operations',async()=>{
   const f=fixture();f.manager.ownerChanged();await Promise.all(Array.from({length:15},()=>f.manager.refresh()));
   expect(f.credits).toHaveBeenCalledTimes(1);expect(f.manager.status().snapshot).toEqual(snapshot);f.manager.dispose();

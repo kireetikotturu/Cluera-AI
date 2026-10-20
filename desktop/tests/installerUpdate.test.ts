@@ -33,6 +33,27 @@ const downloadOptions = (fetcher: typeof fetch) => ({ directory, origins: ['http
   signal: new AbortController().signal, onProgress: vi.fn() });
 
 describe('verified installer download', () => {
+  it('cancels a transport that ignores abort and removes its temporary directory', async () => {
+    const controller = new AbortController();
+    let started!: () => void;
+    const requested = new Promise<void>(resolve => { started = resolve; });
+    const fetcher = vi.fn(() => { started(); return new Promise<Response>(() => undefined); });
+    const pending = downloadInstaller(claims(), { ...downloadOptions(fetcher), signal: controller.signal });
+    const rejected = expect(pending).rejects.toThrow(/interrupted/);
+    await requested; controller.abort(); await rejected;
+    expect(await readdir(directory)).toEqual([]);
+  });
+  it('cancels an unresponsive response body without awaiting its cleanup', async () => {
+    const controller = new AbortController();
+    let reading!: () => void;
+    const requested = new Promise<void>(resolve => { reading = resolve; });
+    const body = new ReadableStream<Uint8Array>({ pull() { reading(); return new Promise(() => undefined); },
+      cancel() { return new Promise(() => undefined); } });
+    const pending = downloadInstaller(claims(), { ...downloadOptions(vi.fn(async () => new Response(body))), signal: controller.signal });
+    const rejected = expect(pending).rejects.toThrow();
+    await requested; controller.abort(); await rejected;
+    expect(await readdir(directory)).toEqual([]);
+  });
   it('streams approved redirects into an exclusive temporary file and verifies its bytes', async () => {
     const fetcher = vi.fn().mockResolvedValueOnce(new Response(null, { status: 302,
       headers: { Location: 'https://release-assets.githubusercontent.com/asset' } }))
@@ -84,6 +105,19 @@ function manager(fetcher: typeof fetch, channel: 'stable' | 'beta' | 'cluera-bet
   return { updates, installer, actions };
 }
 describe('explicit update installation and session exclusion', () => {
+  it.each(['request','body'])('releases a stalled update %s at the deadline and permits a later check', async kind => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn(async () => kind === 'request' ? await new Promise<Response>(() => undefined)
+      : new Response(new ReadableStream({ pull() { return new Promise(() => undefined); },
+        cancel() { return new Promise(() => undefined); } })));
+    const { updates, installer } = manager(fetcher);
+    const pending = updates.check();
+    await vi.advanceTimersByTimeAsync(7001);
+    expect((await pending).state).toBe('unavailable');
+    fetcher.mockResolvedValue(new Response(null, { status:404 }));
+    expect((await updates.check()).state).toBe('current');
+    expect(installer.launch).not.toHaveBeenCalled();
+  });
   it('enforces configured publisher verification before launching an otherwise valid Cluera update', async () => {
     const fetcher = vi.fn(async (input: string | URL | Request) => String(input) === url
       ? new Response(bytes) : Response.json({ signedManifest: token() }));

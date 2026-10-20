@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, mkdtemp, open, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { ReleaseClaims } from './ReleaseManifest';
+import { updateTransport } from './UpdateTransport';
 
 export const MAX_INSTALLER_BYTES = 512 * 1024 * 1024;
 
@@ -53,6 +54,7 @@ export async function downloadInstaller(release: ReleaseClaims, options: {
   const abort = (): void => controller.abort();
   options.signal.addEventListener('abort', abort, { once: true });
   if (options.signal.aborted) abort();
+  const transport = updateTransport(controller.signal);
   const deadline = setTimeout(abort, 15 * 60_000);
   let idle: ReturnType<typeof setTimeout>;
   const touch = (): void => { clearTimeout(idle); idle = setTimeout(abort, 30_000); };
@@ -61,11 +63,12 @@ export async function downloadInstaller(release: ReleaseClaims, options: {
     let url = release.downloadUrl;
     for (let redirects = 0; ; redirects += 1) {
       touch();
+      controller.signal.throwIfAborted();
       assertDownloadOrigin(url, redirects === 0 ? options.origins : [...options.origins, ...options.redirectOrigins]);
-      response = await (options.fetcher ?? fetch)(url, { redirect: 'manual', signal: controller.signal,
-        headers: { Accept: 'application/octet-stream', 'Accept-Encoding': 'identity' }, credentials: 'omit' });
+      response = await transport.request((options.fetcher ?? fetch)(url, { redirect: 'manual', signal: controller.signal,
+        headers: { Accept: 'application/octet-stream', 'Accept-Encoding': 'identity' }, credentials: 'omit' }));
       if (![301, 302, 303, 307, 308].includes(response.status)) break;
-      await response.body?.cancel();
+      transport.discard(response.body);
       const location = response.headers.get('location');
       if (!location || redirects >= 5) throw new Error('Installer redirect limit exceeded.');
       url = new URL(location, url).toString();
@@ -82,7 +85,7 @@ export async function downloadInstaller(release: ReleaseClaims, options: {
     try {
       for (;;) {
         controller.signal.throwIfAborted();
-        const { done, value } = await reader.read();
+        const { done, value } = await transport.wait(reader.read());
         if (done) break;
         touch();
         bytes += value.byteLength;
@@ -95,13 +98,13 @@ export async function downloadInstaller(release: ReleaseClaims, options: {
       await handle.sync();
       if (total !== undefined && bytes !== total) throw new Error('Installer download is incomplete.');
       options.onProgress(bytes, release.fileSizeBytes ?? total);
-    } finally { await reader.cancel().catch(() => undefined); await handle.close(); }
+    } finally { transport.discard(reader); await handle.close(); }
     await verifyInstallerFile(file, release);
     return { file, dispose };
   } catch (error) { await dispose(); throw error; }
   finally {
     clearTimeout(deadline); clearTimeout(idle!);
     options.signal.removeEventListener('abort', abort);
-    if (response?.body && !response.body.locked) await response.body.cancel().catch(() => undefined);
+    controller.abort(); transport.discard(response?.body); transport.dispose();
   }
 }

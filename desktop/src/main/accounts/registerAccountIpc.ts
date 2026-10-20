@@ -53,6 +53,7 @@ export function registerAccountIpc(window: BrowserWindow, account?: AccountSessi
       // UUID is a non-secret owner hint, never authentication. Browser must
       // independently sign in and match; tokens are never transferred.
       await shell.openExternal(`${ACCOUNT_ORIGIN}/account/checkout?desktopAccount=${state.userId}`);
+      if(requireAccount().status().userId===state.userId&&requireAccount().status().state==='active')options?.credits?.checkoutOpened();
     }else await shell.openExternal(`${ACCOUNT_ORIGIN}/account${action==='signup'?'#signup':action==='reset-password'?'#forgot-password':''}`);
   });
   if (!account || !options) return;

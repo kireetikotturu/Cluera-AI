@@ -4,6 +4,7 @@ import type { UpdateStatus } from '../../shared/types';
 import { SecureJsonStore } from '../security/SecureJsonStore';
 import { compareVersions, verifyReleaseManifest, type ReleaseClaims } from './ReleaseManifest';
 import { cleanupInstallerDownloads, downloadInstaller, verifyInstallerFile } from './InstallerDownload';
+import { updateTransport } from './UpdateTransport';
 
 interface CachedManifest { version: 1; signedManifest: string }
 
@@ -115,7 +116,7 @@ export class UpdateManager {
     let artifact: Awaited<ReturnType<typeof downloadInstaller>> | undefined;
     try {
       await this.inFlight;
-      await this.fetchAndVerify(true);
+      await this.fetchAndVerify(true, abort.signal);
       const release = this.currentRelease!;
       if (!release || compareVersions(this.options.appVersion, release.version) >= 0) throw new Error('No newer approved release is available.');
       abort.signal.throwIfAborted();
@@ -126,7 +127,7 @@ export class UpdateManager {
         onProgress: (bytes, total) => { this.downloadedBytes = bytes; this.totalBytes = total; } });
       this.installPhase = 'verifying';
       // Recheck approval after a potentially long download. Cached policy never authorizes execution.
-      await this.fetchAndVerify(true);
+      await this.fetchAndVerify(true, abort.signal);
       const latest = this.currentRelease!;
       if (latest.releaseId !== release.releaseId || latest.sha256 !== release.sha256
         || latest.downloadUrl !== release.downloadUrl || latest.version !== release.version) throw new Error('Release approval changed. Check for updates again.');
@@ -160,13 +161,16 @@ export class UpdateManager {
     return new URL(ACCOUNT_DISTRIBUTION.download,endpoint).toString();
   }
 
-  private async fetchAndVerify(strict = false): Promise<UpdateStatus> {
+  private async fetchAndVerify(strict = false, signal?: AbortSignal): Promise<UpdateStatus> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 7_000);
+    const transport = updateTransport(signal ? AbortSignal.any([signal, controller.signal]) : controller.signal);
+    let response: Response | undefined;
     try {
       const endpoint = new URL(ACCOUNT_DISTRIBUTION.feed,this.options.serverUrl);
       if (endpoint.protocol !== 'https:') throw new Error('Untrusted update endpoint.');
-      const response = await this.fetcher(endpoint, { headers: { Accept: 'application/json' }, redirect: 'error', cache: 'no-store', signal: controller.signal });
+      response = await transport.request(this.fetcher(endpoint, { headers: { Accept: 'application/json' }, redirect: 'error', cache: 'no-store',
+        signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal }));
       if (this.hasSessionWork()) return this.getStatus();
       if (response.status === 404 && !strict) {
         if (this.current.state !== 'required') this.current = { state: 'current', message: "You're up to date. No newer approved release is published." };
@@ -179,9 +183,9 @@ export class UpdateManager {
       let size = 0;
       const chunks: Uint8Array[] = [];
       try {
-        for (;;) { const { done, value } = await reader.read(); if (done) break;
+        for (;;) { const { done, value } = await transport.wait(reader.read()); if (done) break;
           size += value.length; if (size > 64_000) throw new Error('Update response too large.'); chunks.push(value); }
-      } finally { await reader.cancel().catch(() => undefined); }
+      } finally { transport.discard(reader); }
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { signedManifest?: unknown };
       if (typeof body.signedManifest !== 'string') throw new Error('Missing signed manifest.');
       if (this.hasSessionWork()) return this.getStatus();
@@ -193,7 +197,7 @@ export class UpdateManager {
       if (this.current.state !== 'required') this.current = { ...this.current, state: 'unavailable', message: unavailable.message };
       return this.getStatus();
     }
-    finally { clearTimeout(timer); }
+    finally { clearTimeout(timer); controller.abort(); transport.discard(response?.body); transport.dispose(); }
   }
 
   private apply(token: string): UpdateStatus {

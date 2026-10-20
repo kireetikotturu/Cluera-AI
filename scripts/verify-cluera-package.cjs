@@ -23,12 +23,28 @@ function verify(requireArtifact=false){
   if(paths.some(p=>forbidden.test(p)))throw Error('Unapproved archive contents.');
   const metadata=JSON.parse(asar.extractFile(out,'package.json').toString());
   if(metadata.name!==p.name||metadata.version!==p.version||metadata.clueraProduct!=='cluera-ai')throw Error('Archive identity mismatch.');
+  // Verify the actual archive, not just the adjacent build directory. This
+  // catches stale packaged auth/update code and unexpected compiled leftovers.
+  const built=[];
+  function walk(directory){
+   for(const entry of fs.readdirSync(path.join(desktop,directory),{withFileTypes:true})){
+    const relative=path.posix.join(directory,entry.name);
+    if(entry.isSymbolicLink())throw Error('Unexpected build symlink.');
+    if(entry.isDirectory())walk(relative);else if(entry.isFile())built.push(relative);
+   }
+  }
+  walk('dist');
+  const resources=['resources/production-config.json','resources/account-distribution.json','resources/cluera-public-key.pem'];
+  for(const relative of [...built,...resources])
+   if(!asar.extractFile(out,relative.split('/').join(path.sep)).equals(fs.readFileSync(path.join(desktop,relative))))throw Error('Archive build or trust resource mismatch.');
+  const packedBuilt=paths.filter(relative=>relative.startsWith('/dist/')&&!asar.statFile(out,relative.slice(1).split('/').join(path.sep)).files);
+  if(packedBuilt.length!==built.length)throw Error('Unexpected packaged build files.');
   const packed=createPublicKey(asar.extractFile(out,path.join('resources','cluera-public-key.pem')));
   if(!packed.export({type:'spki',format:'der'}).equals(key.export({type:'spki',format:'der'})))throw Error('Archive public trust mismatch.');
   const {getCurrentFuseWire,FuseV1Options,FuseState}=desktopRequire('@electron/fuses');
   const exe=path.join(desktop,config.directories.output,'win-unpacked/Cluera AI.exe'),wire=getCurrentFuseWire(exe);
   // getCurrentFuseWire is async; verify it in the command-line final pass below.
-  return {entries:paths.length,fuseCheck:Promise.resolve(wire).then(w=>{
+  return {entries:paths.length,builtFiles:built.length,trustResources:resources.length,fuseCheck:Promise.resolve(wire).then(w=>{
    for(const [name,value] of Object.entries({RunAsNode:0,EnableCookieEncryption:1,EnableNodeOptionsEnvironmentVariable:0,EnableNodeCliInspectArguments:0,EnableEmbeddedAsarIntegrityValidation:1,OnlyLoadAppFromAsar:1}))
     if(w[FuseV1Options[name]]!==(value?FuseState.ENABLE:FuseState.DISABLE))throw Error('Cluera Electron fuse mismatch.');
   })};
@@ -37,4 +53,4 @@ function verify(requireArtifact=false){
 }
 module.exports=()=>{const result=verify();return result.fuseCheck;};
 module.exports.verify=verify;
-if(require.main===module)Promise.resolve().then(()=>verify(true)).then(async r=>{await r.fuseCheck;console.log(JSON.stringify({status:'passed',entries:r.entries}));}).catch(()=>{console.error('Cluera package verification failed.');process.exitCode=1;});
+if(require.main===module)Promise.resolve().then(()=>verify(true)).then(async r=>{await r.fuseCheck;console.log(JSON.stringify({status:'passed',entries:r.entries,builtFiles:r.builtFiles,trustResources:r.trustResources}));}).catch(()=>{console.error('Cluera package verification failed.');process.exitCode=1;});

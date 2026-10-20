@@ -364,7 +364,7 @@ if (process.platform === 'win32') {
   } : undefined);
 
   const accountFocus = account ? accountFocusCheck(account) : undefined;
-  const refreshAccountCredits=()=>{accountFocus?.focus();void accountCredits?.refresh();};
+  const refreshAccountCredits=()=>{accountFocus?.focus();accountCredits?.foreground();};
   if(accountFocus)window.on('focus',refreshAccountCredits);
 
   // ============================================================
