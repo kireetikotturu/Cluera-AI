@@ -42,6 +42,59 @@ it('login-session identity mismatch cannot display another customer or navigate'
 it.each(['disabled','unavailable'])('Google %s stays closed while email works',async google=>{
  const request=fixture(()=>Response.json({},{status:401}),google);await render();const button=Array.from(host.querySelectorAll('button')).find(value=>value.textContent==='Continue with Google')!;expect(button).toBeUndefined();expect(host.textContent).not.toContain('Google sign-in is not enabled');expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);expect(host.querySelector('input[name="email"]')).not.toBeNull();
 });
+it.each(['button','hash','focus','pageshow','visibilitychange'])('refreshes newly enabled Google on %s without an Auth write',async trigger=>{
+ vi.useFakeTimers();let google='disabled';
+ const request=vi.fn(async(url:unknown,_init?:RequestInit)=>String(url)==='/api/account/auth-options'?Response.json({google}):Response.json({},{status:401}));
+ vi.stubGlobal('fetch',request);await render();loginFields();
+ expect(host.textContent).not.toContain('Continue with Google');google='enabled';
+ await act(async()=>vi.advanceTimersByTimeAsync(5001));
+ await act(async()=>{
+  if(trigger==='button')Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Create account')!.click();
+  else if(trigger==='hash'){history.replaceState(null,'','/account#signup');window.dispatchEvent(new HashChangeEvent('hashchange'));}
+  else if(trigger==='visibilitychange')document.dispatchEvent(new Event(trigger));
+  else window.dispatchEvent(new Event(trigger));
+ });
+ expect(host.textContent).toContain('Continue with Google');
+ expect(request.mock.calls.filter(([url])=>url==='/api/account/auth-options')).toHaveLength(2);
+ expect(request.mock.calls.every(([,init])=>!init?.method||init.method==='GET')).toBe(true);
+ if(['focus','pageshow','visibilitychange'].includes(trigger))expect(host.querySelector<HTMLInputElement>('input[name="password"]')!.value).toBe('synthetic-passphrase');
+});
+it('coalesces return events, hides a disabled provider and never starts OAuth automatically',async()=>{
+ vi.useFakeTimers();let finish!:(response:Response)=>void,reads=0;
+ const request=vi.fn((url:unknown,init?:RequestInit)=>String(url)==='/api/account/auth-options'
+  ?++reads===1?Promise.resolve(Response.json({google:'enabled'})):new Promise<Response>(resolve=>{finish=resolve;})
+  :Promise.resolve(Response.json({},{status:401})));
+ vi.stubGlobal('fetch',request);await render();await act(async()=>vi.advanceTimersByTimeAsync(5001));
+ await act(async()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));document.dispatchEvent(new Event('visibilitychange'));});
+ expect(reads).toBe(2);await act(async()=>finish(Response.json({google:'disabled'})));expect(host.textContent).not.toContain('Continue with Google');
+ await act(async()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));});expect(reads).toBe(2);
+ expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
+});
+it.each(['request','body'])('recovers from a stalled capability %s and fences its late result',async stall=>{
+ vi.useFakeTimers();let finish!:(value:any)=>void,reads=0;
+ const request=vi.fn((url:unknown,init?:RequestInit)=>{
+  if(url!=='/api/account/auth-options')return Promise.resolve(Response.json({},{status:401}));
+  if(++reads>1)return Promise.resolve(Response.json({google:'enabled'}));
+  return stall==='request'?new Promise<Response>(resolve=>{finish=resolve;})
+   :Promise.resolve({ok:true,json:()=>new Promise(resolve=>{finish=resolve;})} as Response);
+ });
+ vi.stubGlobal('fetch',request);await render();await act(async()=>vi.advanceTimersByTimeAsync(10001));
+ expect(reads).toBe(1);expect(host.textContent).not.toContain('Continue with Google');
+ await act(async()=>window.dispatchEvent(new Event('focus')));expect(host.textContent).toContain('Continue with Google');expect(reads).toBe(2);
+ await act(async()=>finish(stall==='request'?Response.json({google:'disabled'}):{google:'disabled'}));
+ expect(host.textContent).toContain('Continue with Google');expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
+});
+it('does not refresh Google during a pending email submission or repeat that write',async()=>{
+ vi.useFakeTimers();let finish!:(response:Response)=>void;
+ const request=vi.fn((url:unknown,init?:RequestInit)=>url==='/api/account/auth-options'?Promise.resolve(Response.json({google:'enabled'}))
+  :init?.method==='POST'?new Promise<Response>(resolve=>{finish=resolve;}):Promise.resolve(Response.json({},{status:401})));
+ vi.stubGlobal('fetch',request);history.replaceState(null,'','/account#signup');await render();loginFields();await submit(host.querySelector('form')!);
+ await act(async()=>{vi.advanceTimersByTime(5001);window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));});
+ expect(request.mock.calls.filter(([url])=>url==='/api/account/auth-options')).toHaveLength(1);
+ expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+ await act(async()=>finish(Response.json({message:emailNotice})));expect(host.querySelector('h2')?.textContent).toBe('Check your email');
+ expect(host.textContent).not.toContain('Continue with Google');
+});
 it('rejected password update retains session and clears submitted secret fields',async()=>{
  const request=fixture((_url,init)=>init?.method==='POST'?Response.json({code:'SAME_PASSWORD',error:'PRIVATE_UPSTREAM'},{status:400}):session());await render();const form=securityForm();(form.elements.namedItem('password') as HTMLInputElement).value='synthetic-passphrase';(form.elements.namedItem('currentPassword') as HTMLInputElement).value='synthetic-old-password';await submit(form);
  expect(host.textContent).toContain('Signed in as');expect(host.textContent).not.toContain('PRIVATE_UPSTREAM');expect((form.elements.namedItem('password') as HTMLInputElement).value).toBe('');expect((form.elements.namedItem('currentPassword') as HTMLInputElement).value).toBe('');expect(request.mock.calls.filter(([url])=>url==='/api/account/logout')).toHaveLength(0);

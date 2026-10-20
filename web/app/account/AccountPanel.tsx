@@ -46,6 +46,7 @@ export function AccountPanel() {
   const reauthUntil=useRef(0),lastSessionCheck=useRef(0),returned=useRef(false);
   const callbackFeedback=useRef<Feedback|null>(null);
   const restoreSession=useRef<(expectedAccountId?:string,writeCurrent?:()=>boolean,explicit?:boolean)=>Promise<boolean>>(async()=>false);
+  const refreshGoogle=useRef<()=>void>(()=>{});
   const baseBusy=pendingAction!==null||checkingSession;
   const currentSecurity=passwordSecurity?.accountId===account?.userId&&passwordSecurity?.passwordRecovery===recovery?passwordSecurity:null;
   const passwordReady=currentSecurity?.status==='ready';
@@ -73,6 +74,7 @@ export function AccountPanel() {
     if(inFlight.current)return;
     window.history.replaceState(null,'',`${window.location.pathname}${window.location.search}#${value}`);
     setMode(value);setFeedback(null);setVisible(false);setVerificationReady(false);verificationEmail.current='';
+    if(value==='login'||value==='signup')refreshGoogle.current();
   }
   // A bounded presentation timer only: server limits remain authoritative.
   // Reaching zero never sends an email, retries or changes an Auth session.
@@ -106,6 +108,7 @@ export function AccountPanel() {
       else if (hash === '#resend-verification') setMode('resend-verification');
       else if (hash === '#login' || !hash) setMode('login');
       setVisible(false);setFeedback(null);
+      if(hash==='#signup'||hash==='#login'||!hash)refreshGoogle.current();
     };
     selectMode();
     const handoffQuery=new URLSearchParams(window.location.search),handoffErrors=handoffQuery.getAll('authError');
@@ -169,15 +172,28 @@ export function AccountPanel() {
       }
     };
     restoreSession.current=readSession;void readSession();
-    const optionsController=new AbortController(),optionsDeadline=setTimeout(()=>optionsController.abort(),10000);
-    fetch('/api/account/auth-options',{cache:'no-store',signal:optionsController.signal}).then(async response=>{
-      const data=await response.json();
-      if(!alive.current||optionsController.signal.aborted)return;
-      if(!response.ok||!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).length!==1||!['enabled','disabled','unavailable'].includes(data.google))throw new Error('Invalid options.');
-      setGoogle(data.google);
-    }).catch(()=>{if(alive.current&&!optionsController.signal.aborted)setGoogle('unavailable');}).finally(()=>clearTimeout(optionsDeadline));
+    let optionsController:AbortController|null=null,optionsDeadline:ReturnType<typeof setTimeout>|undefined;
+    let lastOptionsCheck=-Infinity;
+    const readOptions=()=>{
+      if(!alive.current||optionsController||inFlight.current||Date.now()-lastOptionsCheck<5000)return;
+      const controller=new AbortController();optionsController=controller;lastOptionsCheck=Date.now();
+      const current=()=>alive.current&&optionsController===controller&&!controller.signal.aborted;
+      const deadline=setTimeout(()=>{
+        if(current()){controller.abort();optionsController=null;setGoogle('unavailable');}
+      },10000);optionsDeadline=deadline;
+      void fetch('/api/account/auth-options',{cache:'no-store',signal:controller.signal}).then(async response=>{
+        const data=await response.json();if(!current())return;
+        if(!response.ok||!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).length!==1||!['enabled','disabled','unavailable'].includes(data.google))throw new Error('Invalid options.');
+        setGoogle(data.google);
+      }).catch(()=>{if(current())setGoogle('unavailable');}).finally(()=>{
+        clearTimeout(deadline);if(optionsController===controller)optionsController=null;
+      });
+    };
+    refreshGoogle.current=readOptions;readOptions();
     const checkOnReturn=()=>{
-      if(document.visibilityState==='hidden'||inFlight.current||securityState.current?.status==='checking'||sessionController.current||Date.now()-lastSessionCheck.current<5000)return;
+      if(document.visibilityState==='hidden'||inFlight.current)return;
+      readOptions();
+      if(securityState.current?.status==='checking'||sessionController.current||Date.now()-lastSessionCheck.current<5000)return;
       void readSession();
     };
     const invalidate=(event:StorageEvent)=>{
@@ -192,7 +208,7 @@ export function AccountPanel() {
     window.addEventListener('pageshow',checkOnReturn);document.addEventListener('visibilitychange',checkOnReturn);
     return () => {
       alive.current = false;++sessionEpoch.current;++writeEpoch.current;sessionController.current?.abort();sessionController.current=null;
-      optionsController.abort();clearTimeout(optionsDeadline);
+      refreshGoogle.current=()=>{};optionsController?.abort();clearTimeout(optionsDeadline);
       if(writeDeadline.current!==null)clearTimeout(writeDeadline.current);
       writeController.current?.abort();window.removeEventListener('hashchange', selectMode);
       window.removeEventListener('storage',invalidate);window.removeEventListener('focus',checkOnReturn);

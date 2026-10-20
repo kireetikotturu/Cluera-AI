@@ -2,6 +2,8 @@
 
 Updated October 20, 2026. This guide applies only to [Cluera staging](https://cluera-ai-staging.vercel.app/account) and Supabase project `yhnqlfcgrmckhyjdxegg`. SMTP, Supabase app keys/URLs and the existing Admin/MFA enrollment are already configured. Do not repeat them.
 
+**Current status:** the owner reports Google configuration complete, and the live Cluera capability endpoint now returns `{"google":"enabled"}`. A fresh Create account page displays **Continue with Google**. The private setup instructions below are reference only; do not repeat completed configuration. Actual application consent, callback and same-account/trial acceptance remain separate from this read-only check.
+
 ## Account flow
 
 | Task | Expected behavior |
@@ -16,7 +18,7 @@ Updated October 20, 2026. This guide applies only to [Cluera staging](https://cl
 
 The email timer prevents accidental repeat requests; it cannot prove inbox delivery. Real signup/reset delivery and new-password sign-in require private owner acceptance. Use [authentication acceptance](CLUERA_AUTHENTICATION_ACCEPTANCE.md), without repeating completed setup.
 
-## Remaining private Google setup
+## Google configuration reference
 
 1. Open [Google Auth Platform clients](https://console.cloud.google.com/auth/clients) in the intended Google Cloud project. Reuse the correct **Web application** client if it exists. Configure:
 
@@ -39,7 +41,7 @@ The email timer prevents accidental repeat requests; it cannot prove inbox deliv
 
    Google returns to Supabase; Supabase then returns to Cluera. The Cluera web and loopback URLs belong in Supabase's allowlist, not Google's authorized redirect URI. Do not broaden the web allowlist to a wildcard.
 
-5. Reload [Account](https://cluera-ai-staging.vercel.app/account). **Continue with Google** appears when the live capability check reports enabled; no separate Cluera feature flag is needed. Accept one real consent/sign-in, reload, sign out and test cancellation. If entering from a selected plan, check the return destination without purchasing. For an existing verified email, confirm the same customer UUID and original once-only trial; do not manually merge accounts or grant another trial to make a test pass.
+5. Open [Create account](https://cluera-ai-staging.vercel.app/account#signup) or [Sign in](https://cluera-ai-staging.vercel.app/account#login). **Continue with Google** appears when the live capability check reports enabled; no separate Cluera feature flag is needed. The page refreshes capability on tab return and switching between these forms, with a short request throttle. A full reload also refreshes older open tabs. No email or OAuth request starts automatically. Accept one real consent/sign-in, reload, sign out and test cancellation. If entering from a selected plan, check the return destination without purchasing. For an existing verified email, confirm the same customer UUID and original once-only trial; do not manually merge accounts or grant another trial to make a test pass.
 
 6. Accept Windows Google return/sign-out/account switching on a tested build containing the current source. The retained immutable 1.0.7 installer predates later desktop fixes and has not been rebuilt by this web follow-up.
 
@@ -49,6 +51,6 @@ If Google reports `redirect_uri_mismatch`, compare the Google redirect with the 
 
 Automated tests use synthetic identities and intercepted provider requests. They cover the installed Supabase SDK's Google PKCE authorization, S256 challenge, callback exchange, sealed session restoration, wrong/duplicate redirect rejection, password recovery, MFA and account isolation. These tests do not complete private Google consent or prove email delivery.
 
-Google remains disabled until the private setup above is completed. The existing Supabase leaked-password-protection warning also remains an owner security/plan decision; do not purchase a plan implicitly. Commercial launch, financial/provider activation and public Windows distribution retain their separate gates in [the final launch checklist](CLUERA_FINAL_LAUNCH_CHECKLIST.md).
+Google is enabled in the live capability response. This does not establish completed application consent/callback acceptance. The existing Supabase leaked-password-protection warning also remains an owner security/plan decision; do not purchase a plan implicitly. Commercial launch, financial/provider activation and public Windows distribution retain their separate gates in [the final launch checklist](CLUERA_FINAL_LAUNCH_CHECKLIST.md).
 
 Provider references: [Google integration](https://supabase.com/docs/guides/auth/social-login/auth-google), [redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls), [signup behavior](https://supabase.com/docs/reference/javascript/auth-signup).
