@@ -32,6 +32,16 @@ Desktop source now exposes support before sign-in, rejects malformed Google loop
 
 Local verification: **198 focused web/Auth/installed-SDK tests**, **57 focused desktop tests**, web and desktop typechecks, and the web production build/artifact scan pass. These checks use synthetic identities and intercepted requests. Actual inbox delivery, one real signup/verification/sign-in/reload and a controlled reset/new-password sign-in still need the owner's private acceptance. Follow [the existing acceptance procedure](CLUERA_AUTHENTICATION_ACCEPTANCE.md); do not repeat completed SMTP/key/Admin/MFA setup. Commercial launch and the Remote Desktop exclusion are unchanged.
 
+## October 20 MFA and recovery correction
+
+A read-only Auth-log review for 03:30–04:25 UTC identified two password-update rejections with **`insufficient_aal`**. The recovery session was valid, but its enrolled authenticator had not been verified. The previous app mapped this to a generic session error and provided no MFA step. Both existing identities were already email-verified before that window; no signup was awaiting confirmation. A successful resend request therefore did not establish that another signup email should be sent. No SMTP failure appeared in the inspected errors; this is not proof of new-inbox delivery.
+
+Password security now checks the current recovery deadline and existing factors before enabling an update. An enrolled account verifies its existing six-digit authenticator code, then explicitly submits its new password. MFA keeps the same owner/session and original recovery deadline; it does not unlock the workspace, enroll/remove factors, retry a password update or send mail automatically. Expired recovery offers an explicit sign-out/restart. Definitively ended sessions can still be signed out locally; service outages and account mismatches are not reported as successful logout.
+
+Resend verification now uses neutral request-received feedback and explains that it applies only to an **unverified signup**. Already verified users choose **Sign in**; a forgotten password uses **Forgot password**. Signup verification, password-reset email, authenticator code and optional reauthentication email code are separate steps. Google sign-in is shown only on signup/sign-in screens. Existing SMTP, confirmation requirements and MFA enrollment are retained.
+
+The installed-Supabase-SDK regression exercises recovery email preparation → PKCE callback → MFA-required rejection → existing authenticator verification → same-session AAL2 rotation → separate password submission → sign-out. It verifies that MFA preserves recovery restrictions and never submits the password automatically. All transport in that regression is intercepted; no real email, password change or MFA verification is performed by the operator.
+
 ## Verified October 19 deployment checkpoint
 
 | Component | Independently verified evidence |

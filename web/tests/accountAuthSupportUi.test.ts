@@ -49,6 +49,7 @@ it('explicit status check preserves the typed email and reads no mail, password 
 });
 it('a login confirmed by POST but not its session can be checked explicitly without repeating credentials',async()=>{
  let reads=0;const fetcher=vi.fn(async(url:string,init?:RequestInit)=>{
+  if(url.startsWith('/api/account/password-security?'))return Response.json({accountId:account.userId,passwordRecovery:false,recoveryExpired:false,needsMfa:false,factors:[]});
   if(url==='/api/account/auth-options')return Response.json({google:'disabled'});if(init?.method==='POST')return Response.json({account});
   reads++;return reads<3?Response.json({},{status:reads===1?401:503}):Response.json({account,passwordRecovery:false});
  });vi.stubGlobal('fetch',fetcher);await render();email();(host.querySelector('input[name="password"]')as HTMLInputElement).value='fixture-password';await submit();
@@ -56,11 +57,13 @@ it('a login confirmed by POST but not its session can be checked explicitly with
  expect(host.textContent).toContain('Signed in as');expect(host.textContent).toContain('Your current sign-in is verified.');expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
 });
 it('checking an already verified recovery session retains its reset-only view and completes feedback',async()=>{
- const fetcher=vi.fn(async(url:string,_init?:RequestInit)=>url==='/api/account/auth-options'?Response.json({google:'disabled'}):Response.json({account,passwordRecovery:true}));vi.stubGlobal('fetch',fetcher);await render('#reset-password');await act(async()=>button('Check sign-in status').click());
- expect(host.textContent).toContain('Password-recovery session verified.');expect(host.textContent).toContain('Choose a new password');expect(host.textContent).not.toContain('Synthetic workspace');expect(fetcher.mock.calls.every(([,init])=>!(init as RequestInit|undefined)?.method)).toBe(true);
+ const fetcher=vi.fn(async(url:string,_init?:RequestInit)=>url==='/api/account/auth-options'?Response.json({google:'disabled'}):url.startsWith('/api/account/password-security?')
+  ?Response.json({accountId:account.userId,passwordRecovery:true,recoveryExpired:false,needsMfa:false,factors:[]}):Response.json({account,passwordRecovery:true}));vi.stubGlobal('fetch',fetcher);await render('#reset-password');await act(async()=>button('Check sign-in status').click());
+ expect(host.textContent).toContain('Password-recovery session verified.');expect(host.textContent).toContain('Choose a new password');expect(host.textContent).not.toContain('Synthetic workspace');expect(fetcher.mock.calls.every(([url,init])=>['/api/account/session','/api/account/auth-options',`/api/account/password-security?expectedAccountId=${account.userId}`].includes(url)&&(!init?.method||init.method==='GET'))).toBe(true);
 });
 it('expired recovery rejection explains the explicit recovery exit without signing out, updating twice or sending another email',async()=>{
- const fetcher=vi.fn(async(url:string,init?:RequestInit)=>url==='/api/account/auth-options'?Response.json({google:'disabled'}):init?.method==='POST'
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>url==='/api/account/auth-options'?Response.json({google:'disabled'}):url.startsWith('/api/account/password-security?')
+  ?Response.json({accountId:account.userId,passwordRecovery:true,recoveryExpired:false,needsMfa:false,factors:[]}):init?.method==='POST'
   ?Response.json({code:'RECOVERY_SESSION_REQUIRED',error:'private-expired-recovery-details'},{status:403}):Response.json({account,passwordRecovery:true}));vi.stubGlobal('fetch',fetcher);await render('#reset-password');
  (host.querySelector('input[name="password"]')as HTMLInputElement).value='fixture-new-password';await submit();
  expect(host.querySelector('#account-auth-feedback')?.textContent).toContain('latest password-reset email');expect(host.textContent).toContain('sign out of this browser and explicitly request a new password-reset email');

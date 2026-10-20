@@ -3,7 +3,7 @@ import {act,createElement} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {AccountPanel} from '../app/account/AccountPanel';
-import {emailNotice} from '../lib/accounts/publicAuth';
+import {emailNotice,resendNotice} from '../lib/accounts/publicAuth';
 import {resolveCheckoutSelection} from '../lib/cluera/checkoutJourney';
 import {replaceAccountLocation} from '../lib/accounts/browserNavigation';
 vi.mock('../lib/accounts/browserNavigation',async original=>({...await original<typeof import('../lib/accounts/browserNavigation')>(),replaceAccountLocation:vi.fn()}));
@@ -147,7 +147,7 @@ it('offers explicit email-only verification resend with no automatic request',as
  history.replaceState(null,'','/account#resend-verification');const fetcher=vi.fn(async(_url:any,init?:RequestInit)=>init?.method==='POST'?Response.json({message:emailNotice}):Response.json({},{status:401}));vi.stubGlobal('fetch',fetcher);
  await act(async()=>root.render(createElement(AccountPanel)));expect(host.querySelector('h2')?.textContent).toBe('Resend verification');expect(host.querySelector('input[name="password"]')).toBeNull();expect(fetcher.mock.calls.filter(([url])=>url==='/api/account/session')).toHaveLength(1);
  (host.querySelector('input[name="email"]') as HTMLInputElement).value='fixture@example.invalid';await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
- const post=fetcher.mock.calls.find(([,init])=>init?.method==='POST')!;expect(post[0]).toBe('/api/account/resend-verification');expect(JSON.parse(post[1]!.body as string)).toEqual({email:'fixture@example.invalid'});expect(host.textContent).toContain(emailNotice);
+ const post=fetcher.mock.calls.find(([,init])=>init?.method==='POST')!;expect(post[0]).toBe('/api/account/resend-verification');expect(JSON.parse(post[1]!.body as string)).toEqual({email:'fixture@example.invalid'});expect(host.textContent).toContain(resendNotice);
 });
 it('retains the selected plan through signup and email/Google return without requesting payment',async()=>{
  history.replaceState(null,'','/account?offer=cluera_monthly_100h_v2#signup');
@@ -161,14 +161,15 @@ it('retains the selected plan through signup and email/Google return without req
 const syntheticAccount={userId:'00000000-0000-4000-8000-000000000801',email:'fixture@example.invalid',trialSecondsGranted:900,remoteDesktop:false};
 it('a restored verified session returns only to the remembered plan without starting a purchase',async()=>{
  resolveCheckoutSelection('?offer=cluera_monthly_40h_v2',sessionStorage);
- const request=vi.fn(async()=>Response.json({account:syntheticAccount,passwordRecovery:false}));vi.stubGlobal('fetch',request);
+ const request=vi.fn(async(url:unknown)=>String(url).startsWith('/api/account/password-security?')?Response.json({accountId:syntheticAccount.userId,passwordRecovery:false,recoveryExpired:false,needsMfa:false,factors:[]}):Response.json({account:syntheticAccount,passwordRecovery:false}));vi.stubGlobal('fetch',request);
  await act(async()=>root.render(createElement(AccountPanel)));
  expect(replaceAccountLocation).toHaveBeenCalledExactlyOnceWith('/account/checkout?offer=cluera_monthly_40h_v2');
- expect(sessionStorage.getItem('cluera.checkout-selection.v1')).toBeNull();expect(request.mock.calls.every(([,init])=>!init?.method)).toBe(true);expect(host.querySelector('script')).toBeNull();
+ expect(sessionStorage.getItem('cluera.checkout-selection.v1')).toBeNull();expect(request.mock.calls.every(([url,init])=>['/api/account/session','/api/account/auth-options',`/api/account/password-security?expectedAccountId=${syntheticAccount.userId}`].includes(String(url))&&(!init?.method||init.method==='GET'))).toBe(true);expect(host.querySelector('script')).toBeNull();
 });
 it('password recovery cannot expose the plan continuation and logout clears both selection storage and query',async()=>{
  history.replaceState(null,'','/account?offer=cluera_pack_3h_v2');
- const request=vi.fn(async(_url:unknown,init?:RequestInit)=>init?.method==='POST'?Response.json({ok:true}):Response.json({account:syntheticAccount,passwordRecovery:true}));vi.stubGlobal('fetch',request);
+ const request=vi.fn(async(_url:unknown,init?:RequestInit)=>String(_url).startsWith('/api/account/password-security?')?Response.json({accountId:syntheticAccount.userId,passwordRecovery:true,recoveryExpired:false,needsMfa:false,factors:[]})
+  :init?.method==='POST'?Response.json({ok:true}):Response.json({account:syntheticAccount,passwordRecovery:true}));vi.stubGlobal('fetch',request);
  await act(async()=>root.render(createElement(AccountPanel)));
  expect(host.querySelector('a[href*="checkout"]')).toBeNull();
  await act(async()=>Array.from(host.querySelectorAll('button')).find(b=>b.textContent==='Sign out of this browser')!.click());

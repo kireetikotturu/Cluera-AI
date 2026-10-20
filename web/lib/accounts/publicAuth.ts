@@ -10,9 +10,12 @@ export const publicSessionSchema=z.object({account:publicAccountSchema,passwordR
 export const publicLoginSchema=z.object({account:publicAccountSchema}).strict();
 export const emailNotice='If this request is eligible, check your email. Open the link in this browser.';
 export const signupNotice='Verification email sent! Please check your inbox and click the verification link to activate your Cluera AI account.';
+export const resendNotice='Request received. If this email has an unverified signup, check your inbox for a verification link.';
 export const emailDeliveryNotice='Email delivery could not be confirmed. Check your inbox before using resend, or contact Cluera AI support.';
+const recoveryAuthenticationNotice='This password-recovery session is no longer valid. Sign out and restart recovery with a new password-reset email, or sign in if your password was already changed.';
 export function authFailure(status:number,action?:string,code?:unknown){
- const passwordAction=['reset-password','change-password','reauthenticate'].includes(action??'');
+ const passwordAction=['reset-password','change-password','reauthenticate','password-mfa'].includes(action??'');
+ if(status===401&&action==='reset-password')return recoveryAuthenticationNotice;
  if(status===400&&code==='WEAK_PASSWORD'&&['signup','reset-password','change-password'].includes(action??''))return weakPasswordNotice;
  if(passwordAction){
   const messages:Record<string,string>={REAUTHENTICATION_REQUIRED:'Request a verification code, then enter the code from your email.',
@@ -22,8 +25,12 @@ export function authFailure(status:number,action?:string,code?:unknown){
    SAME_PASSWORD:'Choose a new password different from your current password.',
    PASSWORD_UPDATE_REJECTED:'The password update was not accepted. Check the security fields and try again.',
    PASSWORD_UPDATE_UNCERTAIN:'The password-update outcome is unconfirmed. Do not submit again automatically; sign in or use password recovery.',
-   AUTHENTICATION_REQUIRED:'Verify your session again before changing account security settings.',
-   RECOVERY_SESSION_REQUIRED:'Open the latest password-reset email in this browser before resetting your password.',
+   AUTHENTICATION_REQUIRED:action==='reset-password'?(status===401?recoveryAuthenticationNotice
+     :'The recovery session could not be checked. Check sign-in status before retrying; no password update is confirmed.'):'Verify your session again before changing account security settings.',
+   RECOVERY_SESSION_REQUIRED:'Open the latest password-reset email in this browser before resetting your password. If that recovery window expired, sign out and restart recovery explicitly.',
+   MFA_REQUIRED:'Verify your existing authenticator below, then enter and submit your password update explicitly.',
+   MFA_CODE_INVALID:'That authenticator code was not accepted. Enter the current six-digit code from your authenticator app.',
+   MFA_UNAVAILABLE:'Authenticator verification is unavailable. Check password security before trying again.',
    PASSWORD_RECOVERY_ACTIVE:'Finish the password-reset flow before changing ordinary account settings.',
    REAUTHENTICATION_UNAVAILABLE:'A verification code could not be sent. Try again later.'};
   if(typeof code==='string'&&Object.hasOwn(messages,code))return messages[code];

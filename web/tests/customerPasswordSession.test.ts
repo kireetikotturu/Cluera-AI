@@ -48,6 +48,12 @@ it('ordinary reset rejection explains recovery rather than falsely blaming passw
  expect(authFailure(response.status,'reset-password',body.code)).toContain('password-reset email');expect(auth.updateUser).not.toHaveBeenCalled();expect(signOut).not.toHaveBeenCalled();
  expect(response.headers.get('set-cookie')).toBeNull();
 });
+it.each(['change-password','reset-password'])('MFA-required %s retains the live recovery/session and requests an authenticator step',async action=>{
+ auth.updateUser.mockResolvedValueOnce({data:{user:null},error:{status:401,code:'insufficient_aal',message:'PRIVATE_UPSTREAM_DETAIL'}} as never);
+ const response=await handleAccount(request(action,{expectedAccountId:uid,password:'new-test-passphrase'},cookies(action==='reset-password')),action);
+ expect(response.status).toBe(403);expect(await response.json()).toEqual({code:'MFA_REQUIRED',error:'Verify your authenticator code before updating your password.'});
+ expect(auth.updateUser).toHaveBeenCalledOnce();expect(signOut).not.toHaveBeenCalled();expect(response.headers.get('set-cookie')??'').not.toContain('Max-Age=0');
+});
 it.each([8,128])('ordinary change accepts %i characters without relaxing upstream strength policy',async length=>{
  const response=await handleAccount(request('change-password',{expectedAccountId:uid,password:'x'.repeat(length)}),'change-password');expect(response.status).toBe(200);
  expect(auth.updateUser).toHaveBeenCalledExactlyOnceWith({password:'x'.repeat(length)});
@@ -159,6 +165,14 @@ it('pinned logout revokes only the validated current identity and uses a rotated
  expect((await handleAccount(request('logout',{expectedAccountId:other}),'logout')).status).toBe(403);expect(signOut).not.toHaveBeenCalled();
  const credentials=[cookie('refresh',session().refresh_token),cookie('session',{userId:uid,sessionId:sid})].join('; ');
  expect((await handleAccount(request('logout',{expectedAccountId:uid},credentials),'logout')).status).toBe(200);expect(auth.refreshSession).toHaveBeenCalledOnce();expect(signOut).toHaveBeenCalledExactlyOnceWith(token(),'local');
+});
+it('explicit logout clears an ended recovery session without permitting a stale different-owner operation',async()=>{
+ auth.getUser.mockResolvedValueOnce({data:{user:null},error:{status:401}} as never);
+ const response=await handleAccount(request('logout',{expectedAccountId:uid},cookies(true)),'logout');
+ expect(response.status).toBe(200);expect(await response.json()).toEqual({ok:true});expect(response.headers.get('set-cookie')).toContain('sr-account-flow=;');
+ expect(signOut).not.toHaveBeenCalled();
+ const wrong=await handleAccount(request('logout',{expectedAccountId:other},cookies(true)),'logout');
+ expect(wrong.status).toBe(403);expect(wrong.headers.get('set-cookie')).toBeNull();
 });
 it('recovery restriction survives reset-window expiry without extending reset authorization',async()=>{
  vi.useFakeTimers();const now=Date.now(),config=accountConfig(),lock={sessionId:sid,resetUntil:now+600_000};

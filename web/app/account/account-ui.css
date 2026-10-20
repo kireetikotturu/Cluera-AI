@@ -1,4 +1,10 @@
 /* Account-only design language; no License Edition/Admin selectors. */
+.account-password-security { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid #45516a; border-radius: 12px; background: #101725; }
+.account-password-security p { margin: 0; font-size: 13px; }
+.account-password-security fieldset { display: grid; gap: 14px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.account-password-security legend { padding: 0 0 10px; font-weight: 600; }
+.account-password-security select { width: 100%; min-width: 0; padding: 12px; border: 1px solid #45516a; border-radius: 8px; color: #edf2fa; background: #101725; font: inherit; }
+.account-password-security button { justify-self: start; }
 .account-auth, .account-admin-shell {
   --ink: #edf2fa; --muted: #b4bfd4; --faint: #95a3bd; --line: #35415a;
   --surface: #171e2d; --gold: #b8a7ef; --gold2: #c8b9ff;

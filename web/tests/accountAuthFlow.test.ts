@@ -13,8 +13,9 @@ const second={...first,userId:'00000000-0000-4000-8000-000000000802',email:'othe
 let host:HTMLDivElement,root:ReturnType<typeof createRoot>;
 beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);sessionStorage.clear();vi.mocked(replaceAccountLocation).mockClear();history.replaceState(null,'','/account');host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(()=>{act(()=>root.unmount());host.remove();vi.useRealTimers();vi.unstubAllGlobals();});
-function fixture(handler:(url:string,init?:RequestInit)=>Promise<Response>|Response,google='disabled'){
- const request=vi.fn(async(url:unknown,init?:RequestInit)=>String(url)==='/api/account/auth-options'?Response.json({google}):handler(String(url),init));vi.stubGlobal('fetch',request);return request;
+function fixture(handler:(url:string,init?:RequestInit)=>Promise<Response>|Response,google='disabled',passwordRecovery=false){
+ const request=vi.fn(async(url:unknown,init?:RequestInit)=>String(url)==='/api/account/auth-options'?Response.json({google}):String(url).startsWith('/api/account/password-security?')
+  ?Response.json({accountId:new URL(String(url),'http://localhost').searchParams.get('expectedAccountId'),passwordRecovery,recoveryExpired:false,needsMfa:false,factors:[]}):handler(String(url),init));vi.stubGlobal('fetch',request);return request;
 }
 const session=(account=first,passwordRecovery=false)=>Response.json({account,passwordRecovery});
 async function render(){await act(async()=>root.render(createElement(AccountPanel)));}
@@ -25,7 +26,7 @@ it('ordinary verified session opens workspace rather than recovery and security 
  fixture(()=>session());await render();expect(host.textContent).toContain('Synthetic current account workspace');expect(host.querySelector('h2')?.textContent).toBe('Your workspace');expect(host.querySelector('details')?.open).toBe(false);
 });
 it('recovery never exposes workspace or selected purchase continuation',async()=>{
- history.replaceState(null,'','/account?offer=cluera_pack_3h_v2');fixture(()=>session(first,true));await render();expect(host.textContent).toContain('Choose a new password');expect(securityForm()).toBeNull();expect(host.textContent).not.toContain('Synthetic current account workspace');expect(replaceAccountLocation).not.toHaveBeenCalled();
+ history.replaceState(null,'','/account?offer=cluera_pack_3h_v2');fixture(()=>session(first,true),'disabled',true);await render();expect(host.textContent).toContain('Choose a new password');expect(securityForm()).toBeNull();expect(host.textContent).not.toContain('Synthetic current account workspace');expect(replaceAccountLocation).not.toHaveBeenCalled();
 });
 it('login DTO alone cannot enter workspace or checkout without cookie session proof',async()=>{
  history.replaceState(null,'','/account?offer=cluera_pack_3h_v2');const request=fixture((_url,init)=>init?.method==='POST'?Response.json({account:first}):Response.json({},{status:401}));await render();loginFields();await submit(host.querySelector('form')!);
@@ -33,7 +34,7 @@ it('login DTO alone cannot enter workspace or checkout without cookie session pr
 });
 it('verified login returns only to selected plan without any billing request',async()=>{
  history.replaceState(null,'','/account?offer=cluera_pack_3h_v2');let loggedIn=false;const request=fixture((_url,init)=>{if(init?.method==='POST'){loggedIn=true;return Response.json({account:first});}return loggedIn?session():Response.json({},{status:401});});await render();loginFields();await submit(host.querySelector('form')!);
- expect(replaceAccountLocation).toHaveBeenCalledExactlyOnceWith('/account/checkout?offer=cluera_pack_3h_v2');expect(sessionStorage.getItem('cluera.checkout-selection.v1')).toBeNull();expect(location.search).toBe('');expect(request.mock.calls.every(([url])=>['/api/account/session','/api/account/auth-options','/api/account/login'].includes(String(url)))).toBe(true);
+ expect(replaceAccountLocation).toHaveBeenCalledExactlyOnceWith('/account/checkout?offer=cluera_pack_3h_v2');expect(sessionStorage.getItem('cluera.checkout-selection.v1')).toBeNull();expect(location.search).toBe('');expect(request.mock.calls.every(([url])=>['/api/account/session','/api/account/auth-options','/api/account/login'].includes(String(url))||String(url)===`/api/account/password-security?expectedAccountId=${first.userId}`)).toBe(true);
 });
 it('login-session identity mismatch cannot display another customer or navigate',async()=>{
  let loggedIn=false;fixture((_url,init)=>{if(init?.method==='POST'){loggedIn=true;return Response.json({account:first});}return loggedIn?session(second):Response.json({},{status:401});});await render();loginFields();await submit(host.querySelector('form')!);expect(host.textContent).toContain('signed-in account changed');expect(host.textContent).not.toContain(second.email);expect(replaceAccountLocation).not.toHaveBeenCalled();

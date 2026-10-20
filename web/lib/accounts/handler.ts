@@ -22,13 +22,14 @@ class AuthMailError extends Error {
 }
 type PasswordCode='REAUTHENTICATION_REQUIRED'|'INVALID_REAUTHENTICATION'|'CURRENT_PASSWORD_REQUIRED'|'CURRENT_PASSWORD_MISMATCH'
  |'SAME_PASSWORD'|'PASSWORD_UPDATE_REJECTED'|'PASSWORD_UPDATE_UNCERTAIN'|'AUTHENTICATION_REQUIRED'|'RECOVERY_SESSION_REQUIRED'
- |'PASSWORD_RECOVERY_ACTIVE'|'REAUTHENTICATION_UNAVAILABLE';
+ |'PASSWORD_RECOVERY_ACTIVE'|'REAUTHENTICATION_UNAVAILABLE'|'MFA_REQUIRED';
 class PasswordChangeError extends Error {
  constructor(readonly code:PasswordCode,readonly status:400|401|403|503){super(code);}
 }
 const passwordActions=['reset-password','change-password','reauthenticate'];
 function rejectPasswordFailure(error:{status?:number;code?:string}|null|undefined){
  if(!error)return;
+ if(error.code==='insufficient_aal')throw new PasswordChangeError('MFA_REQUIRED',403);
  if(error.code==='weak_password')throw new AuthMailError('WEAK_PASSWORD',400);
  if(error.status===429||['over_request_rate_limit','over_email_send_rate_limit'].includes(error.code??''))throw new AccountError('RATE_LIMITED',429);
  const mapped:{[key:string]:[PasswordCode,400|403]}={reauthentication_needed:['REAUTHENTICATION_REQUIRED',403],
@@ -148,6 +149,10 @@ const publicAccount = ({ sessionId: _sessionId, ...account }: Account & { sessio
 
 /** Separate BFF auth surface: no customer Auth tokens in JSON, localStorage or React props. */
 export async function handleAccount(request: Request, action: string): Promise<Response> {
+  if(action==='password-security'||action==='password-mfa'){
+    const {handlePasswordSecurity}=await import('./passwordSecurity');
+    return handlePasswordSecurity(request,action);
+  }
   let cookies: AccountCookies | undefined;
   try {
     if(['checkout','checkout-resume'].includes(action)&&!sandboxCheckoutEnabled())return json({error:'Not found.'},404);
@@ -220,9 +225,20 @@ export async function handleAccount(request: Request, action: string): Promise<R
     if (action === 'logout') {
       const input=z.object({expectedAccountId:z.uuid().optional()}).strict().parse(request.body===null?{}:await readJsonBody(request,1024));
       let validatedAccess:string|undefined;
-      if(input.expectedAccountId){const current=await activeSession(clients,cookies);
-        if(current.account.userId!==input.expectedAccountId)throw new AccountError('FORBIDDEN',403);
-        validatedAccess=current.session.access_token;}
+      if(input.expectedAccountId){
+        const anchor=identitySchema.safeParse(cookies.get('session'));
+        if(anchor.success&&anchor.data.userId!==input.expectedAccountId)throw new AccountError('FORBIDDEN',403);
+        try{
+          const current=await activeSession(clients,cookies);
+          if(current.account.userId!==input.expectedAccountId)throw new AccountError('FORBIDDEN',403);
+          validatedAccess=current.session.access_token;
+        }catch(error){
+          // Explicitly leaving a definitively ended session must remain possible.
+          // A service outage or a different owner is not a successful logout.
+          if(!(error instanceof AccountError)||error.status!==401)throw error;
+          cookies.clear();return cookies.apply(json({ok:true}));
+        }
+      }
       // Local scope revokes this Auth session only, never other devices or Admin's separate session.
       const access = validatedAccess??cookies.get('access');
       if (typeof access === 'string') {
@@ -339,7 +355,8 @@ export async function handleAccount(request: Request, action: string): Promise<R
         AUTHENTICATION_REQUIRED:'Your session must be verified again before changing security settings.',
         RECOVERY_SESSION_REQUIRED:'Open the latest password-reset email in this browser before resetting your password.',
         PASSWORD_RECOVERY_ACTIVE:'Finish the password-reset flow before using ordinary account security settings.',
-        REAUTHENTICATION_UNAVAILABLE:'A verification code could not be sent. Try again later.'};
+        REAUTHENTICATION_UNAVAILABLE:'A verification code could not be sent. Try again later.',
+        MFA_REQUIRED:'Verify your authenticator code before updating your password.'};
       const response=json({code:error.code,error:messages[error.code]},error.status);
       return cookies?cookies.apply(response):response;
     }
