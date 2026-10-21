@@ -1,8 +1,24 @@
 # Cluera billing: final setup and acceptance
 
-Updated October 20, 2026 (IST). **Test remains active. Live charging is disabled. Commercial release is not accepted.** This guide supersedes older billing setup instructions where they conflict. It does not authorize a payment, refund, replay, new mandate, Live activation or installer publication.
+Updated October 21, 2026 (IST). **Test remains active. Live charging is disabled. Commercial release is not accepted.** This guide supersedes older billing setup instructions where they conflict. It does not authorize a payment, refund, replay, new mandate, Live activation or installer publication.
 
-Use the existing [Cluera website](https://cluera-ai-staging.vercel.app/account), [Supabase project](https://supabase.com/dashboard/project/yhnqlfcgrmckhyjdxegg), Cluera Vercel project and Cluera Render relay. Existing users, Google OAuth, SMTP and Admin/MFA stay in place; do not repeat their setup. Remote Desktop remains excluded. The Windows installer is a separate next step.
+Use the existing [Cluera website](https://cluera-ai-staging.vercel.app/account), [Supabase project](https://supabase.com/dashboard/project/yhnqlfcgrmckhyjdxegg), Cluera Vercel project and Cluera Render relay. Existing users, Google OAuth, SMTP and Admin/MFA stay in place; do not repeat their setup. Remote Desktop remains excluded. The immutable Windows 1.0.8 candidate is built; its device acceptance and distribution are described in [the Windows release guide](CLUERA_WINDOWS_V1_RELEASE.md).
+
+## October 21 payment-flow follow-up
+
+Checkout now starts a fresh bounded verification window when a customer returns after spending several minutes paying. A callback, dismissal or failure cannot silently inherit an already expired observation window. Duplicate callbacks do not repeat the callback POST; repeated close/failure notifications do not restart polling indefinitely. Each window performs at most four scheduled GET checks over two minutes, plus the immediate return check. No check creates another order, captures a payment or grants time.
+
+The exact-payment success message also requires the post-resolution balance read to succeed. A history record cannot turn a failed balance refresh into an inaccurate “up to date” message. The prepared Live checkout uses the Cluera AI name; Test checkout remains visibly labelled TEST. These are website changes; Windows 1.0.8 and its hashes are unchanged.
+
+Full verification identified newly reported Vite/launch-editor advisories in the existing web and desktop development dependencies. Both now pin **Vite 8.3.3** with updated registry integrity values; only each root dependency entry and the Vite lock entry changed. See [the patched release](https://github.com/vitejs/vite/releases/tag/v8.3.3) and [the advisory](https://github.com/advisories/GHSA-r825-w8mm-5pxw). The retained 1.0.8 ASAR contains neither Vite nor launch-editor. Its October 20 build evidence remains historical; no installer was overwritten or claimed to have been rebuilt with the patched toolchain.
+
+Read-only database observation at **2026-10-21 05:55:45 UTC**: 2 customers, 2 original trials, 0 recorded payments, 0 receipts, 1 BOUND intent; native processing false and Live financial schema absent. This is not a new Razorpay order observation and does not supersede the time-bound merchant verification below. Real payment acceptance remains outstanding.
+
+The SELECT-only operations reader at **06:00:56 UTC** reports the pinned Cluera owner at epoch 1, worker admission at 06:00:04 UTC, and zero pending/quarantined receipts, uncertain intents or expired unsettled reservations. Fresh admission does not establish successful fulfillment, always-on capacity or long-term uptime.
+
+The renewed security review found 56 application tables, all with RLS and no direct SELECT/INSERT/UPDATE/DELETE/TRUNCATE privileges for anon, authenticated or service_role. The intentional RPC-only RLS-without-policy INFO remains. The existing [leaked-password-protection warning](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection) remains an owner security/plan decision; dependency audit success does not resolve it.
+
+“Automatic balance sync” means the server verifies the signed receipt and canonical payment, commits the entitlement once, then clients read that shared balance. It is not an optimistic local credit. The checkout observes delayed processing for a bounded period. Windows 1.0.8 checks on foreground return and observes a browser purchase every five seconds for two minutes; active usage and settlement use its existing refresh loop. A sleeping relay, provider delay or offline device can delay visibility. If verification remains pending, use Refresh billing status or contact support with the payment reference; do not pay again to refresh the balance.
 
 ## Implemented behavior
 
@@ -48,12 +64,16 @@ No monthly catalog, runtime flag, real mandate, Live credential, Live profile, p
 ## Short owner checklist for Test
 
 1. **Confirm the existing account privately.** Sign in, reload, check the same identity/trial and sign out. Google is configured; complete real consent/account switching only if not already accepted. Do not send credentials or email links in chat.
-2. **Accept the retained pack once.** Open [the selected ₹549 pack](https://cluera-ai-staging.vercel.app/account/checkout?offer=cluera_pack_3h_v2) with the existing approved purchaser. Use the application's same-order continuation only when offered. Accept captured ₹549, the same paid order, genuine signed webhook, exactly one 10,800-second non-expiring grant and the original trial intact. Confirm automatic history/balance and Windows balance. Stop on any uncertain result.
+2. **Check delivery, then accept the retained pack once.** In the correct Razorpay **Test** merchant, confirm the existing webhook points to `https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook`, is enabled and uses the matching privately configured Test webhook secret. For packs, verify `payment.captured`, `order.paid` and `refund.processed` subscriptions; monthly acceptance also needs the supported subscription events listed below. Confirm the durable worker is running and its backlog/alerts are observed. Review the merchant's [payment capture settings](https://razorpay.com/docs/payments/payments/capture-settings/): this implementation grants only after capture and does not perform a capture POST. Agree the forward capture policy privately; do not manually capture/refund the retained order or alter old obligations to make a test pass. Then open [the selected ₹549 pack](https://cluera-ai-staging.vercel.app/account/checkout?offer=cluera_pack_3h_v2) with the existing approved purchaser. Use the application's same-order continuation only when offered. Accept captured ₹549, the same paid order, genuine signed webhook, exactly one 10,800-second non-expiring grant and the original trial intact. Confirm automatic history/balance and Windows 1.0.8 balance. Stop on any uncertain result.
 3. **Accept the monthly policy and Test mappings.** Use first-subscription-only and end-of-term plan changes, or obtain a separately reviewed financial design before expanding them. In the correct Test merchant, prepare monthly interval-1 plans at **549900, 959900, 1954900 paise**, with the intended finite charge count. Through existing fresh-MFA Admin, create immutable catalog revisions with those plan IDs and verify them. Do not modify existing paid snapshots.
 4. **Approve a bounded monthly acceptance window.** A named operator must enable the installed native database gate and the existing Test recurring/scheduler/cancellation gates together, with durable receipt processing working. Enterprise has a separate acceptance gate. Test each enabled tier/method: invoice, renewal, failure/grace, cancellation, full refund, duplicate/out-of-order receipt and concurrent-device exhaustion. No real attempt was performed by the automated tests.
 5. **Accept operations and security.** Establish a reliable scheduler, alerts/on-call owner, backlog/reconciliation monitoring, retention and a restore drill. Review Supabase's existing [leaked-password-protection warning and plan support](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). Complete merchant business/KYC, support/refund/privacy/terms and invoice obligations. Paid infrastructure requires your approval.
 
 No SMTP, Google provider, application-key or Admin/MFA enrollment needs repeating.
+
+Supported monthly receipt events are `subscription.charged`, `subscription.authenticated`, `subscription.activated`, `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.paused`, `subscription.resumed`, `subscription.completed` and `subscription.updated`, alongside the pack events above. Preserve the existing secret and receipt history. Validate actual signed delivery and duplicate/out-of-order handling in the approved Test window; a webhook dashboard toggle alone is not acceptance. See [Razorpay webhook validation](https://razorpay.com/docs/webhooks/validate-test/).
+
+For the shortest safe public-launch path, accept the pack journey first and keep unaccepted monthly tiers unavailable. Public real-money sales still require the separate Live steps below, approved methods/business details and real Live acceptance. Test-paid time cannot become Live-paid time. A successful payment also does not activate Gemini/Deepgram: complete the private provider custody/configuration and bounded spending acceptance in [the launch checklist](CLUERA_FINAL_LAUNCH_CHECKLIST.md) before promising usable AI sessions.
 
 ## Later Live preparation and activation
 
@@ -84,7 +104,23 @@ For migration, review the exact new domain in Auth/cookie configuration, Google/
 
 Automated checks use synthetic identities, isolated PostgreSQL fixtures and intercepted provider calls. They verify Test/Live separation, explicit checkout, signed receipts, exactly-once grants, all three Live monthly tiers, renewal, preserved cancellation, refunds, account ownership and bounded transport. They do not prove actual inbox delivery, mandate behavior, paid settlement, operational uptime or a physical Windows device.
 
-**Verified runtime checkpoint, October 20, 09:10–09:13 UTC (14:40–14:43 IST):**
+**Current verified checkpoint, October 21, 06:08–06:10 UTC (11:38–11:40 IST):**
+
+| Evidence | Verified result |
+| --- | --- |
+| Reviewed source | [`c59d28a5a7bc9c06414a6922af7cbc950acce744`](https://github.com/kireetikotturu/Cluera-AI/commit/c59d28a5a7bc9c06414a6922af7cbc950acce744), tree `b9642eeb71e595531859825289fbab1f4cba6cb0`. Six explicit source/test/dependency paths changed across two commits; 832 blobs, 826 retained unchanged, no deletions. Unrelated local drafts excluded. |
+| Website | Vercel `dpl_BmgaXWQ4PQ71urfJHX8ZvggG3S2q`, READY, exact source; canonical staging alias assigned and read back. 100 bounded build events contain zero error-level events, successful compilation/deployment and zero npm audit vulnerabilities. |
+| Relay | Render `dep-dbc5bvuk1f9s73bp93qg`, LIVE, exact source; health revision independently verified. Zero error-level logs in 06:04:45–06:05:40 UTC rollout window. |
+| Full hosted CI | [39553231834](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39553231834): **2,373 web passed / 22 opt-in skipped; 426 desktop passed / 1 opt-in skipped; 154 preparation passed**. Web/backend/desktop typechecks, code builds and dependency audits pass. Exact source scan: **832 files / 0 findings**; web artifact scan: **23 files / passed**. |
+| Public checks | **16/16** fixed credential-free GET checks passed at `2026-10-21T06:08:39.972Z`; Google enabled, private account/Admin/financial routes denied, monthly catalog disabled and installer unapproved. **10/10** additional Live-disabled route checks passed at `06:09:11.943Z`. |
+| Deployed browser | Isolated 390px context with all account/financial requests intercepted and a mocked Checkout SDK. A 150-second virtual Checkout journey, delayed confirmation and duplicate callback produce one mocked create, one mocked callback, exact verified-payment success and automatic synthetic 3h 15m balance/history. Three monthly buttons stay disabled, no horizontal overflow and no page errors. This is not a real payment. |
+| Preserved state | No financial migration, payment, capture/refund/replay, provider enablement, secret/environment change or installer publication. 1.0.8 EXE/blockmap hashes rechecked unchanged; Authenticode remains NotSigned. |
+
+The first follow-up CI run, [39552626982](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39552626982), passed its functional tests/builds but **failed** the newly reported Vite security audit. It is not relabelled successful. The pinned 8.3.3 patch and the separate full successful run above resolve that finding. Local focused billing tests pass 146 checks with the patched dependencies. An initial sandbox network check could not reach any public endpoint; the explicitly network-enabled checks above are the successful deployed observations.
+
+A documentation-only follow-up may advance staging and Render while retaining every runtime/dependency blob above. The accepted full CI and Vercel build remain pinned to this exact runtime source. Real payment, provider, physical-device and operating acceptance are still pending; **production ready: NO**.
+
+**Historical billing implementation checkpoint, October 20, 09:10–09:13 UTC (14:40–14:43 IST):**
 
 | Evidence | Verified result |
 | --- | --- |

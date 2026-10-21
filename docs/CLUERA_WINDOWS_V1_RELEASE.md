@@ -1,6 +1,8 @@
 # Cluera AI Windows V1 candidate and release guide
 
-Updated October 20, 2026 (IST). **Version 1.0.8 is an unsigned TEST release candidate. Public distribution and commercial launch are not accepted.** Existing authentication, Google OAuth, Admin/MFA, billing records and older installers are preserved. Remote Desktop is excluded.
+Updated October 21, 2026 (IST). **Version 1.0.8 is an unsigned TEST release candidate. Public distribution and commercial launch are not accepted.** Existing authentication, Google OAuth, Admin/MFA, billing records and older installers are preserved. Remote Desktop is excluded.
+
+October 21 tooling follow-up: web and desktop source now pin Vite 8.3.3 to resolve the newly reported launch-editor advisories. The retained 1.0.8 ASAR contains neither Vite nor launch-editor, and its installer/blockmap hashes were independently rechecked unchanged. This is a development-tool dependency repair; the installer was not rebuilt, installed or publicly released. A later rebuild must use a new immutable version. Current billing deployment and acceptance steps are in [Billing final setup](CLUERA_BILLING_FINAL_SETUP.md).
 
 ## Candidate
 
