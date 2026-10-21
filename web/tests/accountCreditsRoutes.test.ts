@@ -28,7 +28,8 @@ it('native requires live auth, binds owned identity and forbids browser credenti
 });
 it('browser handoff requires independent cookie auth and exact desktop owner match',async()=>{
  expect((await creditsRequest(native())).status).toBe(401);
- expect((await creditsRequest(browser(`?desktopAccount=${sid}`))).status).toBe(403);
+ const mismatch=await creditsRequest(browser(`?desktopAccount=${sid}`));expect(mismatch.status).toBe(403);
+ expect(await mismatch.json()).toEqual({error:'FORBIDDEN',code:'ACCOUNT_MISMATCH'});
  expect((await creditsRequest(browser(`?desktopAccount=${uid}`))).status).toBe(200);
 });
 it('reports checkout availability only for the verified, explicitly designated tester',async()=>{

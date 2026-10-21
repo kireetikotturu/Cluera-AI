@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import styles from '../../cluera-commerce.module.css';
 import ClueraBillingHistory from './ClueraBillingHistory';
 import {checkoutRequest} from '../../../lib/payments/cluera/checkoutRequest';
+import {checkoutDenial, checkoutDenialMessage, checkoutFailureMessage, type CheckoutDenial} from '../../../lib/payments/cluera/checkoutFailure';
 import type {ClueraBillingHistory as BillingHistory} from '../../../lib/payments/cluera/historyContracts';
 import { z } from 'zod';
 import { usageDuration } from '../../../lib/usage/display';
@@ -71,14 +72,28 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const trailing = useRef(false), lastFocus = useRef(0);
   const pendingObserved = useRef(false);
 
-  const deny = useCallback((unauthenticated=false) => {
-    epoch.current++; owner.current = null;
+  const deny = useCallback((reason: CheckoutDenial = 'ACCOUNT_MISMATCH') => {
+    const preserveAccount = reason === 'TEST_PURCHASER_REQUIRED';
+    epoch.current++; trailing.current = false;
+    if (!preserveAccount) owner.current = null;
     write.current?.abort(); overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
-    binding.current = null; requestId.current = null; uncertain.current = false;
+    if (!preserveAccount) { binding.current = null; requestId.current = null; uncertain.current = false; }
     pendingObserved.current = false; verifiedCallback.current=null;completed.current=false;balanceCurrent.current=false;setWatchPayment(false);
     setResumeRevisionId(null);
-    if (alive.current) { setSignedOut(unauthenticated);setCredits(null); setEligible(false); setBusy(false); setMessage('Sign in with the matching verified Cluera account to continue.'); }
+    if (alive.current) { setSignedOut(reason === 'SIGNED_OUT');if (!preserveAccount) setCredits(null); setEligible(false); setBusy(false); setMessage(checkoutDenialMessage[reason]); }
   }, []);
+
+  const rejectResponse = useCallback(async (response: Awaited<ReturnType<typeof checkoutRequest>>, current: () => boolean, resuming = false) => {
+    if (response.ok) return false;
+    const reason = checkoutDenial(response.status, await response.json());
+    if (current()) {
+      if (reason) deny(reason);
+      else { setEligible(false); setMessage(resuming && response.status >= 500
+        ? 'The existing order cannot safely continue. Verification or configuration is unavailable. Preserve it; do not create or retry a payment.'
+        : checkoutFailureMessage(response.status)); }
+    }
+    return true;
+  }, [deny]);
 
   const refresh = useCallback(async function refreshStatus(queue = false) {
     if (read.current || write.current) { if (queue) trailing.current = true; return; }
@@ -95,8 +110,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         checkoutRequest(`${endpoint}/catalog`, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal }),
       ]);
       if (!current()) return;
-      if (accountResponse.status === 401 || accountResponse.status === 403) { deny(accountResponse.status===401&&owner.current===null); return; }
-      if (!accountResponse.ok) throw new Error();
+      if (await rejectResponse(accountResponse, current)) return;
       const account = creditsSchema.parse(await accountResponse.json());
       if (!current()) return;
       if (hint && account.userId !== hint) { deny(); return; }
@@ -110,8 +124,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       const response = await checkoutRequest(`${endpoint}/checkout?expectedAccountId=${encodeURIComponent(account.userId)}`,
         { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
       if (!current()) return;
-      if (response.status === 401 || response.status === 403) { deny(); return; }
-      if (!response.ok) throw new Error();
+      if (await rejectResponse(response, current)) return;
       const status = clueraCheckoutStatus.parse(await response.json()).payment;
       if (!current()) return;
       if (status.userId !== account.userId || owner.current !== account.userId) { deny(); return; }
@@ -157,7 +170,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       if (current()) setBusy(false);
       if (alive.current && trailing.current && !write.current) { trailing.current = false; void refreshStatus(); }
     }
-  }, [deny, endpoint, mode]);
+  }, [deny, rejectResponse, endpoint, mode]);
 
   useEffect(() => {
     alive.current = true;
@@ -219,8 +232,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
           ...(resume ? {} : { headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ expectedAccountId: accountId, requestId: requestId.current, revisionId: revision.revisionId }) }) });
       if (!current()) return;
-      if (response.status === 401 || response.status === 403) { deny(); return; }
-      if (!response.ok) throw new Error();
+      if (await rejectResponse(response, current, resume)) return;
       const checkout = clueraBoundCheckoutForMode(mode).parse(await response.json()).payment;
       if (!current()) return;
       if (checkout.revisionId !== revision.revisionId || checkout.offerCode !== revision.offerCode
@@ -241,8 +253,8 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
           { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal })] : []),
       ]);
       if (!current()) return;
-      if ([accountResponse.status, statusResponse.status].some(status => status === 401 || status === 403)) { deny(); return; }
-      if (!accountResponse.ok || !statusResponse.ok) throw new Error();
+      if (await rejectResponse(accountResponse, current) || await rejectResponse(statusResponse, current)
+        || resumeResponse && await rejectResponse(resumeResponse, current)) return;
       const verifiedAccount = creditsSchema.parse(await accountResponse.json());
       if (!current()) return;
       if (verifiedAccount.userId !== accountId) { deny(); return; }
@@ -288,8 +300,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
               body: JSON.stringify({ expectedAccountId: accountId, orderId: checkout.orderId, subscriptionId: checkout.subscriptionId,
                 paymentId: callback.razorpay_payment_id, signature: callback.razorpay_signature }) });
             if (!current()) return;
-            if (result.status === 401 || result.status === 403) { deny(); return; }
-            if (!result.ok) throw new Error();
+            if (await rejectResponse(result, current)) return;
             z.object({ payment: z.object({ code: z.literal('AWAITING_WEBHOOK') }).strict() }).strict().parse(await result.json());
             if (current()) {
               verifiedCallback.current={paymentId:callback.razorpay_payment_id,revisionId:checkout.revisionId,amountPaise:checkout.amountPaise};

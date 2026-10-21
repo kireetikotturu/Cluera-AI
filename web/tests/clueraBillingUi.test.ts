@@ -52,6 +52,47 @@ const checkoutGet = (url: RequestInfo | URL) => Response.json(String(url).endsWi
       state:'BOUND',kind:createdBinding.kind,revisionId:createdBinding.revisionId,offerCode:createdBinding.offerCode,
       orderId:createdBinding.orderId,subscriptionId:createdBinding.subscriptionId}}} : status : credits);
 
+it('keeps the verified identity and trial on a Test purchaser denial, with no sign-in loop, SDK or write', async () => {
+  const request=vi.fn(async(url:RequestInfo|URL)=>String(url).includes('/checkout?')
+    ? Response.json({code:'TEST_PURCHASER_REQUIRED',error:'PRIVATE_DO_NOT_REFLECT'},{status:403}):checkoutGet(url));
+  vi.stubGlobal('fetch',request);await renderCheckout();
+  expect(host.textContent).toContain('You are signed in. Test checkout');
+  expect(host.textContent).toContain('Synthetic Tester');expect(host.textContent).toContain('15m');
+  expect(host.textContent).not.toContain('PRIVATE_DO_NOT_REFLECT');
+  expect(host.querySelector('a[href*="#login"]')).toBeNull();expect(buy().disabled).toBe(true);
+  await act(async()=>button('Refresh billing status').click());
+  expect(host.textContent).toContain('Synthetic Tester');expect(document.querySelector('script[src*="razorpay"]')).toBeNull();
+  expect(request.mock.calls.every(([,init])=>!(init as RequestInit|undefined)?.method)).toBe(true);
+});
+
+it.each([
+  [401,undefined,'Your session has ended'],[403,'ACCOUNT_MISMATCH','does not match this checkout'],
+  [403,'RECOVERY_SESSION','Finish resetting your password'],[403,undefined,'Checkout access was denied'],
+  [404,undefined,'not enabled for this deployment'],[409,undefined,'existing payment or order'],
+  [429,undefined,'Too many billing requests'],[503,undefined,'configuration is unavailable'],
+] as const)('explains checkout status %s/%s without claiming a different failure',async(http,code,notice)=>{
+  vi.stubGlobal('fetch',vi.fn(async(url:RequestInfo|URL)=>String(url).includes('/checkout?')
+    ?Response.json({code,error:'PRIVATE_DO_NOT_REFLECT'},{status:http}):checkoutGet(url)));
+  await renderCheckout();expect(host.textContent).toContain(notice);expect(host.textContent).not.toContain('PRIVATE_DO_NOT_REFLECT');
+  if(http===401)expect(host.querySelector('a[aria-label="Sign in to buy: Cluera 3 Hours"]')).not.toBeNull();
+  else expect(buy().disabled).toBe(true);
+  expect(button('Refresh billing status').disabled).toBe(false);
+  if(http!==401)expect(host.querySelector('a[aria-label="Sign in to buy: Cluera 3 Hours"]')).toBeNull();
+  if(http>=404)expect(host.textContent).toContain('Synthetic Tester');
+});
+
+it('revoking Test eligibility closes checkout and fences late callbacks while retaining the verified balance',async()=>{
+  let denied=false,options:Record<string,any>={};const close=vi.fn();
+  window.Razorpay=class{constructor(value:Record<string,unknown>){options=value;}open=vi.fn();close=close;on=vi.fn();};
+  const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?Response.json(bound())
+    :denied&&String(url).includes('/checkout?')?Response.json({code:'TEST_PURCHASER_REQUIRED'},{status:403}):checkoutGet(url));
+  vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>buy().click());denied=true;
+  await act(async()=>button('Refresh billing status').click());expect(close).toHaveBeenCalledOnce();
+  expect(host.textContent).toContain('Synthetic Tester');expect(host.textContent).toContain('approved Test purchaser');
+  await act(async()=>options.handler({razorpay_order_id:orderId,razorpay_payment_id:'pay_synthetic0001',razorpay_signature:'a'.repeat(64)}));
+  expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+});
+
 it.each(['rzp_live_synthetic123456', 'rzp_test_synthetic123456'])('Live checkout uses only Live routes and rejects the wrong key mode: %s', async keyId => {
   const open = vi.fn(); let options: Record<string, unknown> = {};
   window.Razorpay = class { constructor(value: Record<string, unknown>) { options = value; } open = open; close = vi.fn(); on = vi.fn(); };
@@ -269,7 +310,9 @@ it.each([401,403,503,'malformed','foreign-owner','foreign-binding','unresolved-a
     });
     vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>{buy().click();});
     expect(open).not.toHaveBeenCalled();expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
-    expect(host.textContent).not.toContain('never-echo');expect(buy().disabled).toBe(true);
+    expect(host.textContent).not.toContain('never-echo');
+    if(failure===401)expect(host.querySelector('a[aria-label="Sign in to buy: Cluera 3 Hours"]')).not.toBeNull();
+    else expect(buy().disabled).toBe(true);
   });
 
 it('automatically observes a delayed signed-payment resolution and refreshes the committed balance without a payment action',async()=>{

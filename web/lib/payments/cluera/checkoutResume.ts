@@ -47,7 +47,7 @@ export async function resumeClueraCheckout(rpc:PaymentRpc,account:Account,env=pr
     amountPaise:binding.revision.amountPaise,currency:'INR' as const,revisionId:binding.revision.revisionId,offerCode:binding.revision.offerCode};
 }
 export async function handleClueraCheckoutResume(request:Request):Promise<Response> {
-  if(!clueraCheckoutEnabled())return json({error:'Not found.'},404);
+  if(!clueraCheckoutEnabled())return json({code:'CHECKOUT_DISABLED',error:'Not found.'},404);
   let cookies:AccountCookies|undefined;
   try {
     const config=stagingAccountConfig(),url=new URL(request.url),query=url.searchParams;
@@ -56,7 +56,9 @@ export async function handleClueraCheckoutResume(request:Request):Promise<Respon
     if(query.size!==1||query.getAll('expectedAccountId').length!==1||!z.uuid().safeParse(query.get('expectedAccountId')).success)throw new AccountError('INVALID_INPUT',400);
     const clients=accountClients(config);cookies=new AccountCookies(request,config);
     const {account}=await activeSession(clients,cookies);
-    if(cookies.get('recovery')===account.sessionId||query.get('expectedAccountId')!==account.userId||!clueraCheckoutAllowed(account.userId))throw new AccountError('FORBIDDEN',403);
+    if(cookies.get('recovery')===account.sessionId)return cookies.apply(json({code:'RECOVERY_SESSION',error:'Finish password recovery and sign in before checkout.'},403));
+    if(query.get('expectedAccountId')!==account.userId)return cookies.apply(json({code:'ACCOUNT_MISMATCH',error:'Account does not match.'},403));
+    if(!clueraCheckoutAllowed(account.userId))return cookies.apply(json({code:'TEST_PURCHASER_REQUIRED',error:'You are signed in, but this account is not an approved Test purchaser.'},403));
     await rateLimit(request,config,clients,account.email);
     return cookies.apply(json({payment:await resumeClueraCheckout((name,args)=>clients.service.rpc(name,args),account)}));
   } catch(error) {

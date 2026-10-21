@@ -29,7 +29,7 @@ afterEach(() => vi.clearAllMocks());
 it('reads exactly the retained resource with the actual adapter and rechecks binding/owner without financial writes', async () => {
   const { rpc, request } = setup();
   const value = await auditRetainedTestOrder(rpc, env, request);
-  expect(value).toMatchObject({ merchantPinned: true, bindingVerified: true, untouchedOrderVerified: true,
+  expect(value).toMatchObject({ merchantPinned: true, bindingVerified: true, soleApprovedPurchaserOwnsRetainedOrder: true, untouchedOrderVerified: true,
     stopped: 'SAME_ORDER_ELIGIBLE_AT_OBSERVATION', financialMutations: 0, providerRequests: 2, acceptance: 'NOT_PERFORMED' });
   expect(rpc).toHaveBeenCalledTimes(2); expect(hooks.owner).toHaveBeenCalledTimes(2);
   expect(rpc.mock.calls.every(([name]) => name === 'cluera_billing_binding')).toBe(true);

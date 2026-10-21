@@ -20,27 +20,29 @@ export async function handleClueraCatalog(request: Request) {
 export async function handleClueraCheckout(request: Request, callback = false) {
   let cookies:AccountCookies|undefined;
   try {
-    if (!clueraCheckoutEnabled()) return json({error:'Test checkout awaits approval.'},404);
+    if (!clueraCheckoutEnabled()) return json({code:'CHECKOUT_DISABLED',error:'Test checkout awaits approval.'},404);
     if (!['GET','POST'].includes(request.method) || (callback && request.method !== 'POST')) return json({error:'Not found.'},404);
     const config = stagingAccountConfig();
     if (request.method === 'POST') assertAccountOrigin(request,config.origin);
     else if (request.headers.get('sec-fetch-site') === 'cross-site' || (request.headers.has('origin') && request.headers.get('origin') !== config.origin)) return json({error:'This action is not allowed.'},403);
     const clients = accountClients(config); cookies = new AccountCookies(request,config);
     const {account} = await activeSession(clients,cookies);
-    if (cookies.get('recovery') === account.sessionId || !clueraCheckoutAllowed(account.userId)) return cookies.apply(json({error:'This action is not allowed.'},403));
+    if (cookies.get('recovery') === account.sessionId) return cookies.apply(json({code:'RECOVERY_SESSION',error:'Finish password recovery and sign in before checkout.'},403));
     await rateLimit(request,config,clients,account.email);
     const rpc = (name:string,args:Record<string,unknown>)=>clients.service.rpc(name,args);
     if (request.method === 'GET') {
       const query = new URL(request.url).searchParams;
       if (query.size !== 1 || query.getAll('expectedAccountId').length !== 1 || query.get('expectedAccountId') !== account.userId)
-        return cookies.apply(json({error:'Account does not match.'},403));
+        return cookies.apply(json({code:'ACCOUNT_MISMATCH',error:'Account does not match.'},403));
+      if (!clueraCheckoutAllowed(account.userId)) return cookies.apply(json({code:'TEST_PURCHASER_REQUIRED',error:'You are signed in, but this account is not an approved Test purchaser.'},403));
       return cookies.apply(json({payment:await clueraBillingStatus(rpc,account)}));
     }
     if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return cookies.apply(json({error:'The request could not be accepted.'},400));
     const raw = await readClueraRawBody(request,2048);
     const input = callback ? callbackSchema.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw)))
       : z.object({expectedAccountId:z.uuid(),requestId:z.uuid(),revisionId:z.uuid()}).strict().parse(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw)));
-    if (input.expectedAccountId !== account.userId) return cookies.apply(json({error:'Account does not match.'},403));
+    if (input.expectedAccountId !== account.userId) return cookies.apply(json({code:'ACCOUNT_MISMATCH',error:'Account does not match.'},403));
+    if (!clueraCheckoutAllowed(account.userId)) return cookies.apply(json({code:'TEST_PURCHASER_REQUIRED',error:'You are signed in, but this account is not an approved Test purchaser.'},403));
     const payment = 'requestId' in input ? await createClueraCheckout(rpc,account,input.requestId,input.revisionId)
       : await verifyClueraCallback(rpc,account,input);
     return cookies.apply(json({payment},payment.code === 'PENDING' ? 409 : 200));

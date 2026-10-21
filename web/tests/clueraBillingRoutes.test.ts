@@ -87,3 +87,30 @@ it('billing throttling retains HTTP429 and safe guidance before any financial op
   expect(response.status).toBe(429);expect(await response.json()).toEqual({error:'Too many billing requests. Please wait before checking again. Do not retry a payment.'});
   expect(rpc).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
 });
+
+it('an authenticated non-tester gets an eligibility code without clearing the session or reading another owner',async()=>{
+  mocks.session.mockResolvedValue({account:{userId:factor,sessionId:sid,email:'customer@example.invalid'},session:{}});
+  const clear=vi.spyOn((await import('../lib/accounts/cookies')).AccountCookies.prototype,'clear');
+  try {
+    const response=await handleClueraCheckout(request(`checkout?expectedAccountId=${factor}`));
+    expect(response.status).toBe(403);expect(await response.json()).toMatchObject({code:'TEST_PURCHASER_REQUIRED'});
+    expect(clear).not.toHaveBeenCalled();expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(rpc).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+  } finally {clear.mockRestore();}
+});
+it('a different account and a password-recovery session have distinct denial codes',async()=>{
+  const response=await handleClueraCheckout(request(`checkout?expectedAccountId=${factor}`));
+  expect(response.status).toBe(403);expect(await response.json()).toMatchObject({code:'ACCOUNT_MISMATCH'});
+  const get=vi.spyOn((await import('../lib/accounts/cookies')).AccountCookies.prototype,'get').mockReturnValue(sid);
+  try {const recovery=await handleClueraCheckout(request(`checkout?expectedAccountId=${actor}`));
+    expect(recovery.status).toBe(403);expect(await recovery.json()).toMatchObject({code:'RECOVERY_SESSION'});
+  } finally {get.mockRestore();}
+  expect(rpc).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+});
+it.each(['GET','POST'])('account switching to an unapproved purchaser reports mismatch before eligibility for %s',async method=>{
+  mocks.session.mockResolvedValue({account:{userId:factor,sessionId:sid,email:'customer@example.invalid'},session:{}});
+  const response=await handleClueraCheckout(method==='GET'?request(`checkout?expectedAccountId=${actor}`)
+    :request('checkout',{expectedAccountId:actor,requestId:crypto.randomUUID(),revisionId}));
+  expect(response.status).toBe(403);expect(await response.json()).toMatchObject({code:'ACCOUNT_MISMATCH'});
+  expect(rpc).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+});

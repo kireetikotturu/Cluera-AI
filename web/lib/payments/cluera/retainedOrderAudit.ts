@@ -15,7 +15,7 @@ const REVISION = 'c8674aed-4d01-4b34-9b3b-55937545ee7f';
 export async function auditRetainedTestOrder(rpc: PaymentRpc, env = process.env, request: typeof fetch = fetch) {
   let providerRequests = 0;
   const report = { component: 'cluera-retained-test-order', financialMutations: 0,
-    merchantPinned: false, bindingVerified: false, untouchedOrderVerified: false,
+    merchantPinned: false, bindingVerified: false, soleApprovedPurchaserOwnsRetainedOrder: false, untouchedOrderVerified: false,
     acceptance: 'NOT_PERFORMED', stopped: 'CONFIGURATION', providerRequests: 0 };
   const finish = (stopped: string) => ({ ...report, stopped, providerRequests, observedAt: new Date().toISOString() });
   try {
@@ -37,6 +37,8 @@ export async function auditRetainedTestOrder(rpc: PaymentRpc, env = process.env,
     };
     const binding = await read();
     report.bindingVerified = true;
+    const purchasers = (env.SIGMAROUND_PAYMENT_TESTER_IDS ?? '').split(',').map(value => value.trim());
+    report.soleApprovedPurchaserOwnsRetainedOrder = purchasers.length === 1 && purchasers[0] === binding.userId;
     const boundedRead: typeof fetch = async (input, init) => {
       const url = String(input);
       if (init?.method !== 'GET' || ![

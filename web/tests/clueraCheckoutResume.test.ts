@@ -94,3 +94,12 @@ it('resume keeps401/429, masks private provider failures and never authorizes a 
  vi.stubGlobal('fetch',vi.fn(async()=>Response.json({...order,amount_paid:'0',private:'SYNTHETIC_PRIVATE_RECORD'})));
  const response=await handleClueraCheckoutResume(request());expect(response.status).toBe(503);expect(await response.text()).not.toContain('SYNTHETIC_PRIVATE_RECORD');
 });
+it('resume distinguishes an unapproved signed-in purchaser from an account switch, with no provider reads or cookie clearing',async()=>{
+ hooks.session.mockResolvedValue({account:{userId:foreign,sessionId:account.sessionId,email:'customer@example.invalid'},session:{}});
+ const clear=vi.spyOn(AccountCookies.prototype,'clear');
+ const denied=await handleClueraCheckoutResume(request(`expectedAccountId=${foreign}`));
+ expect(denied.status).toBe(403);expect(await denied.json()).toMatchObject({code:'TEST_PURCHASER_REQUIRED'});
+ const switched=await handleClueraCheckoutResume(request());
+ expect(switched.status).toBe(403);expect(await switched.json()).toMatchObject({code:'ACCOUNT_MISMATCH'});
+ expect(clear).not.toHaveBeenCalled();expect(rpc).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+});
