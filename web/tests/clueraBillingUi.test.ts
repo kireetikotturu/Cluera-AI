@@ -65,7 +65,7 @@ it.each(['rzp_live_synthetic123456', 'rzp_test_synthetic123456'])('Live checkout
   expect(request.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
   await act(async () => buy().click());
   expect(request.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
-  if (keyId.startsWith('rzp_live_')) { expect(open).toHaveBeenCalledOnce(); expect(options.key).toBe(keyId); }
+  if (keyId.startsWith('rzp_live_')) { expect(open).toHaveBeenCalledOnce(); expect(options.key).toBe(keyId); expect(options.name).toBe('Cluera AI'); }
   else expect(open).not.toHaveBeenCalled();
 });
 
@@ -303,7 +303,7 @@ it('bounds automatic checks to four and never clears an unknown create or retrie
     const count=request.mock.calls.length;await act(async()=>{await vi.advanceTimersByTimeAsync(300_000);});expect(request).toHaveBeenCalledTimes(count);
   } finally {visibility.mockRestore();vi.useRealTimers();}
 });
-it.each(['VERIFIED','REFUNDED','unrelated'] as const)('success requires exact callback payment plus authoritative %s history and a refreshed balance',async proof=>{
+it.each(['VERIFIED','REFUNDED','unrelated','balance-unavailable'] as const)('success requires exact callback payment plus authoritative %s history and a refreshed balance',async proof=>{
  vi.useFakeTimers();const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');
  try{
   let options:Record<string,any>={},resolved=false,settled=false;
@@ -319,21 +319,49 @@ it.each(['VERIFIED','REFUNDED','unrelated'] as const)('success requires exact ca
     intentCreatedAt:'2026-10-20T00:00:00Z',paidAt:null,periodStart:null,periodEnd:null}]:[],subscriptions:[],hasMorePayments:false,hasMoreSubscriptions:false}},
     {headers:{'cache-control':'no-store','x-content-type-options':'nosniff'}});
    if(path.includes('/checkout?')&&resolved){settled=true;return Response.json({payment:{...status.payment,resolvedOrderIds:[orderId]}});}
-   if(path.startsWith('/api/account/credits'))return Response.json({...credits,availableMilliseconds:settled?11700000:900000});
+   if(path.startsWith('/api/account/credits'))return proof==='balance-unavailable'&&settled?new Response(null,{status:503}):Response.json({...credits,availableMilliseconds:settled?11700000:900000});
    return checkoutGet(url);
   });
   vi.stubGlobal('fetch',request);
   await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled:true,historyEnabled:true})));
   await act(async()=>buy().click());
+  // The customer can spend several minutes in Checkout before completing it.
+  await act(async()=>{await vi.advanceTimersByTimeAsync(150000);});
   await act(async()=>options.handler({razorpay_payment_id:'pay_callback0001',razorpay_order_id:orderId,razorpay_signature:'a'.repeat(64)}));
   expect(host.textContent).not.toContain('Payment verified.');
   resolved=true;await act(async()=>{await vi.advanceTimersByTimeAsync(30000);});
-  expect(host.textContent).toContain('3h 15m');
+  if(proof==='balance-unavailable')expect(host.textContent).not.toContain('3h 15m');
+  else expect(host.textContent).toContain('3h 15m');
   if(proof==='VERIFIED')expect(host.textContent).toContain('Payment verified. Your available time and billing history are up to date.');
   else expect(host.textContent).not.toContain('Payment verified.');
   expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(2);
  }finally{visibility.mockRestore();vi.useRealTimers();}
 });
+it.each(['callback','dismiss','failure'] as const)('a late %s starts one bounded observation window without repeating payment writes',async event=>{
+ vi.useFakeTimers();const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');
+ try{
+  let options:Record<string,any>={},failed=()=>{};
+  window.Razorpay=class{constructor(value:Record<string,unknown>){options=value;}open=vi.fn();close=vi.fn();on=(_event:string,callback:()=>void)=>{failed=callback;};};
+  const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'
+   ?Response.json(String(url).endsWith('/callback')?{payment:{code:'AWAITING_WEBHOOK'}}:bound()):checkoutGet(url));
+  vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>buy().click());
+  await act(async()=>{await vi.advanceTimersByTimeAsync(150000);});
+  const stopped=request.mock.calls.length;
+  await act(async()=>{await vi.advanceTimersByTimeAsync(60000);});expect(request).toHaveBeenCalledTimes(stopped);
+  const returnFromCheckout=()=>event==='callback'?options.handler({razorpay_order_id:orderId,razorpay_payment_id:'pay_synthetic0001',razorpay_signature:'a'.repeat(64)})
+   :event==='dismiss'?options.modal.ondismiss():failed();
+  await act(async()=>{await returnFromCheckout();await returnFromCheckout();});
+  const reads=request.mock.calls.filter(([url])=>String(url).includes('/checkout?')).length;
+  await act(async()=>{await vi.advanceTimersByTimeAsync(120000);});
+  expect(request.mock.calls.filter(([url])=>String(url).includes('/checkout?'))).toHaveLength(reads+4);
+  const finished=request.mock.calls.length;
+  await act(async()=>{await returnFromCheckout();await vi.advanceTimersByTimeAsync(300000);});
+  expect(request).toHaveBeenCalledTimes(finished);
+  expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(event==='callback'?2:1);
+  expect(buy().disabled).toBe(true);expect(host.textContent).not.toContain('Payment verified.');
+ }finally{visibility.mockRestore();vi.useRealTimers();}
+});
+
 it('automatic checks stop after a definitive owner denial and keep the previous overlay closed',async()=>{
   vi.useFakeTimers();const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');
   try {

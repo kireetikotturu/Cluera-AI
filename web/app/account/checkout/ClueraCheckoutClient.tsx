@@ -55,9 +55,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const [busy, setBusy] = useState(false), [eligible, setEligible] = useState(false);
   const [signedOut,setSignedOut]=useState(false);
   const [watchPayment, setWatchPayment] = useState(false);
+  const [observationCycle, setObservationCycle] = useState(0);
   const [historyVersion,setHistoryVersion]=useState(0);
   const verifiedCallback=useRef<{paymentId:string;revisionId:string;amountPaise:number}|null>(null);
   const completed=useRef(false);
+  const balanceCurrent = useRef(false);
   const [resumeRevisionId, setResumeRevisionId] = useState<string | null>(null);
   const [message, setMessage] = useState('Checking your verified Cluera account…');
   const alive = useRef(false), epoch = useRef(0), owner = useRef<string | null>(null);
@@ -73,7 +75,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     epoch.current++; owner.current = null;
     write.current?.abort(); overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
     binding.current = null; requestId.current = null; uncertain.current = false;
-    pendingObserved.current = false; verifiedCallback.current=null;completed.current=false;setWatchPayment(false);
+    pendingObserved.current = false; verifiedCallback.current=null;completed.current=false;balanceCurrent.current=false;setWatchPayment(false);
     setResumeRevisionId(null);
     if (alive.current) { setSignedOut(unauthenticated);setCredits(null); setEligible(false); setBusy(false); setMessage('Sign in with the matching verified Cluera account to continue.'); }
   }, []);
@@ -83,7 +85,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     if (invalidHint.current) { deny(); return; }
     const controller = new AbortController(), generation = epoch.current;
     const current = () => alive.current && modeRef.current===mode && !controller.signal.aborted && epoch.current === generation;
-    read.current = controller; completed.current=false;setBusy(true); setEligible(false);
+    read.current = controller; completed.current=false;balanceCurrent.current=false;setBusy(true); setEligible(false);
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]);
     try {
       const hint = desktopOwner.current ?? owner.current;
@@ -136,6 +138,9 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         && pending.orderId !== null && !binding.current && freshCatalog.some(row => row.revisionId === pending.revisionId && row.enabled && row.testPlanValidated)
         ? pending.revisionId : null);
       const canBuy = status.code === 'AVAILABLE' && !status.pending && !uncertain.current && !binding.current;
+      // A resolution needs the trailing balance read to finish successfully.
+      // History alone must not attest a stale or failed credits snapshot.
+      balanceCurrent.current = canBuy && !trailing.current;
       setEligible(canBuy);
       setMessage(uncertain.current ? 'A checkout outcome is unknown. Keep this attempt for verification; do not retry.'
         : status.pending?.legacy ? 'An existing Account-era Razorpay attempt still requires verification. It is preserved, not resumed or recreated here. New checkout stays locked.'
@@ -182,7 +187,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       if (document.visibilityState !== 'hidden') void refresh(true);
     }, 30_000);
     return () => clearInterval(timer);
-  }, [enabled, refresh, watchPayment]);
+  }, [enabled, refresh, watchPayment, observationCycle]);
   useEffect(() => {
     if (!enabled) {
       setWatchPayment(false);
@@ -203,8 +208,9 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     write.current = controller;
     if (!resume) { requestId.current ??= crypto.randomUUID(); uncertain.current = true; }
     setResumeRevisionId(null);
-    verifiedCallback.current=null;completed.current=false;
+    verifiedCallback.current=null;completed.current=false;balanceCurrent.current=false;
     setWatchPayment(true);
+    setObservationCycle(value => value + 1);
     setEligible(false); setBusy(true);
     try {
       const response = await checkoutRequest(resume ? `${endpoint}/resume?expectedAccountId=${encodeURIComponent(accountId)}` : `${endpoint}/checkout`,
@@ -257,13 +263,21 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       setCredits(verifiedAccount);
       const Constructor = razorpay(); if (!Constructor) throw new Error();
       history.replaceState(null, '', '/account/checkout');
-      const instance = new Constructor({ key: checkout.keyId, name: 'Cluera AI TEST',
+      let callbackStarted = false, exitObserved = false;
+      const observeExit = (notice: string) => {
+        if (!current() || exitObserved) return;
+        exitObserved = true;
+        setObservationCycle(value => value + 1);
+        setMessage(notice); void refresh(true);
+      };
+      const instance = new Constructor({ key: checkout.keyId, name: mode === 'test' ? 'Cluera AI TEST' : 'Cluera AI',
         description: `${revision.name} · ${clueraAllowance(revision.allowanceSeconds)}`,
         ...(checkout.orderId ? { order_id: checkout.orderId, amount: checkout.amountPaise, currency: checkout.currency }
           : { subscription_id: checkout.subscriptionId }),
         retry: { enabled: false }, theme: { color: '#8b5cf6' },
         handler: async (raw: unknown) => {
-          if (!current()) return;
+          if (!current() || callbackStarted) return;
+          callbackStarted = true;
           try {
             const common = { razorpay_payment_id: z.string().regex(/^pay_[A-Za-z0-9]{8,64}$/), razorpay_signature: z.string().regex(/^[a-f0-9]{64}$/) };
             const callback = checkout.orderId
@@ -282,11 +296,16 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
               setMessage('Payment processing. We are confirming your payment and updating your balance automatically.');
             }
           } catch { if (current()) setMessage('The payment outcome needs verification. Do not retry or start another order.'); }
-          if (current()) void refresh(true);
-        }, modal: { ondismiss: () => { if (current()) {setMessage('Checkout closed. We are checking whether a payment completed.');void refresh(true);} } },
+          if (current()) {
+            // Checkout may have remained open longer than the original read
+            // window. Observe delayed receipts from this return, not from Buy.
+            setObservationCycle(value => value + 1);
+            void refresh(true);
+          }
+        }, modal: { ondismiss: () => observeExit('Checkout closed. We are checking whether a payment completed.') },
       });
       instance.on('payment.failed', () => {
-        if (current()) { setMessage('Payment failed or is incomplete. Do not retry.'); void refresh(true); }
+        observeExit('Payment failed or is incomplete. Do not retry.');
       });
       if (!current()) { instance.close(); return; }
       overlay.current = instance; instance.open();
@@ -304,7 +323,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
 
   const historyLoaded=(history:BillingHistory)=>{
     const expected=verifiedCallback.current;
-    if(!expected||history.userId!==owner.current||binding.current||uncertain.current||pendingObserved.current)return;
+    if(!expected||!balanceCurrent.current||history.userId!==owner.current||binding.current||uncertain.current||pendingObserved.current)return;
     if(history.payments.some(payment=>payment.state==='VERIFIED'&&payment.paymentId===expected.paymentId&&payment.revision.revisionId===expected.revisionId&&payment.revision.amountPaise===expected.amountPaise)){
       completed.current=true;setMessage('Payment verified. Your available time and billing history are up to date.');
     }
