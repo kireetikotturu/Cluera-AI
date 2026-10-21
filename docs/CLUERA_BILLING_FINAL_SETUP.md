@@ -16,12 +16,12 @@ The owner reported HTTP 403 with an empty DevTools Response tab. The old handler
 
 **Remaining owner steps for this specific issue:**
 
-1. Reload checkout after this repair is deployed. The current ordinary account should retain its identity and 15-minute balance and explain the approved Test purchaser restriction. Signing in again with the same unapproved account will not grant checkout access.
+1. **Accepted by the owner on October 21:** the signed-in browser now shows the correct Test purchaser restriction and keeps the balance visible. Signing in again with the same unapproved account will not grant checkout access.
 2. To check the retained order, sign in privately with the **existing support account** through Account. If you arrive from Windows, both Windows and the browser must use that same account; return through the app's purchase link after switching. Do not edit the account hint or use another customer's UUID.
 3. Open [the selected pack](https://cluera-ai-staging.vercel.app/account/checkout?offer=cluera_pack_3h_v2), then choose **Continue existing checkout** only if offered. It performs read-only checks and opens the same eligible order. For an eligibility-only check, close Checkout without entering payment details. Do not use Buy Now to manufacture a replacement.
 4. A genuine Test payment remains a separate acceptance step under the checklist below. If the order is now attempted, paid, uncertain or no longer eligible, preserve it and stop. Approval of a different Test purchaser is a separate owner decision; it would not transfer this retained order. Live remains off.
 
-No real customer browser session was available to the agent. Private post-deployment reload and approved-account Checkout opening therefore remain owner acceptance; synthetic browser tests must not be described as that private check. Existing authentication, Google, trial, Admin/MFA, financial gates and Windows 1.0.8 are preserved.
+No real customer browser session was available to the agent. The owner subsequently confirmed the private post-deployment reload: “Restriction message is correct; balance stays visible.” This accepts the reported eligibility-display repair. Approved-account Checkout opening and payment acceptance remain pending; neither the owner's confirmation nor synthetic browser tests establish those checks. Existing authentication, Google, trial, Admin/MFA, financial gates and Windows 1.0.8 are preserved.
 
 **Deployed repair checkpoint, October 21, 07:15 UTC (12:45 IST):**
 
@@ -36,7 +36,7 @@ No real customer browser session was available to the agent. Private post-deploy
 | Deployed browser | Five isolated 390px synthetic cases pass: purchaser denial retains identity/balance, signed-out, mismatch, unavailable configuration and pending original-order continuation. Two mocked resume GETs open the exact mocked order; zero financial POSTs, no raw error disclosure, no horizontal overflow or page errors. This is not an actual customer session or real Razorpay overlay acceptance. |
 | Preserved data | Read-only follow-up: two customers, two original trials, zero payments/events, one original BOUND intent. No financial migration, allowlist change, replacement order, capture/refund/replay, Live activation or installer change. |
 
-A documentation-only staging follow-up may advance the branch and relay without changing the accepted runtime above. The user confirmed the original real HTTP 403; the private post-repair browser result remains pending until supplied by the owner.
+A documentation-only staging follow-up may advance the branch and relay without changing the accepted runtime above. The owner confirmed both the original real HTTP 403 and the corrected restriction message with the balance retained after deployment. Same-order Checkout opening and genuine payment remain separate acceptance steps.
 
 ## October 21 payment-flow follow-up
 
