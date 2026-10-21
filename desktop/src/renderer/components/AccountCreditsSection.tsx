@@ -47,7 +47,7 @@ export function AccountCreditsSection({userId,compact=false}:{userId?:string;com
   <footer><span>{view.active?`Active AI/session estimate ${creditDuration(elapsed)} · settles after checkpoints`:'No active managed AI usage'}</span>
    <span>Last successful server sync: {last??'not yet synced'}</span></footer>
   <p className="muted">Percentages apply only to the currently eligible bucket, not lifetime usage or old recurring cycles. Purchases update time only after verified server reconciliation.</p>
-  {snapshot&&!snapshot.checkoutAvailable&&<p className="account-billing-paused">Test checkout unavailable. You can view plans; opening the page does not create an order or grant credits.</p>}
+  {snapshot&&!snapshot.checkoutAvailable&&<p className="account-billing-paused">Checkout is currently unavailable or an existing payment needs verification. Open billing to check its status; do not pay again to refresh your balance.</p>}
   {snapshot?.payments.slice(0,3).map((payment,index)=><p className="muted" key={index}>Recent checkout · {payment.offerCode.replaceAll('_',' ')} · {payment.state==='VERIFIED'?'Server verified':payment.state==='BOUND'?'Payment pending server verification':payment.state==='UNCERTAIN'?'Needs verification — do not retry':payment.state.toLowerCase()}</p>)}
   {snapshot&&snapshot.availableMilliseconds===0&&<p role="status">No unreserved time available. New AI work needs eligible time; existing reservations remain server-controlled.</p>}
   {(error||view.state==='unavailable')&&<p role="status">{error||'Server sync unavailable. Displayed balances are the last successful snapshot, not authorization.'}</p>}

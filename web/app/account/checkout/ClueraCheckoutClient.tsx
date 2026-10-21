@@ -73,7 +73,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const pendingObserved = useRef(false);
 
   const deny = useCallback((reason: CheckoutDenial = 'ACCOUNT_MISMATCH') => {
-    const preserveAccount = reason === 'TEST_PURCHASER_REQUIRED';
+    const preserveAccount = reason === 'TEST_PURCHASER_REQUIRED' || reason === 'LIVE_PURCHASER_REQUIRED';
     epoch.current++; trailing.current = false;
     if (!preserveAccount) owner.current = null;
     write.current?.abort(); overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;

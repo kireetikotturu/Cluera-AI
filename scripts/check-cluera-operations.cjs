@@ -34,22 +34,25 @@ function assess(value,now=Date.now()){
  return Object.freeze({scope:'CLUERA_PRIVATE_OPERATIONS_SELECT_ONLY',status:alerts.length?'ATTENTION':'OBSERVED',observedAt:value.observedAt,
   alerts:Object.freeze(alerts),snapshot:Object.freeze({...value}),financialMutations:0,creditEffect:'NOT_INFERRED',productionReady:false});
 }
-async function run(env=process.env,request=fetch,now=Date.now){
+async function run(env=process.env,request=fetch,now=Date.now,mode='test'){
+ if(!['test','live'].includes(mode))throw Error('OPERATIONS_UNAVAILABLE');
+ const url=mode==='test'?URL:TARGET+'/rest/v1/rpc/cluera_live_billing_operations_health';
  const key=env.SUPABASE_SERVICE_ROLE_KEY;
- if(env.CLUERA_OPERATIONS_READ_ENABLED!=='true'||env.NEXT_PUBLIC_SUPABASE_URL!==TARGET
+ if(env[mode==='test'?'CLUERA_OPERATIONS_READ_ENABLED':'CLUERA_LIVE_OPERATIONS_READ_ENABLED']!=='true'||env.NEXT_PUBLIC_SUPABASE_URL!==TARGET
  ||typeof key!=='string'||key.length<32||key.length>4096||/[\x00-\x20\x7f]/.test(key))throw Error('OPERATIONS_UNAVAILABLE');
  const controller=new AbortController();let timer,reader;
  const expired=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('OPERATIONS_UNAVAILABLE'));},6000);});
  try{
-  const response=await Promise.race([request(URL,{method:'POST',body:'{}',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json',Accept:'application/json'},
+  const response=await Promise.race([request(url,{method:'POST',body:'{}',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json',Accept:'application/json'},
    cache:'no-store',credentials:'omit',redirect:'error',signal:controller.signal}),expired]);
-  if(response.status!==200||response.redirected||response.url&&response.url!==URL
+  if(response.status!==200||response.redirected||response.url&&response.url!==url
   ||response.headers.get('content-type')?.split(';')[0].trim()!=='application/json'||!response.body)throw Error('OPERATIONS_UNAVAILABLE');
   const declared=response.headers.get('content-length');
   if(declared!==null&&(!/^(?:0|[1-9][0-9]*)$/.test(declared)||Number(declared)>4096))throw Error('OPERATIONS_UNAVAILABLE');
   reader=response.body.getReader();const chunks=[];let size=0;
   for(;;){const part=await Promise.race([reader.read(),expired]);if(part.done)break;size+=part.value.byteLength;if(size>4096)throw Error('OPERATIONS_UNAVAILABLE');chunks.push(part.value);}
-  return assess(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks))),now());
+  const value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)));
+  return mode==='test'?assess(value,now()):require('./check-cluera-live-operations.cjs').assess(value,now());
  }catch{throw Error('OPERATIONS_UNAVAILABLE');}
  finally{clearTimeout(timer);controller.abort();void reader?.cancel().catch(()=>{});try{reader?.releaseLock();}catch{}}
 }

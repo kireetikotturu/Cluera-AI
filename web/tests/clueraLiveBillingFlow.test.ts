@@ -89,15 +89,15 @@ function webhook(eventId: string, refund = false, signer = input.RAZORPAY_LIVE_W
       'x-razorpay-signature': createHmac('sha256', signer).update(raw).digest('hex') }, body: raw,
   });
 }
-async function buy(g: ReturnType<typeof gateway>) {
+async function buy(g: ReturnType<typeof gateway>, publicSales = false) {
   const revision = (await catalog()).find(r => r.kind === 'PACK')!;
-  const env = scope();
+  const env = publicSales ? createLiveBillingScope({ ...input, CLUERA_LIVE_PUBLIC_CHECKOUT_APPROVED: 'true', CLUERA_LIVE_PURCHASER_IDS: '', SIGMAROUND_PAYMENT_TESTER_IDS: '' }) : scope();
   const result = await createClueraCheckout(rpc, account, randomUUID(), revision.revisionId, env, clueraRazorpayAdapter(env, g.request));
   expect(result).toMatchObject({ code: 'BOUND', orderId, keyId: input.RAZORPAY_LIVE_KEY_ID });
   return env;
 }
-it('runs explicit Live checkout → callback without grant → signed receipt → exactly one isolated grant and history', async () => {
-  const g = gateway(), env = await buy(g);
+it.each([false,true])('runs explicit Live checkout → signed receipt → exactly one isolated grant and history (public sales: %s)', async publicSales => {
+  const g = gateway(), env = await buy(g, publicSales);
   expect(await verifyClueraCallback(rpc, account, { expectedAccountId: account.userId, orderId, subscriptionId: null,
     paymentId, signature: createHmac('sha256', input.RAZORPAY_LIVE_KEY_SECRET).update(orderId + '|' + paymentId).digest('hex') },
     env, clueraRazorpayAdapter(env, g.request))).toMatchObject({ code: 'AWAITING_WEBHOOK' });
@@ -110,6 +110,15 @@ it('runs explicit Live checkout → callback without grant → signed receipt �
     { billing_mode: 'live', granted_ms: '10800000' },
   ]);
   expect((await readClueraBillingHistory(rpc, account, env)).payments).toHaveLength(1);
+  // Website and Windows read the same server-owned bank using independent live
+  // Auth sessions. No local entitlement is manufactured by the payment callback.
+  const desktopSession=randomUUID();
+  await db.query("insert into auth.sessions values($1,$2,null,'aal1')",[desktopSession,account.userId]);
+  const webBalance=(await db.query<{v:any}>("select public.cluera_billing_credits_for_mode($1,$2,'live')v",[account.userId,account.sessionId])).rows[0].v;
+  const desktopBalance=(await db.query<{v:any}>('select public.customer_usage_balance($1,$2)v',[account.userId,desktopSession])).rows[0].v;
+  expect(webBalance.availableMilliseconds).toBe(11700000);
+  expect(desktopBalance.availableMilliseconds).toBe(webBalance.availableMilliseconds);
+  expect((await db.query<{v:any}>("select public.cluera_billing_credits_for_mode($1,$2,'test')v",[account.userId,account.sessionId])).rows[0].v.code).toBe('UNAVAILABLE');
   expect((await db.query('select count(*)::int n from cluera_billing_private.payments')).rows[0].n).toBe(0);
   expect((await db.query('select count(*)::int n from cluera_billing_private.events')).rows[0].n).toBe(0);
   expect(g.request.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);

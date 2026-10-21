@@ -46,25 +46,28 @@ export async function handleLiveBilling(request: Request, action: LiveBillingAct
     if (!liveRuntimeApproved(env, 'intake')) return json({ error: 'Not found.' }, 404);
     cookies = new AccountCookies(request, config);
     const { account } = await activeSession(clients, cookies);
-    if (cookies.get('recovery') === account.sessionId) throw new AccountError('FORBIDDEN', 403);
+    if (cookies.get('recovery') === account.sessionId) return cookies.apply(json({ code: 'RECOVERY_SESSION', error: 'Finish password recovery and sign in before checkout.' }, 403));
     await rateLimit(request, config, clients, account.email);
     await billingOwner(rpc, env);
     if (request.method === 'GET') {
       const keys = action === 'cancellation' ? ['expectedAccountId', 'operationId'] : ['expectedAccountId'];
       if (url.searchParams.size !== keys.length || keys.some(key => url.searchParams.getAll(key).length !== 1)
-        || url.searchParams.get('expectedAccountId') !== account.userId) throw new AccountError('FORBIDDEN', 403);
+        || url.searchParams.get('expectedAccountId') !== account.userId) return cookies.apply(json({ code: 'ACCOUNT_MISMATCH', error: 'Account does not match.' }, 403));
       if (action === 'history') return cookies.apply(json({ history: await readClueraBillingHistory(rpc, account, env) }));
       if (action === 'cancellation') return cookies.apply(json(await readClueraCancellation(rpc, account,
         z.uuid().parse(url.searchParams.get('operationId')), env)));
+      if (!liveRuntimeApproved(env, 'checkout')) return cookies.apply(json({ code: 'CHECKOUT_DISABLED', error: 'New purchases are currently unavailable.' }, 404));
+      if (!clueraCheckoutAllowed(account.userId, env)) return cookies.apply(json({ code: 'LIVE_PURCHASER_REQUIRED', error: 'Public sales are not open for this account.' }, 403));
       const payment = action === 'resume' ? await resumeClueraCheckout(rpc, account, env) : await clueraBillingStatus(rpc, account);
       return cookies.apply(json({ payment }));
     }
     if (url.searchParams.size || request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json')
       throw new AccountError('INVALID_INPUT', 400);
     const raw = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readClueraRawBody(request, 2048)));
-    if (raw?.expectedAccountId !== account.userId) throw new AccountError('FORBIDDEN', 403);
+    if (raw?.expectedAccountId !== account.userId) return cookies.apply(json({ code: 'ACCOUNT_MISMATCH', error: 'Account does not match.' }, 403));
     if (action === 'cancellation') return cookies.apply(json(await cancelClueraSubscription(rpc, account, cancellationInput.parse(raw), env)));
-    if (!clueraCheckoutAllowed(account.userId, env)) throw new AccountError('FORBIDDEN', 403);
+    if (!liveRuntimeApproved(env, 'checkout')) return cookies.apply(json({ code: 'CHECKOUT_DISABLED', error: 'New purchases are currently unavailable.' }, 404));
+    if (!clueraCheckoutAllowed(account.userId, env)) return cookies.apply(json({ code: 'LIVE_PURCHASER_REQUIRED', error: 'Public sales are not open for this account.' }, 403));
     const payment = action === 'callback' ? await verifyClueraCallback(rpc, account, callbackSchema.parse(raw), env)
       : await (async () => {
         const body = z.object({ expectedAccountId: z.uuid(), requestId: z.uuid(), revisionId: z.uuid() }).strict().parse(raw);

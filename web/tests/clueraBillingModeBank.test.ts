@@ -54,6 +54,26 @@ it('installs isolated financial tables and disabled Live gates while retaining T
   expect(credits.availableMilliseconds).toBe(960000);
   expect(credits.buckets.find((b: { kind: string }) => b.kind === 'PACK').grantedMilliseconds).toBe(60000);
 });
+it('Live operations observes disabled gates and bounded receipts without executing financial work', async () => {
+  const before = await db.query('select count(*)::int n from cluera_live_billing_private.events');
+  const snapshot = await call('cluera_live_billing_operations_health');
+  expect(snapshot).toMatchObject({mode:'live',activeBank:'test',intakeEnabled:false,checkoutEnabled:false,nativeEnabled:false,pendingCount:0,commandCount:0,cancellationCount:0});
+  const { assess } = createRequire(import.meta.url)('../../scripts/check-cluera-live-operations.cjs');
+  expect(assess(snapshot,Date.parse(snapshot.observedAt)).status).toBe('DISABLED');
+  expect(await db.query('select count(*)::int n from cluera_live_billing_private.events')).toEqual(before);
+  const metadata = (await db.query(`select provolatile,prosecdef,has_function_privilege('anon',oid,'EXECUTE')anon,
+    has_function_privilege('authenticated',oid,'EXECUTE')authenticated,has_function_privilege('service_role',oid,'EXECUTE')service
+    from pg_proc where proname='cluera_live_billing_operations_health'`)).rows[0];
+  expect(metadata).toEqual({provolatile:'s',prosecdef:true,anon:false,authenticated:false,service:true});
+});
+it('Live monitoring caps backlog counts and does not consume signed receipts', async () => {
+  await db.exec("insert into cluera_live_billing_private.events(event_id,account_digest,event_type,resource_id,digest,occurred_at,received_at)select 'synthetic_'||lpad(n::text,8,'0'),repeat('b',64),'payment.captured','pay_synthetic0001',repeat('c',64),now(),now()-n*interval '1 second'from generate_series(1,1005)n");
+  const value=await call('cluera_live_billing_operations_health');expect(value.pendingCount).toBe(1001);
+  expect(Date.parse(value.oldestPendingAt)).toBeLessThan(Date.now()-1004*1000);
+  expect((await db.query('select count(*)::int n from cluera_live_billing_private.events')).rows[0].n).toBe(1005);
+  const {assess}=createRequire(import.meta.url)('../../scripts/check-cluera-live-operations.cjs');
+  expect(assess(value,Date.parse(value.observedAt)).alerts).toContain('COUNT_LIMIT_REACHED');
+});
 it('cannot promote without acceptance or while a provider authorization is active', async () => {
   await expectSqlFailure("update cluera_billing_runtime_private.active_bank set mode='live'");
   const run = randomUUID();

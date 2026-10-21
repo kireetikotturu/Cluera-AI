@@ -52,11 +52,11 @@ const checkoutGet = (url: RequestInfo | URL) => Response.json(String(url).endsWi
       state:'BOUND',kind:createdBinding.kind,revisionId:createdBinding.revisionId,offerCode:createdBinding.offerCode,
       orderId:createdBinding.orderId,subscriptionId:createdBinding.subscriptionId}}} : status : credits);
 
-it('keeps the verified identity and trial on a Test purchaser denial, with no sign-in loop, SDK or write', async () => {
+it.each([['TEST_PURCHASER_REQUIRED','You are signed in. Test checkout'],['LIVE_PURCHASER_REQUIRED','Public sales are not open yet']])('keeps identity and trial on %s, with no sign-in loop, SDK or write', async (code,message) => {
   const request=vi.fn(async(url:RequestInfo|URL)=>String(url).includes('/checkout?')
-    ? Response.json({code:'TEST_PURCHASER_REQUIRED',error:'PRIVATE_DO_NOT_REFLECT'},{status:403}):checkoutGet(url));
+    ? Response.json({code,error:'PRIVATE_DO_NOT_REFLECT'},{status:403}):checkoutGet(url));
   vi.stubGlobal('fetch',request);await renderCheckout();
-  expect(host.textContent).toContain('You are signed in. Test checkout');
+  expect(host.textContent).toContain(message);
   expect(host.textContent).toContain('Synthetic Tester');expect(host.textContent).toContain('15m');
   expect(host.textContent).not.toContain('PRIVATE_DO_NOT_REFLECT');
   expect(host.querySelector('a[href*="#login"]')).toBeNull();expect(buy().disabled).toBe(true);
