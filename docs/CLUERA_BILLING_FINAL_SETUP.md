@@ -4,6 +4,40 @@ Updated October 21, 2026 (IST). **Test remains active. Live charging is disabled
 
 Use the existing [Cluera website](https://cluera-ai-staging.vercel.app/account), [Supabase project](https://supabase.com/dashboard/project/yhnqlfcgrmckhyjdxegg), Cluera Vercel project and Cluera Render relay. Existing users, Google OAuth, SMTP and Admin/MFA stay in place; do not repeat their setup. Remote Desktop remains excluded. The immutable Windows 1.0.8 candidate is built; its device acceptance and distribution are described in [the Windows release guide](CLUERA_WINDOWS_V1_RELEASE.md).
 
+## October 21 checkout authentication and eligibility repair
+
+The reported checkout HTTP 403 was an eligibility denial, not evidence of a signed-out session. Read-only database checks confirmed that the reported customer has a verified email and one original trial, but does not own the retained order. A protected diagnostic using the deployment's actual Test configuration at **2026-10-21T07:11:06.470Z** proved that the **sole approved Test purchaser is the retained order's owner**, the existing support account. Customer UUIDs and allowlists are intentionally omitted from this public guide. No purchaser permission or order ownership was changed.
+
+Three code paths caused the misleading experience: the API combined recovery and purchaser denial into one generic 403; the browser transport discarded error bodies; and the UI treated both 401 and 403 as loss of authentication. The repair adds fixed reason codes, bounded error-body parsing and separate messages. An authenticated purchaser denial retains the verified identity and balance, disables purchase and closes any old payment overlay. Account mismatch takes precedence over purchaser eligibility, clears stale account details and fences late callbacks. Only a genuine 401 offers the expired-session sign-in path. Recovery, generic forbidden access, disabled checkout, pending order, throttling and unavailable verification/configuration have distinct guidance. Raw provider errors are never displayed.
+
+The merchant diagnostic verified the original binding and revision, pinned merchant/owner, Created status, zero attempts, no payments, numeric paid amount zero and amount due **54,900 paise**, then checked the binding again. Result: **SAME_ORDER_ELIGIBLE_AT_OBSERVATION**, two provider GETs, zero financial mutations. This supersedes the older observation below for this time only; continuation independently rechecks. Diagnostic `dpl_c4K4hhUozG3e2ZZwWL9QvtqF8wBF` deliberately exits without producing a website artifact or taking an alias. It does not prove browser authentication or payment acceptance.
+
+The owner reported HTTP 403 with an empty DevTools Response tab. The old handler would return a generic JSON denial for this eligibility condition. The old transport skipped the error body and immediately aborted its controller during cleanup; that is consistent with a missing DevTools body, but the private browser trace was not available to prove it. The existing route does not log reason codes: a recent 30-minute Vercel runtime query returned no matching records; the initial two-hour query exceeded Hobby retention and failed. The verified configuration, ownership and deployed source establish the eligibility restriction; the repaired client reads bounded JSON errors and handles empty/malformed denial bodies safely.
+
+**Remaining owner steps for this specific issue:**
+
+1. Reload checkout after this repair is deployed. The current ordinary account should retain its identity and 15-minute balance and explain the approved Test purchaser restriction. Signing in again with the same unapproved account will not grant checkout access.
+2. To check the retained order, sign in privately with the **existing support account** through Account. If you arrive from Windows, both Windows and the browser must use that same account; return through the app's purchase link after switching. Do not edit the account hint or use another customer's UUID.
+3. Open [the selected pack](https://cluera-ai-staging.vercel.app/account/checkout?offer=cluera_pack_3h_v2), then choose **Continue existing checkout** only if offered. It performs read-only checks and opens the same eligible order. For an eligibility-only check, close Checkout without entering payment details. Do not use Buy Now to manufacture a replacement.
+4. A genuine Test payment remains a separate acceptance step under the checklist below. If the order is now attempted, paid, uncertain or no longer eligible, preserve it and stop. Approval of a different Test purchaser is a separate owner decision; it would not transfer this retained order. Live remains off.
+
+No real customer browser session was available to the agent. Private post-deployment reload and approved-account Checkout opening therefore remain owner acceptance; synthetic browser tests must not be described as that private check. Existing authentication, Google, trial, Admin/MFA, financial gates and Windows 1.0.8 are preserved.
+
+**Deployed repair checkpoint, October 21, 07:15 UTC (12:45 IST):**
+
+| Evidence | Verified result |
+| --- | --- |
+| Runtime | [`25202180be3c7b5f7f2dd18d5b66b8739b1aaf3d`](https://github.com/kireetikotturu/Cluera-AI/commit/25202180be3c7b5f7f2dd18d5b66b8739b1aaf3d), staging; tree `b23c67ef28fc664600a6a1933d152ffdedcfb0c7`. 13 reviewed source/test paths, 833 total blobs, 820 prior blobs unchanged, no deletions. |
+| Website | `dpl_EXvraFS4zcjqbsL2tkSuiVXxYY8q`, READY, exact runtime; canonical staging alias assigned after full CI passed and independently read back. 100 bounded build events contain zero error-level events. |
+| Relay | `dep-dbc6aau7bikc73fmj4gg`, LIVE, exact runtime and public health revision verified. Zero error-level logs in 07:09:31–07:10:15 UTC rollout window. |
+| Full hosted CI | [39560042181](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39560042181), success: **2,391 web passed / 22 opt-in skipped; 426 desktop passed / 1 opt-in skipped; 154 preparation passed**. Typechecks, web/relay/desktop code builds and dependency audits pass. Exact source scan: 833 files / zero findings; web artifact scan passes. |
+| Focused verification | 164 local focused tests and web typecheck pass. Initial focused run found three outdated UI expectations after intentional message/sign-in behavior changes; these were corrected and rerun. No failed run is counted as passed. |
+| Public boundaries | 16/16 fixed credential-free GET checks passed at `2026-10-21T07:15:54.954Z`: Google enabled, anonymous protected access denied, monthly catalog disabled, installer unapproved and exact relay revision. |
+| Deployed browser | Five isolated 390px synthetic cases pass: purchaser denial retains identity/balance, signed-out, mismatch, unavailable configuration and pending original-order continuation. Two mocked resume GETs open the exact mocked order; zero financial POSTs, no raw error disclosure, no horizontal overflow or page errors. This is not an actual customer session or real Razorpay overlay acceptance. |
+| Preserved data | Read-only follow-up: two customers, two original trials, zero payments/events, one original BOUND intent. No financial migration, allowlist change, replacement order, capture/refund/replay, Live activation or installer change. |
+
+A documentation-only staging follow-up may advance the branch and relay without changing the accepted runtime above. The user confirmed the original real HTTP 403; the private post-repair browser result remains pending until supplied by the owner.
+
 ## October 21 payment-flow follow-up
 
 Checkout now starts a fresh bounded verification window when a customer returns after spending several minutes paying. A callback, dismissal or failure cannot silently inherit an already expired observation window. Duplicate callbacks do not repeat the callback POST; repeated close/failure notifications do not restart polling indefinitely. Each window performs at most four scheduled GET checks over two minutes, plus the immediate return check. No check creates another order, captures a payment or grants time.
