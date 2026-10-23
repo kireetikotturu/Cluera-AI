@@ -30,6 +30,7 @@ function provider(patch:Record<string,unknown>={},collection:unknown={entity:'co
 }
 const request=(query=`expectedAccountId=${account.userId}`,headers:HeadersInit={},method='GET')=>new Request(`${site}/api/account/payments/cluera/resume${query?'?'+query:''}`,{method,headers});
 beforeEach(()=>{
+ vi.spyOn(console,'info').mockImplementation(()=>{});
  for(const [key,value]of Object.entries(env))vi.stubEnv(key,value);
  vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY','sb_publishable_synthetic_public_key_00000000000000000');
  vi.stubEnv('SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64',Buffer.alloc(32,3).toString('base64'));vi.stubEnv('SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64',Buffer.alloc(32,4).toString('base64'));
@@ -87,6 +88,18 @@ it('an attempted order returns a fixed reconciliation reason without provider ob
  const body=await response.json();expect(body.code).toBe('ORDER_RECONCILIATION_REQUIRED');
  expect(Object.keys(body).sort()).toEqual(['code','error']);expect(JSON.stringify(body)).not.toContain(orderId);
  expect(clear).not.toHaveBeenCalled();expect(network).toHaveBeenCalledOnce();
+ expect(console.info).toHaveBeenCalledExactlyOnceWith('[cluera-billing] checkout-resume',{
+  component:'cluera-checkout-resume',mode:'test',outcome:'ORDER_ALREADY_ATTEMPTED',httpStatus:409,elapsedMs:expect.any(Number),financialMutations:0});
+ const logged=JSON.stringify(vi.mocked(console.info).mock.calls);
+ for(const secret of [account.userId,account.sessionId,orderId,revisionId,intentId,env.RAZORPAY_TEST_KEY_ID,'synthetic@example.invalid'])expect(logged).not.toContain(secret);
+});
+it('resume observation cannot disclose provider errors or change the outcome when logging fails',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>{throw Error('PRIVATE_PROVIDER_RESPONSE');}));
+ const unavailable=await handleClueraCheckoutResume(request());expect(unavailable.status).toBe(503);
+ expect(console.info).toHaveBeenLastCalledWith('[cluera-billing] checkout-resume',expect.objectContaining({outcome:'UNAVAILABLE',httpStatus:503}));
+ expect(JSON.stringify(vi.mocked(console.info).mock.calls)).not.toContain('PRIVATE_PROVIDER_RESPONSE');
+ vi.mocked(console.info).mockImplementation(()=>{throw Error('LOGGER_DOWN');});vi.stubGlobal('fetch',provider());
+ const eligible=await handleClueraCheckoutResume(request());expect(eligible.status).toBe(200);expect((await eligible.json()).payment.orderId).toBe(orderId);
 });
 it('disabled checkout, foreign origins/owners, recovery, non-testers and injected resource/query cannot reach financial/provider reads',async()=>{
  vi.stubEnv('SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED','false');expect((await handleClueraCheckoutResume(request())).status).toBe(404);expect(hooks.clients).not.toHaveBeenCalled();
@@ -110,4 +123,5 @@ it('resume distinguishes an unapproved signed-in purchaser from an account switc
  const switched=await handleClueraCheckoutResume(request());
  expect(switched.status).toBe(403);expect(await switched.json()).toMatchObject({code:'ACCOUNT_MISMATCH'});
  expect(clear).not.toHaveBeenCalled();expect(rpc).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+ expect(console.info).not.toHaveBeenCalled();
 });

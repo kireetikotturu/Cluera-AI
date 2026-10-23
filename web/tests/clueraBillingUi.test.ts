@@ -543,6 +543,27 @@ it('checks a saved BOUND order before showing Continue and explains an attempted
  expect(document.querySelector('script[src*="razorpay"]')).toBeNull();expect(host.textContent).not.toContain('PRIVATE_DO_NOT_REFLECT');
  expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
 });
+it.each(['initial','explicit'] as const)('a stalled %s resume settles without a popup or a late response restoring Continue',async phase=>{
+ vi.useFakeTimers();
+ try{
+  createdBinding=makeBound().payment;let stall=phase==='initial',finish!:(value:Response)=>void;
+  const open=vi.fn();window.Razorpay=class{open=open;close=vi.fn();on=vi.fn();};
+  const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')&&stall
+   ?new Promise<Response>(resolve=>{finish=resolve;}):checkoutGet(url));
+  vi.stubGlobal('fetch',request);await renderCheckout();
+  if(phase==='explicit'){stall=true;await act(async()=>button('Continue existing checkout').click());}
+  expect(button('Continue existing checkout')).toBeUndefined();
+  await act(async()=>vi.advanceTimersByTimeAsync(15001));
+  expect(button('Refresh billing status').disabled).toBe(false);
+  expect(host.textContent).not.toContain('Preparing your secure checkout');
+  expect(host.textContent).toContain('15m');expect(buy().disabled).toBe(true);
+  const notice=host.querySelector('[role="status"]')!.textContent;
+  await act(async()=>{finish(Response.json(makeBound()));await vi.advanceTimersByTimeAsync(120000);});
+  expect(host.querySelector('[role="status"]')!.textContent).toBe(notice);
+  expect(button('Continue existing checkout')).toBeUndefined();expect(open).not.toHaveBeenCalled();
+  expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
+ }finally{vi.useRealTimers();}
+});
 it('a deferred SDK must repeat untouched-order proof immediately before continuation; a changed provider outcome cannot open',async()=>{
   createdBinding=makeBound().payment;let checks=0;const open=vi.fn();
   const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')?++checks<=2?Response.json(makeBound()):new Response(null,{status:409}):checkoutGet(url));

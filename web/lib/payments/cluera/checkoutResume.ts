@@ -49,6 +49,8 @@ export async function resumeClueraCheckout(rpc:PaymentRpc,account:Account,env=pr
 export async function handleClueraCheckoutResume(request:Request):Promise<Response> {
   if(!clueraCheckoutEnabled())return json({code:'CHECKOUT_DISABLED',error:'Not found.'},404);
   let cookies:AccountCookies|undefined;
+  const started=performance.now();
+  let observe=false,outcome='UNAVAILABLE',httpStatus=503;
   try {
     const config=stagingAccountConfig(),url=new URL(request.url),query=url.searchParams;
     if(request.method!=='GET'||url.origin!==config.origin||url.pathname!=='/api/account/payments/cluera/resume')return json({error:'Not found.'},404);
@@ -59,14 +61,27 @@ export async function handleClueraCheckoutResume(request:Request):Promise<Respon
     if(cookies.get('recovery')===account.sessionId)return cookies.apply(json({code:'RECOVERY_SESSION',error:'Finish password recovery and sign in before checkout.'},403));
     if(query.get('expectedAccountId')!==account.userId)return cookies.apply(json({code:'ACCOUNT_MISMATCH',error:'Account does not match.'},403));
     if(!clueraCheckoutAllowed(account.userId))return cookies.apply(json({code:'TEST_PURCHASER_REQUIRED',error:'You are signed in, but this account is not an approved Test purchaser.'},403));
+    observe=true;
     await rateLimit(request,config,clients,account.email,'billing-read');
-    return cookies.apply(json({payment:await resumeClueraCheckout((name,args)=>clients.service.rpc(name,args),account)}));
+    const response=cookies.apply(json({payment:await resumeClueraCheckout((name,args)=>clients.service.rpc(name,args),account)}));
+    outcome='SAME_ORDER_ELIGIBLE';httpStatus=200;return response;
   } catch(error) {
     const status=error instanceof AccountError?error.status:error instanceof ClueraBillingError&&error.code==='PENDING'?409:503;
+    httpStatus=status;
+    outcome=error instanceof ClueraResumeError?error.reason:status===429?'THROTTLED':status===409?'PENDING':'UNAVAILABLE';
     if(status===401)cookies?.clear();
     const response=json({...error instanceof ClueraResumeError&&error.reason==='ORDER_ALREADY_ATTEMPTED'?{code:'ORDER_RECONCILIATION_REQUIRED'}:{},error:status===429?'Too many status checks. Wait before verifying the original order.'
       :'The existing order cannot safely continue. Preserve it for verification; do not create or retry a payment.'},status);
     if (status === 429) response.headers.set('Retry-After', '60');
     return cookies?cookies.apply(response):response;
+  } finally {
+    // Observe only an authenticated, matching, approved purchaser. This is a
+    // fixed process outcome, never a financial audit or payment acceptance.
+    // Do not log request URLs, headers, identities, bindings or provider errors.
+    if(observe)try{console.info('[cluera-billing] checkout-resume',{
+      component:'cluera-checkout-resume',mode:'test',outcome,httpStatus,
+      elapsedMs:Math.max(0,Math.min(120000,Math.floor(performance.now()-started))),
+      financialMutations:0,
+    });}catch{/* Logging must not change checkout eligibility or the response. */}
   }
 }
