@@ -55,6 +55,8 @@ async (page) => {
   if(await refresh().isEnabled())throw Error('Throttle ignored');await tab.clock.fastForward(7000);throttled=false;
   await refresh().click();await resume().waitFor();await check('retry delay preserves identity and original order');
   await tab.setViewportSize({width:1440,height:1000});await check('desktop layout');
+  const width=await tab.locator('main').evaluate(element=>element.getBoundingClientRect().width);
+  if(width<1000)throw Error('Billing still uses narrow sign-in container');
   if(errors.length)throw Error(JSON.stringify(errors));
   return {reports,options,financialWrites:calls.filter(call=>call.method!=='GET').length,resumeReads:calls.filter(call=>call.path.endsWith('/resume')).length,errors,actualCustomerSession:false};
  }finally{release?.();await context.close();}
