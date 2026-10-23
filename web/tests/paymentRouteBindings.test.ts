@@ -74,9 +74,12 @@ it('Cluera target pricing is explicitly unavailable and never loads a payment SD
  const html=renderToStaticMarkup(AccountPricing());
  for(const price of ['₹549','₹5,499','₹9,599','₹19,549'])expect(html).toContain(price);
  expect(html).toContain('100 hours per month');expect(html).toContain('Paid plans are not yet available');
- expect(html).toContain('Public purchasing is not yet available');
+ expect(html).toContain('Payments are not enabled for this preview');
+ expect(html).toContain('Check availability');
  expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
- expect((html.match(/disabled=""/g)??[])).toHaveLength(4);expect(html).not.toContain('View availability');
+ expect((html.match(/disabled=""/g)??[])).toHaveLength(0);
+ expect((html.match(/href="\/account\/checkout\?offer=/g)??[])).toHaveLength(4);
+ expect(html).not.toContain('View availability');
 });
 it('Cluera presentation is independent of old provider selection and does not alter financial policies',()=>{
  vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','razorpay');const first=renderToStaticMarkup(AccountPricing());
