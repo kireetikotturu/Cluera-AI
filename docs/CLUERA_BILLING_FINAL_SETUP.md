@@ -2,6 +2,8 @@
 
 Updated October 23, 2026 (IST). **Test remains active. Live charging is disabled. Commercial release is not accepted.** This guide supersedes older billing setup instructions where they conflict. It does not authorize a payment, refund, replay, new mandate, Live activation or installer publication.
 
+**October 23 security follow-up:** source now pins Next.js 16.4.2, Vitest 5.0.3 and Electron 44.5.0 after fresh CI identified dependency advisories. See [the production payment handoff](CLUERA_PRODUCTION_PAYMENT_HANDOFF.md) for exact validation/deployment evidence. Windows 1.0.8 is preserved and does not contain the patched Electron dependency. A new immutable build and device/package acceptance are required before distribution; do not release 1.0.8 as patched.
+
 Use the existing [Cluera website](https://cluera-ai-staging.vercel.app/account), [Supabase project](https://supabase.com/dashboard/project/yhnqlfcgrmckhyjdxegg), Cluera Vercel project and Cluera Render relay. Existing users, Google OAuth, SMTP and Admin/MFA stay in place; do not repeat their setup. Remote Desktop remains excluded. The immutable Windows 1.0.8 candidate is built; its device acceptance and distribution are described in [the Windows release guide](CLUERA_WINDOWS_V1_RELEASE.md).
 
 ## Current production payment handoff

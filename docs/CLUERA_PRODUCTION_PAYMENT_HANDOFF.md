@@ -33,6 +33,24 @@ The prior configured-Test-merchant observation at **07:11:06 UTC October 21** ve
 
 ## Deployment and verification record
 
+### October 23 dependency security follow-up
+
+The documentation follow-up's fresh [CI run 39887541070](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39887541070) exposed newer web and desktop audit findings despite passing functional tests/builds. Its failed audits are not a successful run. The reviewed follow-up [`f539da93091a5a5c559fc657973072e0114225af`](https://github.com/kireetikotturu/Cluera-AI/commit/f539da93091a5a5c559fc657973072e0114225af) pins Next.js **16.4.2**, Vitest **5.0.3** in web/desktop, and Electron **44.5.0**. Five dependency/test paths changed; all other 836 source blobs were retained unchanged. The existing compiler-version assertion was updated; no authentication or financial policy was relaxed.
+
+The Next.js patches address the [image optimization](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw), [Server Actions denial of service](https://github.com/vercel/next.js/security/advisories/GHSA-p3m5-59mp-jv5r) and [typed-array cache](https://github.com/vercel/next.js/security/advisories/GHSA-673q-mjm6-r5xr) advisories. Vitest addresses [manual mock registration](https://github.com/vitest-dev/vitest/security/advisories/GHSA-qxg6-89mg-rqv8) and [Windows traversal](https://github.com/vitest-dev/vitest/security/advisories/GHSA-xp26-3454-mjgp); Electron addresses [pointer-lock permission attribution](https://github.com/electron/electron/security/advisories/GHSA-x562-297c-g43g). Updating source does not patch the retained installer. **Do not distribute 1.0.8 as the patched release: build a new immutable version with the accepted Electron dependency and repeat device/package acceptance.** This payment follow-up does not build or publish an installer.
+
+**Current accepted automated/deployment checkpoint, October 23 at 02:18 UTC / 07:48 IST:**
+
+| Evidence | Verified result |
+| --- | --- |
+| Source and full CI | `f539da93091a5a5c559fc657973072e0114225af`, tree `c1928b531b4fd234c6752aef9ba2dcb79ab23d79`, 841 blobs. [CI 39888121334](https://github.com/kireetikotturu/Cluera-AI/actions/runs/39888121334) succeeds: **2,405 web passed / 22 opt-in skipped; 426 desktop passed / 1 opt-in skipped; 158 preparation passed**. All typechecks, web/relay/desktop code builds and three dependency audits pass with zero vulnerabilities. Source scan: 841 files / zero findings; web artifact scan: 23 files / passed. |
+| Website | Vercel `dpl_7J4uDGYDLxQd7S3R9qHe1qEEjGMw`, READY, exact source, Next.js 16.4.2. Canonical alias assigned after full CI and independently read back. Bounded 100 build events: zero error-level events, successful compilation/deployment and zero npm audit findings. |
+| Relay | Render `dep-dbdc45e1egvs738gu230`, LIVE, same exact source and health revision. Zero error-level logs in the bounded 02:10:29–02:11:30 UTC rollout window. |
+| Public and browser | **16/16** fixed GET checks at `02:18:11.717Z`, **10/10** Live-disabled checks at `02:18:06.536Z`. All six eligibility/session/continuation browser cases and the delayed 150-second checkout/duplicate-callback/balance-refresh simulation passed again on the patched canonical site. Requests were intercepted; no actual customer session or payment was used. |
+| Preserved boundary | No secret, financial record, purchaser allowlist, catalog activation, Live flag or installer publication changed. Installer 1.0.8 SHA-256 rechecked unchanged: `f8a4536fd130f7c6f7675207d1ea738e9f74c5cdd4703542d3c9f695b39c3927`; Authenticode NotSigned. The old installer does not inherit the source dependency fixes. |
+
+The dependency patch's verification supersedes earlier audit/build evidence. A later documentation-only staging/relay revision retains these exact runtime and dependency blobs. The following checkpoint is historical evidence for the original payment implementation and earlier October 23 observations.
+
 Reviewed source: [`26c75a5e1706778418ad337f866fccdb3ff47206`](https://github.com/kireetikotturu/Cluera-AI/commit/26c75a5e1706778418ad337f866fccdb3ff47206), staging, tree `37561f73b6d914cccfeaa1001915d0cfcaac310c`. Seventeen explicit paths; 840 blobs, 823 previous blobs retained unchanged, no deletions or unrelated drafts. Runtime deployment and full CI completed October 21; the following public and database checks were renewed October 23.
 
 | Evidence | Verified result |

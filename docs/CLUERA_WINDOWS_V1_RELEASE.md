@@ -2,6 +2,8 @@
 
 Updated October 23, 2026 (IST). **Version 1.0.8 is an unsigned TEST release candidate. Public distribution and commercial launch are not accepted.** Existing authentication, Google OAuth, Admin/MFA, billing records and older installers are preserved. Remote Desktop is excluded.
 
+**October 23 security follow-up:** source now pins Next.js 16.4.2, Vitest 5.0.3 and Electron 44.5.0 after fresh CI identified dependency advisories. See [the production payment handoff](CLUERA_PRODUCTION_PAYMENT_HANDOFF.md) for exact validation/deployment evidence. Windows 1.0.8 is preserved and does not contain the patched Electron dependency. A new immutable build and device/package acceptance are required before distribution; do not release 1.0.8 as patched.
+
 Latest payment infrastructure and acceptance: [Production payment handoff](CLUERA_PRODUCTION_PAYMENT_HANDOFF.md). The existing 1.0.8 balance/checkout integration remains compatible. Current desktop source replaces the misleading generic “Test checkout unavailable” label with payment-status guidance; this copy-only change is not in the retained installer. Do not overwrite 1.0.8. Use a new immutable version for any subsequent rebuilt distribution.
 
 October 21 tooling follow-up: web and desktop source now pin Vite 8.3.3 to resolve the newly reported launch-editor advisories. The retained 1.0.8 ASAR contains neither Vite nor launch-editor, and its installer/blockmap hashes were independently rechecked unchanged. This is a development-tool dependency repair; the installer was not rebuilt, installed or publicly released. A later rebuild must use a new immutable version. Current billing deployment and acceptance steps are in [Billing final setup](CLUERA_BILLING_FINAL_SETUP.md).
