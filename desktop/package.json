@@ -33,7 +33,7 @@
     "@types/sql.js": "^1.4.9",
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^6.1.1",
-    "electron": "^44.4.5",
+    "electron": "44.5.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "global-agent": "file:vendor/global-agent",
@@ -46,7 +46,7 @@
     "supabase": "^2.118.0",
     "typescript": "^5.7.2",
     "vite": "8.3.3",
-    "vitest": "^5.0.2",
+    "vitest": "5.0.3",
     "zustand": "^5.0.2"
   },
   "overrides": {
