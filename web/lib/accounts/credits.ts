@@ -78,13 +78,20 @@ export async function readCredits(rpc:Rpc,account:{userId:string;sessionId:strin
  return {...parsed.data,checkoutAvailable:eligible&&!pending&&!fullHistoryPending};
 }
 export async function creditsRequest(request:Request):Promise<Response>{
+ let cookies:AccountCookies|undefined;
  try{
-  const config=stagingAccountConfig(),clients=accountClients(config),cookies=new AccountCookies(request,config);
+  const config=stagingAccountConfig(),clients=accountClients(config);cookies=new AccountCookies(request,config);
   const {account}=await activeSession(clients,cookies);
   if(cookies.get('recovery')===account.sessionId)return cookies.apply(json({error:'FORBIDDEN',code:'RECOVERY_SESSION'},403));
   const expected=new URL(request.url).searchParams.get('desktopAccount');
   if(expected!==null&&expected!==account.userId)return cookies.apply(json({error:'FORBIDDEN',code:'ACCOUNT_MISMATCH'},403));
   await rateLimit(request,config,clients,account.email,'billing-read');
   return cookies.apply(json(await readCredits((name,args)=>clients.service.rpc(name,args),account)));
- }catch(error){return error instanceof AccountError?json({error:error.code},error.status):apiError(error);}
+ }catch(error){
+  if(error instanceof AccountError&&error.status===401)cookies?.clearSession();
+  const response=error instanceof AccountError?json({error:error.code},error.status):apiError(error);
+  if(response.status===429)response.headers.set('Retry-After','60');
+  // A successful Auth rotation must survive a later rate/credits-read failure.
+  return cookies?cookies.apply(response):response;
+ }
 }

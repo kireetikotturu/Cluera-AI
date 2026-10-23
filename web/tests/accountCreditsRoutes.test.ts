@@ -2,7 +2,7 @@ import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import {handleNativeAccount} from '../lib/accounts/native';
 import {creditsRequest,readCredits} from '../lib/accounts/credits';
 import {accountConfig} from '../lib/accounts/config';
-import {seal} from '../lib/accounts/cookies';
+import {seal,unseal} from '../lib/accounts/cookies';
 import {paymentTestEnvironment} from './helpers/paymentTestMode';
 const mocks=vi.hoisted(()=>({clients:vi.fn()}));vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 const origin='https://cluera-ai-staging.vercel.app',uid='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002';
@@ -19,6 +19,19 @@ beforeEach(()=>{
 afterEach(()=>{vi.unstubAllEnvs();vi.clearAllMocks();});
 const native=(headers:Record<string,string>={})=>new Request(`${origin}/api/account/native/credits`,{headers});
 const browser=(query='')=>{const config=accountConfig();return new Request(`${origin}/api/account/credits${query}`,{headers:{cookie:`__Host-sr-account-access=${seal(token,'access',config,3600)}; __Host-sr-account-refresh=${seal('synthetic-refresh','refresh',config,3600)}`}});};
+it.each([429,503])('keeps a rotated secure session when the subsequent credits read fails with %s',async status=>{
+ const clients=mocks.clients(),config=accountConfig(),original=rpc.getMockImplementation()!;
+ clients.auth.auth.refreshSession=vi.fn(async()=>({data:{session:{access_token:token,refresh_token:'synthetic-rotated-refresh',expires_in:3600}},error:null}));
+ rpc.mockImplementation(async(name:string)=>name==='customer_auth_rate_limit'&&status===429?{data:false,error:null}
+  :name==='customer_credits_read'&&status===503?{data:null,error:{code:'UNAVAILABLE'},status:503}:original(name));
+ const response=await creditsRequest(new Request(`${origin}/api/account/credits`,{headers:{cookie:`__Host-sr-account-refresh=${seal('synthetic-refresh','refresh',config,3600)}`}}));
+ expect(response.status).toBe(status===429?429:500);const headers=response.headers.getSetCookie();
+ const refreshed=headers.find(value=>value.startsWith('__Host-sr-account-refresh='))!;
+ expect(unseal(refreshed.split(';')[0].split('=')[1],'refresh',config)).toBe('synthetic-rotated-refresh');
+ expect(refreshed).toContain('HttpOnly');expect(refreshed).toContain('Secure');expect(refreshed).not.toContain('Max-Age=0');
+ expect(await response.text()).not.toContain('synthetic-rotated-refresh');
+ if(status===429)expect(response.headers.get('retry-after')).toBe('60');
+});
 it('native requires live auth, binds owned identity and forbids browser credential paths',async()=>{
  expect((await handleNativeAccount(native(),'credits')).status).toBe(401);
  for(const headers of [{origin},{cookie:'synthetic'},{'sec-fetch-site':'same-origin'}])expect((await handleNativeAccount(native(headers),'credits')).status).toBe(403);
