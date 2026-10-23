@@ -2,6 +2,16 @@
 
 This is fixed-target, private operations evidence. It does not dispatch or wake a worker, reconcile a receipt, retry checkout, settle usage, call an AI provider, send notifications or change credits.
 
+## Separate Live reader, October 21
+
+Migration `20261021075249_cluera_live_infrastructure_disabled` adds service-only STABLE `cluera_live_billing_operations_health()` and supporting partial indexes. It reads the isolated Live inbox/commands plus shared unsettled usage. Run `node scripts/check-cluera-live-operations.cjs` with `CLUERA_LIVE_OPERATIONS_READ_ENABLED=true` in the same trusted private environment described below. It uses a fixed RPC target, the same six-second/4-KiB bounds and no arbitrary URL or write capability. Keep the original Test monitor running independently.
+
+Live output adds active bank and database intake/checkout/native gates, cancellation/native-command counts and oldest timestamps. Pending commands older than five minutes alert; UNCERTAIN/REVIEW commands alert immediately. Counts cap at 1,001 per source. Missing merchant/admission is expected only while Live intake/checkout are disabled and Test is selected; that empty observation is explicitly `DISABLED`, exit 0. Backlogs, quarantine, unsettled usage and command problems still alert in disabled state. A Live bank with intake off alerts. None of these observations proves processing or payment success.
+
+A renewed SELECT-only read at 02:02:22 UTC October 23 confirms Test selected, Live gates off and no backlog, quarantine, uncertainty, pending commands or unsettled usage in either monitor. Test admission at 02:02:01 UTC establishes only admission, not fulfillment or uptime.
+
+The first read at 07:53 UTC October 21 confirmed Test selected, empty Live financial state, no merchant profile and all Live gates off. No scheduler, alert destination or paid capacity was provisioned. Follow [the current payment handoff](CLUERA_PRODUCTION_PAYMENT_HANDOFF.md) for host/alert acceptance and later Live activation. The October 19 evidence below describes the separate Test reader.
+
 The SELECT-only migration `20261019095014_cluera_operations_health.sql` was applied at 09:50 UTC October 19, 2026. SHA-256: `89a2b201d7091dc15bc6fda5a09e828a1540516199e1f796c3dfeb462c38c6cf`. All 87 prior function definitions retain aggregate digest `76f7d6d36ba283c1e3af9e8be93e26a2`; checked business counts are unchanged. Live RPC body, service-only ACL, STABLE/empty search path/UTC/timeouts pass. Its first read shows fresh current-epoch admission, no pending/quarantined receipts, no uncertain requests and no expired unsettled reservations. This does not establish long-term reliability or financial acceptance. Existing security-advisor findings are unchanged.
 
 ## What is implemented
