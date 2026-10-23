@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {usageDuration} from '../../lib/usage/display';
 import {AdminRoleLink} from './AdminRoleNavigation';
+import styles from '../cluera-commerce.module.css';
 interface Workspace {
  displayName:string;
  balance:{availableMilliseconds:number;reservedMilliseconds:number;spentMilliseconds:number};
@@ -62,21 +63,26 @@ export function AccountWorkspace(){
   }finally{active.current=false;if(version.current===current){request.current=null;if(mounted.current)setBusy(false);}}
  }
  const locked=busy||loading||Boolean(pending);
- return <div aria-busy={busy||loading}><p role="status">{loading?'Loading account details…':message}</p>
+ return <div className={styles.dashboard} aria-busy={busy||loading}><p role="status">{loading?'Loading account details…':message}</p>
+  {loading&&!data?<div className={styles.skeleton} aria-hidden="true"/>:null}
   <button type="button" disabled={locked} onClick={()=>void refresh()}>Refresh balance and account</button>
   {pending?<p>A change is awaiting confirmation. Other edits are paused. <button type="button" disabled={busy} onClick={()=>void submit(pending)}>Retry the same change</button></p>:null}
   {data?<>
   <h2>Your Cluera account</h2>
-  <p>Remaining {minutes(data.balance.availableMilliseconds)} · Reserved for active sessions {minutes(data.balance.reservedMilliseconds)} · Used {minutes(data.balance.spentMilliseconds)}</p>
-  <p>Trial {minutes(data.balances.TRIAL??0)} · Recurring / test allowance {minutes(data.balances.RECURRING??0)} · No-expiry packs {minutes(data.balances.PACK??0)}</p>
-  <p>The trial is granted once per account. Active sessions on all devices share this server balance.</p>
-  <p>This is a server snapshot, not an offline countdown. Refresh after desktop use; reserved time is already excluded from remaining time.</p>
+  <dl className={styles.metrics}>
+   <div className={styles.metric}><dt>Remaining time</dt><dd>{minutes(data.balance.availableMilliseconds)}</dd></div>
+   <div className={styles.metric}><dt>Reserved for active sessions</dt><dd>{minutes(data.balance.reservedMilliseconds)}</dd></div>
+   <div className={styles.metric}><dt>Used</dt><dd>{minutes(data.balance.spentMilliseconds)}</dd></div>
+  </dl>
+  <div className={styles.breakdown}><span>Trial · {minutes(data.balances.TRIAL??0)}</span><span>Monthly · {minutes(data.balances.RECURRING??0)}</span><span>No-expiry packs · {minutes(data.balances.PACK??0)}</span></div>
+  <p>Your balance is shared across devices. Reserved time is already excluded from remaining time. Refresh after desktop use.</p>
+  <nav className={styles.dashboardActions} aria-label="Billing shortcuts"><a href="/account/checkout?offer=cluera_pack_3h_v2">Buy more time</a><a href="/pricing">Compare plans</a><a href="/account/checkout#billing-history">Billing history</a></nav>
   <form onSubmit={event=>{event.preventDefault();void submit({body:{action:'PROFILE',displayName:String(new FormData(event.currentTarget).get('name')??'')}});}}>
    <label>Display name<input name="name" defaultValue={data.displayName} maxLength={80} disabled={locked}/></label><button className="button secondary" disabled={locked}>Save profile</button>
   </form>
   <h3>Plans and billing</h3>
-  {data.plans.length?data.plans.map((plan,i)=><p key={i}>{plan.tier} · {plan.state} · {plan.paymentState}{plan.endsAt?` · until ${new Date(plan.endsAt).toLocaleDateString()}`:''}{plan.cancelFuture?' · renewal stopped':''}{plan.state==='PAUSED'?` · preserved ${minutes(plan.remainingMilliseconds??0)} of access time`:''}</p>):<p>No recurring paid plan is active. Staging test allowances, if granted, appear in the balance above.</p>}
-  <p><a href="/account/checkout?offer=cluera_pack_3h_v2">View credit purchase availability and payment status</a>. Access is verified again there. Do not repeat an unresolved payment attempt. Payment history appears there only when available; Live payments remain disabled.</p>
+  {data.plans.length?data.plans.map((plan,i)=><p key={i}>{plan.tier} · {plan.state} · {plan.paymentState}{plan.endsAt?` · until ${new Date(plan.endsAt).toLocaleDateString()}`:''}{plan.cancelFuture?' · renewal stopped':''}{plan.state==='PAUSED'?` · preserved ${minutes(plan.remainingMilliseconds??0)} of access time`:''}</p>):<p>No monthly subscription is active. Your trial and available packs appear above.</p>}
+  <p>Already started a payment? <a href="/account/checkout">Check its status or continue your existing checkout</a> before making another purchase.</p>
   <h3>Recent AI sessions</h3>
   {data.sessions.length?<ul>{data.sessions.map((session,i)=><li key={i}>{new Date(session.startedAt).toLocaleString()} · {session.state}</li>)}</ul>:<p>No account-managed AI sessions yet.</p>}
   <h3>Private context</h3><p>Save résumé text, a job description, supporting context or instructions. Text only here, up to 120 KB per document and 20 documents. In the account desktop, Settings → Selected account context also imports PDF/DOCX/TXT/Markdown as extracted text. Only documents you explicitly select there contribute bounded excerpts to future answers. Original files are not stored in the cloud.</p>

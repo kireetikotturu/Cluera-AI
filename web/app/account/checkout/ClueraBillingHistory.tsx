@@ -73,9 +73,9 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
   :!validOwner?'Sign in with a verified Cluera account to read its history.'
    :disabled?'Wait for the current account or checkout verification before refreshing history.'
     :busy?'Loading server-confirmed billing history...':message;
- return <section className={styles.history} aria-label="Cluera payment and subscription history" aria-busy={busy}>
+ return <section id="billing-history" className={styles.history} aria-label="Cluera payment and subscription history" aria-busy={busy}>
   <h3>Cluera payment and subscription history</h3>
-  <p>Only verified payments and server-confirmed subscription states from this clean Cluera project are shown. This is not a complete historical provider reconciliation.</p>
+  <p>Your verified payments, available subscription details and renewal controls.</p>
   <p id={statusId} role="status" aria-live="polite">{notice}</p>
   <button type="button" disabled={!enabled||disabled||!validOwner||busy} onClick={()=>void refresh()} aria-describedby={statusId}>Refresh billing history</button>
   {history?<>
@@ -84,8 +84,8 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
     <strong>{payment.revision.name}</strong> · {clueraPrice(payment.revision.amountPaise)} · {payment.state==='REFUNDED'?'Refunded':'Verified payment'}
     <p>{usageDuration(payment.revision.allowanceSeconds*1000)} · {payment.revision.kind==='PACK'?'One-time pack; no expiry':'Monthly allowance; no rollover'}</p>
     <p>{payment.paidAt?'Paid':'Checkout created'}: <time dateTime={payment.paidAt??payment.intentCreatedAt}>{new Date(payment.paidAt??payment.intentCreatedAt).toLocaleString()}</time></p>
-    <p>Payment reference: <code>{payment.paymentId}</code>{payment.invoiceId?<> · Invoice reference: <code>{payment.invoiceId}</code></>:null}</p>
-   </li>)}</ul>:<p>No verified payments are recorded in this project snapshot.</p>}
+    <details><summary>Payment references</summary><p>Payment reference: <code>{payment.paymentId}</code>{payment.invoiceId?<> · Invoice reference: <code>{payment.invoiceId}</code></>:null}</p></details>
+   </li>)}</ul>:<p>No verified payments yet. Completed payments appear here after verification.</p>}
    {history.hasMorePayments?<p>Only the latest 50 payments are shown. Contact support for older records.</p>:null}
    {history.nativeSchedule?<section aria-label="Saved and scheduled monthly access">
     <h4>Saved and scheduled monthly access</h4>
@@ -111,7 +111,7 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
     {subscription.graceUntil?<p>Recorded grace ends <time dateTime={subscription.graceUntil}>{new Date(subscription.graceUntil).toLocaleString()}</time>.</p>:null}
     {subscription.cancelFuture?<p>Renewal is stopped in the current server record.</p>:null}
     {cancellationEnabled&&!subscription.cancelFuture&&subscription.state!=='CANCELED'&&accountId?<SubscriptionCancellation mode={mode} accountId={accountId} subscriptionId={subscription.subscriptionId} enabled={cancellationEnabled} disabled={disabled||busy}/>:null}
-   </li>)}</ul>:<p>No subscription records are displayed in this project snapshot.</p>}
+   </li>)}</ul>:<p>No subscriptions yet. Choose an available monthly plan when you need more time.</p>}
    {history.hasMoreSubscriptions?<p>Only the latest 50 subscriptions are shown. Contact support for older records.</p>:null}
   </>:null}
   <p>{cancellationEnabled?'Invoice downloads, refunds, pause and plan-change controls are not available here yet.':'Invoice downloads and subscription-change controls are not available here yet.'} Contact <a href="mailto:clueraaisupport@gmail.com">Cluera support</a>; never send card details, passwords or verification codes.</p>

@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { checkoutRequest } from '../lib/payments/cluera/checkoutRequest';
+import { checkoutWindowSeconds } from '../lib/payments/cluera/checkoutWindow';
+
+it.each([[undefined,600],['600',600],['60',60],['1800',1800],['0',600],['59',600],['1801',600],['NaN',600],['1e3',600]])('bounds checkout presentation window %s', (value,seconds)=>{
+ expect(checkoutWindowSeconds(value)).toBe(seconds);
+});
+it.each([['7',7],['999',300],['0',1],['bad',60]])('bounds Retry-After %s without parsing provider details',async(value,seconds)=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(null,{status:429,headers:{'Retry-After':value}})));
+ expect((await checkoutRequest('/api/account/credits',{})).retryAfterSeconds).toBe(seconds);
+});
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 it.each(['fetch','body'])('settles a stalled %s even if abort is ignored, without retrying',async kind=>{
  vi.useFakeTimers();

@@ -13,6 +13,7 @@ import { approvedPurchaseCatalog } from './purchaseAvailability';
 import { readClueraBillingHistory } from './history';
 import { resumeClueraCheckout } from './checkoutResume';
 import { cancellationInput, cancelClueraSubscription, readClueraCancellation } from './cancellation';
+import { ClueraBillingError } from './contracts';
 
 export type LiveBillingAction = 'catalog' | 'checkout' | 'callback' | 'resume' | 'history' | 'cancellation';
 /** Separate Live routes; the existing Test receipt destination stays Test.
@@ -75,11 +76,13 @@ export async function handleLiveBilling(request: Request, action: LiveBillingAct
       })();
     return cookies.apply(json({ payment }, payment.code === 'PENDING' ? 409 : 200));
   } catch (error) {
-    const status = error instanceof AccountError ? error.status : error instanceof z.ZodError || error instanceof SyntaxError ? 400 : 503;
+    const status = error instanceof AccountError ? error.status : error instanceof ClueraBillingError && error.code === 'PENDING' ? 409
+      : error instanceof z.ZodError || error instanceof SyntaxError ? 400 : 503;
     if (status === 401) cookies?.clear();
     const response = json({ error: status === 401 ? 'Sign in with a verified email.'
       : status === 429 ? 'Too many requests. Wait before checking the existing payment.'
         : 'Billing is unavailable. Do not repeat a payment.' }, status);
+    if (status === 429) response.headers.set('Retry-After', '60');
     return cookies ? cookies.apply(response) : response;
   }
 }

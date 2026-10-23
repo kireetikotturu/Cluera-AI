@@ -89,7 +89,7 @@ it('history is explicit-refresh, single-flight and GET-only; an empty state requ
  await render();expect(request).not.toHaveBeenCalled();expect(host.textContent).not.toContain('No verified payments');
  await act(async()=>{button().click();button().click();});expect(request).toHaveBeenCalledOnce();expect(button().disabled).toBe(true);expect(host.textContent).toContain('Loading server-confirmed');
  expect(request.mock.calls[0][0]).toBe('/api/account/payments/cluera/history?expectedAccountId='+user);expect(request.mock.calls[0][1]).toMatchObject({method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error'});
- await act(async()=>finish(json({history:empty()})));expect(host.textContent).toContain('No verified payments are recorded');expect(button().disabled).toBe(false);
+ await act(async()=>finish(json({history:empty()})));expect(host.textContent).toContain('No verified payments yet');expect(button().disabled).toBe(false);
 });
 it('customer sees saved Pro calendar window and unused allowance separately from current spendable Enterprise, without a renewal promise or mutation',async()=>{
  const fetcher=vi.fn(async()=>json({history:savedHistory()}));vi.stubGlobal('fetch',fetcher);await render();expect(fetcher).not.toHaveBeenCalled();await act(async()=>button().click());

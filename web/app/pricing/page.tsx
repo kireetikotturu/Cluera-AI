@@ -11,5 +11,5 @@ export default function PricingPage(){
  return <main><AccountPricing/></main>;
 }
 async function currentCatalogPricing(){const billing=billingUiCapabilities();return <main className="account-page"><h1>Cluera plans and pricing</h1>
- <ClueraCheckoutClient key={billing.mode} offers={await readClueraBillingPresentation()??[]} {...billing} firstSubscriptionOnly/>
+ <ClueraCheckoutClient key={billing.mode} offers={await readClueraBillingPresentation()??[]} {...billing} firstSubscriptionOnly pricing/>
  </main>;}

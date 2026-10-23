@@ -76,7 +76,7 @@ it.each([
   await renderCheckout();expect(host.textContent).toContain(notice);expect(host.textContent).not.toContain('PRIVATE_DO_NOT_REFLECT');
   if(http===401)expect(host.querySelector('a[aria-label="Sign in to buy: Cluera 3 Hours"]')).not.toBeNull();
   else expect(buy().disabled).toBe(true);
-  expect(button('Refresh billing status').disabled).toBe(false);
+  expect(button('Refresh billing status').disabled).toBe(http===429);
   if(http!==401)expect(host.querySelector('a[aria-label="Sign in to buy: Cluera 3 Hours"]')).toBeNull();
   if(http>=404)expect(host.textContent).toContain('Synthetic Tester');
 });
@@ -113,7 +113,7 @@ it.each(['rzp_live_synthetic123456', 'rzp_test_synthetic123456'])('Live checkout
 it.each([undefined,[{state:'ACTIVE',paymentState:'ACTIVE'}]])('first-subscription-only availability blocks unproven or competing monthly access while packs remain available',async plans=>{
  const request=vi.fn(async(url:RequestInfo|URL)=>String(url).startsWith('/api/account/credits')?Response.json({...credits,plans}):checkoutGet(url));vi.stubGlobal('fetch',request);
  await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled:true,firstSubscriptionOnly:true})));
- expect(host.textContent).toContain('first subscription only');expect(host.textContent).toContain('queued subscriptions and upgrades are unavailable');expect(subscribe().disabled).toBe(true);expect(buy().disabled).toBe(false);
+ expect(host.textContent).toContain('One monthly subscription at a time');expect(host.textContent).toContain('Automatic upgrades are unavailable');expect(subscribe().disabled).toBe(true);expect(buy().disabled).toBe(false);
  expect(request.mock.calls.every(([,init])=>!(init as RequestInit|undefined)?.method)).toBe(true);expect(document.querySelector('script')).toBeNull();
 });
 it('an independently loaded empty plan snapshot may show first monthly checkout under the explicit capability',async()=>{
@@ -238,7 +238,7 @@ it('never opens SDK for an unverified monthly Test plan even when stale catalog 
   const request = vi.fn(async (url: RequestInfo | URL) => String(url).endsWith('/catalog') ? Response.json({ catalog: unverified }) : checkoutGet(url));
   vi.stubGlobal('fetch', request); await renderCheckout(); expect(subscribe().disabled).toBe(true);
   await act(async () => subscribe().click()); expect(document.querySelector('script')).toBeNull();
-  expect(host.textContent).toContain('Plan and lifecycle acceptance pending');
+  expect(host.textContent).toContain('This plan is not available to purchase yet');
 });
 
 it('does not trust a browser-supplied foreign resource in callback and does not echo it', async () => {
@@ -416,6 +416,76 @@ it('automatic checks stop after a definitive owner denial and keep the previous 
     const count=request.mock.calls.length;await act(async()=>{await vi.advanceTimersByTimeAsync(300_000);});expect(request).toHaveBeenCalledTimes(count);
     expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
   } finally {visibility.mockRestore();vi.useRealTimers();}
+});
+it('continuation supersedes a slow background read, revalidates ownership and ignores its late foreign response',async()=>{
+ createdBinding=makeBound().payment;let delay=false,finish!:(value:Response)=>void,slowSignal:AbortSignal|undefined;
+ const open=vi.fn();window.Razorpay=class{open=open;close=vi.fn();on=vi.fn();};
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+  if(delay&&String(url).includes('/credits')){delay=false;slowSignal=init?.signal as AbortSignal;return new Promise<Response>(resolve=>{finish=resolve;});}
+  return String(url).includes('/resume?')?Response.json(makeBound()):checkoutGet(url);
+ });
+ vi.stubGlobal('fetch',request);await renderCheckout();delay=true;
+ await act(async()=>button('Refresh billing status').click());
+ expect(button('Refresh billing status').disabled).toBe(true);expect(button('Continue existing checkout').disabled).toBe(false);
+ await act(async()=>button('Continue existing checkout').click());
+ expect(slowSignal?.aborted).toBe(true);expect(open).toHaveBeenCalledOnce();
+ await act(async()=>finish(Response.json({...credits,userId:factorId,displayName:'Foreign account'})));
+ expect(host.textContent).toContain('Synthetic Tester');expect(host.textContent).not.toContain('Foreign account');
+ expect(request.mock.calls.filter(([url])=>String(url).includes('/resume?'))).toHaveLength(2);
+ expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
+});
+it('an SDK load failure restores only the same independently rechecked order for explicit continuation',async()=>{
+ createdBinding=makeBound().payment;
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')?Response.json(makeBound()):checkoutGet(url));
+ vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>button('Continue existing checkout').click());
+ const script=document.querySelector<HTMLScriptElement>('script[src*="razorpay"]')!;
+ await act(async()=>script.dispatchEvent(new Event('error')));
+ expect(button('Continue existing checkout').disabled).toBe(false);expect(buy().disabled).toBe(true);
+ const open=vi.fn();window.Razorpay=class{open=open;close=vi.fn();on=vi.fn();};
+ await act(async()=>button('Continue existing checkout').click());expect(open).toHaveBeenCalledOnce();
+ expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
+});
+it.each([true,false])('ten-minute expiry reconciles the original order; untouched=%s never creates or cancels an order',async untouched=>{
+ vi.useFakeTimers();const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');
+ try{
+  createdBinding=makeBound().payment;let expired=false,options:Record<string,any>={};const close=vi.fn(),open=vi.fn();
+  window.Razorpay=class{constructor(value:Record<string,unknown>){options=value;}open=open;close=close;on=vi.fn();};
+  const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')
+   ?expired&&!untouched?Response.json({error:'Pending'},{status:409}):Response.json(makeBound()):checkoutGet(url));
+  vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>button('Continue existing checkout').click());
+  expect(options.timeout).toBe(600);expect(host.textContent).toContain('10:00');
+  await act(async()=>vi.advanceTimersByTimeAsync(599000));expect(close).not.toHaveBeenCalled();expired=true;
+  await act(async()=>vi.advanceTimersByTimeAsync(1000));expect(close).toHaveBeenCalledOnce();
+  expect(request.mock.calls.filter(([url])=>String(url).includes('/resume?'))).toHaveLength(3);
+  expect(buy().disabled).toBe(true);
+  if(untouched){expect(host.textContent).toContain('Your order was not canceled');expect(button('Continue existing checkout').disabled).toBe(false);}
+  else expect(button('Continue existing checkout')).toBeUndefined();
+  expect(open).toHaveBeenCalledOnce();expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
+ }finally{visibility.mockRestore();vi.useRealTimers();}
+});
+it('closing an untouched checkout offers deliberate same-order continuation without a second CREATE',async()=>{
+ let options:Record<string,any>={};const open=vi.fn();
+ window.Razorpay=class{constructor(value:Record<string,unknown>){options=value;}open=open;close=vi.fn();on=vi.fn();};
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?Response.json(bound())
+  :String(url).includes('/resume?')?Response.json(makeBound()):checkoutGet(url));
+ vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>buy().click());
+ await act(async()=>options.modal.ondismiss());expect(button('Continue existing checkout').disabled).toBe(false);
+ await act(async()=>button('Continue existing checkout').click());expect(open).toHaveBeenCalledTimes(2);expect(options.order_id).toBe(orderId);
+ expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+});
+it('a resume throttle preserves identity and prevents repeat reads until the bounded retry delay ends',async()=>{
+ vi.useFakeTimers();try{
+  createdBinding=makeBound().payment;let throttled=true;
+  const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')&&throttled
+   ?Response.json({error:'Wait'},{status:429,headers:{'Retry-After':'7'}}):String(url).includes('/resume?')?Response.json(makeBound()):checkoutGet(url));
+  vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>button('Continue existing checkout').click());
+  expect(host.textContent).toContain('Please wait 7s');expect(host.textContent).toContain('Synthetic Tester');
+  const count=request.mock.calls.length;await act(async()=>{button('Refresh billing status').click();await vi.advanceTimersByTimeAsync(6000);});
+  expect(request).toHaveBeenCalledTimes(count);expect(button('Refresh billing status').disabled).toBe(true);
+  await act(async()=>vi.advanceTimersByTimeAsync(1000));expect(button('Refresh billing status').disabled).toBe(false);
+  throttled=false;await act(async()=>button('Refresh billing status').click());expect(button('Continue existing checkout').disabled).toBe(false);
+  expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
+ }finally{vi.useRealTimers();}
 });
 it('only an explicit continuation verifies and opens the original untouched order, without a checkout CREATE POST',async()=>{
   createdBinding=makeBound().payment;let options:Record<string,any>={};const open=vi.fn();

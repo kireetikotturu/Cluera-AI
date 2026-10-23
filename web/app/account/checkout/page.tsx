@@ -13,7 +13,7 @@ import {clueraBillingHistoryEnabled} from '../../../lib/payments/cluera/history'
 import {billingUiCapabilities} from '../../../lib/payments/cluera/billingUi';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Cluera sandbox checkout', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'Secure checkout · Cluera AI', robots: { index: false, follow: false } };
 
 /** A private staging enablement gate, never a token/query parameter, enables UI. */
 export default async function CheckoutPage() {

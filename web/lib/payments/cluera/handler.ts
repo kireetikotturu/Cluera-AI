@@ -53,6 +53,7 @@ export async function handleClueraCheckout(request: Request, callback = false) {
       : status === 429 ? 'Too many billing requests. Please wait before checking again. Do not retry a payment.'
         : 'Payment verification is unavailable. Do not retry.'},
       status === 401 || status === 403 || status === 429 ? status : error instanceof z.ZodError || error instanceof SyntaxError ? 400 : 503);
+    if (status === 429) response.headers.set('Retry-After', '60');
     return cookies ? cookies.apply(response) : response;
   }
 }

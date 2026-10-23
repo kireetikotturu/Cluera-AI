@@ -7,6 +7,7 @@ export async function checkoutRequest(url: string, init: RequestInit) {
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   let abort = () => {};
   let failedStatus: number | undefined;
+  let retryAfterSeconds = 60;
   const expired = new Promise<never>((_, reject) => {
     abort = () => reject(new Error('Billing request unavailable.'));
     signal.addEventListener('abort', abort, { once: true });
@@ -16,6 +17,8 @@ export async function checkoutRequest(url: string, init: RequestInit) {
   try {
     const response = await Promise.race([fetch(url, { ...init, signal }), expired]);
     if (!response.ok) failedStatus = response.status;
+    const retry = response.headers.get('retry-after');
+    if (retry && /^\d{1,3}$/.test(retry)) retryAfterSeconds = Math.max(1, Math.min(300, Number(retry)));
     if (response.redirected || response.url && response.url !== new URL(url, location.origin).href
       || response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json'
       || !response.body) throw new Error('Billing request unavailable.');
@@ -36,11 +39,11 @@ export async function checkoutRequest(url: string, init: RequestInit) {
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     const value: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     if (signal.aborted) throw new Error('Billing request unavailable.');
-    return { ok: response.ok, status: response.status, json: async () => value };
+    return { ok: response.ok, status: response.status, retryAfterSeconds, json: async () => value };
   } catch (error) {
     // Preserve HTTP denial even when its bounded body is empty, malformed or
     // stalled. Callers only interpret allowlisted reason codes, never raw text.
-    if (failedStatus !== undefined) return { ok: false, status: failedStatus, json: async (): Promise<unknown> => null };
+    if (failedStatus !== undefined) return { ok: false, status: failedStatus, retryAfterSeconds, json: async (): Promise<unknown> => null };
     throw error;
   } finally {
     clearTimeout(timer);

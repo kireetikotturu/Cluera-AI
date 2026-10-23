@@ -29,7 +29,7 @@ it('recovers a failed initial load through explicit refresh without polling',asy
  vi.stubGlobal('fetch',fetcher);await render();
  expect(host.textContent).toContain('No verified account snapshot');expect(host.textContent).not.toContain('Loading account details');
  await act(async()=>button('Refresh balance and account').click());
- expect(host.textContent).toContain('Remaining 3h 25m');expect(host.textContent).toContain('Reserved for active sessions 30s');
+ expect(host.textContent).toContain('Remaining time3h 25m');expect(host.textContent).toContain('Reserved for active sessions30s');
  expect(fetcher).toHaveBeenCalledTimes(2);
  expect(host.querySelector('a[href="/account/download"]')).not.toBeNull();
  expect(host.querySelector('a[href="/download"]')).toBeNull();

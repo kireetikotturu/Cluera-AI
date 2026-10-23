@@ -4,6 +4,7 @@ import { AccountCookies } from '../lib/accounts/cookies';
 import { AccountError } from '../lib/accounts/config';
 import { paymentLiveEnvironment as env } from './helpers/paymentLiveMode';
 import { checkoutDenial, checkoutDenialMessage } from '../lib/payments/cluera/checkoutFailure';
+import { ClueraBillingError } from '../lib/payments/cluera/contracts';
 const mocks = vi.hoisted(() => ({ clients: vi.fn(), session: vi.fn(), limit: vi.fn(), owner: vi.fn(), status: vi.fn(), history: vi.fn(), cancellation: vi.fn() }));
 vi.mock('../lib/accounts/clients', () => ({ accountClients: mocks.clients }));
 vi.mock('../lib/accounts/handler', async original => ({ ...await original<typeof import('../lib/accounts/handler')>(), activeSession: mocks.session, rateLimit: mocks.limit }));
@@ -36,6 +37,14 @@ it('public Live approval permits verified customers without either purchaser lis
   const response = await handleLiveBilling(request(), 'checkout', { ...env, CLUERA_LIVE_PUBLIC_CHECKOUT_APPROVED: 'true', CLUERA_LIVE_PURCHASER_IDS: '',
     SIGMAROUND_PAYMENT_TESTER_IDS: '', CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED: 'false' });
   expect(response.status).toBe(200); expect(mocks.status).toHaveBeenCalledOnce(); expect(fetch).not.toHaveBeenCalled();
+});
+it('Live pending financial state remains a conflict and throttling retains its retry delay without clearing Auth',async()=>{
+ const clear=vi.spyOn(AccountCookies.prototype,'clear'),approved={...env,CLUERA_LIVE_PUBLIC_CHECKOUT_APPROVED:'true'};
+ mocks.status.mockRejectedValue(new ClueraBillingError('PENDING'));
+ expect((await handleLiveBilling(request(),'checkout',approved)).status).toBe(409);
+ mocks.limit.mockRejectedValue(new AccountError('RATE_LIMITED',429));
+ const response=await handleLiveBilling(request(),'checkout',approved);
+ expect(response.status).toBe(429);expect(response.headers.get('retry-after')).toBe('60');expect(clear).not.toHaveBeenCalled();
 });
 it.each(['GET', 'POST'])('account mismatch precedes Live eligibility for %s', async method => {
   const response = await handleLiveBilling(request('checkout', sid, method === 'POST' ? { requestId: sid, revisionId: sid } : undefined), 'checkout', env);

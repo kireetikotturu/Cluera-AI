@@ -66,6 +66,7 @@ export async function handleClueraCheckoutResume(request:Request):Promise<Respon
     if(status===401)cookies?.clear();
     const response=json({error:status===429?'Too many status checks. Wait before verifying the original order.'
       :'The existing order cannot safely continue. Preserve it for verification; do not create or retry a payment.'},status);
+    if (status === 429) response.headers.set('Retry-After', '60');
     return cookies?cookies.apply(response):response;
   }
 }
