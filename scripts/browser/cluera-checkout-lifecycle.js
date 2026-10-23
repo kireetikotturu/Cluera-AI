@@ -53,7 +53,7 @@ async (page) => {
   if(await resume().count())throw Error('Attempted order offered as untouched');await check('attempted order stays locked');
   attempted=false;failSdk=true;await go();await resume().click();await tab.waitForFunction(()=>!document.querySelector('script[src*="checkout.razorpay"]'));
   await resume().waitFor();failSdk=false;await resume().click();await tab.waitForFunction(()=>window.syntheticOpened===1);await check('SDK failure safely recovers same order');
-  await go();throttled=true;await resume().click();await tab.getByText('Please wait 7s',{exact:false}).waitFor();
+  await go();throttled=true;await resume().click();await tab.getByRole('status').filter({hasText:'Please wait 7s'}).waitFor();
   if(await refresh().isEnabled())throw Error('Throttle ignored');await tab.clock.fastForward(7000);throttled=false;
   await refresh().click();await resume().waitFor();await check('retry delay preserves identity and original order');
   await tab.setViewportSize({width:1440,height:1000});await check('desktop layout');
