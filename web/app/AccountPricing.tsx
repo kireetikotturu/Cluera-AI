@@ -27,7 +27,7 @@ export function AccountPricing({catalog=null}:{catalog?:ClueraPublicRevision[]|n
      <li><span aria-hidden="true">✓</span>{plan.kind==='PACK'?'One-time purchase':`Up to ${plan.totalCount} monthly charges`}</li>
     </ul>
     <p className={styles.availability}>Public purchasing is not yet available.</p>
-    <button className={`button secondary ${styles.action}`} disabled aria-label={`Checkout unavailable: ${plan.name}`}>Checkout unavailable</button>
+    <button className={`button secondary ${styles.action}`} disabled aria-label={`${plan.kind==='PACK'?'Buy Now':'Subscribe'}: ${plan.name}`}>{plan.kind==='PACK'?'Buy Now':'Subscribe'}</button>
    </article>):clueraTargetPlans.map(plan=>{const display=offerDisplay(plan);return <article key={plan.id} className={styles.card} aria-label={plan.name}>
     <div className={styles.cardTop}><p className={styles.eyebrow}>{plan.interval?'Planned monthly allowance':'Planned no-expiry pack'}</p><span className={styles.badge}>Preview</span></div>
     <h3>{plan.name}</h3>
@@ -40,7 +40,7 @@ export function AccountPricing({catalog=null}:{catalog?:ClueraPublicRevision[]|n
     </ul>
     <p className={styles.terms}>{display.terms}</p>
     <p className={styles.availability}>Public purchasing is not yet available.</p>
-    <button className={`button secondary ${styles.action}`} disabled aria-label={`Checkout unavailable: ${plan.name}`}>Checkout unavailable</button>
+    <button className={`button secondary ${styles.action}`} disabled aria-label={`${plan.interval?'Subscribe':'Buy Now'}: ${plan.name}`}>{plan.interval?'Subscribe':'Buy Now'}</button>
    </article>;})}
   </div>
   <div className={styles.safetyNote}><p><Link href="/account#signup">Create your account</Link> to start your trial. Approved Test customers can open <Link href="/pricing">plans and billing</Link>.</p>

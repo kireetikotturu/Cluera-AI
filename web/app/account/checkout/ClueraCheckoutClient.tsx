@@ -63,6 +63,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const [observationCycle, setObservationCycle] = useState(0);
   const [historyVersion,setHistoryVersion]=useState(0);
   const verifiedCallback=useRef<{paymentId:string;revisionId:string;amountPaise:number}|null>(null);
+  const callbackObserved=useRef(false);
   const completed=useRef(false);
   const balanceCurrent = useRef(false);
   const [resumeRevisionId, setResumeRevisionId] = useState<string | null>(null);
@@ -84,7 +85,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     if (!preserveAccount) owner.current = null;
     write.current?.abort(); overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
     if (!preserveAccount) { binding.current = null; requestId.current = null; uncertain.current = false; }
-    pendingObserved.current = false; verifiedCallback.current=null;completed.current=false;balanceCurrent.current=false;setWatchPayment(false);
+    pendingObserved.current = false; verifiedCallback.current=null;callbackObserved.current=false;completed.current=false;balanceCurrent.current=false;setWatchPayment(false);
     setResumeRevisionId(null);
     if (alive.current) { setPreparing(false);setSignedOut(reason === 'SIGNED_OUT');if (!preserveAccount) setCredits(null); setEligible(false); setBusy(false); setMessage(checkoutDenialMessage[reason]); }
   }, [clearWindow]);
@@ -145,7 +146,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       if (resolvedKnown) {
         clearWindow();exitNotice.current=null;
         overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
-        binding.current = null; requestId.current = null;
+        binding.current = null; requestId.current = null;callbackObserved.current=false;
       }
       // Credits were read before this status. Read them once more after a
       // pending-to-resolved transition so a worker committing between the two
@@ -157,7 +158,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       // server must still prove an untouched same order with zero payments.
       const pending = status.pending;
       const resumable=pending && !pending.legacy && pending.kind === 'PACK' && pending.state === 'BOUND'
-        && pending.orderId !== null && !overlay.current && !uncertain.current
+        && pending.orderId !== null && !overlay.current && !uncertain.current && !callbackObserved.current
         && (!binding.current||binding.current.orderId===pending.orderId)
         && freshCatalog.some(row => row.revisionId === pending.revisionId && row.enabled && row.testPlanValidated);
       setResumeRevisionId(resumable ? pending.revisionId : null);
@@ -249,7 +250,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     write.current = controller;
     if (!resume) { requestId.current ??= crypto.randomUUID(); uncertain.current = true; }
     setResumeRevisionId(null);
-    verifiedCallback.current=null;completed.current=false;balanceCurrent.current=false;
+    verifiedCallback.current=null;callbackObserved.current=false;completed.current=false;balanceCurrent.current=false;
     setWatchPayment(true);
     setObservationCycle(value => value + 1);
     setEligible(false); setBusy(true);setPreparing(true);
@@ -303,7 +304,8 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       }
       setCredits(verifiedAccount);
       const Constructor = razorpay(); if (!Constructor) throw new Error();
-      history.replaceState(null, '', '/account/checkout');
+      // The official Checkout opens over this page. Preserve the selected plan,
+      // desktop account hint and current route when the customer closes it.
       let callbackStarted = false, exitObserved = false;
       const observeExit = (notice: string) => {
         if (!current() || exitObserved) return;
@@ -316,10 +318,10 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         description: `${revision.name} · ${clueraAllowance(revision.allowanceSeconds)}`,
         ...(checkout.orderId ? { order_id: checkout.orderId, amount: checkout.amountPaise, currency: checkout.currency }
           : { subscription_id: checkout.subscriptionId }),
-        retry: { enabled: false }, timeout: windowSeconds, theme: { color: '#8b5cf6' },
+        retry: { enabled: false }, timeout: windowSeconds, theme: { color: '#8b5cf6', backdrop_color: '#080b14' },
         handler: async (raw: unknown) => {
           if (!current() || callbackStarted) return;
-          callbackStarted = true;
+          callbackStarted = true;callbackObserved.current=true;
           exitObserved=true;clearWindow();overlay.current=null;exitNotice.current=null;needsReconcile.current=false;
           try {
             const common = { razorpay_payment_id: z.string().regex(/^pay_[A-Za-z0-9]{8,64}$/), razorpay_signature: z.string().regex(/^[a-f0-9]{64}$/) };
@@ -344,7 +346,8 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
             setObservationCycle(value => value + 1);
             void refresh(true);
           }
-        }, modal: { ondismiss: () => observeExit('Checkout closed. We are checking whether a payment completed.') },
+        }, modal: { backdropclose: false, escape: true,
+          ondismiss: () => observeExit('Checkout closed. We are checking whether a payment completed.') },
       });
       instance.on('payment.failed', () => {
         if (!current() || exitObserved) return;
@@ -408,7 +411,21 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     <div className={`account-pricing-grid ${styles.grid}`}>{rows ? rows.map(revision => {
       const canPurchase = enabled && eligible && !busy && !cooldown && revision.enabled && revision.testPlanValidated&&!(revision.kind==='RECURRING'&&monthlyBlocked);
       const canSignIn = enabled && signedOut && !credits && !busy && revision.enabled && revision.testPlanValidated;
-      const action = canPurchase ? revision.kind === 'PACK' ? 'Buy Now' : 'Subscribe Now' : 'Checkout unavailable';
+      const savedOrder = enabled && resumeRevisionId === revision.revisionId && revision.enabled && revision.testPlanValidated;
+      const canContinue = savedOrder && !preparing && !cooldown && remaining === null;
+      const action = savedOrder ? 'Continue payment' : revision.kind === 'PACK' ? 'Buy Now' : 'Subscribe';
+      const availabilityId = `${statusId}-${revision.revisionId}`;
+      const availability = !revision.enabled || !revision.testPlanValidated
+        ? revision.kind === 'RECURRING' ? 'Subscriptions for this plan are not open yet.' : 'Purchases for this plan are not open yet.'
+        : !enabled ? 'Payments are currently paused.'
+        : cooldown > 0 ? `Please wait ${cooldown}s before continuing.`
+        : remaining !== null ? 'Your Razorpay payment window is open.'
+        : preparing ? 'Preparing secure payment…'
+        : savedOrder ? 'Continue your saved order in the Razorpay popup. No new order is created.'
+        : busy ? 'Checking payment availability…'
+        : revision.kind === 'RECURRING' && monthlyBlocked && credits ? 'Another subscription cannot start until your current plan is resolved.'
+        : canPurchase || canSignIn ? 'Pay securely in the Razorpay popup.'
+        : 'See the payment status above before continuing.';
       return <article key={revision.revisionId} aria-label={revision.name} className={`account-plan-card ${styles.card}${selection?.offerCode===revision.offerCode?' cluera-plan-selected':''}`}>
         {selection?.offerCode===revision.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
         <div className={styles.cardTop}><p className={styles.eyebrow}>{revision.kind === 'PACK' ? 'One-time pack' : 'Monthly subscription'}</p><span className={styles.badge}>{revision.kind==='PACK'?'Flexible top-up':revision.allowanceSeconds===360000?'For regular sessions':'Monthly allowance'}</span></div>
@@ -421,11 +438,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
           <li><span aria-hidden="true">✓</span>{revision.kind === 'PACK' ? 'One-time purchase' : `No rollover; up to ${revision.totalCount} monthly charges`}</li>
         </ul>
         <p className={styles.revision}>{revision.kind==='PACK'?'One payment. No automatic renewal.':'Renews monthly. Cancel future renewal while keeping your paid term. Unused monthly hours expire.'}</p>
-        {(!revision.enabled||!revision.testPlanValidated) ? <p className={styles.availability}>This plan is not available to purchase yet.</p> : null}
+        <p className={styles.availability} id={availabilityId}>{availability}</p>
         {canSignIn?<a className={styles.action} href={checkoutSelectionHref({offerCode:revision.offerCode,desktopAccount:desktopOwner.current},true)}
           aria-label={`Sign in to ${revision.kind==='PACK'?'buy':'subscribe'}: ${revision.name}`}>Sign in to {revision.kind==='PACK'?'buy':'subscribe'}</a>
-          :<button className={styles.action} data-offer-code={revision.offerCode} type="button" disabled={!canPurchase} aria-label={`${action}: ${revision.name}`} aria-describedby={statusId}
-          onClick={() => void buy(revision)}>{action}</button>}
+          :<button className={styles.action} data-offer-code={revision.offerCode} data-checkout-action={savedOrder?'resume':'purchase'} type="button" disabled={!canPurchase&&!canContinue} aria-label={`${action}: ${revision.name}`} aria-describedby={`${statusId} ${availabilityId}`}
+          onClick={() => void buy(revision, savedOrder)}>{action}</button>}
       </article>;
     }) : clueraTargetPlans.map(plan => {
       const display = offerDisplay(plan);
@@ -440,7 +457,8 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
           <li><span aria-hidden="true">✓</span>One shared account balance</li>
         </ul>
         <p className={styles.terms}>{display.terms}</p>
-        <button className={styles.action} data-offer-code={plan.offerCode} type="button" disabled aria-label={`Checkout unavailable: ${plan.name}`} aria-describedby={statusId}>Checkout unavailable</button>
+        <p className={styles.availability}>This plan is not open for purchase yet.</p>
+        <button className={styles.action} data-offer-code={plan.offerCode} data-checkout-action="purchase" type="button" disabled aria-label={`${plan.interval?'Subscribe':'Buy Now'}: ${plan.name}`} aria-describedby={statusId}>{plan.interval?'Subscribe':'Buy Now'}</button>
       </article>;
     })}</div>
     <div className={styles.safetyNote}><p>Razorpay shows the payment methods available for this plan and merchant. Your balance and billing history update automatically after verification. If a payment remains pending, keep its reference and <a href="mailto:clueraaisupport@gmail.com">contact support</a> before attempting another purchase.</p></div>

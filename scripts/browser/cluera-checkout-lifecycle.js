@@ -32,15 +32,17 @@ async (page) => {
  const check=async(name)=>{
   if(await tab.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Horizontal overflow: '+name);
   const body=await tab.locator('body').innerText();if(body.includes('PRIVATE_DO_NOT_REFLECT')||body.includes('Foreign stale account'))throw Error('Unsafe response: '+name);
-  if(await tab.locator('button[data-offer-code]:not(:disabled)').count())throw Error('Replacement purchase enabled: '+name);
+  if(await tab.locator('button[data-checkout-action="purchase"]:not(:disabled)').count())throw Error('Replacement purchase enabled: '+name);
   reports.push({name,passed:true});
  };
  try{
   await go();hold=true;await refresh().click();await tab.waitForFunction(()=>document.body.innerText.includes('Refreshing payment status'));
   if(!await resume().isEnabled())throw Error('Continuation blocked by background read');
-  await resume().click();await tab.waitForFunction(()=>window.syntheticOpened===1);release();
+  await tab.getByRole('button',{name:'Continue payment: Cluera 3 Hours',exact:true}).click();await tab.waitForFunction(()=>window.syntheticOpened===1);release();
+  if(new URL(tab.url()).search!=='?offer=cluera_pack_3h_v2')throw Error('Popup discarded selected-plan URL');
   const options=await tab.evaluate(()=>({order:window.syntheticCheckout.order_id,timeout:window.syntheticCheckout.timeout,retry:window.syntheticCheckout.retry.enabled}));
   if(options.order!==orderId||options.timeout!==600||options.retry!==false)throw Error('Wrong SDK binding/window');
+  if(await tab.locator('button[data-offer-code]').filter({hasText:'Checkout unavailable'}).count())throw Error('Generic unavailable label returned');
   await check('slow background read superseded; exact original order opened');
   await tab.evaluate(()=>window.syntheticCheckout.modal.ondismiss());await resume().waitFor();
   await resume().click();await tab.waitForFunction(()=>window.syntheticOpened===2);await check('closed original order revalidated and deliberately reopened');

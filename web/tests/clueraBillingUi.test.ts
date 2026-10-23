@@ -129,8 +129,10 @@ it('shows all four approved presentations while migration is unavailable, with n
   for (const price of ['₹549', '₹5,499', '₹9,599', '₹19,549']) expect(host.textContent).toContain(price);
   expect(host.textContent).toContain('Presentation only'); expect(host.textContent).toContain('Checkout is disabled');
   expect(host.textContent).not.toContain('synthetic-private-diagnostic');
-  const unavailable=buttons().filter(item=>item.textContent==='Checkout unavailable');
+  const unavailable=[...host.querySelectorAll<HTMLButtonElement>('button[data-checkout-action="purchase"]')];
   expect(unavailable).toHaveLength(4);expect(unavailable.every(item=>item.disabled)).toBe(true);
+  expect(unavailable.map(item=>item.textContent)).toEqual(['Buy Now','Subscribe','Subscribe','Subscribe']);
+  expect(host.textContent).not.toContain('Checkout unavailable');
   expect(request.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
   expect(document.querySelector('script[src*="razorpay"]')).toBeNull(); expect(host.querySelector('input')).toBeNull();
 });
@@ -142,7 +144,7 @@ it('a pricing selection highlights one planned offer and preserves sign-in witho
  expect(host.querySelector('.cluera-plan-selected')!.textContent).toContain('Cluera Pro 100 Hours');
  expect(host.querySelector<HTMLAnchorElement>('a')!.getAttribute('href')).toBe(`/account?offer=cluera_monthly_100h_v2&desktopAccount=${userId}#login`);
  expect(request.mock.calls.every(([,init])=>!(init as RequestInit|undefined)?.method)).toBe(true);
- expect(document.querySelector('script')).toBeNull();expect(buttons().filter(b=>b.textContent==='Checkout unavailable').every(b=>b.disabled)).toBe(true);
+ expect(document.querySelector('script')).toBeNull();expect([...host.querySelectorAll<HTMLButtonElement>('button[data-offer-code]')].every(b=>b.disabled)).toBe(true);
 });
 it('duplicate desktop owner hints fail closed before any account/catalog reads',async()=>{
  history.replaceState(null,'',`/account/checkout?desktopAccount=${userId}&desktopAccount=${factorId}`);
@@ -170,12 +172,13 @@ it('retains historical Paddle rows without using them as a new binding or automa
   expect(request.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
 });
 
-it.each(['CREATING', 'BOUND', 'UNCERTAIN'])('locks a canonical %s attempt across every offer without SDK or POST', async state => {
+it.each(['CREATING', 'BOUND', 'UNCERTAIN'])('locks new purchases for a canonical %s attempt; only a bound pack offers explicit continuation', async state => {
   const request = vi.fn(async (url: RequestInfo | URL) => String(url).includes('/checkout?') ? Response.json({ payment: {
     ...status.payment, code: 'PENDING', pending: { legacy: false, intentId: factorId, state, kind: 'PACK', revisionId: catalog[0].revisionId,
       offerCode: catalog[0].offerCode, orderId: state === 'BOUND' ? orderId : null, subscriptionId: null },
   } }) : checkoutGet(url)); vi.stubGlobal('fetch', request);
-  await renderCheckout(); expect(buy().disabled).toBe(true); expect(subscribe().disabled).toBe(true);
+  await renderCheckout(); expect(buy().disabled).toBe(state!=='BOUND'); expect(subscribe().disabled).toBe(true);
+  expect(buy().dataset.checkoutAction).toBe(state==='BOUND'?'resume':'purchase');
   expect(document.querySelector('script')).toBeNull(); expect(request.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
 });
 
@@ -238,7 +241,7 @@ it('never opens SDK for an unverified monthly Test plan even when stale catalog 
   const request = vi.fn(async (url: RequestInfo | URL) => String(url).endsWith('/catalog') ? Response.json({ catalog: unverified }) : checkoutGet(url));
   vi.stubGlobal('fetch', request); await renderCheckout(); expect(subscribe().disabled).toBe(true);
   await act(async () => subscribe().click()); expect(document.querySelector('script')).toBeNull();
-  expect(host.textContent).toContain('This plan is not available to purchase yet');
+  expect(host.textContent).toContain('Subscriptions for this plan are not open yet.');
 });
 
 it('does not trust a browser-supplied foreign resource in callback and does not echo it', async () => {
@@ -327,7 +330,7 @@ it('automatically observes a delayed signed-payment resolution and refreshes the
       }
       return String(url).endsWith('/catalog')?Response.json({catalog}):Response.json({...credits,availableMilliseconds:settled?11700000:900000});
     });
-    vi.stubGlobal('fetch',request);await renderCheckout();expect(buy().disabled).toBe(true);expect(host.textContent).toContain('15m');
+    vi.stubGlobal('fetch',request);await renderCheckout();expect(buy().dataset.checkoutAction).toBe('resume');expect(host.textContent).toContain('15m');
     resolvePayment=true;await act(async()=>{await vi.advanceTimersByTimeAsync(30_000);});
     expect(buy().disabled).toBe(false);expect(host.textContent).toContain('3h 15m');
     const count=request.mock.calls.length;await act(async()=>{await vi.advanceTimersByTimeAsync(300_000);});
@@ -401,7 +404,9 @@ it.each(['callback','dismiss','failure'] as const)('a late %s starts one bounded
   await act(async()=>{await returnFromCheckout();await vi.advanceTimersByTimeAsync(300000);});
   expect(request).toHaveBeenCalledTimes(finished);
   expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(event==='callback'?2:1);
-  expect(buy().disabled).toBe(true);expect(host.textContent).not.toContain('Payment verified.');
+  if(event==='callback'){expect(buy().disabled).toBe(true);expect(button('Continue existing checkout')).toBeUndefined();}
+  expect([...host.querySelectorAll<HTMLButtonElement>('button[data-checkout-action="purchase"]')].every(item=>item.disabled)).toBe(true);
+  expect(host.textContent).not.toContain('Payment verified.');
  }finally{visibility.mockRestore();vi.useRealTimers();}
 });
 
@@ -440,7 +445,7 @@ it('an SDK load failure restores only the same independently rechecked order for
  vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>button('Continue existing checkout').click());
  const script=document.querySelector<HTMLScriptElement>('script[src*="razorpay"]')!;
  await act(async()=>script.dispatchEvent(new Event('error')));
- expect(button('Continue existing checkout').disabled).toBe(false);expect(buy().disabled).toBe(true);
+ expect(button('Continue existing checkout').disabled).toBe(false);expect(buy().disabled).toBe(false);expect(buy().dataset.checkoutAction).toBe('resume');
  const open=vi.fn();window.Razorpay=class{open=open;close=vi.fn();on=vi.fn();};
  await act(async()=>button('Continue existing checkout').click());expect(open).toHaveBeenCalledOnce();
  expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
@@ -457,7 +462,7 @@ it.each([true,false])('ten-minute expiry reconciles the original order; untouche
   await act(async()=>vi.advanceTimersByTimeAsync(599000));expect(close).not.toHaveBeenCalled();expired=true;
   await act(async()=>vi.advanceTimersByTimeAsync(1000));expect(close).toHaveBeenCalledOnce();
   expect(request.mock.calls.filter(([url])=>String(url).includes('/resume?'))).toHaveLength(3);
-  expect(buy().disabled).toBe(true);
+  expect(buy().disabled).toBe(!untouched);expect(buy().dataset.checkoutAction).toBe(untouched?'resume':'purchase');
   if(untouched){expect(host.textContent).toContain('Your order was not canceled');expect(button('Continue existing checkout').disabled).toBe(false);}
   else expect(button('Continue existing checkout')).toBeUndefined();
   expect(open).toHaveBeenCalledOnce();expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
@@ -491,12 +496,32 @@ it('only an explicit continuation verifies and opens the original untouched orde
   createdBinding=makeBound().payment;let options:Record<string,any>={};const open=vi.fn();
   window.Razorpay=class{constructor(value:Record<string,unknown>){options=value;}open=open;close=vi.fn();on=vi.fn();};
   const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')?Response.json(makeBound()):checkoutGet(url));
-  vi.stubGlobal('fetch',request);await renderCheckout();expect(open).not.toHaveBeenCalled();expect(document.querySelector('script')).toBeNull();expect(buy().disabled).toBe(true);
+  vi.stubGlobal('fetch',request);await renderCheckout();expect(open).not.toHaveBeenCalled();expect(document.querySelector('script')).toBeNull();expect(buy().dataset.checkoutAction).toBe('resume');
   await act(async()=>{button('Continue existing checkout').click();button('Continue existing checkout').click();});
   expect(open).toHaveBeenCalledOnce();expect(options.order_id).toBe(orderId);expect(options.retry).toEqual({enabled:false});
   expect(request.mock.calls.filter(([url])=>String(url).includes('/resume?'))).toHaveLength(2);
   expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);expect(button('Continue existing checkout')).toBeUndefined();
 });
+it.each(['/pricing?offer=cluera_pack_3h_v2',`/account/checkout?offer=cluera_pack_3h_v2&desktopAccount=${userId}`])('the plan-card continuation opens only the original popup and preserves route/handoff: %s',async path=>{
+  history.replaceState(null,'',path);createdBinding=makeBound().payment;
+  let options:Record<string,any>={};const open=vi.fn();
+  window.Razorpay=class{constructor(value:Record<string,unknown>){options=value;}open=open;close=vi.fn();on=vi.fn();};
+  const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')?Response.json(makeBound()):checkoutGet(url));
+  vi.stubGlobal('fetch',request);await renderCheckout();
+  expect(buy().textContent).toBe('Continue payment');expect(buy().disabled).toBe(false);
+  expect(subscribe().textContent).toBe('Subscribe');expect(subscribe().disabled).toBe(true);
+  expect(host.textContent).toContain('Subscriptions for this plan are not open yet.');
+  expect(host.textContent).not.toContain('Checkout unavailable');
+  await act(async()=>{buy().click();buy().click();});
+  expect(open).toHaveBeenCalledOnce();expect(options.order_id).toBe(orderId);
+  expect(options.callback_url).toBeUndefined();expect(options.redirect).not.toBe(true);
+  expect(options.modal).toMatchObject({backdropclose:false,escape:true});
+  expect(location.pathname+location.search).toBe(path);
+  await act(async()=>options.modal.ondismiss());
+  expect(location.pathname+location.search).toBe(path);expect(buy().dataset.checkoutAction).toBe('resume');
+  expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
+});
+
 it('a retained order that fails strict server verification never loads SDK, retries payment or creates a replacement order',async()=>{
   createdBinding=makeBound().payment;const open=vi.fn();window.Razorpay=class{open=open;close=vi.fn();on=vi.fn();};
   const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')?new Response(null,{status:503}):checkoutGet(url));
