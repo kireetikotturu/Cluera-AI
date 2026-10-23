@@ -3,7 +3,7 @@ import type { PaymentRpc } from '../core/types';
 import { billingOwner, billingRpc, clueraBillingConfig, clueraCheckoutAllowed, clueraCheckoutEnabled } from './config';
 import { bindingSchema, ClueraBillingError, type Binding } from './contracts';
 import { clueraBillingStatus } from './checkout';
-import { clueraRazorpayAdapter } from './adapter';
+import { clueraRazorpayAdapter, ClueraResumeError } from './adapter';
 import { accountClients } from '../../accounts/clients';
 import { AccountCookies } from '../../accounts/cookies';
 import { AccountError } from '../../accounts/config';
@@ -64,7 +64,7 @@ export async function handleClueraCheckoutResume(request:Request):Promise<Respon
   } catch(error) {
     const status=error instanceof AccountError?error.status:error instanceof ClueraBillingError&&error.code==='PENDING'?409:503;
     if(status===401)cookies?.clear();
-    const response=json({error:status===429?'Too many status checks. Wait before verifying the original order.'
+    const response=json({...error instanceof ClueraResumeError&&error.reason==='ORDER_ALREADY_ATTEMPTED'?{code:'ORDER_RECONCILIATION_REQUIRED'}:{},error:status===429?'Too many status checks. Wait before verifying the original order.'
       :'The existing order cannot safely continue. Preserve it for verification; do not create or retry a payment.'},status);
     if (status === 429) response.headers.set('Retry-After', '60');
     return cookies?cookies.apply(response):response;

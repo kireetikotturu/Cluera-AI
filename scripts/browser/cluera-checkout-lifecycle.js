@@ -21,7 +21,7 @@ async (page) => {
   else if(path.endsWith('/history'))body={history:{code:'ACTIVE',userId,payments:[],subscriptions:[],hasMorePayments:false,hasMoreSubscriptions:false}};
   else if(path.endsWith('/resume')){
    status=throttled?429:attempted?409:200;
-   body=status===200?{payment:{code:'BOUND',kind:'PACK',orderId,subscriptionId:null,keyId:'rzp_test_synthetic123456',amountPaise:54900,currency:'INR',revisionId,offerCode:pack.offerCode}}:{error:'PRIVATE_DO_NOT_REFLECT'};
+   body=status===200?{payment:{code:'BOUND',kind:'PACK',orderId,subscriptionId:null,keyId:'rzp_test_synthetic123456',amountPaise:54900,currency:'INR',revisionId,offerCode:pack.offerCode}}:{...(status===409?{code:'ORDER_RECONCILIATION_REQUIRED'}:{}),error:'PRIVATE_DO_NOT_REFLECT'};
   }else if(path.endsWith('/checkout'))body={payment:{userId,code:'PENDING',pending:{legacy:false,intentId:'00000000-0000-4000-8000-000000000811',state:'BOUND',kind:'PACK',revisionId,offerCode:pack.offerCode,orderId,subscriptionId:null},resolvedOrderIds:[],resolvedSubscriptionIds:[]}};
   else {await route.abort();return;}
   await route.fulfill({status,contentType:'application/json',headers:{'cache-control':'no-store','x-content-type-options':'nosniff',...(status===429?{'retry-after':'7'}:{})},body:JSON.stringify(body)}).catch(()=>{});
@@ -49,10 +49,10 @@ async (page) => {
   await tab.clock.fastForward(600000);await tab.getByRole('status').filter({hasText:'Your order was not canceled'}).waitFor();await resume().waitFor();
   await check('ten-minute expiry reconciles without cancellation or replacement');
   await resume().click();await tab.waitForFunction(()=>window.syntheticOpened===3);attempted=true;
-  await tab.evaluate(()=>window.syntheticCheckout.modal.ondismiss());await tab.getByRole('status').filter({hasText:'existing payment or order'}).waitFor();
+  await tab.evaluate(()=>window.syntheticCheckout.modal.ondismiss());await tab.getByRole('status').filter({hasText:'already has a payment attempt'}).waitFor();
   if(await resume().count())throw Error('Attempted order offered as untouched');await check('attempted order stays locked');
   await tab.clock.fastForward(120000);if(await resume().count())throw Error('Background read reoffered denied order');
-  await tab.getByRole('status').filter({hasText:'existing payment or order'}).waitFor();await check('failed verification persists across background checks');
+  await tab.getByRole('status').filter({hasText:'already has a payment attempt'}).waitFor();await check('failed verification persists across background checks');
   attempted=false;failSdk=true;await go();await resume().click();await tab.waitForFunction(()=>!document.querySelector('script[src*="checkout.razorpay"]'));
   await tab.getByRole('status').filter({hasText:'Razorpay window could not load'}).waitFor();
   if(await resume().count())throw Error('SDK failure silently reoffered checkout');
@@ -60,6 +60,9 @@ async (page) => {
   await go();throttled=true;await resume().click();await tab.getByRole('status').filter({hasText:'Please wait 7s'}).waitFor();
   if(await refresh().isEnabled())throw Error('Throttle ignored');await tab.clock.fastForward(7000);throttled=false;
   await refresh().click();await resume().waitFor();await check('retry delay preserves identity and original order');
+  attempted=true;await tab.reload();await tab.getByRole('status').filter({hasText:'already has a payment attempt'}).waitFor();
+  if(await resume().count()||await tab.locator('script[src*="checkout.razorpay"]').count())throw Error('Blocked order exposed continuation or loaded SDK on reload');
+  await check('initial saved-order check withholds continuation for attempted orders');
   await tab.setViewportSize({width:1440,height:1000});await check('desktop layout');
   const width=await tab.locator('main').evaluate(element=>element.getBoundingClientRect().width);
   if(width<1000)throw Error('Billing still uses narrow sign-in container');

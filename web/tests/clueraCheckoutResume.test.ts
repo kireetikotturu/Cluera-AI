@@ -80,6 +80,14 @@ it('guarded GET route independently authorizes the current owner and returns no-
  const response=await handleClueraCheckoutResume(request());expect(response.status).toBe(200);expect((await response.json()).payment.orderId).toBe(orderId);expect(response.headers.get('cache-control')).toBe('no-store');
  expect(network.mock.calls.every(([,init])=>init?.method==='GET')).toBe(true);
 });
+it('an attempted order returns a fixed reconciliation reason without provider observations or sign-out',async()=>{
+ const network=provider({status:'attempted',attempts:1});vi.stubGlobal('fetch',network);
+ const clear=vi.spyOn(AccountCookies.prototype,'clear'),response=await handleClueraCheckoutResume(request());
+ expect(response.status).toBe(409);expect(response.headers.get('cache-control')).toBe('no-store');
+ const body=await response.json();expect(body.code).toBe('ORDER_RECONCILIATION_REQUIRED');
+ expect(Object.keys(body).sort()).toEqual(['code','error']);expect(JSON.stringify(body)).not.toContain(orderId);
+ expect(clear).not.toHaveBeenCalled();expect(network).toHaveBeenCalledOnce();
+});
 it('disabled checkout, foreign origins/owners, recovery, non-testers and injected resource/query cannot reach financial/provider reads',async()=>{
  vi.stubEnv('SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED','false');expect((await handleClueraCheckoutResume(request())).status).toBe(404);expect(hooks.clients).not.toHaveBeenCalled();
  vi.stubEnv('SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED','true');

@@ -14,6 +14,7 @@ import { readClueraBillingHistory } from './history';
 import { resumeClueraCheckout } from './checkoutResume';
 import { cancellationInput, cancelClueraSubscription, readClueraCancellation } from './cancellation';
 import { ClueraBillingError } from './contracts';
+import { ClueraResumeError } from './adapter';
 
 export type LiveBillingAction = 'catalog' | 'checkout' | 'callback' | 'resume' | 'history' | 'cancellation';
 /** Separate Live routes; the existing Test receipt destination stays Test.
@@ -79,7 +80,7 @@ export async function handleLiveBilling(request: Request, action: LiveBillingAct
     const status = error instanceof AccountError ? error.status : error instanceof ClueraBillingError && error.code === 'PENDING' ? 409
       : error instanceof z.ZodError || error instanceof SyntaxError ? 400 : 503;
     if (status === 401) cookies?.clear();
-    const response = json({ error: status === 401 ? 'Sign in with a verified email.'
+    const response = json({ ...error instanceof ClueraResumeError&&error.reason==='ORDER_ALREADY_ATTEMPTED'?{code:'ORDER_RECONCILIATION_REQUIRED'}:{}, error: status === 401 ? 'Sign in with a verified email.'
       : status === 429 ? 'Too many requests. Wait before checking the existing payment.'
         : 'Billing is unavailable. Do not repeat a payment.' }, status);
     if (status === 429) response.headers.set('Retry-After', '60');

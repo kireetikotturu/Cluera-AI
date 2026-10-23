@@ -17,7 +17,9 @@ export const checkoutDenialMessage: Record<CheckoutDenial, string> = {
   FORBIDDEN: 'Checkout access was denied. Return to your account or contact Cluera support. Do not repeat a payment.',
 };
 
-export function checkoutFailureMessage(status: number): string {
+export function checkoutFailureMessage(status: number, body?: unknown): string {
+  if(status===409 && body && typeof body==='object' && 'code' in body && body.code==='ORDER_RECONCILIATION_REQUIRED')
+    return 'This order already has a payment attempt. It cannot be continued automatically. Check billing status or contact Cluera support before making another payment.';
   if (status === 404) return 'Checkout is not enabled for this deployment. Your sign-in is unchanged. Contact Cluera support.';
   if (status === 409) return 'An existing payment or order needs verification. Refresh billing status; do not create another attempt.';
   if (status === 429) return 'Too many billing requests. Wait before refreshing status. Do not retry a payment.';

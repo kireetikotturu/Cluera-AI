@@ -58,6 +58,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const cooldownUntil=useRef(0),windowDeadline=useRef<number|null>(null),windowTimer=useRef<ReturnType<typeof setInterval>|null>(null);
   const needsReconcile=useRef(false),exitNotice=useRef<string|null>(null);
   const preparationFailure=useRef<string|null>(null);
+  const resumeProof=useRef<string|null>(null);
   const windowSeconds=Number.isInteger(checkoutWindowSeconds)&&checkoutWindowSeconds>=60&&checkoutWindowSeconds<=1800?checkoutWindowSeconds:600;
   const [signedOut,setSignedOut]=useState(false);
   const [watchPayment, setWatchPayment] = useState(false);
@@ -82,7 +83,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const deny = useCallback((reason: CheckoutDenial = 'ACCOUNT_MISMATCH') => {
     const preserveAccount = reason === 'TEST_PURCHASER_REQUIRED' || reason === 'LIVE_PURCHASER_REQUIRED';
     epoch.current++; trailing.current = false;
-    clearWindow();needsReconcile.current=false;exitNotice.current=null;preparationFailure.current=null;
+    clearWindow();needsReconcile.current=false;exitNotice.current=null;preparationFailure.current=null;resumeProof.current=null;
     if (!preserveAccount) owner.current = null;
     write.current?.abort(); overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
     if (!preserveAccount) { binding.current = null; requestId.current = null; uncertain.current = false; }
@@ -93,14 +94,14 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
 
   const rejectResponse = useCallback(async (response: Awaited<ReturnType<typeof checkoutRequest>>, current: () => boolean, resuming = false) => {
     if (response.ok) return false;
-    const reason = checkoutDenial(response.status, await response.json());
+    const body=await response.json(),reason = checkoutDenial(response.status, body);
     if (current()) {
       if(response.status===429){cooldownUntil.current=Date.now()+response.retryAfterSeconds*1000;setCooldown(response.retryAfterSeconds);}
       if (reason) deny(reason);
       else { setEligible(false); const notice = resuming && response.status >= 500
         ? 'The existing order cannot safely continue. Verification or configuration is unavailable. Preserve it; do not create or retry a payment.'
-        : checkoutFailureMessage(response.status);
-        if (write.current || resuming) { preparationFailure.current=notice;setResumeRevisionId(null); }
+        : checkoutFailureMessage(response.status,body);
+        if (write.current || resuming) { preparationFailure.current=notice;resumeProof.current=null;setResumeRevisionId(null); }
         setMessage(notice); }
     }
     return true;
@@ -148,7 +149,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         && (known.orderId ? status.resolvedOrderIds.includes(known.orderId)
           : Boolean(known.subscriptionId && status.resolvedSubscriptionIds.includes(known.subscriptionId))));
       if (resolvedKnown) {
-        clearWindow();exitNotice.current=null;preparationFailure.current=null;
+        clearWindow();exitNotice.current=null;preparationFailure.current=null;resumeProof.current=null;
         overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
         binding.current = null; requestId.current = null;callbackObserved.current=false;
       }
@@ -165,16 +166,18 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         && pending.orderId !== null && !overlay.current && !uncertain.current && !callbackObserved.current
         && (!binding.current||binding.current.orderId===pending.orderId)
         && freshCatalog.some(row => row.revisionId === pending.revisionId && row.enabled && row.testPlanValidated);
-      setResumeRevisionId(resumable && !preparationFailure.current && !needsReconcile.current ? pending.revisionId : null);
-      if(needsReconcile.current&&resumable){
+      const proofKey=resumable?`${pending.orderId}:${pending.revisionId}`:null;
+      setResumeRevisionId(resumable && resumeProof.current===proofKey && !preparationFailure.current && !needsReconcile.current ? pending.revisionId : null);
+      if(resumable&&(needsReconcile.current||!preparationFailure.current&&resumeProof.current!==proofKey)){
         needsReconcile.current=false;checkingResume=true;
+        setMessage('Checking whether your saved order can continue…');
         const proof=await checkoutRequest(`${endpoint}/resume?expectedAccountId=${encodeURIComponent(account.userId)}`,
           {credentials:'same-origin',cache:'no-store',redirect:'error',signal});
         if(!current())return;
         if(!proof.ok){setResumeRevisionId(null);await rejectResponse(proof,current,true);return;}
         const same=clueraBoundCheckoutForMode(mode).parse(await proof.json()).payment;
         if(same.orderId!==pending.orderId||same.revisionId!==pending.revisionId)throw Error('Binding changed');
-        preparationFailure.current=null;checkingResume=false;setResumeRevisionId(pending.revisionId);
+        preparationFailure.current=null;resumeProof.current=proofKey;checkingResume=false;setResumeRevisionId(pending.revisionId);
       }
       // A BOUND database row is not a fresh provider proof. Background polling
       // must not erase a failed preparation or silently offer that order again.
@@ -196,7 +199,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       if (current()) { setResumeRevisionId(null);setEligible(false); const notice = !enabledRef.current
         ? 'Cluera payment acceptance is pending. Checkout is disabled; no payment is requested.'
         : 'Account or payment verification is unavailable. Refresh status only; do not retry a payment.';
-        if(checkingResume)preparationFailure.current=notice;setMessage(notice); }
+        if(checkingResume){preparationFailure.current=notice;resumeProof.current=null;}setMessage(notice); }
     } finally {
       if (read.current === controller) read.current = null;
       if (current()) setBusy(false);
