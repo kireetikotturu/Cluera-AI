@@ -17,13 +17,27 @@ afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAl
 const action=(code:typeof codes[number]=codes[0])=>host.querySelector<HTMLButtonElement>(`button[data-offer-code="${code}"]`)!;
 async function render(enabled=true){await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled})));}
 function installReadFixture(rows=catalog,status=available){const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?new Response(null,{status:503}):Response.json(String(url).endsWith('/catalog')?{catalog:rows}:String(url).includes('/checkout?')?status:credits));vi.stubGlobal('fetch',request);return request;}
-it('public pricing has four named disabled actions, real INR prices and no purchase claim',()=>{
+it('public pricing links to guarded checkout availability instead of dead disabled buttons',()=>{
  host.innerHTML=renderToStaticMarkup(AccountPricing());expect(host.querySelectorAll('article')).toHaveLength(4);
- for(const [index] of codes.entries())expect(host.querySelectorAll('article button')[index]?.getAttribute('aria-label')).toBe(`${index?'Subscribe':'Buy Now'}: ${catalog[index].name}`);
+ for(const [index,code] of codes.entries()){
+  const link=host.querySelectorAll<HTMLAnchorElement>('article a')[index];
+  expect(link?.getAttribute('aria-label')).toBe(`Check availability: ${catalog[index].name}`);
+  expect(link?.getAttribute('href')).toBe(`/account/checkout?offer=${code}`);
+ }
  for(const amount of ['549','5,499','9,599','19,549'])expect(host.textContent).toContain(`\u20b9${amount}`);
- expect(host.textContent).toContain('Paid plans are not yet available');expect([...host.querySelectorAll<HTMLButtonElement>('article button')].every(button=>button.disabled)).toBe(true);expect(host.textContent).not.toMatch(/View availability|Checkout unavailable/);expect(host.querySelector('script,iframe,form')).toBeNull();
+ expect(host.textContent).toContain('Paid plans are not yet available');expect(host.querySelectorAll('article button')).toHaveLength(0);
+ expect(host.textContent).toContain('Check availability');expect(host.textContent).not.toMatch(/View availability|Checkout unavailable/);expect(host.querySelector('script,iframe,form')).toBeNull();
 });
-it('catalog revisions alone do not enable public purchasing',()=>{host.innerHTML=renderToStaticMarkup(AccountPricing({catalog}));expect(host.querySelectorAll('article a')).toHaveLength(0);expect([...host.querySelectorAll<HTMLButtonElement>('article button')].every(button=>button.disabled)).toBe(true);expect(host.textContent).not.toMatch(/View availability|Checkout unavailable/);expect(host.textContent).toContain('historical prices never change');});
+it('reviewed catalog cards route to guarded checkout without creating orders or loading payment SDK',()=>{
+ host.innerHTML=renderToStaticMarkup(AccountPricing({catalog}));expect(host.querySelectorAll('article a')).toHaveLength(4);
+ for(const [index,code] of codes.entries()){
+  const link=host.querySelectorAll<HTMLAnchorElement>('article a')[index];
+  expect(link?.getAttribute('aria-label')).toBe(`${index?'Subscribe':'Buy Now'}: ${catalog[index].name}`);
+  expect(link?.getAttribute('href')).toBe(`/account/checkout?offer=${code}`);
+ }
+ expect(host.querySelectorAll('article button')).toHaveLength(0);expect(host.textContent).not.toMatch(/View availability|Checkout unavailable/);
+ expect(host.textContent).toContain('historical prices never change');expect(host.querySelector('script,iframe,form')).toBeNull();
+});
 it('fresh enabled account and validated revisions get purchase labels without automatic SDK or writes',async()=>{const request=installReadFixture();await render();expect(action().textContent).toBe('Buy Now');for(const code of codes.slice(1))expect(action(code).textContent).toBe('Subscribe');expect(action().getAttribute('aria-label')).toBe('Buy Now: Cluera 3 Hours');const descriptions=action().getAttribute('aria-describedby')!.split(' ').map(id=>document.getElementById(id));expect(descriptions[0]?.getAttribute('role')).toBe('status');expect(descriptions[1]?.textContent).toContain('Razorpay popup');expect(host.querySelectorAll('dl dt')).toHaveLength(2);expect(request.mock.calls.every(([,init])=>!init?.method)).toBe(true);expect(document.querySelector('script[src*="razorpay"]')).toBeNull();});
 it.each(['rollout-disabled','catalog-disabled','plan-unvalidated'] as const)('keeps purchase actions disabled with an explanation when %s',async reason=>{const rows=catalog.map(row=>reason==='catalog-disabled'?{...row,enabled:false}:reason==='plan-unvalidated'?{...row,testPlanValidated:false}:row);const request=installReadFixture(rows);await render(reason!=='rollout-disabled');for(const [index,code] of codes.entries()){expect(action(code).disabled).toBe(true);expect(action(code).textContent).toBe(index?'Subscribe':'Buy Now');expect(action(code).getAttribute('aria-label')).toContain(`${index?'Subscribe':'Buy Now'}:`);}expect(host.textContent).toContain(reason==='rollout-disabled'?'Payments are currently paused.':'Subscriptions for this plan are not open yet.');expect(request.mock.calls.every(([,init])=>!init?.method)).toBe(true);});
 it('preserves selected offer and same-owner login link on denial',async()=>{history.replaceState(null,'',`/account/checkout?offer=${codes[2]}&desktopAccount=${userId}`);vi.stubGlobal('fetch',vi.fn(async()=>new Response(null,{status:401})));await render(false);expect(host.querySelector('.cluera-plan-selected')?.getAttribute('aria-label')).toBe(catalog[2].name);expect(host.querySelector<HTMLAnchorElement>('a')?.getAttribute('href')).toBe(`/account?offer=${codes[2]}&desktopAccount=${userId}#login`);expect([...host.querySelectorAll<HTMLButtonElement>('button[data-offer-code]')].every(button=>button.disabled)).toBe(true);});

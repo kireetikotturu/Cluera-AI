@@ -12,8 +12,9 @@ it('shows four reviewed prices/hours, honest terms and no payment SDK or promise
  for(const offer of clueraTargetPlans){const display=offerDisplay(offer);expect(html).toContain(offer.name);expect(html).toContain(display.price);expect(html).toContain(`${display.hours} hours`);expect(html).toContain(display.terms);}
  expect(html).toContain('do not roll over');expect(html).toContain('before packs');expect(html).toContain('Paid plans are not yet available');
  expect(html).toContain('Remote Desktop and Mobile are not included');expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
- expect((html.match(/disabled=""/g)??[])).toHaveLength(4);expect(html).not.toContain('View availability');
- expect(html).not.toContain('Checkout unavailable');expect(html).toContain('Buy Now');expect(html).toContain('Subscribe');expect(html).toContain('100 hours per month');
+ expect((html.match(/disabled=""/g)??[])).toHaveLength(0);expect(html).not.toContain('View availability');
+ expect(html).not.toContain('Checkout unavailable');expect(html).toContain('Check availability');expect(html).toContain('100 hours per month');
+ for(const plan of clueraTargetPlans)expect(html).toContain(`href="/account/checkout?offer=${plan.offerCode}"`);
 });
 it('always presents Cluera pricing without enabling a financial route',()=>{
  vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','false');const html=renderToStaticMarkup(PricingPage());expect(html).toContain('Cluera 3 Hours');expect(html).toContain('Paid plans are not yet available');expect(html).not.toMatch(/<form|<script|<iframe/);
