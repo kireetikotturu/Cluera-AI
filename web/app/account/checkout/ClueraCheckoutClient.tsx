@@ -57,6 +57,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const [preparing,setPreparing]=useState(false),[remaining,setRemaining]=useState<number|null>(null),[cooldown,setCooldown]=useState(0);
   const cooldownUntil=useRef(0),windowDeadline=useRef<number|null>(null),windowTimer=useRef<ReturnType<typeof setInterval>|null>(null);
   const needsReconcile=useRef(false),exitNotice=useRef<string|null>(null);
+  const preparationFailure=useRef<string|null>(null);
   const windowSeconds=Number.isInteger(checkoutWindowSeconds)&&checkoutWindowSeconds>=60&&checkoutWindowSeconds<=1800?checkoutWindowSeconds:600;
   const [signedOut,setSignedOut]=useState(false);
   const [watchPayment, setWatchPayment] = useState(false);
@@ -81,7 +82,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const deny = useCallback((reason: CheckoutDenial = 'ACCOUNT_MISMATCH') => {
     const preserveAccount = reason === 'TEST_PURCHASER_REQUIRED' || reason === 'LIVE_PURCHASER_REQUIRED';
     epoch.current++; trailing.current = false;
-    clearWindow();needsReconcile.current=false;exitNotice.current=null;
+    clearWindow();needsReconcile.current=false;exitNotice.current=null;preparationFailure.current=null;
     if (!preserveAccount) owner.current = null;
     write.current?.abort(); overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
     if (!preserveAccount) { binding.current = null; requestId.current = null; uncertain.current = false; }
@@ -96,9 +97,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     if (current()) {
       if(response.status===429){cooldownUntil.current=Date.now()+response.retryAfterSeconds*1000;setCooldown(response.retryAfterSeconds);}
       if (reason) deny(reason);
-      else { setEligible(false); setMessage(resuming && response.status >= 500
+      else { setEligible(false); const notice = resuming && response.status >= 500
         ? 'The existing order cannot safely continue. Verification or configuration is unavailable. Preserve it; do not create or retry a payment.'
-        : checkoutFailureMessage(response.status)); }
+        : checkoutFailureMessage(response.status);
+        if (write.current || resuming) { preparationFailure.current=notice;setResumeRevisionId(null); }
+        setMessage(notice); }
     }
     return true;
   }, [deny]);
@@ -111,6 +114,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     const current = () => alive.current && modeRef.current===mode && !controller.signal.aborted && epoch.current === generation;
     read.current = controller; completed.current=false;balanceCurrent.current=false;setBusy(true); setEligible(false);
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]);
+    let checkingResume=false;
     try {
       const hint = desktopOwner.current ?? owner.current;
       const [accountResponse, catalogResponse] = await Promise.all([
@@ -144,7 +148,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         && (known.orderId ? status.resolvedOrderIds.includes(known.orderId)
           : Boolean(known.subscriptionId && status.resolvedSubscriptionIds.includes(known.subscriptionId))));
       if (resolvedKnown) {
-        clearWindow();exitNotice.current=null;
+        clearWindow();exitNotice.current=null;preparationFailure.current=null;
         overlayAbort.current?.abort(); overlay.current?.close(); overlay.current = null;
         binding.current = null; requestId.current = null;callbackObserved.current=false;
       }
@@ -161,15 +165,21 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         && pending.orderId !== null && !overlay.current && !uncertain.current && !callbackObserved.current
         && (!binding.current||binding.current.orderId===pending.orderId)
         && freshCatalog.some(row => row.revisionId === pending.revisionId && row.enabled && row.testPlanValidated);
-      setResumeRevisionId(resumable ? pending.revisionId : null);
+      setResumeRevisionId(resumable && !preparationFailure.current && !needsReconcile.current ? pending.revisionId : null);
       if(needsReconcile.current&&resumable){
-        needsReconcile.current=false;
+        needsReconcile.current=false;checkingResume=true;
         const proof=await checkoutRequest(`${endpoint}/resume?expectedAccountId=${encodeURIComponent(account.userId)}`,
           {credentials:'same-origin',cache:'no-store',redirect:'error',signal});
         if(!current())return;
         if(!proof.ok){setResumeRevisionId(null);await rejectResponse(proof,current,true);return;}
         const same=clueraBoundCheckoutForMode(mode).parse(await proof.json()).payment;
         if(same.orderId!==pending.orderId||same.revisionId!==pending.revisionId)throw Error('Binding changed');
+        preparationFailure.current=null;checkingResume=false;setResumeRevisionId(pending.revisionId);
+      }
+      // A BOUND database row is not a fresh provider proof. Background polling
+      // must not erase a failed preparation or silently offer that order again.
+      if(preparationFailure.current && (status.code==='PENDING'||binding.current||uncertain.current)) {
+        setMessage(preparationFailure.current);return;
       }
       const canBuy = status.code === 'AVAILABLE' && !status.pending && !uncertain.current && !binding.current;
       // A resolution needs the trailing balance read to finish successfully.
@@ -183,9 +193,10 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
             : completed.current ? 'Payment verified. Your available time and billing history are up to date.'
               : `Review your plan, then continue to secure Razorpay ${mode==='test'?'Test ':''}checkout.`);
     } catch {
-      if (current()) { setResumeRevisionId(null);setEligible(false); setMessage(!enabledRef.current
+      if (current()) { setResumeRevisionId(null);setEligible(false); const notice = !enabledRef.current
         ? 'Cluera payment acceptance is pending. Checkout is disabled; no payment is requested.'
-        : 'Account or payment verification is unavailable. Refresh status only; do not retry a payment.'); }
+        : 'Account or payment verification is unavailable. Refresh status only; do not retry a payment.';
+        if(checkingResume)preparationFailure.current=notice;setMessage(notice); }
     } finally {
       if (read.current === controller) read.current = null;
       if (current()) setBusy(false);
@@ -243,7 +254,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     // A deliberate continuation supersedes a background read. It still performs
     // fresh account, server binding and provider checks before opening Checkout.
     read.current?.abort();read.current=null;trailing.current=false;epoch.current++;
-    overlayAbort.current?.abort();clearWindow();exitNotice.current=null;
+    overlayAbort.current?.abort();clearWindow();exitNotice.current=null;preparationFailure.current=null;
     const accountId = credits.userId, generation = epoch.current, controller = new AbortController();
     const current = () => alive.current && modeRef.current===mode && enabledRef.current && !controller.signal.aborted
       && epoch.current === generation && owner.current === accountId;
@@ -254,6 +265,8 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     setWatchPayment(true);
     setObservationCycle(value => value + 1);
     setEligible(false); setBusy(true);setPreparing(true);
+    let stage:'order'|'sdk'|'session'='order';
+    setMessage(resume?'Checking your existing order with Razorpay…':'Creating your secure checkout…');
     try {
       const response = await checkoutRequest(resume ? `${endpoint}/resume?expectedAccountId=${encodeURIComponent(accountId)}` : `${endpoint}/checkout`,
         { method: resume ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
@@ -267,7 +280,9 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       if (checkout.revisionId !== revision.revisionId || checkout.offerCode !== revision.offerCode
         || checkout.kind !== revision.kind || checkout.amountPaise !== revision.amountPaise) throw new Error();
       binding.current = checkout; uncertain.current = false; overlayAbort.current = controller;
+      stage='sdk';setMessage('Loading the Razorpay payment window…');
       await loadSdk(controller.signal); if (!current()) return;
+      stage='session';setMessage('Confirming your account and order before opening Razorpay…');
       // HttpOnly account cookies can change in another tab while CREATE or SDK
       // loading is in flight. Refs alone cannot attest the CURRENT browser owner.
       // These GETs revalidate that owner and the exact canonical binding; no
@@ -367,9 +382,13 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       },1000);
       setMessage(mode==='test'?'Razorpay Test checkout is open. Use Test details only. Your balance updates after payment verification.'
         :'Razorpay checkout is open. Your balance updates after payment verification.');
-    } catch { if (current()) {needsReconcile.current=Boolean(binding.current);trailing.current=Boolean(binding.current);setMessage(resume
-      ? 'The existing order cannot safely continue. Preserve it for verification; do not create or retry a payment.'
-      : 'Checkout is incomplete or unknown. Keep this attempt for verification; do not retry.');} }
+    } catch { if (current()) {
+      const notice=stage==='sdk'
+        ? 'The Razorpay window could not load. Check your connection or browser content blocker, then refresh billing status to verify this same order. No replacement order will be created.'
+        : resume ? 'The existing order could not be verified. Refresh billing status to check it again. Do not create another order or repeat a payment.'
+          : 'Checkout is incomplete or unknown. Keep this attempt for verification; do not retry.';
+      preparationFailure.current=notice;needsReconcile.current=false;setResumeRevisionId(null);setMessage(notice);
+    } }
     finally {
       if (write.current === controller) write.current = null;
       if (alive.current && epoch.current === generation) {setBusy(false);setPreparing(false);}
@@ -403,7 +422,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     <div className={styles.accountSummary}>
       {credits ? <dl><div><dt>Signed in as</dt><dd>{credits.displayName?.trim() || 'verified customer'}</dd></div><div className={styles.balance}><dt>Available time</dt><dd>{usageDuration(credits.availableMilliseconds)}</dd><p>Shared across your devices</p></div></dl>
         : <a className={styles.signIn} href={selection?checkoutSelectionHref(selection,true):'/account#login'}>Sign in to Cluera AI</a>}
-      <button className={styles.refresh} type="button" disabled={busy||cooldown>0} onClick={() => void refresh()}>Refresh billing status</button>
+      <button className={styles.refresh} type="button" disabled={busy||cooldown>0} onClick={() => {needsReconcile.current=true;void refresh();}}>Refresh billing status</button>
       {enabled && resumeRevisionId ? <div className={styles.resumePanel}><div><strong>Your existing checkout is saved</strong><p>Continue this order. Other purchases stay paused until its payment status is resolved.</p></div><button className={styles.resume} type="button" disabled={preparing||cooldown>0||remaining!==null} onClick={() => {
         const revision = catalog.find(row => row.revisionId === resumeRevisionId); if (revision) void buy(revision, true);
       }}>Continue existing checkout</button></div> : null}

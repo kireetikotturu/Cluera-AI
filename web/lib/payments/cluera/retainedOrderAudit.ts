@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { PaymentRpc } from '../core/types';
 import { billingOwner, billingRpc, clueraBillingConfig, clueraCheckoutAllowed } from './config';
-import { bindingSchema } from './contracts';
-import { clueraRazorpayAdapter } from './adapter';
+import { bindingSchema, ClueraBillingError } from './contracts';
+import { clueraRazorpayAdapter, ClueraResumeError } from './adapter';
 
 export const RETAINED_TEST_ORDER = 'order_TpRplT79SeFnTp';
 const PIN = 'd426167dbe3272ee6f8e336d80512516b7dd6d3d96ce14c6fc634ca5d54698da';
@@ -16,7 +16,8 @@ export async function auditRetainedTestOrder(rpc: PaymentRpc, env = process.env,
   let providerRequests = 0;
   const report = { component: 'cluera-retained-test-order', financialMutations: 0,
     merchantPinned: false, bindingVerified: false, soleApprovedPurchaserOwnsRetainedOrder: false, untouchedOrderVerified: false,
-    acceptance: 'NOT_PERFORMED', stopped: 'CONFIGURATION', providerRequests: 0 };
+    acceptance: 'NOT_PERFORMED', stopped: 'CONFIGURATION', providerRequests: 0,
+    failureCode: null as string | null, providerHttpStatus: null as number | null, invalidFields: [] as string[] };
   const finish = (stopped: string) => ({ ...report, stopped, providerRequests, observedAt: new Date().toISOString() });
   try {
     clueraBillingConfig(env);
@@ -53,7 +54,16 @@ export async function auditRetainedTestOrder(rpc: PaymentRpc, env = process.env,
       || ownerAfter.epoch !== owner.epoch) return finish('BINDING_CHANGED');
     report.untouchedOrderVerified = true;
     return finish('SAME_ORDER_ELIGIBLE_AT_OBSERVATION');
-  } catch {
+  } catch (error) {
+    if (report.bindingVerified) {
+      report.failureCode = error instanceof ClueraResumeError ? error.reason
+        : error instanceof ClueraBillingError ? error.code : error instanceof z.ZodError ? 'INVALID_PROVIDER_FIELDS' : 'VERIFICATION_FAILED';
+      if (error instanceof ClueraBillingError && error.httpStatus && error.httpStatus >= 100 && error.httpStatus <= 599)
+        report.providerHttpStatus = error.httpStatus;
+      // Log only reviewed field names, never issue messages, values, notes or IDs.
+      if (error instanceof z.ZodError) report.invalidFields = [...new Set(error.issues.map(issue => String(issue.path[0]))
+        .filter(field => ['amount','amount_paid','amount_due','attempts','status','currency','receipt','notes','id','entity','offer_id','partial_payment','count','items'].includes(field)))].slice(0,16);
+    }
     return finish(report.bindingVerified ? 'PROVIDER_OR_BINDING_REVIEW_REQUIRED'
       : report.merchantPinned ? 'BINDING_REVIEW_REQUIRED' : 'CONFIGURATION');
   }

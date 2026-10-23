@@ -31,6 +31,13 @@ const invoiceSchema = z.object({ id: invoiceId, entity: z.literal('invoice'), su
     gross_amount: z.number().int().positive(), net_amount: z.number().int().positive(), tax_amount: z.literal(0),
     currency: z.literal('INR'), quantity: z.literal(1), taxes: z.array(z.unknown()).length(0) })).length(1) });
 
+/** Fixed operator diagnostics only; never includes provider payloads or identifiers. */
+export class ClueraResumeError extends ClueraBillingError {
+  constructor(readonly reason: 'ORDER_BINDING_MISMATCH' | 'ORDER_ALREADY_ATTEMPTED' | 'ORDER_BALANCE_CHANGED') {
+    super('PENDING');
+  }
+}
+
 export function recurringMethodAllowed(revision: Revision, method: string, network?: string) {
   if (revision.kind !== 'RECURRING') return true;
   if (!['card','upi','emandate'].includes(method)) return false;
@@ -82,11 +89,13 @@ export function clueraRazorpayAdapter(env = process.env, request: typeof fetch =
     async resumeUntouchedPack(binding: Binding) {
       if (binding.revision.kind !== 'PACK' || binding.code !== 'BOUND' || !binding.orderId || binding.subscriptionId !== null)
         throw new ClueraBillingError('INVALID');
-      const order = orderSchema.parse(await api(`/orders/${binding.orderId}`)), notes = parseNotes(order.notes);
+      const order = orderSchema.parse(await api(`/orders/${binding.orderId}`)), notes = noteSchema.parse(order.notes);
       if (order.id !== binding.orderId || order.receipt !== binding.intentId || order.amount !== binding.revision.amountPaise
-        || order.status !== 'created' || order.amount_paid !== 0 || order.amount_due !== binding.revision.amountPaise || order.attempts !== 0
+        || notes.cluera_environment !== mode
         || notes.cluera_intent !== binding.intentId || notes.cluera_revision !== binding.revision.revisionId)
-        throw new ClueraBillingError('PENDING');
+        throw new ClueraResumeError('ORDER_BINDING_MISMATCH');
+      if (order.status !== 'created' || order.attempts !== 0) throw new ClueraResumeError('ORDER_ALREADY_ATTEMPTED');
+      if (order.amount_paid !== 0 || order.amount_due !== binding.revision.amountPaise) throw new ClueraResumeError('ORDER_BALANCE_CHANGED');
       // Any associated payment, including authorized/failed/unknown, requires
       // reconciliation. Continuing an untouched order never means retrying one.
       z.object({ entity: z.literal('collection'), count: z.literal(0), items: z.array(z.unknown()).length(0) })

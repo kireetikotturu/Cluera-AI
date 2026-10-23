@@ -26,6 +26,24 @@ function setup(patch = {}, collection = { entity: 'collection', count: 0, items:
   return { rpc, request };
 }
 afterEach(() => vi.clearAllMocks());
+it.each([
+  [{amount_paid:null},'INVALID_PROVIDER_FIELDS',['amount_paid']],
+  [{attempts:1},'ORDER_ALREADY_ATTEMPTED',[]],
+  [{amount_due:1},'ORDER_BALANCE_CHANGED',[]],
+  [{receipt:'private-foreign-reference'},'ORDER_BINDING_MISMATCH',[]],
+] as const)('reports bounded diagnostic categories without provider values: %j',async(patch,failureCode,invalidFields)=>{
+  const {rpc,request}=setup(patch);
+  const report=await auditRetainedTestOrder(rpc,env,request);
+  expect(report).toMatchObject({failureCode,invalidFields,providerRequests:1,financialMutations:0,untouchedOrderVerified:false});
+  expect(JSON.stringify(report)).not.toContain('private-foreign-reference');
+});
+it('distinguishes provider HTTP failure without logging its private response',async()=>{
+  const {rpc}=setup();
+  const request=vi.fn(async()=>Response.json({description:'private-merchant-data'},{status:429}));
+  const report=await auditRetainedTestOrder(rpc,env,request);
+  expect(report).toMatchObject({failureCode:'UNAVAILABLE',providerHttpStatus:429,invalidFields:[],providerRequests:1});
+  expect(JSON.stringify(report)).not.toContain('private-merchant-data');
+});
 it('reads exactly the retained resource with the actual adapter and rechecks binding/owner without financial writes', async () => {
   const { rpc, request } = setup();
   const value = await auditRetainedTestOrder(rpc, env, request);

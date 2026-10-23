@@ -51,8 +51,12 @@ async (page) => {
   await resume().click();await tab.waitForFunction(()=>window.syntheticOpened===3);attempted=true;
   await tab.evaluate(()=>window.syntheticCheckout.modal.ondismiss());await tab.getByRole('status').filter({hasText:'existing payment or order'}).waitFor();
   if(await resume().count())throw Error('Attempted order offered as untouched');await check('attempted order stays locked');
+  await tab.clock.fastForward(120000);if(await resume().count())throw Error('Background read reoffered denied order');
+  await tab.getByRole('status').filter({hasText:'existing payment or order'}).waitFor();await check('failed verification persists across background checks');
   attempted=false;failSdk=true;await go();await resume().click();await tab.waitForFunction(()=>!document.querySelector('script[src*="checkout.razorpay"]'));
-  await resume().waitFor();failSdk=false;await resume().click();await tab.waitForFunction(()=>window.syntheticOpened===1);await check('SDK failure safely recovers same order');
+  await tab.getByRole('status').filter({hasText:'Razorpay window could not load'}).waitFor();
+  if(await resume().count())throw Error('SDK failure silently reoffered checkout');
+  failSdk=false;await refresh().click();await resume().waitFor();await resume().click();await tab.waitForFunction(()=>window.syntheticOpened===1);await check('SDK failure safely recovers same order after deliberate verification');
   await go();throttled=true;await resume().click();await tab.getByRole('status').filter({hasText:'Please wait 7s'}).waitFor();
   if(await refresh().isEnabled())throw Error('Throttle ignored');await tab.clock.fastForward(7000);throttled=false;
   await refresh().click();await resume().waitFor();await check('retry delay preserves identity and original order');
