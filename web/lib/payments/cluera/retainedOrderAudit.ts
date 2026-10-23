@@ -3,6 +3,7 @@ import type { PaymentRpc } from '../core/types';
 import { billingOwner, billingRpc, clueraBillingConfig, clueraCheckoutAllowed } from './config';
 import { bindingSchema, ClueraBillingError } from './contracts';
 import { clueraRazorpayAdapter, ClueraResumeError } from './adapter';
+import { clueraRazorpayTransport } from './transport';
 
 export const RETAINED_TEST_ORDER = 'order_TpRplT79SeFnTp';
 const PIN = 'd426167dbe3272ee6f8e336d80512516b7dd6d3d96ce14c6fc634ca5d54698da';
@@ -14,10 +15,13 @@ const REVISION = 'c8674aed-4d01-4b34-9b3b-55937545ee7f';
  * or upstream response is returned to the diagnostic log. */
 export async function auditRetainedTestOrder(rpc: PaymentRpc, env = process.env, request: typeof fetch = fetch) {
   let providerRequests = 0;
+  let inspectPayments: (()=>Promise<Record<string,number>>) | null=null;
   const report = { component: 'cluera-retained-test-order', financialMutations: 0,
     merchantPinned: false, bindingVerified: false, soleApprovedPurchaserOwnsRetainedOrder: false, untouchedOrderVerified: false,
     acceptance: 'NOT_PERFORMED', stopped: 'CONFIGURATION', providerRequests: 0,
-    failureCode: null as string | null, providerHttpStatus: null as number | null, invalidFields: [] as string[] };
+    failureCode: null as string | null, providerHttpStatus: null as number | null, invalidFields: [] as string[],
+    orderObservation:null as ClueraResumeError['observation']|null,
+    paymentStates:null as Record<string,number>|null, paymentRead:'NOT_REQUIRED' };
   const finish = (stopped: string) => ({ ...report, stopped, providerRequests, observedAt: new Date().toISOString() });
   try {
     clueraBillingConfig(env);
@@ -48,6 +52,18 @@ export async function auditRetainedTestOrder(rpc: PaymentRpc, env = process.env,
       ].includes(url) || ++providerRequests > 2) throw Error('READ_ONLY_BOUNDARY');
       return request(input, init);
     };
+    inspectPayments=async()=>{
+      const raw=await clueraRazorpayTransport(env,boundedRead)(`/orders/${RETAINED_TEST_ORDER}/payments`);
+      const collection=z.object({entity:z.literal('collection'),count:z.number().int().min(0).max(100),items:z.array(z.object({
+        order_id:z.literal(RETAINED_TEST_ORDER),amount:z.literal(54900),currency:z.literal('INR'),
+        status:z.enum(['created','authorized','captured','refunded','failed'])})).max(100)}).parse(raw);
+      if(collection.count!==collection.items.length)throw Error('COLLECTION');
+      const after=await read(),ownerAfter=await billingOwner(rpc,env);
+      if(JSON.stringify(after)!==JSON.stringify(binding)||ownerAfter.accountDigest!==owner.accountDigest||ownerAfter.epoch!==owner.epoch)throw Error('BINDING_CHANGED');
+      const counts:Record<string,number>={created:0,authorized:0,captured:0,refunded:0,failed:0};
+      for(const payment of collection.items)counts[payment.status]++;
+      return counts;
+    };
     await clueraRazorpayAdapter(env, boundedRead).resumeUntouchedPack(binding);
     const after = await read(), ownerAfter = await billingOwner(rpc, env);
     if (JSON.stringify(after) !== JSON.stringify(binding) || ownerAfter.accountDigest !== owner.accountDigest
@@ -56,6 +72,11 @@ export async function auditRetainedTestOrder(rpc: PaymentRpc, env = process.env,
     return finish('SAME_ORDER_ELIGIBLE_AT_OBSERVATION');
   } catch (error) {
     if (report.bindingVerified) {
+      if(error instanceof ClueraResumeError && error.observation){
+        report.orderObservation=error.observation;
+        if(inspectPayments)try{report.paymentStates=await inspectPayments();report.paymentRead='VERIFIED_AT_OBSERVATION';}
+        catch{report.paymentRead='UNAVAILABLE_OR_BINDING_CHANGED';}
+      }
       report.failureCode = error instanceof ClueraResumeError ? error.reason
         : error instanceof ClueraBillingError ? error.code : error instanceof z.ZodError ? 'INVALID_PROVIDER_FIELDS' : 'VERIFICATION_FAILED';
       if (error instanceof ClueraBillingError && error.httpStatus && error.httpStatus >= 100 && error.httpStatus <= 599)

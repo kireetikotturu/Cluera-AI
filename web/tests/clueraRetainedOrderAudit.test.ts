@@ -34,8 +34,22 @@ it.each([
 ] as const)('reports bounded diagnostic categories without provider values: %j',async(patch,failureCode,invalidFields)=>{
   const {rpc,request}=setup(patch);
   const report=await auditRetainedTestOrder(rpc,env,request);
-  expect(report).toMatchObject({failureCode,invalidFields,providerRequests:1,financialMutations:0,untouchedOrderVerified:false});
+  expect(report).toMatchObject({failureCode,invalidFields,providerRequests:failureCode==='ORDER_ALREADY_ATTEMPTED'||failureCode==='ORDER_BALANCE_CHANGED'?2:1,financialMutations:0,untouchedOrderVerified:false});
   expect(JSON.stringify(report)).not.toContain('private-foreign-reference');
+});
+it('reads canonical attempted-order disposition without retrying, granting or exposing payment data',async()=>{
+ const {rpc,request}=setup({status:'attempted',attempts:1},{entity:'collection',count:1,items:[{
+  order_id:RETAINED_TEST_ORDER,amount:54900,currency:'INR',status:'authorized',email:'private@example.invalid',id:'pay_private0001'}]});
+ const report=await auditRetainedTestOrder(rpc,env,request);
+ expect(report).toMatchObject({failureCode:'ORDER_ALREADY_ATTEMPTED',providerRequests:2,financialMutations:0,
+  orderObservation:{state:'attempted',attempts:1,paidPaise:0,duePaise:54900},paymentRead:'VERIFIED_AT_OBSERVATION',
+  paymentStates:{created:0,authorized:1,captured:0,refunded:0,failed:0},untouchedOrderVerified:false});
+ expect(rpc).toHaveBeenCalledTimes(2);expect(JSON.stringify(report)).not.toMatch(/private@example|pay_private/);
+});
+it('never reports payment disposition for a foreign or changed binding',async()=>{
+ const {rpc,request}=setup({status:'attempted',attempts:1},{entity:'collection',count:1,items:[{
+  order_id:'order_foreign0001',amount:54900,currency:'INR',status:'captured'}]});
+ expect(await auditRetainedTestOrder(rpc,env,request)).toMatchObject({paymentRead:'UNAVAILABLE_OR_BINDING_CHANGED',paymentStates:null,untouchedOrderVerified:false});
 });
 it('distinguishes provider HTTP failure without logging its private response',async()=>{
   const {rpc}=setup();

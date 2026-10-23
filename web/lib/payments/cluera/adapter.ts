@@ -33,7 +33,8 @@ const invoiceSchema = z.object({ id: invoiceId, entity: z.literal('invoice'), su
 
 /** Fixed operator diagnostics only; never includes provider payloads or identifiers. */
 export class ClueraResumeError extends ClueraBillingError {
-  constructor(readonly reason: 'ORDER_BINDING_MISMATCH' | 'ORDER_ALREADY_ATTEMPTED' | 'ORDER_BALANCE_CHANGED') {
+  constructor(readonly reason: 'ORDER_BINDING_MISMATCH' | 'ORDER_ALREADY_ATTEMPTED' | 'ORDER_BALANCE_CHANGED',
+    readonly observation?: {state:'created'|'attempted'|'paid';attempts:number;paidPaise:number;duePaise:number}) {
     super('PENDING');
   }
 }
@@ -94,8 +95,9 @@ export function clueraRazorpayAdapter(env = process.env, request: typeof fetch =
         || notes.cluera_environment !== mode
         || notes.cluera_intent !== binding.intentId || notes.cluera_revision !== binding.revision.revisionId)
         throw new ClueraResumeError('ORDER_BINDING_MISMATCH');
-      if (order.status !== 'created' || order.attempts !== 0) throw new ClueraResumeError('ORDER_ALREADY_ATTEMPTED');
-      if (order.amount_paid !== 0 || order.amount_due !== binding.revision.amountPaise) throw new ClueraResumeError('ORDER_BALANCE_CHANGED');
+      const observation={state:order.status,attempts:order.attempts,paidPaise:order.amount_paid,duePaise:order.amount_due};
+      if (order.status !== 'created' || order.attempts !== 0) throw new ClueraResumeError('ORDER_ALREADY_ATTEMPTED',observation);
+      if (order.amount_paid !== 0 || order.amount_due !== binding.revision.amountPaise) throw new ClueraResumeError('ORDER_BALANCE_CHANGED',observation);
       // Any associated payment, including authorized/failed/unknown, requires
       // reconciliation. Continuing an untouched order never means retrying one.
       z.object({ entity: z.literal('collection'), count: z.literal(0), items: z.array(z.unknown()).length(0) })
