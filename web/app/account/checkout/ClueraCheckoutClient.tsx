@@ -448,6 +448,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     <details className={styles.history} aria-label="Preserved server-confirmed history"><summary>Earlier payment attempts</summary>
       <h3>Preserved server-confirmed history</h3>
       <p>Recent attempts are kept here while their payment status is checked. Old drafts are not resumed, canceled or retried here.</p>
+      <p>Earlier Account and Paddle database history was not imported; provider-side obligations remain subject to independent reconciliation.</p>
       {credits?.payments.length ? <ul>{credits.payments.map((payment, index) => <li key={`${payment.createdAt}:${index}`}>
         <span>{payment.offerCode}</span><span className={styles.badge}>{payment.state}</span><time dateTime={payment.createdAt}>{payment.createdAt}</time>
       </li>)}</ul> : <p>No historical entries are displayed in this snapshot.</p>}

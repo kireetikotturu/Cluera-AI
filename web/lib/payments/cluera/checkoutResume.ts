@@ -59,7 +59,7 @@ export async function handleClueraCheckoutResume(request:Request):Promise<Respon
     if(cookies.get('recovery')===account.sessionId)return cookies.apply(json({code:'RECOVERY_SESSION',error:'Finish password recovery and sign in before checkout.'},403));
     if(query.get('expectedAccountId')!==account.userId)return cookies.apply(json({code:'ACCOUNT_MISMATCH',error:'Account does not match.'},403));
     if(!clueraCheckoutAllowed(account.userId))return cookies.apply(json({code:'TEST_PURCHASER_REQUIRED',error:'You are signed in, but this account is not an approved Test purchaser.'},403));
-    await rateLimit(request,config,clients,account.email);
+    await rateLimit(request,config,clients,account.email,'billing-read');
     return cookies.apply(json({payment:await resumeClueraCheckout((name,args)=>clients.service.rpc(name,args),account)}));
   } catch(error) {
     const status=error instanceof AccountError?error.status:error instanceof ClueraBillingError&&error.code==='PENDING'?409:503;

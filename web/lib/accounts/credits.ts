@@ -84,7 +84,7 @@ export async function creditsRequest(request:Request):Promise<Response>{
   if(cookies.get('recovery')===account.sessionId)return cookies.apply(json({error:'FORBIDDEN',code:'RECOVERY_SESSION'},403));
   const expected=new URL(request.url).searchParams.get('desktopAccount');
   if(expected!==null&&expected!==account.userId)return cookies.apply(json({error:'FORBIDDEN',code:'ACCOUNT_MISMATCH'},403));
-  await rateLimit(request,config,clients);
+  await rateLimit(request,config,clients,account.email,'billing-read');
   return cookies.apply(json(await readCredits((name,args)=>clients.service.rpc(name,args),account)));
  }catch(error){return error instanceof AccountError?json({error:error.code},error.status):apiError(error);}
 }

@@ -41,7 +41,7 @@ export async function handleClueraBillingHistory(request: Request): Promise<Resp
     const { account } = await activeSession(clients, cookies);
     if (cookies.get('recovery') === account.sessionId || query.get('expectedAccountId') !== account.userId)
       throw new AccountError('FORBIDDEN', 403);
-    await rateLimit(request, config, clients, account.email);
+    await rateLimit(request, config, clients, account.email, 'billing-read');
     const history = await readClueraBillingHistory((name, args) => clients.service.rpc(name, args), account);
     return cookies.apply(json({ history }));
   } catch (error) {

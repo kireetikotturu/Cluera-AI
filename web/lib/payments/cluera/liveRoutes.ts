@@ -48,7 +48,7 @@ export async function handleLiveBilling(request: Request, action: LiveBillingAct
     cookies = new AccountCookies(request, config);
     const { account } = await activeSession(clients, cookies);
     if (cookies.get('recovery') === account.sessionId) return cookies.apply(json({ code: 'RECOVERY_SESSION', error: 'Finish password recovery and sign in before checkout.' }, 403));
-    await rateLimit(request, config, clients, account.email);
+    await rateLimit(request, config, clients, account.email, request.method==='GET'?'billing-read':'authentication');
     await billingOwner(rpc, env);
     if (request.method === 'GET') {
       const keys = action === 'cancellation' ? ['expectedAccountId', 'operationId'] : ['expectedAccountId'];

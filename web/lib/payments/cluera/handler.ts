@@ -28,7 +28,7 @@ export async function handleClueraCheckout(request: Request, callback = false) {
     const clients = accountClients(config); cookies = new AccountCookies(request,config);
     const {account} = await activeSession(clients,cookies);
     if (cookies.get('recovery') === account.sessionId) return cookies.apply(json({code:'RECOVERY_SESSION',error:'Finish password recovery and sign in before checkout.'},403));
-    await rateLimit(request,config,clients,account.email);
+    await rateLimit(request,config,clients,account.email,request.method==='GET'?'billing-read':'authentication');
     const rpc = (name:string,args:Record<string,unknown>)=>clients.service.rpc(name,args);
     if (request.method === 'GET') {
       const query = new URL(request.url).searchParams;

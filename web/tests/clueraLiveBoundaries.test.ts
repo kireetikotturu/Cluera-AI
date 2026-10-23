@@ -23,7 +23,8 @@ it('mode selection exposes only UI capabilities and cannot change existing Test 
   const input = {...env, CLUERA_BILLING_UI_MODE:'live'};
   expect(clueraBillingConfig(input).keyId).toBe(env.RAZORPAY_TEST_KEY_ID);
   expect(clueraBillingConfig(billingUiEnvironment(input)).keyId).toBe(env.RAZORPAY_LIVE_KEY_ID);
-  expect(Object.keys(billingUiCapabilities(input)).sort()).toEqual(['cancellationEnabled','enabled','historyEnabled','mode']);
+  expect(Object.keys(billingUiCapabilities(input)).sort()).toEqual(['cancellationEnabled','checkoutWindowSeconds','enabled','historyEnabled','mode']);
+  expect(billingUiCapabilities(input).checkoutWindowSeconds).toBe(600);
   expect(JSON.stringify(billingUiCapabilities(input))).not.toContain(env.RAZORPAY_LIVE_KEY_SECRET);
   expect(billingUiCapabilities({...input, RAZORPAY_LIVE_KEY_SECRET:undefined}).enabled).toBe(false);
 });
