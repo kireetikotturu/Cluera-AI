@@ -1,5 +1,15 @@
 # Cluera Admin AI provider vault — staged implementation
 
+## October 24 — infrastructure enabled; private provider entry remains
+
+The owner authorized Gemini/Deepgram setup and confirmed the keyring absent from Render; Vercel metadata independently showed it absent. A new dedicated 32-byte keyring was generated once, locally protected for the owner's Windows account, tested with the actual envelope implementation and saved to the existing Cluera Vercel/Render services. Vault mode and provider telemetry are configured. At **06:06:28 UTC**, the protected hosted audit verified encryption/decryption, rejection of a wrong provider identity, and the authenticated Render `admin-vault` response with zero AI calls or financial mutations. **Do not repeat keyring generation or schema installation.** Independent password-manager recovery escrow, private API key entry, metadata verification, model approval and physical-device usage acceptance remain. Follow [current setup and recovery steps](CLUERA_AI_ENABLEMENT.md). Earlier “vault off” and “do not enter keys yet” instructions below are historical.
+
+## October 17 - bounded request cleanup; no provider activation
+
+Cluera-only source0176f31b hardens existing model-metadata fetch/body deadlines and Admin request cleanup even when upstream cancellation hangs. It does not change encryption, MFA, model eligibility, SQL permissions or any provider key. Focused synthetic regressions and typecheck pass; actual vault remains empty/off and relay auth-only. No Gemini/Deepgram/OpenAI/Claude spending or customer BYOK is enabled. Dedicated KEK/recovery custody and metered text/image/both-audio-channel acceptance remain separate gates; no repeated Admin/MFA setup is needed. See [the current completion map](CLUERA_V1_COMPLETION_CHECKLIST.md).
+
+
+
 ## Current October17 - clean schema applied; Admin MFA accepted; vault still off
 
 Only **yhnqlfcgrmckhyjdxegg** is current. The unchanged vault schema was applied as20261016015041 after clean foundation20261016014532; old-project schema/credential/Support prerequisites below are historical and superseded. New modern web/relay keys and Auth configuration are already verified. Owner protected Admin access is now accepted, independently supported by verifiedTOTP1/liveAAL2session1/protectedAdmin=true at02:06:24.451327UTC. Never repeat registration, role bootstrap or enrollment merely for this feature.
