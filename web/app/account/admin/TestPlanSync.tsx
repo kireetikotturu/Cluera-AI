@@ -89,10 +89,10 @@ export function TestPlanSync({disabled=false}:{disabled?:boolean}) {
       setMessage('Test plan mapped and verified. The new catalog revision is disabled. Refresh to view its plan ID; subscription acceptance and activation are separate.');
     });
   };
-  return <section aria-label="Razorpay Test plan synchronization" aria-busy={busy}>
+  return <section className="ai-provider-console" aria-label="Razorpay Test plan synchronization" aria-busy={busy}>
     <h2>Razorpay Test plan sync</h2><p role="status">{message}</p>
     <button type="button" disabled={disabled||busy} onClick={()=>void refresh()}>Refresh Test plan sync</button>
-    {catalog.map(row=>{const op=operations.find(value=>value.offerCode===row.offerCode);return <article key={row.offerCode}>
+    {catalog.map(row=>{const op=operations.find(value=>value.offerCode===row.offerCode);return <article className="ai-provider-card" key={row.offerCode}>
       <h3>{row.name}</h3><p>{clueraPrice(row.amountPaise)} / month · {clueraAllowance(row.allowanceSeconds)}</p>
       <p>Mapped Test plan: {row.razorpayPlanId??'None'}</p>
       {op?<p>Unresolved operation: {op.operationId}. Saved plan: {op.razorpayPlanId??'Not yet confirmed'}. Review the original plan in Razorpay Test if its ID is missing.</p>:null}
