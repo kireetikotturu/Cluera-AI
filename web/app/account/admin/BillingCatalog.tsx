@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { checkoutRequest } from '../../../lib/payments/cluera/checkoutRequest';
+import { TestPlanSync } from './TestPlanSync';
 import { clueraPublicCatalog, clueraPublicRevision, clueraPrice, clueraAllowance,
   type ClueraPublicRevision,
 } from '../../../lib/payments/cluera/publicCatalog';
@@ -166,6 +167,7 @@ export function BillingCatalog({ disabled = false, mode = 'test' }: { disabled?:
         </fieldset>
       </form>
     </article>)}</div>
-    <p>Future price changes require new immutable provider plans where applicable. This panel never creates provider plans, changes a current mandate, activates a payment flag, repoints a webhook/scheduler or manually grants credits.</p>
+    <p>Future price changes require new immutable provider plans where applicable. Manual mapping never creates provider plans. Catalog changes do not change a current mandate, activate payment flags or manually grant credits.</p>
+    {mode === 'test' ? <TestPlanSync disabled={disabled}/> : null}
   </section>;
 }

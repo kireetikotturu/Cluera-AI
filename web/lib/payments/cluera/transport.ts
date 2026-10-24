@@ -1,8 +1,19 @@
 import { ClueraBillingError } from './contracts';
 import { clueraBillingConfig } from './config';
+import { liveBillingProfile } from './modeProfile';
 
 /** Reviewed resource paths only, bounded body/deadline, no redirects or automatic retries. */
 export function clueraRazorpayTransport(env = process.env, request: typeof fetch = fetch, monotonicNow: () => number = () => performance.now()) {
+  return transport(env, request, monotonicNow, false);
+}
+
+/** Separate capability: Test plan templates only; never orders, mandates or Live. */
+export function clueraTestPlanTransport(env = process.env, request: typeof fetch = fetch) {
+  if (liveBillingProfile(env) || env.RAZORPAY_ENVIRONMENT !== 'test') throw new ClueraBillingError('CONFIGURATION');
+  return transport(env, request, () => performance.now(), true);
+}
+
+function transport(env:NodeJS.ProcessEnv, request:typeof fetch, monotonicNow:()=>number, plansOnly:boolean) {
   const { keyId, keySecret } = clueraBillingConfig(env);
   // One verification chain must finish within its SQL lease, even with paginated invoice reads.
   const chainDeadline = monotonicNow() + 65000;
@@ -11,9 +22,9 @@ export function clueraRazorpayTransport(env = process.env, request: typeof fetch
     const invoiceList = /^\/invoices\?subscription_id=sub_[A-Za-z0-9]{8,64}&count=100&skip=\d{1,3}$/;
     const orderPayments = /^\/orders\/order_[A-Za-z0-9]{8,64}\/payments$/.test(path);
     const cancel = /^\/subscriptions\/sub_[A-Za-z0-9]{8,64}\/cancel$/.test(path);
-    if ((!resource.test(path) && !invoiceList.test(path) && !cancel && !orderPayments)
+    if (plansOnly ? !(body ? path === '/plans' : /^\/plans\/plan_[A-Za-z0-9]{8,64}$/.test(path)) : ((!resource.test(path) && !invoiceList.test(path) && !cancel && !orderPayments)
       || (cancel && (!body || Object.keys(body).length !== 1 || body.cancel_at_cycle_end !== true))
-      || (body && !cancel && !['/orders', '/subscriptions'].includes(path)))
+      || (body && !cancel && !['/orders', '/subscriptions'].includes(path))))
       throw new ClueraBillingError('INVALID');
     const remaining = Math.min(10000,chainDeadline-monotonicNow());
     if (remaining <= 0) throw new ClueraBillingError('UNAVAILABLE');

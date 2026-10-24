@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { clueraBillingAdminRequest } from '../lib/payments/cluera/admin';
 import { handleClueraCatalog, handleClueraCheckout } from '../lib/payments/cluera/handler';
 import { paymentTestEnvironment } from './helpers/paymentTestMode';
+import * as planSync from '../lib/payments/cluera/planSync';
 const mocks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:mocks.session,rateLimit:mocks.limit}));
@@ -113,4 +114,36 @@ it.each(['GET','POST'])('account switching to an unapproved purchaser reports mi
     :request('checkout',{expectedAccountId:actor,requestId:crypto.randomUUID(),revisionId}));
   expect(response.status).toBe(403);expect(await response.json()).toMatchObject({code:'ACCOUNT_MISMATCH'});
   expect(rpc).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+});
+
+const monthly={...pack,offerCode:'cluera_monthly_40h_v2',kind:'RECURRING',interval:'MONTH',amountPaise:549900,allowanceSeconds:144000,totalCount:120};
+const planBody=()=>({...body(),action:'CREATE_TEST_PLAN',offerCode:monthly.offerCode,input:{name:monthly.name,amountPaise:549900,allowanceSeconds:144000,totalCount:120}});
+function monthlyAdmin(){rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_billing_admin_read'?{code:'ACTIVE',catalog:[monthly]}:null,error:null}));}
+it.each(['aal1','non-admin','foreign-origin','cross-site','step-up-denied','changed-owner','changed-session','unverified-factor','old-revision','live-setting'])('plan sync refuses %s before durable claim/provider creation',async failure=>{
+ monthlyAdmin();let req=request('admin',planBody());
+ if(failure==='aal1')mocks.session.mockResolvedValue({account:{userId:actor,sessionId:sid,email:'admin@example.invalid'},session:{access_token:`header.${Buffer.from(JSON.stringify({aal:'aal1',session_id:sid})).toString('base64url')}.synthetic`}});
+ if(failure==='non-admin')rpc.mockResolvedValue({data:false,error:null});
+ if(failure==='foreign-origin')req=request('admin',planBody(),{origin:'https://attacker.invalid'});
+ if(failure==='cross-site')req=request('admin',planBody(),{'sec-fetch-site':'cross-site'});
+ if(failure==='step-up-denied')mfa.challengeAndVerify.mockResolvedValue({data:null,error:{message:'private'}});
+ if(failure==='changed-owner')getUser.mockResolvedValue({data:{user:{id:factor,email_confirmed_at:'x'}},error:null});
+ if(failure==='changed-session')mfa.challengeAndVerify.mockResolvedValue({data:{access_token:`header.${Buffer.from(JSON.stringify({aal:'aal2',session_id:factor})).toString('base64url')}.synthetic`},error:null});
+ if(failure==='unverified-factor')mfa.listFactors.mockResolvedValue({data:{all:[]},error:null});
+ if(failure==='old-revision')req=request('admin',{...planBody(),expectedRevisionId:factor});
+ if(failure==='live-setting')vi.stubEnv('RAZORPAY_ENVIRONMENT','live');
+ const sync=vi.spyOn(planSync,'syncTestPlan');try{
+  expect((await clueraBillingAdminRequest(req)).status).toBeGreaterThanOrEqual(400);expect(sync).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+ }finally{sync.mockRestore();}
+});
+it.each(['CREATE_TEST_PLAN','RECONCILE_TEST_PLAN'])('fresh MFA precedes %s and unknown post-claim validation is 503 with secure cookies',async action=>{
+ monthlyAdmin();const sync=vi.spyOn(planSync,'syncTestPlan').mockImplementation(async()=>{expect(mfa.challengeAndVerify).toHaveBeenCalledTimes(1);throw Error('private provider details');});
+ try{const input=action==='CREATE_TEST_PLAN'?planBody():{action,operationId:crypto.randomUUID(),factorId:factor,code:'123456',input:{razorpayPlanId:null}};
+ const response=await clueraBillingAdminRequest(request('admin',input));expect(response.status).toBe(503);expect(await response.json()).toEqual({error:'PLAN_SYNC_PENDING_REVIEW'});
+ expect(response.headers.get('set-cookie')).toContain('HttpOnly');expect(response.headers.get('cache-control')).toContain('no-store');expect(sync).toHaveBeenCalledTimes(1);
+ }finally{sync.mockRestore();}
+});
+it('Admin Test plan read exposes only validated plan mappings and own pending operations, with no provider call',async()=>{
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_billing_plan_sync_read'?{code:'ACTIVE',catalog:[monthly],operations:[]}:null,error:null}));
+ const response=await clueraBillingAdminRequest(request('admin?plans=1'));expect(response.status).toBe(200);
+ expect(await response.json()).toEqual({code:'ACTIVE',catalog:[monthly],operations:[]});expect(fetch).not.toHaveBeenCalled();expect(mfa.challengeAndVerify).not.toHaveBeenCalled();
 });

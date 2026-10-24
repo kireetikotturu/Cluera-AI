@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import ClueraCheckoutClient from '../app/account/checkout/ClueraCheckoutClient';
 import { BillingCatalog } from '../app/account/admin/BillingCatalog';
+import { TestPlanSync } from '../app/account/admin/TestPlanSync';
 import { clueraPublicRevision, type ClueraPublicRevision } from '../lib/payments/cluera/publicCatalog';
 
 let host: HTMLDivElement, root: Root;
@@ -798,5 +799,38 @@ it('Admin disabled owner boundary aborts a read and fences its late response', a
   vi.stubGlobal('fetch', request); await renderAdmin(); await act(async () => button('Refresh billing catalog').click());
   await renderAdmin(true); expect(signal!.aborted).toBe(true);
   await act(async () => resolve(Response.json({ code: 'ACTIVE', catalog }))); expect(host.querySelector('form')).toBeNull();
+});
+
+const syncCatalog=catalog.slice(1).map(row=>({...row,razorpayPlanId:null,enabled:false,testPlanValidated:false}));
+const syncRead=(url:RequestInfo|URL,operations:unknown[]=[])=>Response.json(String(url).includes('factors=1')?{factors:[{id:factorId,status:'verified'}]}:{code:'ACTIVE',catalog:syncCatalog,operations});
+async function readySync(){await act(async()=>root.render(createElement(TestPlanSync)));await act(async()=>button('Refresh Test plan sync').click());}
+it('Test plan UI is explicit and sends one reviewed creation with exact prices, clearing the MFA input',async()=>{
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?Response.json({code:'APPLIED',revision:{...catalog[1],enabled:false}}):syncRead(url));
+ vi.stubGlobal('fetch',request);await act(async()=>root.render(createElement(TestPlanSync)));expect(request).not.toHaveBeenCalled();
+ await act(async()=>button('Refresh Test plan sync').click());const form=fillAdminForm();
+ await act(async()=>{form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+ const writes=request.mock.calls.filter(([,init])=>init?.method==='POST');expect(writes).toHaveLength(1);
+ expect(JSON.parse(writes[0][1]!.body as string)).toMatchObject({action:'CREATE_TEST_PLAN',offerCode:catalog[1].offerCode,expectedRevisionId:catalog[1].revisionId,
+  input:{amountPaise:549900,allowanceSeconds:144000,totalCount:120},factorId,code:'123456'});
+ expect((form.elements.namedItem('code') as HTMLInputElement).value).toBe('');expect(host.textContent).toContain('Test plan mapped and verified');
+});
+it('a pending Test plan is recovered from the database after remount and sends reconciliation instead of another create',async()=>{
+ const op={operationId:factorId,offerCode:catalog[1].offerCode,expectedRevisionId:catalog[1].revisionId,state:'BOUND',
+  input:{name:catalog[1].name,amountPaise:549900,allowanceSeconds:144000,totalCount:120},reason:'Original reviewed Test setup',razorpayPlanId:'plan_syntheticSync0001'};
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?Response.json({code:'APPLIED',revision:{...catalog[1],enabled:false}}):syncRead(url,[op]));
+ vi.stubGlobal('fetch',request);await readySync();expect(host.textContent).toContain(op.razorpayPlanId);
+ const form=host.querySelector('form')!;(form.elements.namedItem('factor') as HTMLSelectElement).value=factorId;(form.elements.namedItem('code') as HTMLInputElement).value='123456';
+ await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(JSON.parse(request.mock.calls.find(([,init])=>init?.method==='POST')![1]!.body as string)).toEqual({action:'RECONCILE_TEST_PLAN',operationId:op.operationId,factorId,code:'123456',input:{razorpayPlanId:op.razorpayPlanId}});
+});
+it('lost plan response stays locked when an immediate catalog read has not found the durable operation yet',async()=>{
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?Response.json({error:'private-provider-payload'},{status:503}):syncRead(url));
+ vi.stubGlobal('fetch',request);await readySync();const form=fillAdminForm();await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ await act(async()=>button('Refresh Test plan sync').click());expect(host.textContent).toContain('Unresolved operation:');
+ expect(button('Reconcile original Test plan')).toBeDefined();expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+ expect(host.textContent).not.toContain('private-provider-payload');
+});
+it('Live Admin never mounts Test creation controls',async()=>{
+ await act(async()=>root.render(createElement(BillingCatalog,{mode:'live'})));expect(button('Refresh Test plan sync')).toBeUndefined();
 });
 
