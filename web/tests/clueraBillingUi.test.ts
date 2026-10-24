@@ -805,7 +805,10 @@ const syncCatalog=catalog.slice(1).map(row=>({...row,razorpayPlanId:null,enabled
 const syncRead=(url:RequestInfo|URL,operations:unknown[]=[])=>Response.json(String(url).includes('factors=1')?{factors:[{id:factorId,status:'verified'}]}:{code:'ACTIVE',catalog:syncCatalog,operations});
 async function readySync(){await act(async()=>root.render(createElement(TestPlanSync)));await act(async()=>button('Refresh Test plan sync').click());}
 it('Test plan UI is explicit and sends one reviewed creation with exact prices, clearing the MFA input',async()=>{
- const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?Response.json({code:'APPLIED',revision:{...catalog[1],enabled:false}}):syncRead(url));
+ let applied=false;const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+  if(init?.method==='POST'){applied=true;return Response.json({code:'APPLIED',revision:{...catalog[1],enabled:false}});}
+  return applied&&!String(url).includes('factors=1')?Response.json({code:'ACTIVE',catalog:[{...syncCatalog[0],testPlanValidated:true,razorpayPlanId:'plan_syntheticSync0001'},...syncCatalog.slice(1)],operations:[]}):syncRead(url);
+ });
  vi.stubGlobal('fetch',request);await act(async()=>root.render(createElement(TestPlanSync)));expect(request).not.toHaveBeenCalled();
  await act(async()=>button('Refresh Test plan sync').click());const form=fillAdminForm();
  await act(async()=>{form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
@@ -832,5 +835,76 @@ it('lost plan response stays locked when an immediate catalog read has not found
 });
 it('Live Admin never mounts Test creation controls',async()=>{
  await act(async()=>root.render(createElement(BillingCatalog,{mode:'live'})));expect(button('Refresh Test plan sync')).toBeUndefined();
+});
+
+it('Test plan local validation preserves an unsent code and explains the issue beside that form',async()=>{
+ const request=vi.fn(async(url:RequestInfo|URL)=>syncRead(url));vi.stubGlobal('fetch',request);await readySync();
+ const form=fillAdminForm();(form.elements.namedItem('price') as HTMLInputElement).value='0';
+ await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect((form.elements.namedItem('code') as HTMLInputElement).value).toBe('123456');
+ expect(form.closest('article')!.querySelector('[role="status"]')!.textContent).toContain('Check the price');
+ expect(request.mock.calls.filter(([,init])=>(init as RequestInit|undefined)?.method==='POST')).toHaveLength(0);
+});
+
+it('a verified mapped Test plan shows completion and collapses new-revision creation; unchanged terms never consume the code',async()=>{
+ const mapped={...syncCatalog[0],razorpayPlanId:'plan_syntheticSync0001',testPlanValidated:true};
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('factors=1')?syncRead(url)
+  :Response.json({code:'ACTIVE',catalog:[mapped,...syncCatalog.slice(1)],operations:[]}));
+ vi.stubGlobal('fetch',request);await readySync();const card=host.querySelector('article')!;
+ expect(card.textContent).toContain('Plan verified and mapped. You do not need to create it again.');
+ expect(card.querySelector('details')!.open).toBe(false);
+ expect(card.textContent).toContain('Subscription checkout is still disabled');
+ const form=fillAdminForm();await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect((form.elements.namedItem('code') as HTMLInputElement).value).toBe('123456');
+ expect(card.querySelector('[role="status"]')!.textContent).toContain('already have a mapped Test plan');
+ expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
+});
+
+it('confirmed Test creation reads its saved ID automatically and keeps the result beside its card',async()=>{
+ const mapped={...syncCatalog[0],revisionId:'00000000-0000-4000-8000-000000000832',version:2,razorpayPlanId:'plan_syntheticSync0001',testPlanValidated:true};let applied=false;
+ const {razorpayPlanId:_plan,...revision}=mapped;
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+  if(init?.method==='POST'){applied=true;return Response.json({code:'APPLIED',revision});}
+  return String(url).includes('factors=1')?syncRead(url):Response.json({code:'ACTIVE',catalog:applied?[mapped,...syncCatalog.slice(1)]:syncCatalog,operations:[]});
+ });vi.stubGlobal('fetch',request);await readySync();const form=fillAdminForm();
+ await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ const card=host.querySelector('article')!;expect(card.textContent).toContain('Mapped Test plan: plan_syntheticSync0001');
+ expect(card.querySelector('[role="status"]')!.textContent).toContain('Test plan mapped and verified');
+ expect(card.querySelector('details')!.open).toBe(false);expect(host.querySelectorAll('fieldset')[1].disabled).toBe(false);
+ expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+ expect(request.mock.calls.filter(([url])=>String(url).includes('plans=1'))).toHaveLength(2);
+});
+
+it('failed read after confirmed Test creation keeps confirmation and asks for a read refresh, not reconciliation',async()=>{
+ let applied=false;const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+  if(init?.method==='POST'){applied=true;return Response.json({code:'APPLIED',revision:{...catalog[1],enabled:false}});}
+  return applied?Response.json({error:'private-read-error'},{status:503}):syncRead(url);
+ });vi.stubGlobal('fetch',request);await readySync();const form=fillAdminForm();
+ await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(host.querySelector('article [role="status"]')!.textContent).toContain('Mapping succeeded');
+ expect(host.textContent).not.toContain('Unresolved operation:');expect(host.textContent).not.toContain('private-read-error');
+ expect(host.querySelector('fieldset')!.disabled).toBe(true);expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+});
+
+it('rejected Test Admin authorization reports no creation next to the form and clears the submitted code',async()=>{
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?Response.json({error:'FORBIDDEN'},{status:403}):syncRead(url));
+ vi.stubGlobal('fetch',request);await readySync();const form=fillAdminForm();
+ await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(host.querySelector('article [role="status"]')!.textContent).toContain('authorization or authenticator verification was rejected');
+ expect((form.elements.namedItem('code') as HTMLInputElement).value).toBe('');expect(host.textContent).not.toContain('Unresolved operation:');
+});
+
+it('a late saved-plan read cannot restore the Admin card after the owner boundary is disabled',async()=>{
+ let applied=false,resolve!:(response:Response)=>void,signal:AbortSignal|undefined;
+ const request=vi.fn((url:RequestInfo|URL,init?:RequestInit)=>{
+  if(init?.method==='POST'){applied=true;return Promise.resolve(Response.json({code:'APPLIED',revision:{...catalog[1],enabled:false}}));}
+  if(applied){signal=init?.signal as AbortSignal;return new Promise<Response>(done=>{resolve=done;});}
+  return Promise.resolve(syncRead(url));
+ });vi.stubGlobal('fetch',request);await readySync();
+ expect((host.querySelector('[name="factor"]') as HTMLSelectElement).value).toBe(factorId);
+ const form=fillAdminForm();await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ await act(async()=>root.render(createElement(TestPlanSync,{disabled:true})));expect(signal!.aborted).toBe(true);
+ await act(async()=>resolve(Response.json({code:'ACTIVE',catalog:[{...syncCatalog[0],razorpayPlanId:'plan_syntheticSync0001',testPlanValidated:true}],operations:[]})));
+ expect(host.querySelector('article')).toBeNull();expect(host.textContent).not.toContain('plan_syntheticSync0001');
 });
 
