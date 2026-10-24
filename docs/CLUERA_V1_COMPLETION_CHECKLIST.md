@@ -1,5 +1,9 @@
 # Cluera V1 completion and controlled acceptance
 
+## October 24 Admin Test plan synchronization
+
+Use [the current payment handoff](CLUERA_PRODUCTION_PAYMENT_HANDOFF.md) for the new Admin **Razorpay Test plan sync** workflow, installation/deployment evidence and remaining owner actions. It creates and verifies a provider plan and maps a disabled future catalog revision using fresh MFA. It preserves the ₹549/3h pack, free 15-minute trial and ₹5,499/40h, ₹9,599/100h, ₹19,549/200h monthly prices. Unknown outcomes remain locked and recovery performs provider reads only. Actual plan creation by the owner, failed-pack recovery, subscription lifecycle, genuine payment/shared balance and public Live acceptance remain outstanding. Live remains disabled. The October 19 and earlier notes below are historical.
+
 ## October 19 current consolidated handoff
 
 See [CLUERA_FINAL_LAUNCH_CHECKLIST.md](CLUERA_FINAL_LAUNCH_CHECKLIST.md) for the current code fixes, exact verification/publication evidence, remaining engineering and one consolidated owner checklist. Do not repeat completed SMTP, key/URL, Admin or MFA setup. Reconcile the retained BOUND Test order before another payment action. Monthly queuing/pause/resume, provider custody and acceptance, Windows distribution and commercial operations are not accepted merely because source/tests exist. Commercial launch remains NO-GO. The dated paragraphs below retain historical evidence.
