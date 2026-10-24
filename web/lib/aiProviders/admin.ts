@@ -8,12 +8,14 @@ import {json} from '../http';
 import {apiKey,providerId,vaultKeyring} from './vault';
 import {discoverModels,modelId} from './discovery';
 import {listMetadata,metadataSchema,readSealed} from './repository';
+import {operationContextSchema} from './publicMetadata';
+import {verifyProviderOperation} from './operationStatus';
 
 const common={operationId:z.uuid(),provider:providerId,revision:z.number().int().min(0),factorId:z.uuid(),code:z.string().regex(/^\d{6}$/)};
 const inputSchema=z.discriminatedUnion('action',[
  z.object({...common,action:z.literal('REPLACE'),apiKey}).strict(),
- z.object({...common,action:z.literal('TEST')}).strict(),
- z.object({...common,action:z.literal('CONFIGURE'),enabled:z.boolean(),defaultModel:modelId.nullable(),fallback:z.literal('NONE')}).strict(),
+ z.object({...common,action:z.literal('TEST'),retry:z.literal(true).optional()}).strict(),
+ z.object({...common,action:z.literal('CONFIGURE'),enabled:z.boolean(),defaultModel:modelId.nullable(),fallback:z.literal('NONE'),retry:z.literal(true).optional()}).strict(),
 ]);
 async function readBody(request:Request){
  const declared=Number(request.headers.get('content-length'));if(declared>8192||!request.body)throw new AccountError('INVALID_INPUT',400);
@@ -31,7 +33,7 @@ async function readBody(request:Request){
  * authenticator challenge, Auth-verified same user/session and live SQL AAL2.
  * No role grant, enrollment, plaintext retrieval or provider generation. */
 export async function providerAdminRequest(request:Request):Promise<Response>{
- let cookies:AccountCookies|undefined,mutationSubmitted=false;
+ let cookies:AccountCookies|undefined,mutationSubmitted=false,verificationRequested=false;
  try{
   const config=stagingAccountConfig();
   if(request.method!=='GET')assertAccountOrigin(request,config.origin);
@@ -47,7 +49,9 @@ export async function providerAdminRequest(request:Request):Promise<Response>{
   const vault=vaultKeyring();
   if(request.method==='GET'){
    const params=new URL(request.url).searchParams;
-   if([...params.keys()].some(k=>!['operation','factors'].includes(k))||params.size>1)throw new AccountError('INVALID_INPUT',400);
+   if([...params.keys()].some(k=>!['operation','factors','provider','revision'].includes(k)||params.getAll(k).length!==1))throw new AccountError('INVALID_INPUT',400);
+   if(params.has('factors')&&(params.size!==1||params.get('factors')!=='1'))throw new AccountError('INVALID_INPUT',400);
+   if((params.has('provider')||params.has('revision'))&&(!params.has('operation')||!params.has('provider')||!params.has('revision')))throw new AccountError('INVALID_INPUT',400);
    if(params.get('factors')==='1'){
     const restored=await clients.auth.auth.setSession(session);if(restored.error)throw new AccountError('UNAVAILABLE',503);
     const factors=await clients.auth.auth.mfa.listFactors();if(factors.error)throw new AccountError('UNAVAILABLE',503);
@@ -55,9 +59,11 @@ export async function providerAdminRequest(request:Request):Promise<Response>{
    }
    if(params.has('operation')){
     const op=z.uuid().parse(params.get('operation'));
-    const result=await rpc('cluera_provider_admin_read',{p_actor:account.userId,p_session:account.sessionId,p_operation:op});
-    if(result?.code==='NOT_FOUND')return cookies.apply(json({code:'NOT_FOUND'}));
-    return cookies.apply(json({code:'APPLIED',metadata:metadataSchema.parse(result.metadata)}));
+    const revision=params.get('revision');
+    if(revision!==null&&!/^(0|[1-9][0-9]{0,9})$/.test(revision))throw new AccountError('INVALID_INPUT',400);
+    const context=params.has('provider')?operationContextSchema.parse({provider:params.get('provider'),revision:Number(revision)}):undefined;
+    verificationRequested=true;
+    return cookies.apply(json(await verifyProviderOperation(rpc,account.userId,account.sessionId,op,context)));
    }
    return cookies.apply(json(await listMetadata(rpc,account.userId,account.sessionId)));
   }
@@ -76,7 +82,16 @@ export async function providerAdminRequest(request:Request):Promise<Response>{
   cookies.set('access',step.data.access_token,Math.max(1,Math.min(step.data.expires_in-30,3570)));
   cookies.set('refresh',step.data.refresh_token,30*86400);
   const {code:_code,factorId:_factor,...operation}=input;
+  // Recovery must have the same original digest. The retry marker grants no
+  // authority and is excluded; every attempt above still requires fresh MFA.
+  if('retry' in operation)delete operation.retry;
   const digest=vault.digest(JSON.stringify({actor:account.userId,session:account.sessionId,...operation}));
+  const recovering=input.action!=='REPLACE'&&input.retry===true;
+  if(recovering){
+   verificationRequested=true;
+   const status=await verifyProviderOperation(rpc,account.userId,account.sessionId,input.operationId,input);
+   if(status.code!=='NOT_RECORDED')return cookies.apply(json(status));
+  }
   let value:unknown;
   if(input.action==='REPLACE')value={credentialId:input.operationId,sealed:vault.seal(input.apiKey,{provider:input.provider,credentialId:input.operationId})};
   else if(input.action==='TEST'){
@@ -87,6 +102,18 @@ export async function providerAdminRequest(request:Request):Promise<Response>{
   mutationSubmitted=true;
   const result=await rpc('cluera_provider_mutate',{p_actor:account.userId,p_session:account.sessionId,p_operation:input.operationId,
    p_provider:input.provider,p_action:input.action,p_revision:input.revision,p_digest:digest,p_reauthenticated_at:reauthenticatedAt,p_input:value});
+  if(recovering&&['APPLIED','CONFLICT','INVALID'].includes(result?.code)){
+   const status=await verifyProviderOperation(rpc,account.userId,account.sessionId,input.operationId,input);
+   if(status.code!=='NOT_RECORDED')return cookies.apply(json(status));
+   // This retry was rejected. Do not assert that a delayed original could never
+   // commit: a transaction may have started before probe expiry. The UI retains
+   // the pending operation until audit/revision proof or a separately approved
+   // metadata check advances the revision and fences the original settings.
+   if(input.action==='CONFIGURE'&&result.code==='INVALID'&&status.metadata&&status.metadata.revision===input.revision)return cookies.apply(json({code:'REJECTED',operationId:input.operationId,metadata:status.metadata}));
+   // A conflict with no same-actor audit/revision advancement proves neither
+   // original completion nor permission to create a different operation.
+   throw Error();
+  }
   if(result?.code==='CONFLICT')return cookies.apply(json({error:'CONFLICT'},409));
   if(result?.code==='INVALID')return cookies.apply(json({error:'CHANGE_REJECTED'},409));
   if(result?.code==='FORBIDDEN')return cookies.apply(json({error:'FORBIDDEN'},403));
@@ -95,7 +122,7 @@ export async function providerAdminRequest(request:Request):Promise<Response>{
  }catch(error){
   // A result/parser failure after submission cannot prove that SQL did not apply.
   // Preserve the operation lock so the browser verifies the immutable audit.
-  const response=mutationSubmitted?json({error:'PROVIDER_SERVICE_UNAVAILABLE'},503):json({error:error instanceof AccountError?error.code:error instanceof z.ZodError?'INVALID_INPUT':'PROVIDER_SERVICE_UNAVAILABLE'},error instanceof AccountError?error.status:error instanceof z.ZodError?400:503);
+  const response=mutationSubmitted||(verificationRequested&&!(error instanceof AccountError))?json({error:'PROVIDER_SERVICE_UNAVAILABLE'},503):json({error:error instanceof AccountError?error.code:error instanceof z.ZodError?'INVALID_INPUT':'PROVIDER_SERVICE_UNAVAILABLE'},error instanceof AccountError?error.status:error instanceof z.ZodError?400:503);
   return cookies?cookies.apply(response):response;
  }
 }

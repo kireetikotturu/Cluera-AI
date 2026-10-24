@@ -1,7 +1,8 @@
 import {afterEach,beforeEach,it,expect,vi} from 'vitest';
 import {providerAdminRequest} from '../lib/aiProviders/admin';
 import {vaultKeyring} from '../lib/aiProviders/vault';
-const mocks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn()}));
+const mocks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn(),discover:vi.fn()}));
+vi.mock('../lib/aiProviders/discovery',async original=>({...await original<typeof import('../lib/aiProviders/discovery')>(),discoverModels:mocks.discover}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:mocks.session,rateLimit:mocks.limit}));
 const origin='https://cluera-ai-staging.vercel.app',actor='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002',factor='00000000-0000-4000-8000-000000000003';
@@ -21,6 +22,62 @@ beforeEach(()=>{
  rpc=vi.fn(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_provider_admin_read'?{code:'ACTIVE',providers:[metadata()]}:name==='cluera_provider_mutate'?{code:'APPLIED',metadata:metadata()}:null,error:null}));
  mocks.clients.mockReturnValue({service:{rpc},auth:{auth:{setSession:vi.fn(async()=>({error:null})),getUser,mfa}}});
  vi.stubGlobal('fetch',vi.fn());
+ mocks.discover.mockResolvedValue({status:'VERIFIED',models:[{id:'gemini-3.5-flash',runtimeCompatible:true}],complete:true});
+});
+const operationRequest=(query:string)=>new Request(`${origin}/api/account/admin/ai-providers?${query}`);
+function retryFixture({applied=false,revision=1,mutation='APPLIED'}:{applied?:boolean;revision?:number;mutation?:string}={}){
+ const input={action:'TEST',provider:'gemini',revision:1,operationId:crypto.randomUUID(),factorId:factor,code:'654321',retry:true};
+ const credentialId=crypto.randomUUID(),sealed=vaultKeyring().seal(secret,{provider:'gemini',credentialId});
+ let current={...metadata(),revision};
+ rpc.mockImplementation(async(name:string,args:any)=>{
+  if(name==='account_admin_check')return {data:true,error:null};
+  if(name==='cluera_provider_admin_read')return {data:args.p_operation?(applied?{code:'APPLIED',provider:'gemini',metadata:{...metadata(),revision:2}}:{code:'NOT_FOUND'}):{code:'ACTIVE',providers:[current]},error:null};
+  if(name==='cluera_provider_read')return {data:{provider:'gemini',revision:current.revision,credential_id:credentialId,sealed,enabled:false,default_model:null,probe_status:'UNVERIFIED',probe_at:null,models:[],complete:false,updated_at:current.updatedAt},error:null};
+  if(name==='cluera_provider_mutate'){
+   if(mutation==='APPLIED'){applied=true;current={...current,revision:2};}
+   return {data:{code:mutation,...(applied?{metadata:current}:{})},error:null};
+  }
+  throw Error('Unexpected fixture RPC');
+ });return input;
+}
+it('verifies through authenticated metadata-only reads and returns the latest provider revision',async()=>{
+ const input=retryFixture({applied:true,revision:3});const response=await providerAdminRequest(operationRequest(`operation=${input.operationId}&provider=gemini&revision=1`));
+ expect(response.status).toBe(200);expect(await response.json()).toEqual({code:'APPLIED',operationId:input.operationId,metadata:{...metadata(),revision:3}});
+ expect(rpc.mock.calls.every(([name]:any)=>['account_admin_check','cluera_provider_admin_read'].includes(name))).toBe(true);expect(mfa.challengeAndVerify).not.toHaveBeenCalled();expect(mocks.discover).not.toHaveBeenCalled();
+});
+it('reports not-recorded separately and rejects malformed verification query contexts',async()=>{
+ const input=retryFixture();expect(await (await providerAdminRequest(operationRequest(`operation=${input.operationId}`))).json()).toEqual({code:'NOT_RECORDED',operationId:input.operationId,metadata:null});
+ for(const query of [`operation=${input.operationId}&provider=gemini`,`operation=${input.operationId}&provider=gemini&revision=-1`,`operation=${input.operationId}&operation=${input.operationId}`,`operation=${input.operationId}&factors=1`])expect((await providerAdminRequest(operationRequest(query))).status).toBe(400);
+});
+it.each(['FORBIDDEN','MALFORMED'])('distinguishes %s audit read failure without exposing raw data or changing state',async code=>{
+ const input=retryFixture();rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:code==='FORBIDDEN'?{code}:{code:'APPLIED',metadata:{apiKey:secret}},error:null}));
+ const response=await providerAdminRequest(operationRequest(`operation=${input.operationId}`));expect(response.status).toBe(code==='FORBIDDEN'?403:503);expect(JSON.stringify(await response.json())).not.toContain(secret);expect(mocks.discover).not.toHaveBeenCalled();
+});
+it('retries a missing metadata operation with fresh MFA and the original digest, applying at most once',async()=>{
+ const input=retryFixture();const response=await providerAdminRequest(request(input));expect(response.status).toBe(200);expect((await response.json()).code).toBe('APPLIED');
+ const mutation=rpc.mock.calls.find(([name]:any)=>name==='cluera_provider_mutate')![1];
+ const original={operationId:input.operationId,provider:'gemini',revision:1,action:'TEST'};
+ expect(mutation.p_operation).toBe(input.operationId);expect(mutation.p_digest).toBe(vaultKeyring().digest(JSON.stringify({actor,session:sid,...original})));
+ expect(mutation.p_action).toBe('TEST');expect(mutation.p_input).not.toHaveProperty('enabled');expect(mutation.p_input).not.toHaveProperty('sealed');
+ expect((await providerAdminRequest(request({...input,code:'987654'}))).status).toBe(200);
+ expect(mfa.challengeAndVerify).toHaveBeenCalledTimes(2);expect(mocks.discover).toHaveBeenCalledOnce();expect(rpc.mock.calls.filter(([name]:any)=>name==='cluera_provider_mutate')).toHaveLength(1);
+});
+it.each(['applied','superseded'])('does not rediscover or mutate when retry finds the original %s',async state=>{
+ const input=retryFixture({applied:state==='applied',revision:3});const response=await providerAdminRequest(request(input));expect(response.status).toBe(200);expect((await response.json()).code).toBe(state==='applied'?'APPLIED':'SUPERSEDED');
+ expect(mfa.challengeAndVerify).toHaveBeenCalledOnce();expect(mocks.discover).not.toHaveBeenCalled();expect(rpc.mock.calls.some(([name]:any)=>name==='cluera_provider_read'||name==='cluera_provider_mutate')).toBe(false);
+});
+it('rejects retry before discovery when fresh authenticator approval fails',async()=>{
+ const input=retryFixture();mfa.challengeAndVerify.mockResolvedValue({data:null,error:{message:secret}});expect((await providerAdminRequest(request(input))).status).toBe(403);expect(mocks.discover).not.toHaveBeenCalled();expect(rpc.mock.calls.every(([name]:any)=>name==='account_admin_check')).toBe(true);
+});
+it('never accepts a key replacement retry marker',async()=>{
+ expect((await providerAdminRequest(request({...body(),retry:true}))).status).toBe(400);expect(mfa.challengeAndVerify).not.toHaveBeenCalled();
+});
+it('returns a rejected settings retry without asserting the original can never commit',async()=>{
+ const input=retryFixture({mutation:'INVALID'});const response=await providerAdminRequest(request({...input,action:'CONFIGURE',enabled:true,defaultModel:'gemini-3.5-flash',fallback:'NONE'}));
+ expect(response.status).toBe(200);expect(await response.json()).toEqual({code:'REJECTED',operationId:input.operationId,metadata:metadata()});expect(mocks.discover).not.toHaveBeenCalled();
+});
+it('preserves uncertainty for an unexplained conflict with no audit or newer revision',async()=>{
+ const input=retryFixture({mutation:'CONFLICT'});expect((await providerAdminRequest(request(input))).status).toBe(503);
 });
 afterEach(()=>{vi.useRealTimers();vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks();});
 it('fails at missing infrastructure before any session, vault, MFA, SQL or provider action',async()=>{

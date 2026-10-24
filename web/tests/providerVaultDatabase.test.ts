@@ -65,3 +65,22 @@ it('denies direct table CRUD/trigger execution and browser RPC execution with AL
  for(const statement of ['update cluera_private.ai_provider_audit set action=\'changed\'','delete from cluera_private.ai_provider_audit','truncate cluera_private.ai_provider_audit'])await expect(db.exec(statement)).rejects.toThrow('immutable');
  expect((await db.query<any>("select tgenabled from pg_trigger where tgname='ai_provider_audit_immutable'")).rows[0].tgenabled).toBe('A');
 });
+it('allows one metadata outcome per original operation and preserves the encrypted key through replays',async()=>{
+ const before=(await db.query<any>("select revision,credential_id,sealed,enabled,default_model from cluera_private.ai_providers where provider='gemini'")).rows[0];
+ const op=randomUUID(),probe={status:'VERIFIED',models:[{id:'gemini-3.5-flash',runtimeCompatible:true}],complete:true};
+ const first=await change('TEST',before.revision,probe,op);
+ const second=await change('TEST',before.revision,{status:'UNAVAILABLE',models:[],complete:false},op);
+ expect(first.code).toBe('APPLIED');expect(second).toEqual(first);
+ expect((await db.query<any>('select count(*)::int n from cluera_private.ai_provider_audit where operation_id=$1',[op])).rows[0].n).toBe(1);
+ const after=(await db.query<any>("select revision,credential_id,sealed,enabled,default_model from cluera_private.ai_providers where provider='gemini'")).rows[0];
+ expect(after).toEqual({...before,revision:before.revision+1});
+});
+it.each(['settings','metadata'])('fences the delayed competing action when %s wins the same revision',async winner=>{
+ const before=(await db.query<any>("select revision,credential_id,sealed from cluera_private.ai_providers where provider='gemini'")).rows[0];
+ const settings=randomUUID(),metadata=randomUUID(),config={enabled:true,defaultModel:'gemini-3.5-flash'},probe={status:'VERIFIED',models:[{id:'gemini-3.5-flash',runtimeCompatible:true}],complete:true};
+ const first=winner==='settings'?await change('CONFIGURE',before.revision,config,settings):await change('TEST',before.revision,probe,metadata);
+ const late=winner==='settings'?await change('TEST',before.revision,probe,metadata):await change('CONFIGURE',before.revision,config,settings);
+ expect(first.code).toBe('APPLIED');expect(late.code).toBe('CONFLICT');
+ expect((await db.query<any>('select count(*)::int n from cluera_private.ai_provider_audit where operation_id in ($1,$2)',[settings,metadata])).rows[0].n).toBe(1);
+ const after=(await db.query<any>("select revision,credential_id,sealed from cluera_private.ai_providers where provider='gemini'")).rows[0];expect(after).toEqual({...before,revision:before.revision+1});
+});
