@@ -36,7 +36,13 @@ export function AiProviders({disabled=false,models}:{disabled?:boolean;models?:M
   const values=new FormData(form),action=String(values.get('action')),operationId=crypto.randomUUID();
   const body:Record<string,unknown>={action,provider,operationId,revision:rows.find(r=>r.provider===provider)?.revision??0,factorId:String(values.get('factor')),code:String(values.get('code'))};
   if(action==='REPLACE')body.apiKey=String(values.get('key'));
-  if(action==='CONFIGURE'){body.enabled=values.get('enabled')==='on';body.defaultModel=String(values.get('model'))||null;body.fallback='NONE';}
+  if(action==='CONFIGURE'){
+   body.enabled=values.get('enabled')==='on';body.defaultModel=String(values.get('model')??'')||null;body.fallback='NONE';
+   if(body.enabled&&!rows.find(r=>r.provider===provider)?.models.some(m=>m.runtimeCompatible&&m.id===body.defaultModel)){
+    setMessage('Choose a compatible default model before enabling this provider. No change was submitted.');
+    (form.elements.namedItem('model') as HTMLSelectElement|null)?.focus();return;
+   }
+  }
   // Clear entry controls immediately; never keep keys/codes in React state,
   // browser storage, URL, history, console or a retained retry body.
   for(const name of ['key','code']){const field=form.elements.namedItem(name);if(field instanceof HTMLInputElement)field.value='';}
@@ -46,6 +52,16 @@ export function AiProviders({disabled=false,models}:{disabled?:boolean;models?:M
    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});
    if(signal.aborted)return;
    if(!response.ok){
+    if(response.status===409){
+     const rejection=await response.json();if(signal.aborted)return;
+     // Only the server's exact, definitive refusal DTO can release this lock.
+     // Transport failures, malformed responses and late bodies remain uncertain.
+     if(rejection&&Object.keys(rejection).length===1&&(rejection.error==='CONFLICT'||rejection.error==='CHANGE_REJECTED')){
+      uncertain.current=null;if(alive.current){setPending(null);setAvailable(false);setMessage(rejection.error==='CONFLICT'
+       ?'Nothing was saved: provider settings changed. Click Refresh vault, review the latest settings and submit your change with a fresh code.'
+       :'Nothing was saved: enablement requires a selected compatible default and a complete metadata test within the last 15 minutes. Click Refresh vault, check these settings and use a fresh code.');}return;
+     }
+    }
     if([400,401,403,429].includes(response.status)){uncertain.current=null;if(alive.current)setPending(null);}
     if(alive.current)setMessage(response.status===403?'Authentication was rejected before saving. Check your Admin session and enter a fresh authenticator code.':response.status===400?'The request was rejected before saving. Check the selected action and required fields, then enter a fresh code.':response.status===429?'Too many requests. Wait before entering a fresh code.':response.status===401?'Sign in to Admin again before making a change.':'Change rejected or outcome unknown. Verify this operation before submitting another change.');return;
    }
@@ -88,7 +104,7 @@ export function AiProviders({disabled=false,models}:{disabled?:boolean;models?:M
      <legend>Write-only configuration</legend>
      <label>Action<select name="action" value={action} onChange={event=>{const field=event.currentTarget.form?.elements.namedItem('key');if(field instanceof HTMLInputElement)field.value='';setActions(previous=>({...previous,[provider]:event.target.value}));}}><option value="REPLACE">Add / replace key (disables provider)</option><option value="TEST" disabled={!row?.credentialPresent}>Test metadata access / discover models</option><option value="CONFIGURE" disabled={!row?.credentialPresent}>Save enablement / default model</option></select></label>
      <label>New API key (replacement only)<input name="key" type="password" autoComplete="off" minLength={20} maxLength={4096} spellCheck={false} required={action==='REPLACE'} disabled={action!=='REPLACE'}/></label>
-     <label>Compatible default model<select name="model" defaultValue={row?.defaultModel??''} key={row?.revision??0}><option value="">No model selected</option>{compatible.map(m=><option key={m.id} value={m.id}>{m.id}</option>)}</select></label>
+     <label>Compatible default model<select name="model" disabled={action!=='CONFIGURE'} defaultValue={row?.defaultModel??''} key={row?.revision??0}><option value="">No model selected</option>{compatible.map(m=><option key={m.id} value={m.id}>{m.id}</option>)}</select></label>
      <label><input name="enabled" type="checkbox" defaultChecked={row?.enabled??false} key={`enabled:${row?.revision??0}`} disabled={action!=='CONFIGURE'||(!row?.enabled&&!verified)||provider==='openai'||provider==='anthropic'}/> Enable this provider</label>
      <label>Existing authenticator<select name="factor" required><option value="">Choose authenticator</option>{factors.map((factor,i)=><option key={factor.id} value={factor.id}>Authenticator {i+1}</option>)}</select></label>
      <label>Fresh six-digit code<input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required/></label>

@@ -84,3 +84,13 @@ it.each(['read','cancel'] as const)('an untrusted Admin body cannot extend the e
  expect(mfa.challengeAndVerify).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
  expect(rpc.mock.calls.every(([name]:any)=>name==='account_admin_check')).toBe(true);
 });
+it.each([['CONFLICT',409,'CONFLICT'],['INVALID',409,'CHANGE_REJECTED'],['FORBIDDEN',403,'FORBIDDEN']] as const)('returns a definitive %s refusal without exposing the database response',async(code,status,error)=>{
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:{code,privateValue:secret},error:null}));
+ const response=await providerAdminRequest(request(body()));expect(response.status).toBe(status);expect(await response.json()).toEqual({error});
+ expect(mfa.challengeAndVerify).toHaveBeenCalledOnce();expect(fetch).not.toHaveBeenCalled();
+});
+it.each([null,{code:'UNEXPECTED'},{code:'APPLIED',metadata:{...metadata(),apiKey:secret}}])('preserves an unknown mutation outcome for an unexpected or malformed result',async result=>{
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:result,error:null}));
+ const response=await providerAdminRequest(request(body()));expect(response.status).toBe(503);expect(await response.json()).toEqual({error:'PROVIDER_SERVICE_UNAVAILABLE'});
+ expect(mfa.challengeAndVerify).toHaveBeenCalledOnce();expect(fetch).not.toHaveBeenCalled();
+});

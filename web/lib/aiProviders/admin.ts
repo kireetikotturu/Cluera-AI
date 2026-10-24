@@ -31,7 +31,7 @@ async function readBody(request:Request){
  * authenticator challenge, Auth-verified same user/session and live SQL AAL2.
  * No role grant, enrollment, plaintext retrieval or provider generation. */
 export async function providerAdminRequest(request:Request):Promise<Response>{
- let cookies:AccountCookies|undefined;
+ let cookies:AccountCookies|undefined,mutationSubmitted=false;
  try{
   const config=stagingAccountConfig();
   if(request.method!=='GET')assertAccountOrigin(request,config.origin);
@@ -84,12 +84,18 @@ export async function providerAdminRequest(request:Request):Promise<Response>{
    const probe=await discoverModels(input.provider,vault.open(stored.sealed,{provider:input.provider,credentialId:stored.credential_id}));
    value=probe;
   }else value={enabled:input.enabled,defaultModel:input.defaultModel};
+  mutationSubmitted=true;
   const result=await rpc('cluera_provider_mutate',{p_actor:account.userId,p_session:account.sessionId,p_operation:input.operationId,
    p_provider:input.provider,p_action:input.action,p_revision:input.revision,p_digest:digest,p_reauthenticated_at:reauthenticatedAt,p_input:value});
-  if(result?.code!=='APPLIED')return cookies.apply(json({error:result?.code==='CONFLICT'?'CONFLICT':'CHANGE_REJECTED'},409));
+  if(result?.code==='CONFLICT')return cookies.apply(json({error:'CONFLICT'},409));
+  if(result?.code==='INVALID')return cookies.apply(json({error:'CHANGE_REJECTED'},409));
+  if(result?.code==='FORBIDDEN')return cookies.apply(json({error:'FORBIDDEN'},403));
+  if(result?.code!=='APPLIED')throw Error();
   return cookies.apply(json({code:'APPLIED',metadata:metadataSchema.parse(result.metadata)}));
  }catch(error){
-  const response=json({error:error instanceof AccountError?error.code:error instanceof z.ZodError?'INVALID_INPUT':'PROVIDER_SERVICE_UNAVAILABLE'},error instanceof AccountError?error.status:error instanceof z.ZodError?400:503);
+  // A result/parser failure after submission cannot prove that SQL did not apply.
+  // Preserve the operation lock so the browser verifies the immutable audit.
+  const response=mutationSubmitted?json({error:'PROVIDER_SERVICE_UNAVAILABLE'},503):json({error:error instanceof AccountError?error.code:error instanceof z.ZodError?'INVALID_INPUT':'PROVIDER_SERVICE_UNAVAILABLE'},error instanceof AccountError?error.status:error instanceof z.ZodError?400:503);
   return cookies?cookies.apply(response):response;
  }
 }

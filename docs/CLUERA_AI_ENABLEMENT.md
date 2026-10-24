@@ -19,6 +19,14 @@ The Admin repair gives immediate progress and action-specific results, distingui
 5. Open **Models → AI model registry**. Select the existing Gemini row, keep its ID, enable it, make it Default, retain text and screenshot/image support, enter an audit reason and save. Do the same for the existing Deepgram `flux-general-en` row with internal audio support. Keep **Declared health = UNVERIFIED** until real device acceptance succeeds; this label is not a live test. Use the existing rows rather than creating duplicates. These controls already use authenticated, audited Admin changes.
 6. Return to Providers and refresh. Each card must show enabled provider and approved model settings. A snapshot is not proof of a successful AI request. If a change says **result unknown**, use **Verify pending change**; never re-enter the key simply because the code field cleared. A definitive authentication rejection permits a new manual attempt with a fresh code.
 
+## If metadata is VERIFIED but the provider is disabled
+
+Saving a key and testing metadata do not enable a provider. Select **Save enablement / default model**, choose the compatible model, tick **Enable this provider**, select your existing authenticator and confirm with a fresh code. Complete this within **15 minutes of the metadata test**; if that window has passed, run **Test metadata access / discover models** again first. Do not replace the saved key or add duplicate registry rows. Enable the existing matching model policy separately, then restart desktop.
+
+The Admin repair checks for a missing compatible model before submitting enablement. A confirmed `CONFLICT` or `CHANGE_REJECTED` response now explains that nothing was saved and requires **Refresh vault** before another deliberate change. An uncertain transport/result failure still requires **Verify pending change** and is never automatically retried. The server preserves uncertainty if a mutation response is missing or malformed, including malformed metadata after a reported application.
+
+At **06:24:50 UTC / 11:54:50 IST**, metadata-only readback confirmed both keys saved. Gemini was `VERIFIED` with a complete listing containing compatible `gemini-3.5-flash`, but disabled with no default. Its audit contained two successful metadata tests and no enablement change. Deepgram was still disabled/unverified. This establishes the saved state; it does not identify the exact rejected form fields or prove a real AI request. Seven new regressions failed before the repair; all **87 focused vault, Admin, model and database tests** and web typecheck passed afterward. The rebuilt synthetic browser flow passed missing-model prevention, confirmed rejection/refresh/manual recovery and both provider setup flows, with seven mocked POSTs, zero real mutations/provider calls and no desktop/mobile overflow or page errors. The initial sandbox fixture build failed on dependency-path access; its stale fixture result is excluded, and only the successful rebuilt run counts.
+
 ## Owner steps: recovery copy
 
 An encrypted local recovery file is at `.local-secrets/provider-vault-owner/keyring.dpapi`. It is protected for the original Windows account, excluded from source publication, and **is not portable disaster recovery**. Save an independent copy in your encrypted password manager before relying on the vault:
@@ -43,6 +51,8 @@ Real provider responses, both physical audio channels and usage settlement must 
 
 ## Verification record
 
+The table below records the earlier bootstrap checkpoint. The enablement-rejection repair and its local verification are described above; its deployment must be checked against its own source and CI.
+
 | Evidence | Result |
 | --- | --- |
 | Reviewed source | [`29576c430a7083c991bdefe4130a0e575fd89f82`](https://github.com/kireetikotturu/Cluera-AI/commit/29576c430a7083c991bdefe4130a0e575fd89f82), tree `17b1e63cd31cd048131de18b6977c6ad61f0825c`: 851 source blobs; three existing paths changed, two scripts added, 846 prior blobs retained unchanged, no deletions. Local desktop 1.0.10 changes were not published by this follow-up. |
@@ -57,4 +67,4 @@ Real provider responses, both physical audio channels and usage settlement must 
 
 At that same 06:10:44 UTC observation, the vault has **zero provider records** and both model rows are still disabled. Infrastructure readiness does not claim owner key entry, real Gemini replies, Deepgram audio or physical-device settlement. Those remain the private acceptance steps above. The real encryption test used a synthetic payload and did not save a provider credential. The unsigned 1.0.10 installer and its hash remain unchanged; it is still a local TEST candidate.
 
-A documentation-only follow-up may advance staging/Render while retaining every runtime and dependency blob from the reviewed source. The canonical website and successful full CI remain pinned to `29576c430a7083c991bdefe4130a0e575fd89f82`.
+The bootstrap checkpoint used canonical source and successful full CI `29576c430a7083c991bdefe4130a0e575fd89f82`. Later reviewed repairs have their own deployment and CI evidence; this historical table does not establish their acceptance.
