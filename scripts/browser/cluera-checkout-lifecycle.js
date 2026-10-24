@@ -6,7 +6,7 @@ async (page) => {
  const tab=await context.newPage(),calls=[],errors=[],reports=[];
  const userId='00000000-0000-4000-8000-000000000801',revisionId='00000000-0000-4000-8000-000000000821',orderId='order_synthetic0001';
  const pack={revisionId,offerCode:'cluera_pack_3h_v2',name:'Cluera 3 Hours',version:1,amountPaise:54900,currency:'INR',allowanceSeconds:10800,kind:'PACK',interval:null,totalCount:null,testPlanValidated:true,enabled:true};
- let hold=false,release,attempted=false,throttled=false,failSdk=false,slowChain=false,holdQuiet=false,releaseQuiet;
+ let hold=false,release,attempted=false,throttled=false,failSdk=false,slowChain=false,holdQuiet=false,releaseQuiet,quietStarted;
  tab.on('pageerror',error=>errors.push(error.message));
  await tab.clock.install();
  await context.route('https://checkout.razorpay.com/**',route=>failSdk?route.abort():route.fulfill({contentType:'application/javascript',body:'window.Razorpay=class {constructor(o){window.syntheticCheckout=o;}open(){window.syntheticOpened=(window.syntheticOpened||0)+1;}close(){window.syntheticClosed=(window.syntheticClosed||0)+1;}on(){}};'}));
@@ -17,7 +17,7 @@ async (page) => {
   let body,status=200;
   if(path==='/api/account/credits'){
    body={userId,displayName:'Synthetic verified customer',availableMilliseconds:900000,payments:[],plans:[]};
-   if(holdQuiet){holdQuiet=false;await new Promise(resolve=>{releaseQuiet=resolve;});}
+   if(holdQuiet){holdQuiet=false;await new Promise(resolve=>{releaseQuiet=resolve;quietStarted();});}
    if(hold){hold=false;await new Promise(resolve=>{release=resolve;});body={...body,userId:revisionId,displayName:'Foreign stale account'};}
   }else if(path.endsWith('/catalog'))body={catalog:[pack,...[40,100,200].map((hours,index)=>({...pack,revisionId:'00000000-0000-4000-8000-00000000082'+(index+2),offerCode:'cluera_monthly_'+hours+'h_v2',name:'Cluera '+hours+' Hours',amountPaise:[549900,959900,1954900][index],allowanceSeconds:hours*3600,kind:'RECURRING',interval:'MONTH',totalCount:120,enabled:false,testPlanValidated:false}))]};
   else if(path.endsWith('/history'))body={history:{code:'ACTIVE',userId,payments:[],subscriptions:[],hasMorePayments:false,hasMoreSubscriptions:false}};
@@ -68,7 +68,7 @@ async (page) => {
   slowChain=true;await tab.reload();await tab.getByRole('status').filter({hasText:'already has a payment attempt'}).waitFor({timeout:25000});slowChain=false;
   if(await resume().count()||!await refresh().isEnabled())throw Error('Sequential reads lost provider refusal');
   await check('sequential seventeen-second verification retains exact provider refusal');
-  holdQuiet=true;await tab.clock.fastForward(30000);
+  holdQuiet=true;const quietRequest=new Promise(resolve=>{quietStarted=resolve;});await tab.clock.fastForward(30000);await quietRequest;
   await tab.waitForFunction(()=>[...document.querySelectorAll('button')].some(button=>button.textContent==='Refresh billing status'&&button.disabled));
   if((await tab.locator('body').innerText()).includes('Refreshing payment status'))throw Error('Automatic read flashes foreground progress');
   await tab.getByRole('status').filter({hasText:'already has a payment attempt'}).waitFor();

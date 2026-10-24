@@ -17,11 +17,14 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "ws": "8.22.0",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "overrides": {
     "sharp": "0.35.5",
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "@vercel/cli-config": {
+      "zod": "$zod"
+    }
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
