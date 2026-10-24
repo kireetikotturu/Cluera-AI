@@ -2,7 +2,9 @@
 
 ## October 24 Admin Test plan synchronization
 
-Use [the current payment handoff](CLUERA_PRODUCTION_PAYMENT_HANDOFF.md) for the new Admin **Razorpay Test plan sync** workflow, installation/deployment evidence and remaining owner actions. It creates and verifies a provider plan and maps a disabled future catalog revision using fresh MFA. It preserves the ₹549/3h pack, free 15-minute trial and ₹5,499/40h, ₹9,599/100h, ₹19,549/200h monthly prices. Unknown outcomes remain locked and recovery performs provider reads only. Actual plan creation by the owner, failed-pack recovery, subscription lifecycle, genuine payment/shared balance and public Live acceptance remain outstanding. Live remains disabled. The October 19 and earlier notes below are historical.
+The owner's 40-hour Test plan `plan_TrcQhNH4W2pPze` is now APPLIED, mapped and verified, independently read from the application database at 04:53:58 UTC. Its ₹5,499 price is unchanged and sales remain disabled; the other two monthly tiers are still unmapped at that observation. The follow-up UI repair preserves unsent MFA input, shows results beside each plan, reads the saved mapping after success and collapses creation for mapped plans. Do not create the 40-hour plan again. See the current handoff for exact verification/deployment evidence and remaining activation/payment acceptance.
+
+Use [the current payment handoff](CLUERA_PRODUCTION_PAYMENT_HANDOFF.md) for the new Admin **Razorpay Test plan sync** workflow, installation/deployment evidence and remaining owner actions. It creates and verifies a provider plan and maps a disabled future catalog revision using fresh MFA. It preserves the ₹549/3h pack, free 15-minute trial and ₹5,499/40h, ₹9,599/100h, ₹19,549/200h monthly prices. Unknown outcomes remain locked and recovery performs provider reads only. Creation of the remaining two monthly plans, failed-pack recovery, subscription lifecycle, genuine payment/shared balance and public Live acceptance remain outstanding. Live remains disabled. The October 19 and earlier notes below are historical.
 
 ## October 19 current consolidated handoff
 
