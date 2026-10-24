@@ -54,6 +54,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const [credits, setCredits] = useState<Credits | null>(null);
   const [selection,setSelection]=useState<CheckoutSelection|null>(null);
   const [busy, setBusy] = useState(false), [eligible, setEligible] = useState(false);
+  const [quietRead, setQuietRead] = useState(false);
   const [preparing,setPreparing]=useState(false),[remaining,setRemaining]=useState<number|null>(null),[cooldown,setCooldown]=useState(0);
   const cooldownUntil=useRef(0),windowDeadline=useRef<number|null>(null),windowTimer=useRef<ReturnType<typeof setInterval>|null>(null);
   const needsReconcile=useRef(false),exitNotice=useRef<string|null>(null);
@@ -107,14 +108,17 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     return true;
   }, [deny]);
 
-  const refresh = useCallback(async function refreshStatus(queue = false) {
+  const refresh = useCallback(async function refreshStatus(queue = false, quiet = false) {
     if(Date.now()<cooldownUntil.current)return;
     if (read.current || write.current) { if (queue) trailing.current = true; return; }
     if (invalidHint.current) { deny(); return; }
     const controller = new AbortController(), generation = epoch.current;
     const current = () => alive.current && modeRef.current===mode && !controller.signal.aborted && epoch.current === generation;
-    read.current = controller; completed.current=false;balanceCurrent.current=false;setBusy(true); setEligible(false);
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]);
+    read.current = controller; completed.current=false;balanceCurrent.current=false;setQuietRead(quiet);setBusy(true); setEligible(false);
+    // Each transport bounds its own fetch and body read to fifteen seconds.
+    // A shared deadline would cut short resume after slower account/status reads
+    // and discard its useful refusal. Account changes still abort the whole chain.
+    const signal = controller.signal;
     let checkingResume=false;
     try {
       const hint = desktopOwner.current ?? owner.current;
@@ -203,7 +207,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     } finally {
       if (read.current === controller) read.current = null;
       if (current()) setBusy(false);
-      if (alive.current && trailing.current && !write.current) { trailing.current = false; void refreshStatus(); }
+      if (alive.current && trailing.current && !write.current) { trailing.current = false; void refreshStatus(false, true); }
     }
   }, [deny, rejectResponse, endpoint, mode, clearWindow]);
 
@@ -216,7 +220,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     invalidHint.current = query.getAll('desktopAccount').length>1||(hint !== null && !z.uuid().safeParse(hint).success);
     desktopOwner.current = invalidHint.current ? null : hint;
     void refresh();
-    const focus = () => { if (overlay.current || Date.now() - lastFocus.current < 5_000) return; lastFocus.current = Date.now(); void refresh(); };
+    const focus = () => { if (overlay.current || Date.now() - lastFocus.current < 5_000) return; lastFocus.current = Date.now(); void refresh(false, true); };
     window.addEventListener('focus', focus); window.addEventListener('online', focus);
     return () => {
       alive.current = false; epoch.current++; trailing.current = false;
@@ -235,7 +239,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     const timer = setInterval(() => {
       checks++;
       if (checks === 4) clearInterval(timer);
-      if (document.visibilityState !== 'hidden') void refresh(true);
+      if (document.visibilityState !== 'hidden') void refresh(true, true);
     }, 30_000);
     return () => clearInterval(timer);
   }, [enabled, refresh, watchPayment, observationCycle]);
@@ -395,7 +399,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     finally {
       if (write.current === controller) write.current = null;
       if (alive.current && epoch.current === generation) {setBusy(false);setPreparing(false);}
-      if (alive.current && trailing.current) { trailing.current = false; void refresh(); }
+      if (alive.current && trailing.current) { trailing.current = false; void refresh(false, true); }
     }
   };
 
@@ -415,7 +419,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     </header>
     <ol className={styles.steps} aria-label="Purchase steps"><li>01 <span>Choose your time</span></li><li>02 <span>Secure checkout</span></li><li>03 <span>Balance updated</span></li></ol>
     <div className={styles.status} id={statusId} role="status" aria-live="polite"><p>{message}</p></div>
-    {busy?<p className={styles.reading}>{preparing?'Preparing your secure checkout…':'Refreshing payment status…'}</p>:null}
+    {busy&&(preparing||!quietRead)?<p className={styles.reading}>{preparing?'Preparing your secure checkout…':'Refreshing payment status…'}</p>:null}
     {cooldown>0?<p role="status" className={styles.availability}>Please wait {cooldown}s before another billing check. Your order and balance are preserved.</p>:null}
     {remaining!==null?<p className={styles.windowNotice}>Payment window: <strong>{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</strong> remaining. Closing this window does not cancel your order.</p>:null}
     {firstSubscriptionOnly?<details className={styles.purchasePolicy}><summary>Monthly plans and changes</summary><p>One monthly subscription at a time. Change plans after cancellation is confirmed and your paid term ends. Automatic upgrades are unavailable.</p>
@@ -444,7 +448,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         : remaining !== null ? 'Your Razorpay payment window is open.'
         : preparing ? 'Preparing secure payment…'
         : savedOrder ? 'Continue your saved order in the Razorpay popup. No new order is created.'
-        : busy ? 'Checking payment availability…'
+        : busy && !quietRead ? 'Checking payment availability…'
         : revision.kind === 'RECURRING' && monthlyBlocked && credits ? 'Another subscription cannot start until your current plan is resolved.'
         : canPurchase || canSignIn ? 'Pay securely in the Razorpay popup.'
         : 'See the payment status above before continuing.';

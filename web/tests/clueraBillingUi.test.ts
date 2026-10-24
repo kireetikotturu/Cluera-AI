@@ -627,6 +627,61 @@ it('public revision DTO rejects secret/plan fields, weekly cadence, old codes an
   }
 });
 
+it('preserves the authoritative resume denial when sequential reads take more than fifteen seconds altogether', async () => {
+  vi.useFakeTimers();
+  const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+    const controller = new AbortController(); setTimeout(() => controller.abort(), ms); return controller.signal;
+  });
+  createdBinding = makeBound().payment;
+  const request = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
+    const path = String(url);
+    const delay = path.includes('/credits') ? 8000 : path.includes('/checkout?') ? 5000 : path.includes('/resume?') ? 4000 : 0;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return path.includes('/resume?') ? Response.json({code:'ORDER_RECONCILIATION_REQUIRED'}, {status:409}) : checkoutGet(url);
+  });
+  vi.stubGlobal('fetch', request);
+  try {
+    await renderCheckout();
+    await act(async () => vi.advanceTimersByTimeAsync(17001));
+    expect(host.textContent).toContain('This order already has a payment attempt');
+    expect(host.textContent).toContain('Synthetic Tester'); expect(host.textContent).toContain('15m');
+    expect(button('Continue existing checkout')).toBeUndefined(); expect(buy().disabled).toBe(true);
+    expect(button('Refresh billing status').disabled).toBe(false);
+    expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+    expect(document.querySelector('script[src*="razorpay"]')).toBeNull();
+  } finally { timeout.mockRestore(); vi.useRealTimers(); }
+});
+
+it('keeps automatic checks quiet while preserving the attempted-order reason and explicit refresh progress', async () => {
+  vi.useFakeTimers(); createdBinding = makeBound().payment;
+  let slow = false;
+  const request = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
+    if (slow && String(url).includes('/credits')) await new Promise(resolve => setTimeout(resolve, 4000));
+    return String(url).includes('/resume?') ? Response.json({code:'ORDER_RECONCILIATION_REQUIRED'}, {status:409}) : checkoutGet(url);
+  });
+  vi.stubGlobal('fetch', request);
+  try {
+    await renderCheckout(); slow = true;
+    await act(async () => vi.advanceTimersByTimeAsync(30000));
+    expect(host.textContent).toContain('This order already has a payment attempt');
+    expect(host.textContent).not.toContain('Refreshing payment status');
+    expect(host.textContent).not.toContain('Checking payment availability');
+    expect(button('Refresh billing status').disabled).toBe(true);
+    await act(async () => vi.advanceTimersByTimeAsync(4000));
+    await act(async () => button('Refresh billing status').click());
+    expect(host.textContent).toContain('Refreshing payment status');
+    await act(async () => vi.advanceTimersByTimeAsync(4000));
+    expect(host.textContent).toContain('This order already has a payment attempt');
+    await act(async () => vi.advanceTimersByTimeAsync(120000));
+    const reads = request.mock.calls.length;
+    await act(async () => vi.advanceTimersByTimeAsync(120000));
+    expect(request.mock.calls).toHaveLength(reads);
+    expect(request.mock.calls.filter(([url]) => String(url).includes('/resume?'))).toHaveLength(2);
+    expect(button('Continue existing checkout')).toBeUndefined(); expect(buy().disabled).toBe(true);
+    expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  } finally { vi.useRealTimers(); }
+});
+
 const renderAdmin = async (disabled = false) => { await act(async () => root.render(createElement(BillingCatalog, { disabled }))); };
 async function readyAdmin() {
   await renderAdmin(); await act(async () => button('Refresh billing catalog').click());

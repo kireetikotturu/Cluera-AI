@@ -6,16 +6,18 @@ async (page) => {
  const tab=await context.newPage(),calls=[],errors=[],reports=[];
  const userId='00000000-0000-4000-8000-000000000801',revisionId='00000000-0000-4000-8000-000000000821',orderId='order_synthetic0001';
  const pack={revisionId,offerCode:'cluera_pack_3h_v2',name:'Cluera 3 Hours',version:1,amountPaise:54900,currency:'INR',allowanceSeconds:10800,kind:'PACK',interval:null,totalCount:null,testPlanValidated:true,enabled:true};
- let hold=false,release,attempted=false,throttled=false,failSdk=false;
+ let hold=false,release,attempted=false,throttled=false,failSdk=false,slowChain=false,holdQuiet=false,releaseQuiet;
  tab.on('pageerror',error=>errors.push(error.message));
  await tab.clock.install();
  await context.route('https://checkout.razorpay.com/**',route=>failSdk?route.abort():route.fulfill({contentType:'application/javascript',body:'window.Razorpay=class {constructor(o){window.syntheticCheckout=o;}open(){window.syntheticOpened=(window.syntheticOpened||0)+1;}close(){window.syntheticClosed=(window.syntheticClosed||0)+1;}on(){}};'}));
  await context.route('**/api/account/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;calls.push({path,method:request.method()});
   if(request.method()!=='GET'){await route.abort();errors.push('Unexpected write');return;}
+  if(slowChain){const delay=path.endsWith('/credits')?8000:path.endsWith('/checkout')?5000:path.endsWith('/resume')?4000:0;if(delay)await new Promise(resolve=>setTimeout(resolve,delay));}
   let body,status=200;
   if(path==='/api/account/credits'){
    body={userId,displayName:'Synthetic verified customer',availableMilliseconds:900000,payments:[],plans:[]};
+   if(holdQuiet){holdQuiet=false;await new Promise(resolve=>{releaseQuiet=resolve;});}
    if(hold){hold=false;await new Promise(resolve=>{release=resolve;});body={...body,userId:revisionId,displayName:'Foreign stale account'};}
   }else if(path.endsWith('/catalog'))body={catalog:[pack,...[40,100,200].map((hours,index)=>({...pack,revisionId:'00000000-0000-4000-8000-00000000082'+(index+2),offerCode:'cluera_monthly_'+hours+'h_v2',name:'Cluera '+hours+' Hours',amountPaise:[549900,959900,1954900][index],allowanceSeconds:hours*3600,kind:'RECURRING',interval:'MONTH',totalCount:120,enabled:false,testPlanValidated:false}))]};
   else if(path.endsWith('/history'))body={history:{code:'ACTIVE',userId,payments:[],subscriptions:[],hasMorePayments:false,hasMoreSubscriptions:false}};
@@ -63,10 +65,19 @@ async (page) => {
   attempted=true;await tab.reload();await tab.getByRole('status').filter({hasText:'already has a payment attempt'}).waitFor();
   if(await resume().count()||await tab.locator('script[src*="checkout.razorpay"]').count())throw Error('Blocked order exposed continuation or loaded SDK on reload');
   await check('initial saved-order check withholds continuation for attempted orders');
+  slowChain=true;await tab.reload();await tab.getByRole('status').filter({hasText:'already has a payment attempt'}).waitFor({timeout:25000});slowChain=false;
+  if(await resume().count()||!await refresh().isEnabled())throw Error('Sequential reads lost provider refusal');
+  await check('sequential seventeen-second verification retains exact provider refusal');
+  holdQuiet=true;await tab.clock.fastForward(30000);
+  await tab.waitForFunction(()=>[...document.querySelectorAll('button')].some(button=>button.textContent==='Refresh billing status'&&button.disabled));
+  if((await tab.locator('body').innerText()).includes('Refreshing payment status'))throw Error('Automatic read flashes foreground progress');
+  await tab.getByRole('status').filter({hasText:'already has a payment attempt'}).waitFor();
+  releaseQuiet();await tab.waitForFunction(()=>[...document.querySelectorAll('button')].some(button=>button.textContent==='Refresh billing status'&&!button.disabled));
+  await check('quiet automatic read preserves attempted-order guidance');
   await tab.setViewportSize({width:1440,height:1000});await check('desktop layout');
   const width=await tab.locator('main').evaluate(element=>element.getBoundingClientRect().width);
   if(width<1000)throw Error('Billing still uses narrow sign-in container');
   if(errors.length)throw Error(JSON.stringify(errors));
   return {reports,options,financialWrites:calls.filter(call=>call.method!=='GET').length,resumeReads:calls.filter(call=>call.path.endsWith('/resume')).length,errors,actualCustomerSession:false};
- }finally{release?.();await context.close();}
+ }finally{release?.();releaseQuiet?.();await context.close();}
 }
