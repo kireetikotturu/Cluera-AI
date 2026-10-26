@@ -74,6 +74,14 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
     return () => { if (dialog?.open) dialog.close(); };
   }, [continuing]);
   const [setupError, setSetupError] = useState<{ message: string; sessionId?: string } | null>(null);
+  const [checkingSetup, setCheckingSetup] = useState(false);
+  const setupErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (setupError && !continuing) {
+      setupErrorRef.current?.focus();
+      setupErrorRef.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [setupError, continuing]);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const windowMenuRef = useRef<HTMLDivElement>(null);
@@ -123,6 +131,7 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
   const enterSession = async (id?: string, note?: string): Promise<void> => {
     if (opening.current) return;
     opening.current = true;
+    setCheckingSetup(true);
     setSetupError(null);
     try {
       const detail = id ? await window.electronAPI.getSession(id) : null;
@@ -139,7 +148,7 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
       setActive(id ?? null); setPage(id ? 'copilot' : 'create');
     } catch (error) {
       if (mounted.current) setSetupError({ message: error instanceof Error ? error.message : 'Could not check provider setup. Open Settings and try again.', sessionId: id });
-    } finally { opening.current = false; if(mounted.current)setStartingRound(false); }
+    } finally { opening.current = false; if(mounted.current){setStartingRound(false);setCheckingSetup(false);} }
   };
   const create = (): void => { void enterSession(); };
   const open = (id: string): void => { void enterSession(id); };
@@ -180,7 +189,7 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
             {account&&<><button className="ghost" onClick={()=>{setShowAccountMenu(false);setPage('settings');}}>Settings & Updates</button><button className="ghost" onClick={()=>void window.accountAPI?.logout(false).catch(()=>setError('Sign-out could not be confirmed.'))}>Log out</button></>}
           </div>}
         </div>}
-        <button className="dashboard-create" onClick={create}><Plus size={15}/>Create Session</button>
+        <button className="dashboard-create" disabled={checkingSetup} onClick={create}><Plus size={15}/>{checkingSetup ? 'Checking…' : 'Create Session'}</button>
         <div className="dashboard-window-menu-wrap" ref={windowMenuRef}>
           <button className={`dashboard-icon ${showWindowMenu ? 'active' : ''}`} aria-label="Dashboard window controls" title="Window controls" aria-expanded={showWindowMenu} onClick={() => { setShowAccountMenu(false); setShowWindowMenu((value) => !value); }}><MoreHorizontal size={17}/></button>
           {showWindowMenu && <div className="dashboard-window-menu" role="menu">
@@ -200,7 +209,8 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
 
     <section className="dashboard-content">
       {account&&<AccountCreditsSection key={account.userId} userId={account.userId}/>}
-      {setupError && <div className="settings-note" role="alert"><p>{setupError.message}</p><button className="ghost" onClick={() => setPage('settings')}>Open Settings</button>{setupError.sessionId && <button className="ghost" onClick={() => { setActive(setupError.sessionId!); setPage('create'); }}>Edit saved session</button>}</div>}
+      {checkingSetup && <p role="status">Checking session setup…</p>}
+      {setupError && <div className="settings-note" role="alert" tabIndex={-1} ref={setupErrorRef}><p>{setupError.message}</p><button className="ghost" onClick={() => setPage('settings')}>Open Settings</button>{setupError.sessionId && <button className="ghost" onClick={() => { setActive(setupError.sessionId!); setPage('create'); }}>Edit saved session</button>}</div>}
       <div className="dashboard-intro"><div><p>SESSION WORKSPACE</p><h1>Your interviews</h1></div><span role="status">{search.trim() ? `${filteredSessions.length} of ${sessions.length}` : sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}</span></div>
       <div className="dashboard-search" role="search">
         <Search size={15} aria-hidden="true"/>
@@ -209,7 +219,7 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
       </div>
       {!sessions.length ? <div className="dashboard-empty">
         <span><CalendarDays size={23}/></span><h2>No sessions yet</h2><p>Create an interview workspace with your resume and job context.</p>
-        <button className="dashboard-create" onClick={create}><Plus size={15}/>Create Session</button>
+        <button className="dashboard-create" disabled={checkingSetup} onClick={create}><Plus size={15}/>{checkingSetup ? 'Checking…' : 'Create Session'}</button>
       </div> : !filteredSessions.length ? <div className="dashboard-search-empty"><Search size={21} aria-hidden="true"/><h2>No matching sessions</h2><p>Try another session name, company or role.</p><button type="button" onClick={() => { setSearch(''); searchRef.current?.focus(); }}>Clear search</button></div> : <div className="dashboard-groups">
         {groupedSessions.map((group) => <section className="dashboard-group" key={group.label}>
           <h2>{group.label}</h2>
@@ -224,7 +234,7 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
               <div className="session-badges"><span className="session-badge interview">Interview</span>{hasTranscript && <span className="session-badge transcript"><FileText size={10}/>Transcript</span>}</div>
               <div className="session-usage"><strong>{status}</strong><span>{formatDate(session.updatedAt)} · {sessionDuration(detail)}</span></div>
               <div className="session-row-actions">
-                <button className="session-main-action start" onClick={() => open(session.id)}>Start Session<ArrowRight size={14}/></button>
+                <button className="session-main-action start" disabled={checkingSetup} onClick={() => open(session.id)}>Start Session<ArrowRight size={14}/></button>
                 {(hasTranscript || Boolean(detail?.rounds?.length || detail?.questions.length)) && <button className="session-main-action" onClick={() => transcript(session.id)}>View Transcript<ArrowRight size={14}/></button>}
                 <button className="session-details-action" aria-label={`View setup for ${session.title}`} title="View saved session setup" onClick={() => transcript(session.id)}><FileText size={14}/></button>
                 <button className="session-delete" disabled={deletingIds.includes(session.id)} aria-label={`Delete ${session.title}`} title="Delete session" onClick={() => void remove(session.id)}><Trash2 size={14}/></button>

@@ -1,6 +1,18 @@
 # Cluera release blockers
 
+## October 17 - no public V1 approval in this phase
+
+This phase does not change desktop source/features or1.0.3installer bytes. The retained candidate is unsigned TEST,121924027bytes, SHA256 `d8e782a3cfa18ceb3e10f90940a403f3d0277e701953cc7db1644c17ac078a59`; no installation, EXE execution, upload, updater action or release approval is performed. The current source changes are web-side only. Owner-operated Windows secure-store/login/restart/session/audio/balance/update acceptance and independently verified immutable hosted bytes precede private-MFA publication; commercial Authenticode/operations remain open. Do not advertise operational payments/providers/RD or production-ready status. [Current completed-versus-missing map](CLUERA_V1_COMPLETION_CHECKLIST.md).
+
+
+
+## October17 - fresh static verification, no public approval
+
+Current1.0.3 independently rehashes to SHA-256 d8e782a3cfa18ceb3e10f90940a403f3d0277e701953cc7db1644c17ac078a59 and remains NotSigned. Fresh actual package verification passes2276ASAR entries and existing trust/fuse checks. No desktop source/feature or installer byte changed; the agent did not run/install/upload/approve it. Real Windows secure-store/login/restart/isolation/high-DPI/AI/audio/balance/update acceptance remains unrecorded. Public feed/download remains correctly404 without an approved release; no installer link is invented. Complete actual acceptance, immutable hosting/independent downloaded hash and deliberate private-MFA release approval before first distribution. Commercial Authenticode and operations remain launch gates.
+
 ## Current October17 - controlled Windows candidate; public release not yet accepted
+
+Fresh current scheduler-source CI39032139105 passes complete desktop366/1skipped, typechecks/build/audit without desktop source changes. Root independently rehashes the retained1.0.3 EXE at the same121924027bytes/d8e782a3cfa18ceb3e10f90940a403f3d0277e701953cc7db1644c17ac078a59/NotSigned. Read-only GitHub inventory finds no release in the private Cluera-AI source repository and no Cluera asset in the nine existing public SigmaRound-Releases-Test releases. Source-repository availability is not public binary hosting. No upload, installer execution, release record or public feed approval occurred. Prepare a separate immutable Cluera TEST release only after controlled real-device acceptance; retain all original assets and product trust. Exact next owner action remains billing-secret provisioning in execution status, not an additional release/setup request.
 
 Canonical clean staging and modern web/relay DB authentication are verified; signup feedback/password8 repair is live. Clean-project Admin login/MFA and private Razorpay Test configuration are complete: do not repeat signup, role bootstrap, authenticator enrollment, SMTP, keys or Auth URLs. The latest accepted full CI desktop result remains366passed/1opt-in skipped; it is not a new installed-Windows test.
 

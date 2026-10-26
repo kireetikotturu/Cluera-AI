@@ -42,7 +42,7 @@ it('grants only one audited role, truthfully records operator authority, preserv
   expect(audits[0].detail).toMatchObject({before:null,noMfaClaim:true,noAuthenticatedSession:true,actorSemantics:'bootstrap_subject_not_authenticated_grantor',after:{user_id:target,active:true}});
   expect(audits[0].detail.scope).toBe('Clean independent Cluera project yhnqlfcgrmckhyjdxegg only; excludes old Account and License Edition');
   expect(audits[0].detail).toMatchObject({targetProjectRef:PROJECT,oldAuthorityImported:false});
-  expect(audits[0].detail.authorization).toContain('October 16 2026');
+  expect(audits[0].detail.authorization).toBe('Direct owner approval of exact clean Cluera Admin bootstrap, October 17 2026');
   expect((await db.query('select to_jsonb(u) value from auth.users u')).rows).toEqual(before);
   expect((await db.query('select granted_seconds from public.customer_trial_grants')).rows).toEqual([{granted_seconds:900}]);
   expect((await db.query('select public.account_admin_check($1,null,true) allowed',[target])).rows[0]).toEqual({allowed:false});

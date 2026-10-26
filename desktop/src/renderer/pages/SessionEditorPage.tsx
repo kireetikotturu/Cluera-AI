@@ -211,7 +211,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
   if (loading) return <main className="session-wizard"><div className="wizard-loading">Loading session...</div></main>;
   const actions = <footer className="wizard-actions">
     {account ? <div><span>{locked ? 'Please wait for the current operation…' : 'Your setup is saved with this session'}</span>
-      <small>Creating a session does not start AI or spend credits.</small></div> : <span>Your setup is saved with this session</span>}
+      <small>Saving opens the workspace. Its audio device check uses your account time.</small></div> : <span>Your setup is saved with this session</span>}
     <button className="dashboard-create" disabled={locked} onClick={() => void save()}>{saving ? 'Saving...' : editing ? 'Save Session' : 'Create Session'}<ArrowRight size={16}/></button>
   </footer>;
   return <main className={`session-wizard session-create${account ? ' account-session' : ''}`} aria-busy={locked}>

@@ -2,13 +2,14 @@
 import {useEffect,useRef,useState} from 'react';
 import {metadataListSchema,metadataSchema,operationStatusSchema,type Metadata,type PendingOperation} from '../../../lib/aiProviders/publicMetadata';
 import {ProviderUsage} from './ProviderUsage';
+import {AiQuickSetup} from './AiQuickSetup';
 import type {ModelPolicy} from './ModelPolicyEditor';
 
 const endpoint='/api/account/admin/ai-providers';
 const labels={gemini:'Google Gemini',deepgram:'Deepgram Flux',openai:'OpenAI',anthropic:'Anthropic Claude'};
 type Provider=keyof typeof labels;
 type Factor={id:string;status:string};
-export function AiProviders({disabled=false,models}:{disabled?:boolean;models?:ModelPolicy[]}){
+export function AiProviders({disabled=false,models,onChanged}:{disabled?:boolean;models?:ModelPolicy[];onChanged?:()=>void}){
  const [rows,setRows]=useState<Metadata[]>([]),[message,setMessage]=useState('Refresh to inspect the vault. No background polling.'),[busy,setBusy]=useState(false),[available,setAvailable]=useState(false),[factors,setFactors]=useState<Factor[]>([]),[pending,setPending]=useState<PendingOperation|null>(null),[retryAllowed,setRetryAllowed]=useState(false);
  const [actions,setActions]=useState<Partial<Record<Provider,string>>>({});
  const alive=useRef(true),running=useRef(false),controller=useRef<AbortController|null>(null),uncertain=useRef<PendingOperation|null>(null);
@@ -144,6 +145,8 @@ export function AiProviders({disabled=false,models}:{disabled?:boolean;models?:M
   if(alive.current){setFactors(data.factors);setMessage(data.factors.length?(uncertain.current?'Authenticator loaded. Review the original action and settings before any explicitly offered retry; enter a fresh code below.':'Authenticator loaded. Enter provider keys only in the password fields below. Each change needs a fresh six-digit code.'):'No verified authenticator was returned. Verify your existing Admin authenticator first.');}
  });
  return <div className="ai-provider-console" aria-busy={busy}>
+  <AiQuickSetup disabled={disabled} models={models} onApplied={onChanged}/>
+  <details open={Boolean(pending)||undefined}><summary>Advanced: manage keys, metadata checks and enablement as separate steps</summary>
   <p className="account-ui-kicker">SERVER-OWNED AI CONTROL</p><h2>AI Providers &amp; Models</h2>
   <p>Encrypted credentials · fresh authenticator approval · immutable audit. Customer BYOK is disabled. OpenAI and Claude generation are not integrated or enabled.</p>
   <p>Configure Gemini and Deepgram once here for signed-in desktop users. Access still requires an active account and remaining trial or paid time. The original trial is 15 minutes total per account.</p>
@@ -184,6 +187,7 @@ export function AiProviders({disabled=false,models}:{disabled?:boolean;models?:M
     </fieldset>
    </form><p>Fallback: none. Discovered models are not automatically approved. Metadata tests do not prove streaming quality, billing permissions or actual availability.</p>
   </article>;})}</div>
+  </details>
   <ProviderUsage disabled={disabled}/>
  </div>;
 }

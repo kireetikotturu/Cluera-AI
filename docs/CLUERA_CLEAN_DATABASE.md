@@ -2,6 +2,18 @@
 
 October16,2026. New target only: **cluera-ai-production / yhnqlfcgrmckhyjdxegg**, Mumbai, PostgreSQL17.11.0.003. Exactly two products: Cluera AI and unchanged SigmaRoundAI License Edition. The owner confirms the old project is unavailable and explicitly waived migration of dummy users/trial balances. Old source-access/backup prerequisites are superseded; genuine external payment obligations are not waived.
 
+## Current October17 - one verified owner; audited Admin addition
+
+Canonical **READY dpl_6MxFH4Q4vfRXibLR5UPSMuwZG2hh /11bf1948** serves the signup fix, with complete777-entry/644-blob source and original locks;42environment entries compare unchanged. No schema is applied in this phase. Exact owner-approved bootstrap added only Admin profile0->1 and audit0->1; no Auth/session/factor writer. Seven complete customer/trial/grant/intent/payment/receipt/application snapshots match01:44:34.213499-01:51:38.930022UTC: one customer, original900-second trial, zero paid grants/financial rows. This is a bounded seven-table comparison, not full arbitrary database equivalence.
+
+Catalog disabled, merchantunbound, workerpassive/no-op, vaultempty/off and paymentsfalse remain. History/merchant-pin drafts are unapplied; original48-table foundation/vault is retained. [Rollout, audit security limits and next private Admin MFA action](CLUERA_EXECUTION_STATUS.md). Earlier zero-user and key-saving sections are historical/completed; never restore obsolete Auth keys on rollback.
+
+## Earlier canonical staging handoff - October16
+
+Completed clean staging rollout: exact reviewedc12f55f0/full776-entry/643-blob tree/original locks, **READY dpl_GpMbQjNKRRx6oQ9AHAjgv4H8JYNN**, dedicated Cluera Vercel Production-named staging. Complete21-entry new Production tuple verified,21 Preview entries preserved. Canonical alias held unchanged through READY/configured modern web+relay DB proof and empty feed, then explicitly assigned and independently read back. Auto domain assignment requested false; no deployment-protection change. No partial URL/key mix, new schema, old Auth import or License change.
+
+Owner reports new URLs, private SMTP and Confirm sign up template saved. These are not inbox acceptance. Fresh44/44 synthetic/22/22 public boundaries/two empty-context signup viewports pass; all12 observed identity/customer/grant/financial/provider/release counts remain0 through04:13:06.778197UTC. Security remains48RLS tables/0policies/0direct grants/0browser functions, catalog off, passive worker/no cron and no merchant binding. [Full evidence/limitations and single private signup step](CLUERA_EXECUTION_STATUS.md). Payment flags false/paused, AI auth-only. The key-saving and pre-promotion instructions below are historical/completed, not repeated owner actions. After a new identity exists, keep this DB on any compatible code rollback; never resurrect old Auth/keys.
+
 ## Applied and independently verified
 
 | Migration | SHA-256 | Actual result |

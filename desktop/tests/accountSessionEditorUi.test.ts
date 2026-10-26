@@ -8,7 +8,7 @@ import {useAppStore} from '../src/renderer/stores/appStore';
 const require=createRequire(import.meta.url);
 const {JSDOM}=require('jsdom');
 let dom:any,root:ReturnType<typeof createRoot>;
-const provider=(model='flash')=>({providerMode:'managed',defaultGeminiModel:model,modelOptions:[{modelId:model,displayName:model}]} as any);
+const provider=(model='flash')=>({providerMode:'managed',defaultGeminiModel:model,modelOptions:[{modelId:model,displayName:model}],defaultDeepgramModel:'flux',deepgramModelOptions:[{modelId:'flux'}]} as any);
 const session={id:'session-one',title:'Original session',company:'Acme',role:'Engineer',resumeText:'Resume',jobDescription:'Description',selectedModel:'flash',language:'English'};
 beforeEach(()=>{
  dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});

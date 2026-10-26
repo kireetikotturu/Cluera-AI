@@ -10,12 +10,14 @@ import {discoverModels,modelId} from './discovery';
 import {listMetadata,metadataSchema,readSealed} from './repository';
 import {operationContextSchema} from './publicMetadata';
 import {verifyProviderOperation} from './operationStatus';
+import {runProviderSetup} from './quickSetup';
 
 const common={operationId:z.uuid(),provider:providerId,revision:z.number().int().min(0),factorId:z.uuid(),code:z.string().regex(/^\d{6}$/)};
 const inputSchema=z.discriminatedUnion('action',[
  z.object({...common,action:z.literal('REPLACE'),apiKey}).strict(),
  z.object({...common,action:z.literal('TEST'),retry:z.literal(true).optional()}).strict(),
  z.object({...common,action:z.literal('CONFIGURE'),enabled:z.boolean(),defaultModel:modelId.nullable(),fallback:z.literal('NONE'),retry:z.literal(true).optional()}).strict(),
+ z.object({...common,provider:z.enum(['gemini','deepgram']),action:z.literal('SETUP'),apiKey}).strict(),
 ]);
 async function readBody(request:Request){
  const declared=Number(request.headers.get('content-length'));if(declared>8192||!request.body)throw new AccountError('INVALID_INPUT',400);
@@ -81,6 +83,13 @@ export async function providerAdminRequest(request:Request):Promise<Response>{
   const reauthenticatedAt=new Date().toISOString();
   cookies.set('access',step.data.access_token,Math.max(1,Math.min(step.data.expires_in-30,3570)));
   cookies.set('refresh',step.data.refresh_token,30*86400);
+  if(input.action==='SETUP'){
+   mutationSubmitted=true;
+   const result=await runProviderSetup({provider:input.provider,revision:input.revision,apiKey:input.apiKey,operationId:input.operationId},
+    {rpc,actor:account.userId,session:account.sessionId,reauthenticatedAt,digest:value=>vault.digest(value),seal:(key,binding)=>vault.seal(key,binding),
+     discover:(provider,key)=>discoverModels(provider,key)});
+   return cookies.apply(json(result));
+  }
   const {code:_code,factorId:_factor,...operation}=input;
   // Recovery must have the same original digest. The retry marker grants no
   // authority and is excluded; every attempt above still requires fresh MFA.

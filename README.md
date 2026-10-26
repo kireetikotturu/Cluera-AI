@@ -1,5 +1,9 @@
 # Cluera AI
 
+## Go-live in one place
+
+**Start with [docs/GO_LIVE_GUIDE.md](docs/GO_LIVE_GUIDE.md).** It lists, in order, what to push to GitHub and what to set in Razorpay, Vercel, Render, Supabase and the Admin panel so that Razorpay payments and the Gemini/Deepgram desktop sessions work. In Admin, *Providers → AI setup in one step* saves and enables each AI key with one authenticator code, and *Cluera billing → Payment setup checklist* says exactly what is still missing before customers can pay. The dated notes below are history; where they conflict with the guide, follow the guide.
+
 ## October 19 completion pass
 
 Use the consolidated [final launch checklist](docs/CLUERA_FINAL_LAUNCH_CHECKLIST.md) for code/deployment evidence and all owner actions. Existing SMTP, project keys/URLs, registration, Admin role and MFA enrollment are complete. Auth, original-order recovery, bounded reconciliation, AI cancellation/output errors, publisher enforcement, Admin financial reporting, provider metadata and operations monitoring are implemented. Windows **1.0.7 unsigned TEST** is built/static-verified; full desktop tests pass 401/1 opt-in skip. Monthly orchestration is prepared behind disabled gates; queues/upgrades need a supported method-specific financial policy and acceptance. Remote Desktop is excluded from launch by owner choice. Real payment/provider/device/operations acceptance and public release remain gated. **Not production-ready.** Older next-step paragraphs below are historical.

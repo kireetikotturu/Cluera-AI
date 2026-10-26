@@ -1,6 +1,8 @@
 # Cluera AI Windows V1 candidate and release guide
 
-Updated October 24, 2026 (IST). **Version 1.0.8 is a retained unsigned TEST candidate, not the patched release. Public distribution and commercial launch are not accepted.** Existing authentication, Google OAuth, Admin/MFA, billing records and older installers are preserved. Remote Desktop is excluded.
+Updated October 24, 2026 (IST). **Version 1.0.10 is the new local unsigned TEST candidate. Public distribution and real AI/device acceptance remain pending.** See [the current candidate, exact hash, session fixes and private setup steps](CLUERA_WINDOWS_1_0_10_ACCEPTANCE.md). Version 1.0.8 is retained unchanged and remains unpatched; failed build 1.0.9 is not a release. Existing authentication, Google OAuth, Admin/MFA, billing records and older installers are preserved. Remote Desktop is excluded.
+
+The sections below record the historical 1.0.8 checkpoint. The linked 1.0.10 acceptance report supersedes their candidate selection and rebuild requirement. The server still has no configured providers or enabled models; updating the installer alone cannot enable real session creation or AI.
 
 **October 24 security follow-up:** source now pins Electron **44.9.1** and Zod **4.6.6**, plus patched fast-uri/undici build dependencies, after fresh CI identified additional advisories. This supersedes the October 23 Electron 44.5.0 source checkpoint; Next.js 16.4.2 and Vitest 5.0.3 remain pinned. See [the production payment handoff](CLUERA_PRODUCTION_PAYMENT_HANDOFF.md) for exact validation/deployment evidence. Windows 1.0.8 is preserved and contains neither the new Electron nor Zod dependency. A new immutable build and device/package acceptance are required before distribution; do not release 1.0.8 as patched. The automated/package results below remain historical evidence for that retained candidate.
 

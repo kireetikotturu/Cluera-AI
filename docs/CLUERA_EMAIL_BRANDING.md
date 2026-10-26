@@ -1,5 +1,27 @@
 # Cluera email and Auth branding
 
+## Current October17 - signup mail delivered by owner report; feedback repair live
+
+Owner reports successful verification mail; independent new-project metadata confirms the support identity is verified/ACTIVE. SMTP/App Password/template/URL/key saves are complete, not repeated. Exact From headers/hosted HTML and new mail delivery were not inspected by the agent. Support/temporary sender remains **Cluera AI <clueraaisupport@gmail.com>**. Other five templates and recovery/header/capacity acceptance remain gaps, not silently installed features.
+
+The real offscreen signup feedback is fixed on11bf1948, including exact requested success text, masked recipient, loading/single-flight, generic safe errors and explicit rate-limited resend. Deployed UI scenarios use intercepted Auth, no mail. Minimum8 source+owner save recorded; confirmation/security limits retained. Next is first clean-project Admin MFA, not repeat signup/SMTP. [Exact action/evidence](CLUERA_EXECUTION_STATUS.md). All older next-step instructions below are historical/superseded.
+
+## Current October16 - official support and temporary Gmail sender
+
+Owner selects **clueraaisupport@gmail.com** for official support and temporary verification mail, configured sender display **Cluera AI**, with no domain yet. The prior domain-input request is resolved and superseded; do not block independent safe development on a domain purchase. New key/Auth URL saving remains completed.
+
+Use the low-volume [Gmail SMTP plan](CLUERA_TEMPORARY_GMAIL_SMTP.md): TLS, same authenticated username/From and dedicated App Password, never the normal Gmail password. **Owner confirms Created privately, Gmail SMTP saved privately and Signup template saved; do not repeat them or request the value.** Saving is owner-reported, not actual SMTP authentication/delivery proof. Confirm sign up subject **Confirm your Cluera AI email**, exact raw **emails/auth/confirm-signup.html** body and literal **{{ .ConfirmationURL }}** are the instructed mapping, not independently read-back hosted content. Canonical clean staging is verified; next is one private same-browser signup/verification under the linked handoff's stop conditions. No agent email, repeat/resend, other-five-template/notification or SMTP/security change.
+
+The six templates/two manifests match brand/support; the unchanged2678-byte signup file matches reviewed5b853155 exactly (SHA256204062130db01972e7420f818f800ac8c5f864c3b7694b7065d82567ff80f08a), with passed project/subject/support/placeholder/inert-content checks. Supabase SMTP sender-name must be **Cluera AI** for every Auth message; human support replies use Gmail's separate Send mail as name, checked later. Recipient contact-label overrides are outside sender control. Hosted save is owner-reported only; other five templates remain for later branding. Existing ConfirmationURL/Token, PKCE/session/verification/no-tracking behavior remains; no delivery/production-capacity claim.
+
+## Current October16 - SMTP absent; owned sending-domain input required
+
+Owner confirms new project **yhnqlfcgrmckhyjdxegg** Auth URLs saved and transactional SMTP **not configured**. Do not repeat either completed status question or ask again for saved server keys. All six templates remain prepared-not-installed; no real delivery is accepted. Cluera project-domain inventory contains only its vercel.app alias; external domain ownership remains unknown.
+
+**Next single input:** an existing domain the owner controls DNS for and wants to use for Cluera transactional email, or **no domain yet**. No purchase, DNS edit, provider account/key creation or License-domain reuse is performed. Sending-domain verification does not require changing the existing website origin/callbacks. [Resend SMTP](https://resend.com/docs/send-with-supabase-smtp) is one reviewed option, not selected/activated; it needs a [verified owned domain](https://resend.com/docs/dashboard/domains/introduction). Use provider-issued exact records later, preserve root/inbound MX and unrelated DNS, keep Auth tracking off and verification enabled. Never send a password/API key/code/link in chat.
+
+The current execution status is authoritative. Earlier shared-project installation/ticket-hold sections below are retained historical evidence only, not current instructions. No hosted SMTP/template/Auth/notification, email send, source feature, environment, schema, provider/payment activation, old service or License change occurs in this documentation step.
+
 ## October 16 - clean independent Cluera setup supersedes shared-project installation
 
 The owner explicitly authorized a clean setup on **yhnqlfcgrmckhyjdxegg** without old Cluera users or dummy trial balances. Both `emails/auth/manifest.json` and `manifest.cluera-production.json` now pin only this new project and reuse the exact six HTML bodies/subjects. Neither is installed. No old Auth/template/SMTP configuration is changed or imported.

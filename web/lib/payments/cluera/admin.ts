@@ -9,7 +9,9 @@ import { billingRpc, merchantDigest, clueraBillingV2Enabled } from './config';
 import { offerCode, planId, revisionSchema, type Revision } from './contracts';
 import { clueraRazorpayAdapter } from './adapter';
 import { readClueraRawBody } from './events';
-import { liveBillingProfile, liveBillingRpc } from './modeProfile';
+import { liveBillingProfile, liveBillingRpc, createLiveBillingScope } from './modeProfile';
+import { billingReadiness } from './readiness';
+import type { PaymentRpc } from '../core/types';
 import { testPlanInput, testPlanOperation } from './planSyncContracts';
 import { syncTestPlan } from './planSync';
 
@@ -25,6 +27,22 @@ export const catalogMutationSchema = z.discriminatedUnion('action',[
     input:z.object({razorpayPlanId:planId.nullable()}).strict()}).strict(),
 ]);
 function claims(token:string) { try { return JSON.parse(Buffer.from(token.split('.')[1],'base64url').toString('utf8')); } catch { return {}; } }
+/** Admin-only, read-only setup checklist for the mode customers currently see. */
+async function readBillingReadiness(rawRpc:PaymentRpc,admin:Record<string,unknown>,env:NodeJS.ProcessEnv) {
+  const evidence:Parameters<typeof billingReadiness>[1] = {};
+  if (clueraBillingV2Enabled(env)) {
+    try {
+      const scope = env.CLUERA_BILLING_UI_MODE === 'live' ? createLiveBillingScope(env) : env, profile = liveBillingProfile(scope);
+      if (profile) {
+        const proof = await rawRpc('cluera_live_billing_profile',{p_account_digest:profile.merchantDigest});
+        evidence.liveProof = proof.error ? null : proof.data;
+      }
+      const read = await billingRpc(profile ? liveBillingRpc(rawRpc) : rawRpc,'cluera_billing_admin_read',{...admin,p_operation:null}) as {code?:unknown;catalog?:unknown};
+      if (read.code === 'ACTIVE') evidence.catalog = z.array(revisionSchema).max(4).parse(read.catalog);
+    } catch { /* The checklist reports the unavailable evidence as not ready. */ }
+  }
+  return billingReadiness(env,evidence);
+}
 const publicRevision = (revision:Revision) => { const {razorpayPlanId:_plan,...value}=revision;return value; };
 /** Catalog mutations require current Admin+AAL2, fresh same-session MFA and an immutable operation/revision CAS. */
 export async function clueraBillingAdminRequest(request:Request, env = process.env):Promise<Response> {
@@ -44,6 +62,10 @@ export async function clueraBillingAdminRequest(request:Request, env = process.e
     const admin = {p_actor:account.userId,p_session:account.sessionId};
     if (claims(session.access_token).aal !== 'aal2' || await billingRpc(rawRpc,'account_admin_check',{...admin,p_require_mfa:true}) !== true) throw new AccountError('FORBIDDEN',403);
     await rateLimit(request,config,clients,account.email);
+    if (request.method === 'GET' && new URL(request.url).searchParams.get('readiness') === '1') {
+      if (live || new URL(request.url).searchParams.size !== 1) throw new AccountError('FORBIDDEN',403);
+      return cookies.apply(json({readiness:await readBillingReadiness(rawRpc,admin,env)}));
+    }
     if (!clueraBillingV2Enabled(env)) return cookies.apply(json({error:'BILLING_SCHEMA_APPROVAL_REQUIRED'},503));
     if (request.method === 'GET') {
       const params = new URL(request.url).searchParams;

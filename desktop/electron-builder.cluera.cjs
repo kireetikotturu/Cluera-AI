@@ -3,6 +3,9 @@ const {version}=require('./package.json');
 if(!/^\d+[.]\d+[.]\d+$/.test(version))throw Error('Invalid Cluera version.');
 module.exports={
  extends:null,publish:null,forceCodeSigning:false,appId:'ai.cluera.desktop',productName:'Cluera AI',asar:true,compression:'maximum',
+ // Use checksums shipped with the lockfile-pinned Electron package. Retain
+ // verification for cached archives without another release-metadata fetch.
+ electronDownload:{force:false,checksums:require('electron/checksums.json')},
  directories:{output:`release-cluera-staging/${version}`},
  extraMetadata:{name:'cluera-ai-desktop',version,clueraProduct:'cluera-ai',main:'dist/main/main.js'},
  files:['dist/**/*','resources/production-config.json','resources/cluera-public-key.pem','resources/account-distribution.json','package.json',

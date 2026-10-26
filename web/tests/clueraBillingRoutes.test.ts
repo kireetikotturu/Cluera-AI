@@ -147,3 +147,21 @@ it('Admin Test plan read exposes only validated plan mappings and own pending op
  const response=await clueraBillingAdminRequest(request('admin?plans=1'));expect(response.status).toBe(200);
  expect(await response.json()).toEqual({code:'ACTIVE',catalog:[monthly],operations:[]});expect(fetch).not.toHaveBeenCalled();expect(mfa.challengeAndVerify).not.toHaveBeenCalled();
 });
+it('Admin payment checklist is read-only, needs no MFA code and works while billing is still switched off',async()=>{
+ vi.stubEnv('CLUERA_BILLING_V2_ENABLED','false');
+ const response=await clueraBillingAdminRequest(request('admin?readiness=1'));expect(response.status).toBe(200);
+ const {readiness}=await response.json();expect(readiness).toMatchObject({mode:'test',ready:false});
+ expect(readiness.items.find((item:{id:string})=>item.id==='billing').ok).toBe(false);
+ expect(rpc.mock.calls.map(([name]:any)=>name)).toEqual(['account_admin_check']);expect(mfa.challengeAndVerify).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+});
+it('Admin payment checklist reads the catalog and reports ready when everything is configured',async()=>{
+ vi.stubEnv('SIGMAROUND_BILLING_WORKER_SECRET','synthetic-billing-worker-private-material-0');vi.stubEnv('CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED','true');
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_billing_admin_read'?{code:'ACTIVE',catalog:[{...pack,enabled:true}]}:null,error:null}));
+ const {readiness}=await (await clueraBillingAdminRequest(request('admin?readiness=1'))).json();
+ expect(readiness).toMatchObject({mode:'test',ready:true,audience:'listed accounts'});expect(JSON.stringify(readiness)).not.toContain(paymentTestEnvironment.RAZORPAY_TEST_KEY_SECRET);
+});
+it('Admin payment checklist rejects extra parameters and non-admin callers',async()=>{
+ expect((await clueraBillingAdminRequest(request('admin?readiness=1&plans=1'))).status).toBe(403);
+ rpc.mockResolvedValue({data:false,error:null});expect((await clueraBillingAdminRequest(request('admin?readiness=1'))).status).toBe(403);
+});
+

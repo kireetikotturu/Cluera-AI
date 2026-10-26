@@ -21,7 +21,7 @@ function prepareOwnerBootstrap(input) {
     || !Number.isFinite(Date.parse(evidenceAt))) throw new Error('Invalid bootstrap pins.');
   const detail=after=>`jsonb_build_object(
   'actorSemantics','bootstrap_subject_not_authenticated_grantor',
-  'authorization','Direct owner request for clean Cluera setup and verified owner Admin, October 16 2026',
+  'authorization','Direct owner approval of exact clean Cluera Admin bootstrap, October 17 2026',
   'executor',current_user,'sessionExecutor',session_user,
   'scope','Clean independent Cluera project yhnqlfcgrmckhyjdxegg only; excludes old Account and License Edition',
   'targetProjectRef','${PROJECT}','oldAuthorityImported',false,

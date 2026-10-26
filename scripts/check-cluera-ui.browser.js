@@ -7,13 +7,17 @@ async (page) => {
   const active={mode:'cluera-staging',state:'active',userId:'synthetic-owner',email:'synthetic@example.invalid'};
   const credits={state:'ready',refreshing:false,active:false,activeMilliseconds:0,snapshot:{userId:active.userId,displayName:'Synthetic tester',serverTime:new Date().toISOString(),availableMilliseconds:900000,reservedMilliseconds:0,spentMilliseconds:0,buckets:[{kind:'TRIAL',grantedMilliseconds:900000,spentMilliseconds:0,reservedMilliseconds:0,availableMilliseconds:900000}],plans:[],payments:[],checkoutAvailable:false}};
   const settings={theme:'dark',overlayOpacity:.96,privateMode:true,debugMode:false,demoMode:false,shortcuts:{},geminiModel:'flash',deepgramModel:'flux'};
-  const provider={providerMode:'managed',demoMode:false,deepgramConfigured:true,geminiConfigured:true,databasePath:'synthetic',models:['flash'],modelOptions:[{provider:'gemini',modelId:'flash',displayName:'Approved synthetic model',description:'UI fixture'}],defaultGeminiModel:'flash',screenAnalysisEnabled:true};
+  const provider={providerMode:'managed',demoMode:false,deepgramConfigured:true,geminiConfigured:true,databasePath:'synthetic',models:['flash'],modelOptions:[{provider:'gemini',modelId:'flash',displayName:'Approved synthetic model',description:'UI fixture'}],defaultGeminiModel:'flash',deepgramModelOptions:[{provider:'deepgram',modelId:'flux',displayName:'Synthetic transcription',description:'UI fixture'}],defaultDeepgramModel:'flux',screenAnalysisEnabled:true};
   let sessions=[],detail;window.__fixtureCalls=[];
   window.accountAPI={status:async()=>location.hash==='#active'?active:{mode:'cluera-staging',state:'signed-out'},onStatus:()=>()=>{},
    login:async()=>{window.__fixtureCalls.push('login');return {mode:'cluera-staging',state:'signed-out',message:'Synthetic rejected sign-in'};},google:async()=>({mode:'cluera-staging',state:'signed-out'}),retry:async()=>({mode:'cluera-staging',state:'signed-out'}),logout:async()=>({mode:'cluera-staging',state:'signed-out'}),openWeb:async action=>{window.__fixtureCalls.push('web:'+action);},
    credits:{refresh:async()=>credits,onChange:()=>()=>{}},context:{list:async()=>({documents:[],selectedIds:[],version:0}),onChange:()=>()=>{}}};
   window.electronAPI={bridgeVersion:'synthetic-v1',onEvent:()=>()=>{},getUpdateStatus:async()=>({state:'current',currentVersion:'1.0.0',sessionActive:false}),checkForUpdates:async()=>({state:'current'}),
-   getProviderStatus:async()=>provider,getSettings:async()=>settings,saveSettings:async next=>next,listSessions:async()=>sessions,getSession:async()=>detail??null,listLibraryFiles:async()=>[],
+   getProviderStatus:async()=>{
+    if(window.__fixtureProviderState==='disabled')return {...provider,modelOptions:[],deepgramModelOptions:[]};
+    if(window.__fixtureProviderState==='pending')return new Promise(resolve=>{window.__resolveProvider=()=>resolve(provider);});
+    return provider;
+   },getSettings:async()=>settings,saveSettings:async next=>next,listSessions:async()=>sessions,getSession:async()=>detail??null,listLibraryFiles:async()=>[],
    uploadLibraryFile:async kind=>({libraryFileId:'synthetic-file',name:'Synthetic resume.txt',text:'Synthetic resume content',sizeBytes:24,category:kind}),
    saveSession:async input=>{window.__fixtureCalls.push('save');const now=new Date().toISOString(),session={...input,id:'synthetic-session',createdAt:now,updatedAt:now};sessions=[session];detail={session,documents:[],conversation:[],questions:[],answers:[],rounds:[]};return session;},
    addTextDocument:async()=>({id:'synthetic-document'}),addExtractedDocument:async()=>({id:'synthetic-file'}),deleteSession:async()=>{},removeDocument:async()=>{},
@@ -32,8 +36,21 @@ async (page) => {
   }
   await p.setViewportSize({width:1280,height:800});await p.goto('http://127.0.0.1:43690/desktop/home#active');await p.getByText('No sessions yet').waitFor();
   assert((await geometry()).doc<=1280,'dashboard no horizontal overflow');await p.screenshot({path:'C:/Users/kiree/Downloads/sigmaroundAI Copies/products/cluera-ai/.test-output/cluera-desktop-dashboard.png'});
-  await p.getByRole('button',{name:'Create Session',exact:true}).first().click();await p.getByPlaceholder('Frontend interview at Acme').waitFor();
-  for(const viewport of [{width:1280,height:800},{width:1000,height:600},{width:800,height:600}]){
+  await p.setViewportSize({width:800,height:600});
+  await p.evaluate(()=>{window.__fixtureProviderState='disabled';const content=document.querySelector('.dashboard-content');content.scrollTop=content.scrollHeight;});
+  await p.getByRole('button',{name:'Create Session',exact:true}).last().click();
+  const alert=p.getByRole('alert');await alert.filter({hasText:'administrator'}).waitFor();
+  assert(await alert.evaluate(el=>document.activeElement===el),'disabled model failure receives focus');
+  const alertBounds=await alert.boundingBox();assert(alertBounds&&alertBounds.y>=0&&alertBounds.y+alertBounds.height<=600,'disabled model reason visible',alertBounds);
+  assert((await p.evaluate(()=>window.__fixtureCalls.filter(x=>x==='save').length))===0,'disabled models cannot save a session');
+  await p.screenshot({path:'C:/Users/kiree/Downloads/sigmaroundAI Copies/products/cluera-ai/.test-output/cluera-desktop-session-blocked.png'});
+  await p.evaluate(()=>{window.__fixtureProviderState='pending';});
+  await p.getByRole('button',{name:'Create Session',exact:true}).first().click();
+  await p.getByText('Checking session setup…',{exact:true}).waitFor();
+  assert(await p.getByRole('button',{name:'Checking…',exact:true}).first().isDisabled(),'session check shows progress and disables repeated clicks');
+  await p.evaluate(()=>{window.__fixtureProviderState='ready';window.__resolveProvider();});
+  await p.getByPlaceholder('Frontend interview at Acme').waitFor();
+  for(const viewport of [{width:1280,height:800},{width:1000,height:600},{width:420,height:360},{width:800,height:600}]){
    await p.setViewportSize(viewport);const g=await p.locator('.wizard-actions').boundingBox();assert(!!g&&g.y>=0&&g.y+g.height<=viewport.height+1,'session footer visible '+viewport.width,g);assert((await geometry()).doc<=viewport.width,'session no horizontal clipping '+viewport.width,await geometry());
   }
   await p.screenshot({path:'C:/Users/kiree/Downloads/sigmaroundAI Copies/products/cluera-ai/.test-output/cluera-desktop-session-800.png'});

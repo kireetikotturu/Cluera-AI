@@ -1,6 +1,30 @@
 # Cluera customer and Admin guide
 
-## Current October16 - clean destination Admin workflow prepared
+## October 17 - completed Admin setup is not repeated
+
+The existing clean-project support Admin/MFA acceptance remains recorded. No role or authenticator changes occur now. The exact Test merchant pin is complete; payments/catalog/worker/providers remain disabled. New customer billing history is prepared behind an absent/false flag and an unapplied SELECT-only proposal; it is not an active invoice-download or Admin-wide financial-reporting feature. Do not enable catalog, send payment/provider requests or grant credits while following historical instructions. Use [the current completion checklist](CLUERA_V1_COMPLETION_CHECKLIST.md) for the staged Test scope and separate provider/device/release gates.
+
+
+
+## Current October17 - no repeated Admin or key setup
+
+Admin login/MFA, new-project SMTP/signup template and Test credentials are already completed. Scheduler secret equality is now independently accepted by protected STATUS with processing disabled. Do not repeat older setup instructions below. The next essential approval is only the [frozen audited merchant pin](CLUERA_TEST_MERCHANT_PIN_APPROVAL.md); it is not permission to edit offers, turn on checkout, grant credits or enter provider keys. Payment/provider/release acceptance remains incomplete.
+
+## Current October17 - clean Admin login and MFA accepted
+
+Owner reports **Admin workspace opens**. Independent02:06:24.451327UTC read in **yhnqlfcgrmckhyjdxegg** confirms exact eligible support Admin1, verifiedTOTP1, liveAAL2session1 and protectedAdmin=true; null-session remainsfalse. No private session/credentials/code/QR was read. Do not repeat registration, bootstrap or enrollment. Complete only ordinary private reauthentication when an intentional sensitive operation requests it; enrollment is not an every-login task.
+
+No provider/payment/catalog/credit/release mutation was accepted or performed by this confirmation. All payments remain disabled, vault empty/off and relayauth-only. The single next action is **private new Cluera Razorpay Test configuration saving**, with no redeploy/key rotation/webhook edit/activation: [exact four names, scope and stop conditions](CLUERA_EXECUTION_STATUS.md). Do not enter AI credentials before encryption custody/bootstrap is verified. Historical zero-factor/enrollment instructions below are completed/superseded.
+
+## Earlier October17 - exact role bootstrap before owner MFA
+
+The support identity **clueraaisupport@gmail.com** is independently verified/ACTIVE in **yhnqlfcgrmckhyjdxegg**. Following explicit owner approval, exactly one Admin profile and one truthful owner-operator audit were inserted atomically; independent read-back and customer/trial/financial preservation checks pass. No public registration grant or Auth/session/factor mutation was used. Privileged operations still require token and live-session AAL2; current verified factors0.
+
+**Single private action:** open [Cluera Admin](https://cluera-ai-staging.vercel.app/account/admin), sign in with the existing verified account if needed, click **Enroll authenticator** once, privately scan the QR, enter **Six-digit code**, then **Verify**. Report only the result; never send QR/setup key/code/password/token. This is the clean project's first enrollment; old-project factors were not copied. Do not repeat signup, keys or SMTP. Do not change payments, catalog, provider credentials, credits or release approval. If interrupted, inspect state after refresh and cancel only unfinished setup before restarting.
+
+Payments remain disabled, provider vault empty/off and AI auth-only. [Current evidence and remaining gates](CLUERA_EXECUTION_STATUS.md). Historical instructions below are superseded.
+
+## Earlier October16 - prepared bootstrap before owner registration
 
 The new authorized project **yhnqlfcgrmckhyjdxegg** has verified schema but zero Auth users/Admin roles. Old project's accepted Admin/MFA remains historical; it is not imported or requested again. No dummy UUID, role, session or factor is copied. After new infrastructure/Auth is configured, a new verified owner identity can use the project-pinned audited bootstrap and destination MFA; registration never grants Admin. Do not perform that step now. The single current owner action is fresh private server-key provisioning in [execution status](CLUERA_EXECUTION_STATUS.md). [Clean Auth/provider procedure](CLUERA_CLEAN_AUTH_PROVIDER_SETUP.md).
 
@@ -45,22 +69,22 @@ The 12,752-byte checkout denial/refresh/effect/buy/SDK/callback body is byte-ide
 
 ## Admin boundary
 
-Use `/account/admin` with an explicitly authorized Admin. On October15 the owner requested and the operator granted `clueraaisupport@gmail.com` the retained Account Admin role, atomically recording one truthful owner-authorized bootstrap audit. That allowlist also applies to temporary old Account Admin, not License Edition. Public signup still never grants a role; no general invitation/role-grant endpoint was added. [Exact guards, tests and preservation evidence](CLUERA_EXECUTION_STATUS.md).
+Use `/account/admin` with an explicitly authorized Admin in the clean project **yhnqlfcgrmckhyjdxegg**. On October17 the exact verified support identity received one owner-approved audited role. No old identity/role/session/factor was imported; this new allowlist grants no old Account or License permissions. Public signup never grants a role; no general invitation/role-grant endpoint was added. [Exact guards, tests and preservation evidence](CLUERA_EXECUTION_STATUS.md).
 
-**Owner acceptance received:** the protected Admin workspace opens. The preceding zero-factor observation was before the owner's private interaction, not a current factor-count claim. The operator did not enroll factors, inspect credentials or bypass AAL2. Keep setup keys/QR/codes private; complete normal reauthentication only when the application requests it. Do not enter AI keys or change payment/catalog/credits yet: vault schema/bootstrap and financial activation remain separately gated. This is owner-reported browser Admin access, not Windows or payment acceptance.
+**New-project MFA is now accepted:** owner-reported protected workspace plus independent verified factor/AAL2/predicate evidence are recorded above. Historical old-project acceptance was not reused. The operator did not enroll factors, inspect credentials or bypass AAL2. Keep setup keys/QR/codes private; no repeat enrollment is needed. Do not enter AI keys or change payments/catalog/credits: encryption custody and financial activation remain gated. Admin access is not Windows/provider/payment acceptance.
 
 Customer/catalog/usage/release/provider reads require the existing server authorization. Sensitive operations need reasons, retained operation UUIDs, live allowed MFA and, where required, fresh authenticator reauthentication. An unknown write remains locked to its original operation/body; verify it by a read, never invent a replacement operation. No dashboard metric or provider cost should display a fabricated zero.
 
 ### Pricing and payments
 
-The frozen billing schema is unapplied. Billing catalog controls must honestly show unavailable until verified preparation completes. After separately approved schema/configuration, an Admin may create a new **disabled future revision** or explicitly change availability. Existing purchased amount/time/plan/invoice snapshots never change. Recurring revisions require separately configured, independently verified exact Test plans; availability cannot bypass the global financial gates. Full audit-list/invoice/customer-subscription management is not claimed operational by an operation-verification view.
+The clean billing foundation is applied but catalog heads are disabled, merchant binding is NULL and the worker is passive. History and merchant-pin follow-up proposals are unapplied. After verified MFA and the separately approved financial configuration, an Admin may create a new **disabled future revision** or deliberately change availability; existing purchased amount/time/plan/invoice snapshots never change. Recurring revisions require independently verified exact Test plans; Admin availability cannot bypass global financial gates. Invoice/history/customer lifecycle controls are not claimed fully operational.
 
 ### Providers
 
-The vault is unapplied/unbootstrapped and relay remains auth-only. Do not enter/import real provider keys until approved encryption custody, synthetic envelope/security checks and staging bootstrap pass. Keys remain encrypted/server-side and absent from customers, desktop, API responses and logs. Provider testing and metered acceptance require their own authority. OpenAI/Claude and fallback stay unavailable; BYOK is disabled. Actual usage/cost telemetry remains incomplete.
+The clean vault schema is applied but empty/off and encryption custody is unbootstrapped; relay remains auth-only. Do not enter/import real provider keys until approved custody, synthetic envelope/security checks and bootstrap pass. Keys remain encrypted/server-side and absent from customers, desktop, API responses and logs. Provider testing and metered acceptance require their own authority. OpenAI/Claude and fallback stay unavailable; BYOK is disabled. Actual usage/cost telemetry remains incomplete.
 
 ### Releases/support
 
-Cluera release registry is unapplied; there is no automatic old Account binary/feed fallback. Existing unsigned Cluera TEST files are not commercial installers or automatically upgraded by website work. Commercial distribution requires signing, independent hosted-byte verification, private-MFA approval and real normal-Windows update acceptance.
+The clean Cluera release registry is applied but empty/unapproved; feed/download correctly return404. There is no old Account binary/feed fallback. Existing unsigned TEST files are not commercial installers or automatically upgraded by website work. Distribution needs immutable hosted-byte verification and deliberate private-MFA approval; commercial signing and real normal-Windows update acceptance remain gates.
 
 Support reports should contain app version, stage and fixed safe error/result categories only. Never request passwords, verification links/codes, cookies, API keys, raw payment/card data or transcripts/screenshots lacking consent. Refund/cancellation promises and retention/deletion/legal wording require owner review before sales.

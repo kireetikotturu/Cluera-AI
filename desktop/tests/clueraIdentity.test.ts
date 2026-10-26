@@ -26,6 +26,6 @@ it('keeps Windows installation per-user and refuses both existing products',()=>
 });
 it('never offers personal key setup or accepts a stale BYOK status',()=>{
  expect(providerSetupProblem({providerMode:'byok'} as any)).toContain('personal API keys are not supported');
- expect(providerSetupProblem({providerMode:'managed',defaultGeminiModel:'flash',modelOptions:[{modelId:'flash'}]} as any)).toBeNull();
+ expect(providerSetupProblem({providerMode:'managed',defaultGeminiModel:'flash',modelOptions:[{modelId:'flash'}],defaultDeepgramModel:'flux',deepgramModelOptions:[{modelId:'flux'}]} as any)).toBeNull();
  expect(providerSetupProblem({providerMode:'managed',defaultGeminiModel:'disabled',modelOptions:[{modelId:'flash'}]} as any)).toContain('unavailable');
 });

@@ -1,6 +1,12 @@
 # Shared Supabase credential incident — approval-required plan
 
-## Current October16 - new independent authority; no old credential import
+## Current October17 - clean modern credentials verified; no old incident dependency
+
+Fresh new-project web/relay keys, cookie/rate material and exact Auth target are already provisioned and positively authenticated. Canonical staging runs11bf1948 on **yhnqlfcgrmckhyjdxegg**, with unchanged42-entry environment metadata and signed relay-own database proof at01:54:29.105UTC. Owner signup verification and minimum8 save are complete; one exact owner-approved Admin bootstrap is audited, with first clean-project MFA pending. [Current evidence/single action](CLUERA_EXECUTION_STATUS.md). Do not repeat new keys, old legacy disable or old-project migration/Support steps.
+
+The unavailable old project's incident is not declared resolved; no exact retired-token rejection is invented. No old JWT/API/session/MFA material was imported, and License Edition is untouched. External provider obligations still require independent reconciliation. New financial/provider activation is gated by this clean project's own verified configuration, custody and acceptance, not dummy-user migration or waiting for the old ticket. All older next-step instructions below are historical and superseded.
+
+## Earlier October16 - clean infrastructure before private provisioning
 
 The owner confirms old project dwqltsqumiwsxtkzdoaa is unavailable and authorizes a clean setup only in **yhnqlfcgrmckhyjdxegg**. Dummy-user/trial migration and waiting for the old Support ticket are not prerequisites for clean development. The old exposure is not declared resolved and no exact old-token negative test is invented. No old JWT signing secret/API key/session/MFA/cookie/rate/provider/worker credential is copied. License Edition and its project remain untouched; no revocation or signing/session-trust rotation is performed there.
 

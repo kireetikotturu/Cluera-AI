@@ -1,6 +1,18 @@
-# Provider-vault schema review — unapplied proposal
+# Provider-vault schema review — clean-project applied schema, activation held
 
-October 13, 2026. [Exact SQL](proposals/cluera-provider-vault.sql). **No migration applied, credential imported or root key provisioned.**
+## Current October17 - exact schema applied; clean Admin MFA accepted, activation held
+
+Owner reports protected Admin workspace access; independent02:06:24.451327UTC read verifies one factor, an AAL2 session and protected authorization in **yhnqlfcgrmckhyjdxegg**. The earlier first-enrollment instruction is completed; do not repeat it. Vault remains empty/off and relayauth-only, with dedicated encryption-key custody/bootstrap still required before provider entry/activation. [Current single action/evidence](CLUERA_EXECUTION_STATUS.md) is private disabled Razorpay Test configuration, not a provider or schema action.
+
+### Schema application checkpoint before owner MFA
+
+The unchanged reviewed vault SQL **72e1fdf4b02924ffc35af19fe3392749b024e9d948e5d00c7ca13f104f294cf9** was applied to new **yhnqlfcgrmckhyjdxegg** as20261016015041, after clean foundation20261016014532. The object/policy design below remains relevant; its historical unapplied/shared-project status is superseded. Tables are empty, root-key custody is not provisioned, vault=false and relayauth-only. No old identity/key/secret is imported, and the old Support ticket is not a clean-development prerequisite.
+
+The exact verified support Admin now has one audited owner-approved role; privileged UI still needs this clean project's first MFA enrollment. [Current evidence and single private action](CLUERA_EXECUTION_STATUS.md). Only after that acceptance should dedicated KEK custody/recovery and separately controlled Gemini/Deepgram imports/tests/activation proceed. No provider key, payment or commercial readiness is implied by applying the schema. Existing startup/auth/session and shared-usage controls remain intact.
+
+## Historical October13 proposal review - objects and bootstrap design
+
+October 13, 2026. [Exact SQL](proposals/cluera-provider-vault.sql). At that historical checkpoint no migration was applied, credential imported or root key provisioned.
 
 ## Every object and access policy
 
