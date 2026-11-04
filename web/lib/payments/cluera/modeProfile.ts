@@ -8,6 +8,7 @@ import type { PaymentRpc } from '../core/types';
 export type BillingMode = 'test' | 'live';
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const secret = z.string().min(32).max(256).refine(value => value.trim() === value && !/[\r\n\0]/.test(value));
+const razorpayKeySecret = z.string().min(16).max(256).refine(value => value.trim() === value && !/[\r\n\0]/.test(value));
 const accountId = z.string().regex(/^acc_[A-Za-z0-9]{8,64}$/);
 const originSchema = z.string().max(253).refine(value => {
   try {
@@ -83,7 +84,7 @@ export function billingModeProfile(mode: BillingMode, env = process.env) {
     throw new ClueraBillingError('CONFIGURATION');
   const credentials = live ? {
     keyId: z.string().regex(/^rzp_live_[A-Za-z0-9]{8,64}$/).parse(env.RAZORPAY_LIVE_KEY_ID),
-    keySecret: secret.parse(env.RAZORPAY_LIVE_KEY_SECRET),
+    keySecret: razorpayKeySecret.parse(env.RAZORPAY_LIVE_KEY_SECRET),
     webhookSecret: secret.parse(env.RAZORPAY_LIVE_WEBHOOK_SECRET),
     accountId: accountId.parse(env.RAZORPAY_LIVE_ACCOUNT_ID),
   } : razorpayConfig(env);
