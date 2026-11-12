@@ -15,8 +15,12 @@ export const clueraPublicRevision = z.object({
 }).strict().refine(row => (row.kind === 'PACK') === (row.interval === null)
   && (row.kind === 'PACK') === (row.totalCount === null)
   && (row.offerCode === 'cluera_pack_3h_v2') === (row.kind === 'PACK'));
-export const clueraPublicCatalog = z.array(clueraPublicRevision).max(4)
-  .refine(rows => new Set(rows.map(row => row.offerCode)).size === rows.length);
+/** Owner-managed one-time packs share one offer code (the installed Windows app only knows
+ * that code), so a plan is identified by its revision, never by its offer code. */
+export const CLUERA_MAX_CATALOG_ROWS = 60;
+export const clueraPublicCatalog = z.array(clueraPublicRevision).max(CLUERA_MAX_CATALOG_ROWS)
+  .refine(rows => new Set(rows.map(row => `${row.offerCode}:${row.revisionId}`)).size === rows.length
+    && rows.filter(row => row.kind === 'RECURRING').every(row => rows.filter(other => other.offerCode === row.offerCode).length === 1));
 export const clueraCatalogResponse = z.object({ catalog: clueraPublicCatalog }).strict();
 export type ClueraPublicRevision = z.infer<typeof clueraPublicRevision>;
 export type ClueraOfferCode = z.infer<typeof clueraOfferCode>;

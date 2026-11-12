@@ -14,6 +14,7 @@ import { billingReadiness } from './readiness';
 import type { PaymentRpc } from '../core/types';
 import { testPlanInput, testPlanOperation } from './planSyncContracts';
 import { syncTestPlan } from './planSync';
+import { CLUERA_MAX_CATALOG_ROWS } from './publicCatalog';
 
 const common = { operationId:z.uuid(), offerCode, expectedRevisionId:z.uuid(), reason:z.string().trim().min(10).max(500),
   factorId:z.uuid(), code:z.string().regex(/^\d{6}$/) };
@@ -38,7 +39,7 @@ async function readBillingReadiness(rawRpc:PaymentRpc,admin:Record<string,unknow
         evidence.liveProof = proof.error ? null : proof.data;
       }
       const read = await billingRpc(profile ? liveBillingRpc(rawRpc) : rawRpc,'cluera_billing_admin_read',{...admin,p_operation:null}) as {code?:unknown;catalog?:unknown};
-      if (read.code === 'ACTIVE') evidence.catalog = z.array(revisionSchema).max(4).parse(read.catalog);
+      if (read.code === 'ACTIVE') evidence.catalog = z.array(revisionSchema).max(CLUERA_MAX_CATALOG_ROWS).parse(read.catalog);
     } catch { /* The checklist reports the unavailable evidence as not ready. */ }
   }
   return billingReadiness(env,evidence);
@@ -86,16 +87,18 @@ export async function clueraBillingAdminRequest(request:Request, env = process.e
       const result = await billingRpc(rpc,'cluera_billing_admin_read',{...admin,p_operation:operation}) as {code?:unknown;catalog?:unknown;revision?:unknown};
       if (operation) return cookies.apply(json(result.code === 'APPLIED' ? {code:'APPLIED',revision:publicRevision(revisionSchema.parse(result.revision))} : {code:'PENDING'}));
       if (result.code !== 'ACTIVE') throw new AccountError('FORBIDDEN',403);
-      return cookies.apply(json({code:'ACTIVE',catalog:z.array(revisionSchema).max(4).parse(result.catalog).map(publicRevision)}));
+      return cookies.apply(json({code:'ACTIVE',catalog:z.array(revisionSchema).max(CLUERA_MAX_CATALOG_ROWS).parse(result.catalog).map(publicRevision)}));
     }
     if (request.method !== 'POST') return json({error:'METHOD_NOT_ALLOWED'},405);
     if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') throw new AccountError('INVALID_INPUT',400);
     const input = catalogMutationSchema.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(await readClueraRawBody(request,4096))));
+    // Live one-time packs are managed through the plan routes; several packs share this offer code.
+    if (live && 'offerCode' in input && input.offerCode === 'cluera_pack_3h_v2') throw new AccountError('INVALID_INPUT',400);
     const planAction=input.action === 'CREATE_TEST_PLAN' || input.action === 'RECONCILE_TEST_PLAN';
     if (planAction && (live || env.RAZORPAY_ENVIRONMENT !== 'test')) throw new AccountError('FORBIDDEN',403);
     const read = await billingRpc(rpc,'cluera_billing_admin_read',{...admin,p_operation:null}) as {code?:unknown;catalog?:unknown};
     if (read.code !== 'ACTIVE') throw new AccountError('FORBIDDEN',403);
-    const catalog=z.array(revisionSchema).max(4).parse(read.catalog);
+    const catalog=z.array(revisionSchema).max(CLUERA_MAX_CATALOG_ROWS).parse(read.catalog);
     const current = input.action === 'RECONCILE_TEST_PLAN' ? undefined : catalog.find(revision=>revision.offerCode === input.offerCode);
     if (input.action !== 'RECONCILE_TEST_PLAN' && (!current || current.revisionId !== input.expectedRevisionId)) return cookies.apply(json({error:'CONFLICT'},409));
     if (input.action === 'CREATE_TEST_PLAN' && current?.kind !== 'RECURRING') throw new AccountError('INVALID_INPUT',400);

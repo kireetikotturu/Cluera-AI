@@ -9,9 +9,18 @@ import { createLiveBillingTransport } from './liveBillingTransport';
 // Deliberately no dotenv/file discovery: inject rotated staging secrets at runtime.
 try {
   const config = relayConfig();
-  const liveBilling = createLiveBillingTransport(process.env, {
-    observe: event => console.info(JSON.stringify({ component: 'cluera-live-billing-dispatch', event })),
-  });
+  // A mistake in the Live payment worker settings must never take the AI relay
+  // down for every customer. The worker stays off and the reason is logged.
+  const liveBilling = (() => {
+    try {
+      return createLiveBillingTransport(process.env, {
+        observe: event => console.info(JSON.stringify({ component: 'cluera-live-billing-dispatch', event })),
+      });
+    } catch {
+      console.error('{"component":"cluera-live-billing-dispatch","event":"configuration_unavailable"}');
+      return { start() {}, async stop() {} };
+    }
+  })();
   const billing = createRenderBillingTransport({database:config.database,site:config.site},process.env,{
     observe:event=>console.info(JSON.stringify({component:'cluera-billing-dispatch',event})),
   });

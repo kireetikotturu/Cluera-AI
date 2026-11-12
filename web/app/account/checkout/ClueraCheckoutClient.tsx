@@ -44,13 +44,14 @@ async function loadSdk(signal: AbortSignal): Promise<void> {
 }
 
 /** Explicit user action only. Browser callbacks never fulfill or grant usage. */
-export default function ClueraCheckoutClient({ enabled, offers = [], historyEnabled = false, cancellationEnabled = false, firstSubscriptionOnly = false, mode = 'test', checkoutWindowSeconds = 600, pricing = false }: {
-  enabled: boolean; offers?: ClueraPublicRevision[]; historyEnabled?: boolean; cancellationEnabled?: boolean; firstSubscriptionOnly?:boolean; mode?:'test'|'live'; checkoutWindowSeconds?:number; pricing?:boolean;
+export default function ClueraCheckoutClient({ enabled, offers = [], historyEnabled = false, cancellationEnabled = false, firstSubscriptionOnly = false, mode = 'test', checkoutWindowSeconds = 600, pricing = false, catalogKnown = false }: {
+  enabled: boolean; offers?: ClueraPublicRevision[]; historyEnabled?: boolean; cancellationEnabled?: boolean; firstSubscriptionOnly?:boolean; mode?:'test'|'live'; checkoutWindowSeconds?:number; pricing?:boolean; catalogKnown?:boolean;
 }) {
   const endpoint = mode === 'live' ? '/api/account/payments/cluera/live' : '/api/account/payments/cluera';
   const modeRef=useRef(mode);modeRef.current=mode;
   const statusId = useId();
   const [catalog, setCatalog] = useState<ClueraPublicRevision[]>(offers);
+  const [catalogLoaded, setCatalogLoaded] = useState(catalogKnown);
   const [credits, setCredits] = useState<Credits | null>(null);
   const [selection,setSelection]=useState<CheckoutSelection|null>(null);
   const [busy, setBusy] = useState(false), [eligible, setEligible] = useState(false);
@@ -135,7 +136,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       owner.current = account.userId; setSignedOut(false);setCredits(account);setHistoryVersion(value=>value+1);
       if (!catalogResponse.ok) { setCatalog([]); throw new Error(); }
       const freshCatalog = clueraCatalogResponse.parse(await catalogResponse.json()).catalog;
-      if (!current()) return; setCatalog(freshCatalog);
+      if (!current()) return; setCatalog(freshCatalog); setCatalogLoaded(true);
       if (!enabledRef.current) {
         setMessage('Cluera payment acceptance is pending. Checkout is disabled; no payment is requested.'); return;
       }
@@ -422,7 +423,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     {busy&&(preparing||!quietRead)?<p className={styles.reading}>{preparing?'Preparing your secure checkout…':'Refreshing payment status…'}</p>:null}
     {cooldown>0?<p role="status" className={styles.availability}>Please wait {cooldown}s before another billing check. Your order and balance are preserved.</p>:null}
     {remaining!==null?<p className={styles.windowNotice}>Payment window: <strong>{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</strong> remaining. Closing this window does not cancel your order.</p>:null}
-    {firstSubscriptionOnly?<details className={styles.purchasePolicy}><summary>Monthly plans and changes</summary><p>One monthly subscription at a time. Change plans after cancellation is confirmed and your paid term ends. Automatic upgrades are unavailable.</p>
+    {firstSubscriptionOnly&&(catalog.some(row=>row.kind==='RECURRING')||!catalogLoaded)?<details className={styles.purchasePolicy}><summary>Monthly plans and changes</summary><p>One monthly subscription at a time. Change plans after cancellation is confirmed and your paid term ends. Automatic upgrades are unavailable.</p>
       {monthlyBlocked&&credits?<p>Your current subscription must be resolved before another monthly checkout. One-time packs remain separate.</p>:null}</details>:null}
     {selection?<aside className="cluera-plan-handoff" aria-label="Selected Cluera plan"><p>Selected plan: <strong>{checkoutSelectionName(selection)}</strong></p>
       <p>Review the price and terms. Nothing is charged until you complete payment.</p></aside>:null}
@@ -470,7 +471,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
           :<button className={styles.action} data-offer-code={revision.offerCode} data-checkout-action={savedOrder?'resume':'purchase'} type="button" disabled={!canPurchase&&!canContinue} aria-label={`${action}: ${revision.name}`} aria-describedby={`${statusId} ${availabilityId}`}
           onClick={() => void buy(revision, savedOrder)}>{action}</button>}
       </article>;
-    }) : clueraTargetPlans.map(plan => {
+    }) : catalogLoaded ? <p className={styles.availability} role="status">No plans are on sale right now. Please check back soon. Your existing time and billing history are unchanged.</p> : clueraTargetPlans.map(plan => {
       const display = offerDisplay(plan);
       return <article key={plan.id} aria-label={plan.name} className={`account-plan-card ${styles.card}${selection?.offerCode===plan.offerCode?' cluera-plan-selected':''}`}>
         {selection?.offerCode===plan.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}

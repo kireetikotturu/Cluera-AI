@@ -5,12 +5,16 @@ import { bindingSchema, ClueraBillingError, orderId, paymentId, revisionSchema, 
 import { clueraRazorpayAdapter } from './adapter';
 import { clueraNativeRecurringEnabled } from './nativeRecurring';
 import { approvedPurchaseCatalog } from './purchaseAvailability';
+import { CLUERA_MAX_CATALOG_ROWS } from './publicCatalog';
 
 type Account = { userId: string; sessionId: string };
 type Adapter = ReturnType<typeof clueraRazorpayAdapter>;
 export async function clueraBillingCatalog(rpc: PaymentRpc) {
-  const catalog = z.array(revisionSchema).max(4).parse(await billingRpc(rpc, 'cluera_billing_catalog', {}));
-  if (new Set(catalog.map(item => item.offerCode)).size !== catalog.length) throw new ClueraBillingError('UNAVAILABLE');
+  const catalog = z.array(revisionSchema).max(CLUERA_MAX_CATALOG_ROWS).parse(await billingRpc(rpc, 'cluera_billing_catalog', {}));
+  // Several one-time packs may share an offer code; only a monthly offer must stay unique.
+  if (new Set(catalog.map(item => `${item.offerCode}:${item.revisionId}`)).size !== catalog.length
+    || catalog.some(item => item.kind === 'RECURRING' && catalog.filter(other => other.offerCode === item.offerCode).length !== 1))
+    throw new ClueraBillingError('UNAVAILABLE');
   return catalog.map(({ razorpayPlanId: _plan, ...value }) => value);
 }
 export async function clueraBillingStatus(rpc: PaymentRpc, account: Account) {
