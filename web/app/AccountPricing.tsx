@@ -5,10 +5,11 @@ import {clueraPrice,clueraAllowance,type ClueraPublicRevision} from '../lib/paym
 import styles from './cluera-commerce.module.css';
 
 export function AccountPricing({catalog=null}:{catalog?:ClueraPublicRevision[]|null}={}){
- const reviewed=catalog?.length===4;
+ // A known catalog is exactly the list of plans that are On (it may be empty); null means "not readable".
+ const reviewed=catalog!==null;
  return <section id="pricing" className={`section ${styles.pricingSection}`} aria-label={reviewed?'Cluera reviewed catalog':'Cluera planned pricing'}>
   <div className={`section-heading ${styles.heading}`}>
-   <p className={styles.eyebrow}>{reviewed?'Cluera AI · Razorpay Test catalog':'Cluera staging · payments unavailable'}</p>
+   <p className={styles.eyebrow}>{reviewed?'Cluera AI · Plans and pricing':'Cluera staging · payments unavailable'}</p>
    <h2>Your time. One shared balance.</h2>
    <p>{reviewed
     ?'Choose the time you need. One-time packs never expire; monthly plans include a fresh allowance each billing period.'
@@ -16,8 +17,8 @@ export function AccountPricing({catalog=null}:{catalog?:ClueraPublicRevision[]|n
   </div>
   <div className={styles.trialNote}><span aria-hidden="true" className={styles.noteIcon}>15</span><p><strong>Start with your lifetime 15-minute trial.</strong> Concurrent devices share one server-side balance. Eligible recurring allowance is consumed before packs.</p></div>
   <div className={`account-purchase-grid ${styles.grid}`}>
-   {reviewed?catalog!.map(plan=><article key={plan.revisionId} className={styles.card} aria-label={plan.name}>
-    <div className={styles.cardTop}><p className={styles.eyebrow}>{plan.kind==='PACK'?'Non-expiring pack':'Monthly allowance'}</p><span className={styles.badge}>Test catalog</span></div>
+   {reviewed&&!catalog!.length?<p className={styles.availability} role="status">No plans are on sale right now. Please check back soon.</p>:reviewed?catalog!.map(plan=><article key={plan.revisionId} className={styles.card} aria-label={plan.name}>
+    <div className={styles.cardTop}><p className={styles.eyebrow}>{plan.kind==='PACK'?'Non-expiring pack':'Monthly allowance'}</p></div>
     <h3>{plan.name}</h3>
     <p className={styles.price}>{clueraPrice(plan.amountPaise)}<span>{plan.kind==='RECURRING'?' / month':' one time'}</span></p>
     <p className={styles.allowance}>{clueraAllowance(plan.allowanceSeconds)}{plan.kind==='RECURRING'?' per month':''}</p>
@@ -43,7 +44,7 @@ export function AccountPricing({catalog=null}:{catalog?:ClueraPublicRevision[]|n
     <Link className={`button secondary ${styles.action}`} href={`/account/checkout?offer=${encodeURIComponent(plan.offerCode)}`} aria-label={`Check availability: ${plan.name}`} aria-describedby={`pricing-${plan.offerCode}`}>Check availability</Link>
    </article>;})}
   </div>
-  <div className={styles.safetyNote}><p><Link href="/account#signup">Create your account</Link> to start your trial. Approved Test customers can open <Link href="/pricing">plans and billing</Link>.</p>
+  <div className={styles.safetyNote}><p><Link href="/account#signup">Create your account</Link> to start your trial. Then open <Link href="/pricing">plans and billing</Link> to buy more time.</p>
    <p>Remote Desktop and Mobile are not included. Existing paid allowances and historical prices never change.</p></div>
  </section>;
 }

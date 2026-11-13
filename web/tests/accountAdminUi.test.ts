@@ -125,7 +125,7 @@ it('provides anchored navigation and local audit filtering without extra request
  await act(async()=>{setter.call(filter,'catalog');filter.dispatchEvent(new Event('input',{bubbles:true}));});
  expect(host.querySelector('.account-admin-audit')?.textContent).toContain('CATALOG');expect(host.querySelector('.account-admin-audit')?.textContent).not.toContain('SUSPEND');
  expect(fetcher).toHaveBeenCalledTimes(1);expect(host.textContent).toContain('recurring checkout is unavailable');
- expect(host.querySelector('#account-admin-billing')?.textContent).toContain('Future');
+ expect(host.querySelector('#account-admin-billing-tools')?.textContent).toContain('Future');
 });
 
 it('includes releases in the parent uncertain-operation lock without allocating another mutation',async()=>{

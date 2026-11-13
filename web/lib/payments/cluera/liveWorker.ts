@@ -7,7 +7,7 @@ import type { PaymentRpc } from '../core/types';
 
 const configured = (env: NodeJS.ProcessEnv) => env.CLUERA_LIVE_OWNER_APPROVED === 'true'
   && env.CLUERA_LIVE_RUNTIME_ACCEPTED === 'true' && env.CLUERA_LIVE_INTAKE_ENABLED === 'true';
-export async function handleLiveWebhook(request: Request, input = process.env, injectedRpc?: PaymentRpc) {
+export async function handleLiveWebhook(request: Request, input = process.env, injectedRpc?: PaymentRpc, onStored?: () => void) {
   if (!configured(input)) return json({ error: 'Not found.' }, 404);
   try {
     const env = createLiveBillingScope(input), profile = liveBillingProfile(env)!;
@@ -25,7 +25,7 @@ export async function handleLiveWebhook(request: Request, input = process.env, i
       assertBillingProfileProof(profile, proof.error ? null : proof.data, 'intake', env);
       return scoped(name, args);
     };
-    return handleClueraWebhook(request, env, admitted);
+    return handleClueraWebhook(request, env, admitted, onStored);
   } catch { return json({ error: 'Webhook intake is unavailable.' }, 503); }
 }
 export async function handleLiveTick(request: Request, input = process.env,

@@ -11,7 +11,7 @@ import Page from '../app/account/admin/page';
 beforeEach(()=>{vi.resetAllMocks();mocks.headers.mockResolvedValue(new Headers({cookie:'sealed-synthetic-cookie'}));});
 it.each([401,503])('direct %s page exposes only neutral access gate',async status=>{
  mocks.access.mockResolvedValue(new Response(null,{status}));const html=renderToStaticMarkup(await Page());
- expect(html).toContain('VERIFY_ACCESS_ONLY');expect(html).not.toMatch(/PRIVATE_ADMIN_CONTROLS|ACCOUNT CONTROL CENTER|Account administration|Customers, policies/);
+ expect(html).toContain('VERIFY_ACCESS_ONLY');expect(html).not.toMatch(/PRIVATE_ADMIN_CONTROLS|ACCOUNT CONTROL CENTER|Account administration|Customers, policies|CLUERA ADMIN|Look after your AI keys/);
  expect(mocks.protected).not.toHaveBeenCalled();expect(mocks.access).toHaveBeenCalledOnce();
  const [request,refresh]=mocks.access.mock.calls[0];expect(refresh).toBe(false);expect(request.headers.get('cookie')).toBe('sealed-synthetic-cookie');
 });

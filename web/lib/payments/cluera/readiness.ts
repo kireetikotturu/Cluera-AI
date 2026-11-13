@@ -58,23 +58,26 @@ export function billingReadiness(env: NodeJS.ProcessEnv, evidence: Evidence = {}
     add('intake', 'Razorpay', 'Live payment confirmations (webhook) are accepted', flag(env, 'CLUERA_LIVE_INTAKE_ENABLED'),
       `Set CLUERA_LIVE_INTAKE_ENABLED=true. ${guide('Step 2')}`);
     add('checkout', 'Razorpay', 'The Live Buy button is switched on', flag(env, 'CLUERA_LIVE_CHECKOUT_ENABLED'),
-      'Set CLUERA_LIVE_CHECKOUT_ENABLED=true.');
+      'This is the last switch. After the database "promote" step has worked, set CLUERA_LIVE_CHECKOUT_ENABLED=true in Vercel, then push to main and promote the deployment. See docs/GO_LIVE_FINAL.md, step 2.');
     add('worker', 'Database', 'The Live credit worker is switched on', flag(env, 'CLUERA_LIVE_SCHEDULER_ENABLED'),
       `Set CLUERA_LIVE_SCHEDULER_ENABLED=true on Vercel and Render. ${guide('Step 4')}`);
     let proofOk = false;
     if (scope && 'liveProof' in evidence) {
-      try { assertBillingProfileProof(liveBillingProfile(scope)!, evidence.liveProof, 'checkout', scope); proofOk = true; } catch { /* reported as a missing item */ }
+      // The database's own "promote" result is judged here, independent of the Vercel Buy-button switch (reported separately above).
+      try { proofOk = assertBillingProfileProof(liveBillingProfile(scope)!, evidence.liveProof, 'intake', scope).checkoutEnabled; } catch { /* reported as a missing item */ }
     }
-    add('profile', 'Database', 'The database Live profile is installed and promoted', proofOk,
-      scope ? `Run the three generated SQL phases (profile, intake, promote) in the Supabase SQL editor. ${guide('Step 5')}`
+    add('profile', 'Database', 'The database is switched over to real payments', proofOk,
+      scope ? 'The database is not switched to real payments yet. Close any unfinished Test orders, then run the "promote" SQL. See docs/GO_LIVE_FINAL.md, step 1.'
         : 'Fix the Razorpay Live settings above first; this check needs them.');
     const ids = count(env.CLUERA_LIVE_PURCHASER_IDS), everyone = flag(env, 'CLUERA_LIVE_PUBLIC_CHECKOUT_APPROVED');
     audience = everyone ? 'every verified customer' : ids ? 'listed accounts' : 'nobody';
     add('buyers', 'Buyers', everyone ? 'Every verified customer may buy' : ids ? `${ids} account(s) may buy (first real payment)` : 'No account may buy yet', everyone || ids > 0,
-      'Put your own Cluera user id in CLUERA_LIVE_PURCHASER_IDS for the first real payment, then set CLUERA_LIVE_PUBLIC_CHECKOUT_APPROVED=true to sell to everyone.');
+      'Put your own Cluera user id in CLUERA_LIVE_PURCHASER_IDS for the first real payment. After that payment is checked and refunded, set CLUERA_LIVE_PUBLIC_CHECKOUT_APPROVED=true to sell to everyone. See docs/GO_LIVE_FINAL.md, steps 4 and 5.');
   }
-  const pack = evidence.catalog?.find(row => row.offerCode === 'cluera_pack_3h_v2');
-  add('catalog', 'Catalog', 'The 3-hour pack is enabled in the catalog', Boolean(pack?.enabled),
-    `Admin → Cluera billing → ${live ? 'Live' : 'Test'} catalog: refresh, then enable the 3-hour pack with your authenticator code. ${guide('Step 6')}`);
+  // Any One-time pack that is On counts; owners may sell several packs.
+  const anyPackOn = Boolean(evidence.catalog?.some(row => row.offerCode === 'cluera_pack_3h_v2' && row.enabled));
+  add('catalog', 'Catalog', 'At least one plan is switched On', anyPackOn,
+    live ? 'Open Admin > Plans, add or edit a plan, then switch it On. Customers only see plans that are On.'
+      : `Admin > Cluera billing > Test catalog: refresh, then enable the 3-hour pack with your authenticator code. ${guide('Step 6')}`);
   return { mode, items, ready: items.every(item => item.ok), audience };
 }

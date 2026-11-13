@@ -74,7 +74,7 @@ export function BillingCatalog({ disabled = false, mode = 'test' }: { disabled?:
   });
   const applyRevision = (row: ClueraPublicRevision) => {
     operation.current = null; setPending(false);
-    setCatalog(previous => [...previous.filter(item => item.offerCode !== row.offerCode), row]);
+    setCatalog(previous => [...previous.filter(item => item.revisionId !== row.revisionId && item.offerCode !== row.offerCode), row]);
     setAvailable(true); setMessage(`Audited change confirmed. The current catalog revision is ${row.enabled ? 'enabled' : 'disabled'}. Catalog availability does not activate checkout or change webhook/scheduler ownership.`);
   };
   const submit = (row: ClueraPublicRevision, form: HTMLFormElement) => {
@@ -132,8 +132,9 @@ export function BillingCatalog({ disabled = false, mode = 'test' }: { disabled?:
   });
 
   return <section className="ai-provider-console" aria-label="Cluera financial catalog" aria-busy={busy}>
-    <p className="account-ui-kicker">IMMUTABLE FINANCIAL CATALOG</p>
-    <h2>{modeName} billing plans &amp; future prices</h2>
+    <p className="account-ui-kicker">{mode === 'live' ? 'MONTHLY PLANS (NOT ON SALE)' : 'IMMUTABLE FINANCIAL CATALOG'}</p>
+    <h2>{mode === 'live' ? 'Monthly plans (kept hidden for now)' : `${modeName} billing plans & future prices`}</h2>
+    {mode === 'live' ? <p>One-time packs are managed in the Plans screen above. Monthly plans stay hidden and Off: Razorpay does not let a monthly plan be edited, so any price change needs a brand-new Razorpay plan.</p> : null}
     <p>Cluera owns future billing. New revisions never rewrite a paid order, a current subscription or the preserved Account/Paddle history.</p>
     <p role="status" aria-live="polite">{message}</p>
     <div className="ai-provider-actions">
@@ -141,7 +142,7 @@ export function BillingCatalog({ disabled = false, mode = 'test' }: { disabled?:
       <button type="button" disabled={disabled || busy || !available || pending} onClick={() => void loadFactors()}>Load billing authenticators</button>
       {pending ? <button type="button" disabled={disabled || busy} onClick={() => void verify()}>Verify original billing change</button> : null}
     </div>
-    <div className="ai-provider-grid">{catalog.map(row => <article className="ai-provider-card" key={row.offerCode}>
+    <div className="ai-provider-grid">{catalog.filter(row => mode !== 'live' || row.kind === 'RECURRING').map(row => <article className="ai-provider-card" key={row.revisionId}>
       <header><h3>{row.name}</h3><span>{row.enabled ? 'Catalog enabled' : 'Catalog disabled'}</span></header>
       <p>{clueraPrice(row.amountPaise)}{row.kind === 'RECURRING' ? ' / month' : ''} · {clueraAllowance(row.allowanceSeconds)}</p>
       <p>Revision {row.version} · {row.kind === 'PACK' ? 'Non-expiring, stackable pack' : `Monthly, no rollover, at most ${row.totalCount} charges`}</p>

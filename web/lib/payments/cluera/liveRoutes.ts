@@ -9,7 +9,7 @@ import { createLiveBillingScope, liveBillingProfile, liveBillingRpc, assertBilli
 import { billingOwner, clueraCheckoutAllowed } from './config';
 import { callbackSchema, clueraBillingCatalog, clueraBillingStatus, createClueraCheckout, verifyClueraCallback } from './checkout';
 import { readClueraRawBody } from './events';
-import { approvedPurchaseCatalog } from './purchaseAvailability';
+import { onSaleCatalog } from './purchaseAvailability';
 import { readClueraBillingHistory } from './history';
 import { resumeClueraCheckout } from './checkoutResume';
 import { cancellationInput, cancelClueraSubscription, readClueraCancellation } from './cancellation';
@@ -43,7 +43,7 @@ export async function handleLiveBilling(request: Request, action: LiveBillingAct
       if (url.searchParams.size) return json({ error: 'Invalid request.' }, 400);
       const proof = await clients.service.rpc('cluera_live_billing_profile', { p_account_digest: profile.merchantDigest });
       assertBillingProfileProof(profile, proof.error ? null : proof.data, 'checkout', env);
-      return json({ catalog: approvedPurchaseCatalog(await clueraBillingCatalog(rpc), env) });
+      return json({ catalog: onSaleCatalog(await clueraBillingCatalog(rpc), env) });
     }
     if (!liveRuntimeApproved(env, 'intake')) return json({ error: 'Not found.' }, 404);
     cookies = new AccountCookies(request, config);

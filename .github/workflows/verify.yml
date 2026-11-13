@@ -22,6 +22,9 @@ jobs:
           package-manager-cache: false
       - run: npm ci --prefix web
       - run: npm ci --prefix backend
+      # The packaging test loads desktop/electron-builder.cluera.cjs, which reads
+      # electron/checksums.json. Scripts are skipped so no Electron binary downloads.
+      - run: npm ci --prefix desktop --ignore-scripts
       - run: npm run test:preparation
       - run: npm run verify:source
       - run: npm --prefix web test -- --maxWorkers=1

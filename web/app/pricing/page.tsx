@@ -10,6 +10,6 @@ export default function PricingPage(){
  if(process.env.CLUERA_BILLING_V2_ENABLED==='true')return currentCatalogPricing();
  return <main><AccountPricing/></main>;
 }
-async function currentCatalogPricing(){const billing=billingUiCapabilities();return <main className="account-page"><h1>Cluera plans and pricing</h1>
- <ClueraCheckoutClient key={billing.mode} offers={await readClueraBillingPresentation()??[]} {...billing} firstSubscriptionOnly pricing/>
+async function currentCatalogPricing(){const billing=billingUiCapabilities(),offers=await readClueraBillingPresentation();return <main className="account-page"><h1>Cluera plans and pricing</h1>
+ <ClueraCheckoutClient key={billing.mode} offers={offers??[]} catalogKnown={offers!==null} {...billing} firstSubscriptionOnly pricing/>
  </main>;}

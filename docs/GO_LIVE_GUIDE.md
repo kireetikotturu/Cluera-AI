@@ -1,5 +1,7 @@
 # Cluera go-live guide (start here)
 
+> **Finishing real payments?** Use [GO_LIVE_FINAL.md](GO_LIVE_FINAL.md): the short, numbered owner checklist for closing the two stuck Test orders, switching on Live checkout, managing plans and making the first real payment. This guide keeps the longer first-time setup (Steps 1-5 below).
+
 One page that takes you from "code on my PC" to "customers can pay with Razorpay and the desktop app answers with Gemini and Deepgram". It replaces the long historical notes in this folder for day-to-day work. Do the steps in order and tick each box.
 
 **The pieces**
@@ -189,7 +191,7 @@ The database keeps Test and Live money in separate ledgers. Moving to Live is th
    select count(*) from cluera_billing_private.events where state = 'PENDING';
    ```
 
-   An old Test order still sitting in `BOUND` (for example the support account's retained ₹549 order that Razorpay marked *Attempted/failed*) blocks the switch on purpose. **Do not edit or delete these rows by hand**; the ledger is audited. Ask for a reviewed close-out of that single Test order, or finish a Test payment for a fresh test account first so nothing is left unresolved.
+   An old Test order still sitting in `BOUND` (for example the support account's retained ₹549 order that Razorpay marked *Attempted/failed*) blocks the switch on purpose. **Do not edit or delete these rows by hand**; the ledger is audited. The reviewed, audited close-out is [cluera-test-intent-closeout.sql](proposals/cluera-test-intent-closeout.sql); follow [GO_LIVE_FINAL.md](GO_LIVE_FINAL.md), step 1.
 
 After promote, set `CLUERA_LIVE_CHECKOUT_ENABLED=true` in Vercel (Step 3B) and redeploy.
 
@@ -200,14 +202,14 @@ After promote, set `CLUERA_LIVE_CHECKOUT_ENABLED=true` in Vercel (Step 3B) and r
 
 ## Step 6 - Admin panel (the simple way)
 
-Open `https://cluera-ai-staging.vercel.app/account/admin`, sign in and enter your authenticator code. The top of the page now lists the first-time order: **Turn on AI, Turn on payments, Look after customers**.
+Open `https://cluera-ai-staging.vercel.app/account/admin`, sign in and enter your authenticator code. The top of the page now has a **Do these in order** checklist and a **Check if payments are ready** button.
 
 **Turn on payments**
 
-1. *Cluera billing → Payment setup checklist → Check payment setup.* Fix any red line (each says which variable to set).
-2. In the **Test** (or **Live**) billing plans card press **Refresh billing catalog**, then **Load billing authenticators**.
-3. On the **3-hour pack** card choose *Set current catalog availability*, tick **Enabled**, write a reason (10+ characters), choose your authenticator, enter the fresh 6-digit code, **Confirm**.
-4. Run **Check payment setup** again. It should say *Ready*.
+1. Press **Check if payments are ready**. Fix every line marked with a red cross (each says what to do next).
+2. Live plans (one-time packs) are managed in **Payments and plans**: press **Refresh plans**, then **+ Add a plan**, **Edit**, **Turn On / Turn Off** or **Remove**. Each change shows an *Are you sure?* box with the old and new values and needs no authenticator code. See [GO_LIVE_FINAL.md](GO_LIVE_FINAL.md), step 3. (This screen needs the plan-management proposal [cluera-live-plan-management.sql](proposals/cluera-live-plan-management.sql) to be applied once.)
+3. Test-mode plans and monthly plans are under **Advanced**. Monthly plans are not sold: Razorpay does not let a monthly plan be edited.
+4. Press **Check if payments are ready** again. It should say *Payments are ready*.
 
 **Turn on AI (Gemini and Deepgram)** - *Providers → AI setup in one step*
 
@@ -220,7 +222,7 @@ The old multi-step form is still there under *Advanced*; you do not need it.
 
 Set a spending limit/alert in the Google and Deepgram dashboards: these are shared keys and real usage costs money.
 
-- [ ] Pack enabled, checklist says Ready
+- [ ] At least one plan is On, "Check if payments are ready" says Payments are ready
 - [ ] Gemini card Ready, Deepgram card Ready
 
 ---

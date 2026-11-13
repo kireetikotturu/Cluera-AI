@@ -12,5 +12,22 @@
 .account-admin-shell .account-admin-help a { color:#c8b9ff; }
 .account-admin-shell .account-admin-help summary { width:fit-content;max-width:100%;padding:8px 0;color:#c8b9ff;font-size:12px;cursor:pointer; }
 .account-admin-shell .account-admin-help summary:focus-visible { outline:2px solid #c8b9ff;outline-offset:3px; }
+/* Owner-friendly Admin: start checklist, plans table, confirm box and the collapsed Advanced area. */
+.account-admin-shell .account-admin-start ol { padding-left:22px;line-height:1.8; }
+.account-admin-shell .account-admin-start ol li { border:0;background:none;padding:2px 0;box-shadow:none; }
+.account-admin-shell .account-admin-start ol a, .account-admin-shell .account-admin-advanced summary { color:#c8b9ff; }
+.account-admin-shell .account-admin-advanced { padding:14px 16px;border:1px dashed #45516a;border-radius:12px; }
+.account-admin-shell .account-admin-advanced > summary { cursor:pointer;font-size:14px;font-weight:600; }
+.account-admin-shell .account-admin-advanced > summary:focus-visible { outline:2px solid #c8b9ff;outline-offset:3px; }
+.account-admin-shell .account-admin-plans-table, .account-admin-shell .account-admin-confirm table { width:100%;border-collapse:collapse;margin:14px 0;font-size:14px; }
+.account-admin-shell .account-admin-plans-table th, .account-admin-shell .account-admin-plans-table td,
+.account-admin-shell .account-admin-confirm th, .account-admin-shell .account-admin-confirm td { padding:10px 8px;border-bottom:1px solid #2f3b54;text-align:left;vertical-align:middle; }
+.account-admin-shell .account-admin-confirm { margin:14px 0;padding:16px;border:2px solid #c8b9ff;border-radius:12px;background:#1b2236; }
+.account-admin-shell .plan-status-on { color:#6fdc9a; }
+.account-admin-shell .plan-status-off { color:#aab3c5; }
+.account-admin-shell .payments-ready { padding:12px 14px;border:1px solid #2f7d54;border-radius:10px;background:#12281d; }
+.account-admin-shell .payments-not-ready, .account-admin-shell .account-admin-problem { padding:12px 14px;border:1px solid #9a5a3a;border-radius:10px;background:#2a1d17; }
+.account-admin-shell .account-admin-plan-form fieldset { display:grid;gap:12px;max-width:520px;border:1px solid #45516a;border-radius:12px;padding:16px; }
+@media (max-width:640px) { .account-admin-shell .account-admin-plans-table { display:block;overflow-x:auto; } }
 @media (max-width:900px) { .account-admin-shell .account-admin-navigation-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:480px) { .account-admin-shell .account-admin-navigation-grid { grid-template-columns:minmax(0,1fr); }.account-admin-shell .account-admin-navigation-grid a { min-height:68px; } }
