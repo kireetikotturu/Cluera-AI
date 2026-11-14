@@ -48,7 +48,7 @@ const nextConfig: NextConfig = {
         // Paddle.js Sandbox checkoutFrontEndBase builds this iframe source.
         // No wildcard, Live host or unrelated analytics capability is allowed.
         +'; frame-src https://sandbox-buy.paddle.com'}],
-    }]:[]),...((razorpayCheckoutEnabled()||billing.mode==='live'&&billing.enabled)?['/account/checkout',...(process.env.CLUERA_BILLING_V2_ENABLED==='true'?['/pricing']:[])].map(source=>({
+    }]:[]),...((razorpayCheckoutEnabled()||billing.mode==='live'&&billing.enabled||process.env.CLUERA_BILLING_V2_ENABLED==='true')?['/account/checkout',...(process.env.CLUERA_BILLING_V2_ENABLED==='true'?['/pricing']:[])].map(source=>({
       source,headers:[{key:'Content-Security-Policy',value:csp
         .replace("script-src 'self' 'unsafe-inline'","script-src 'self' 'unsafe-inline' https://checkout.razorpay.com")
         .replace("connect-src 'self' https://*.supabase.co wss://*.supabase.co","connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com")
