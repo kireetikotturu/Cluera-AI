@@ -34,7 +34,7 @@ const row={id:'00000000-0000-4000-8000-000000000001',version:'1.0.8',minimumSupp
  sha256:'a'.repeat(64),fileSizeBytes:122030307,updateType:'OPTIONAL',releaseNotes:'Account test notes',state:'PUBLISHED',publishedAt:'2026-10-09T00:00:00Z'};
 it('shows Account awaiting-approval without a binary download and keeps all installer endpoints empty',async()=>{
  const html=renderToStaticMarkup(await Download());
- expect(html).toContain('Cluera TEST installer awaiting approval');expect(html).toContain('unsigned TEST');
+ expect(html).toContain('Download coming soon');expect(html).toContain('Create your account now');
  expect(html).not.toContain('href="/account/download"');expect(html).not.toContain('activate your license');
  expect(html).not.toContain('SigmaRoundSetup-');expect(html).not.toContain('href="/download/installer"');
  for(const get of [installer,accountDownload,feed]){const response=await get();expect(response.status).toBe(404);expect(response.headers.get('cache-control')).toBe('no-store');expect(response.headers.get('location')).toBeNull();expect(await response.text()).not.toContain('signedManifest');}
@@ -60,8 +60,8 @@ it('uses Account branding, navigation, CTAs and setup copy without legacy onboar
  const home=renderToStaticMarkup(Home()),setup=renderToStaticMarkup(Setup());
  const layout=renderToStaticMarkup(Layout({children:createElement('main',null,'test')}));
  for(const html of [home,setup,layout]){expect(html).not.toContain('href="/download/installer"');expect(html).not.toContain('href="/admin"');expect(html).not.toContain('Activate your license');expect(html).not.toContain('One-time purchase');expect(html).not.toContain('Bring your own AI');}
- expect(home).toContain('href="/download"');expect(home).toContain('shared account balance');
- expect(setup).toContain('ClueraAITestSetup-');expect(setup).toContain('no personal provider credentials');
+ expect(home).toContain('href="/download"');expect(home).toContain('one shared time balance');
+ expect(setup).toContain('Windows protected your PC');expect(setup).toContain('No API keys');
  expect(layout).not.toContain('href="/account/admin"');expect(layout).not.toContain('>Admin<');expect(layout).toContain('My account');
  expect(layout).toContain('class="account-site cluera-site"');
  expect(siteMetadata.description).toContain('managed AI');expect(downloadMetadata.title).toContain('Cluera');expect(setupMetadata.description).not.toContain('activate');

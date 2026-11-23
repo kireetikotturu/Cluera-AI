@@ -169,8 +169,8 @@ it('signed-out pricing preserves the selected purchasable plan through sign-in w
 
 it('retains historical Paddle rows without using them as a new binding or automatically opening checkout', async () => {
   const request = vi.fn(async (url: RequestInfo | URL) => checkoutGet(url)); vi.stubGlobal('fetch', request);
-  await renderCheckout(); expect(buy().disabled).toBe(false); expect(host.textContent).toContain('pro_3_hours');
-  expect(host.textContent).toContain('Old drafts are not resumed'); expect(document.querySelector('script')).toBeNull();
+  await renderCheckout(); expect(buy().disabled).toBe(false); expect(host.textContent).not.toContain('pro_3_hours');
+  expect(host.textContent).not.toContain('Old drafts are not resumed'); expect(document.querySelector('script')).toBeNull();
   expect(request.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
 });
 
@@ -665,12 +665,12 @@ it('keeps automatic checks quiet while preserving the attempted-order reason and
     await renderCheckout(); slow = true;
     await act(async () => vi.advanceTimersByTimeAsync(30000));
     expect(host.textContent).toContain('A payment for this order is already being processed');
-    expect(host.textContent).not.toContain('Refreshing payment status');
+    expect(host.querySelector('[aria-label="Refreshing payment status…"]')).toBeNull();
     expect(host.textContent).not.toContain('Checking payment availability');
     expect(button('Refresh billing status').disabled).toBe(true);
     await act(async () => vi.advanceTimersByTimeAsync(4000));
     await act(async () => button('Refresh billing status').click());
-    expect(host.textContent).toContain('Refreshing payment status');
+    expect(host.querySelector('[aria-label="Refreshing payment status…"]')).not.toBeNull();
     await act(async () => vi.advanceTimersByTimeAsync(4000));
     expect(host.textContent).toContain('A payment for this order is already being processed');
     await act(async () => vi.advanceTimersByTimeAsync(120000));

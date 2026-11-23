@@ -10,14 +10,14 @@ afterEach(()=>vi.unstubAllEnvs());
 it('shows four reviewed prices/hours, honest terms and no payment SDK or promised Remote Desktop',()=>{
  const html=renderToStaticMarkup(AccountPricing());
  for(const offer of clueraTargetPlans){const display=offerDisplay(offer);expect(html).toContain(offer.name);expect(html).toContain(display.price);expect(html).toContain(`${display.hours} hours`);expect(html).toContain(display.terms);}
- expect(html).toContain('do not roll over');expect(html).toContain('before packs');expect(html).toContain('Paid plans are not yet available');
- expect(html).toContain('Remote Desktop and Mobile are not included');expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
+ expect(html).toContain('do not roll over');expect(html).toContain('15 free minutes');expect(html).toContain('Paid plans are coming soon');
+ expect(html).toContain('Create your free account');expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
  expect((html.match(/disabled=""/g)??[])).toHaveLength(0);expect(html).not.toContain('View availability');
  expect(html).not.toContain('Checkout unavailable');expect(html).toContain('Check availability');expect(html).toContain('100 hours per month');
  for(const plan of clueraTargetPlans)expect(html).toContain(`href="/account/checkout?offer=${plan.offerCode}"`);
 });
 it('always presents Cluera pricing without enabling a financial route',()=>{
- vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','false');const html=renderToStaticMarkup(PricingPage());expect(html).toContain('Cluera 3 Hours');expect(html).toContain('Paid plans are not yet available');expect(html).not.toMatch(/<form|<script|<iframe/);
+ vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','false');const html=renderToStaticMarkup(PricingPage());expect(html).toContain('Cluera 3 Hours');expect(html).toContain('Paid plans are coming soon');expect(html).not.toMatch(/<form|<script|<iframe/);
 });
 it('uses current immutable Admin revisions for future presentation without changing target/history aliases or starting checkout',()=>{
  const codes=['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2'] as const;
@@ -26,6 +26,6 @@ it('uses current immutable Admin revisions for future presentation without chang
   enabled:false,version:2,testPlanValidated:!index}));
  const html=renderToStaticMarkup(AccountPricing({catalog}));
  expect(html).toContain('₹599');expect(html).toContain('4 hours');expect(html).toContain('Future revision 0');
- expect(html).toContain('historical prices never change');expect(html).not.toContain('₹549');expect(html).not.toMatch(/<script|<iframe|<form/);
+ expect(html).toContain('Packs never expire');expect(html).not.toContain('₹549');expect(html).not.toMatch(/<script|<iframe|<form/);
  expect(clueraTargetPlans[0].amount).toBe('54900');
 });

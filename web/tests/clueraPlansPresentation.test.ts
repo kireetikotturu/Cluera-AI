@@ -29,6 +29,6 @@ describe('website pricing and checkout show only the plans that are On, from the
     const one = renderToStaticMarkup(createElement(AccountPricing, { catalog: [plan(1, 'Only Plan', 99900, 10)] }));
     expect(one).toContain('Only Plan'); expect(one).toContain('₹999'); expect(one).toContain('10 hours');
     expect(one).not.toMatch(/Test catalog|Approved Test|Razorpay Test/); expect(one).toContain('Buy Now');
-    expect(renderToStaticMarkup(createElement(AccountPricing))).toContain('Paid plans are not yet available');
+    expect(renderToStaticMarkup(createElement(AccountPricing))).toContain('Paid plans are coming soon');
   });
 });

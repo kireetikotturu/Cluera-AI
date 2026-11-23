@@ -25,7 +25,7 @@ it('public pricing links to guarded checkout availability instead of dead disabl
   expect(link?.getAttribute('href')).toBe(`/account/checkout?offer=${code}`);
  }
  for(const amount of ['549','5,499','9,599','19,549'])expect(host.textContent).toContain(`\u20b9${amount}`);
- expect(host.textContent).toContain('Paid plans are not yet available');expect(host.querySelectorAll('article button')).toHaveLength(0);
+ expect(host.textContent).toContain('Paid plans are coming soon');expect(host.querySelectorAll('article button')).toHaveLength(0);
  expect(host.textContent).toContain('Check availability');expect(host.textContent).not.toMatch(/View availability|Checkout unavailable/);expect(host.querySelector('script,iframe,form')).toBeNull();
 });
 it('reviewed catalog cards route to guarded checkout without creating orders or loading payment SDK',()=>{
@@ -36,7 +36,7 @@ it('reviewed catalog cards route to guarded checkout without creating orders or 
   expect(link?.getAttribute('href')).toBe(`/account/checkout?offer=${code}`);
  }
  expect(host.querySelectorAll('article button')).toHaveLength(0);expect(host.textContent).not.toMatch(/View availability|Checkout unavailable/);
- expect(host.textContent).toContain('historical prices never change');expect(host.querySelector('script,iframe,form')).toBeNull();
+ expect(host.textContent).toContain('Packs never expire');expect(host.querySelector('script,iframe,form')).toBeNull();
 });
 it('fresh enabled account and validated revisions get purchase labels without automatic SDK or writes',async()=>{const request=installReadFixture();await render();expect(action().textContent).toBe('Buy Now');for(const code of codes.slice(1))expect(action(code).textContent).toBe('Subscribe');expect(action().getAttribute('aria-label')).toBe('Buy Now: Cluera 3 Hours');const descriptions=action().getAttribute('aria-describedby')!.split(' ').map(id=>document.getElementById(id));expect(descriptions[0]?.getAttribute('role')).toBe('status');expect(descriptions[1]?.textContent).toContain('Razorpay popup');expect(host.querySelectorAll('dl dt')).toHaveLength(2);expect(request.mock.calls.every(([,init])=>!init?.method)).toBe(true);expect(document.querySelector('script[src*="razorpay"]')).toBeNull();});
 it.each(['rollout-disabled','catalog-disabled','plan-unvalidated'] as const)('keeps purchase actions disabled with an explanation when %s',async reason=>{const rows=catalog.map(row=>reason==='catalog-disabled'?{...row,enabled:false}:reason==='plan-unvalidated'?{...row,testPlanValidated:false}:row);const request=installReadFixture(rows);await render(reason!=='rollout-disabled');for(const [index,code] of codes.entries()){expect(action(code).disabled).toBe(true);expect(action(code).textContent).toBe(index?'Subscribe':'Buy Now');expect(action(code).getAttribute('aria-label')).toContain(`${index?'Subscribe':'Buy Now'}:`);}expect(host.textContent).toContain(reason==='rollout-disabled'?'Payments are currently paused.':'Subscriptions for this plan are not open yet.');expect(request.mock.calls.every(([,init])=>!init?.method)).toBe(true);});

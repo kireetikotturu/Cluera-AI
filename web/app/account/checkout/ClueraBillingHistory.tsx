@@ -25,15 +25,15 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
  const identity=useRef(accountId),availability=useRef(enabled),blocked=useRef(disabled);
  identity.current=accountId;availability.current=enabled;blocked.current=disabled;
  const [result,setResult]=useState<{owner:string;history:History}|null>(null);
- const [busy,setBusy]=useState(false),[message,setMessage]=useState('History is not loaded. Refresh to read the current server records.');
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState('Tap Refresh to load your purchases.');
  const validOwner=z.uuid().safeParse(accountId).success;
  useEffect(()=>{
   alive.current=true;pending.current?.abort();pending.current=null;setResult(null);setBusy(false);
-  setMessage('History is not loaded. Refresh to read the current server records.');
+  setMessage('Tap Refresh to load your purchases.');
   return()=>{alive.current=false;pending.current?.abort();pending.current=null;};
  },[accountId,enabled,mode]);
  useEffect(()=>{if(disabled){pending.current?.abort();pending.current=null;setResult(null);setBusy(false);
-  setMessage('History is not loaded. Refresh to read the current server records.');}},[disabled]);
+  setMessage('Tap Refresh to load your purchases.');}},[disabled]);
 
  async function refresh(){
   if(!enabled||disabled||!validOwner||!accountId||pending.current)return;
@@ -59,7 +59,7 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
    const history=envelope.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(body))).history;
    if(!current())return;if(history.userId!==owner)throw Error('History unavailable.');
    setResult({owner,history});setMessage('Your billing history is up to date.');onLoaded?.(history);
-  }catch{if(owned())setMessage('Billing history is unavailable. No payment action was taken; refresh later.');}
+  }catch{if(owned())setMessage('Purchase history is unavailable right now. Please try again later.');}
   finally{
    clearTimeout(timer);controller.signal.removeEventListener('abort',abort);controller.abort();void reader?.cancel().catch(()=>{});
    try{reader?.releaseLock();}catch{/* Never wait on cancellation. */}
@@ -72,12 +72,12 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
  const notice=!enabled?'Billing history is unavailable while its read-only setup awaits approval.'
   :!validOwner?'Sign in with a verified Cluera account to read its history.'
    :disabled?'Wait for the current account or checkout verification before refreshing history.'
-    :busy?'Loading server-confirmed billing history...':message;
+    :busy?'Loading your purchases…':message;
  return <section id="billing-history" className={styles.history} aria-label="Cluera payment and subscription history" aria-busy={busy}>
-  <h3>Cluera payment and subscription history</h3>
-  <p>Your verified payments, available subscription details and renewal controls.</p>
+  <h3>Purchase history</h3>
+  <p>Your payments and purchases.</p>
   <p id={statusId} role="status" aria-live="polite">{notice}</p>
-  <button type="button" disabled={!enabled||disabled||!validOwner||busy} onClick={()=>void refresh()} aria-describedby={statusId}>Refresh billing history</button>
+  <button type="button" disabled={!enabled||disabled||!validOwner||busy} onClick={()=>void refresh()} aria-describedby={statusId}>Refresh</button>
   {history?<>
    <h4>Verified payments</h4>
    {history.payments.length?<ul>{history.payments.map(payment=><li key={payment.paymentId}>
@@ -85,7 +85,7 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
     <p>{usageDuration(payment.revision.allowanceSeconds*1000)} · {payment.revision.kind==='PACK'?'One-time pack; no expiry':'Monthly allowance; no rollover'}</p>
     <p>{payment.paidAt?'Paid':'Checkout created'}: <time dateTime={payment.paidAt??payment.intentCreatedAt}>{new Date(payment.paidAt??payment.intentCreatedAt).toLocaleString()}</time></p>
     <details><summary>Payment references</summary><p>Payment reference: <code>{payment.paymentId}</code>{payment.invoiceId?<> · Invoice reference: <code>{payment.invoiceId}</code></>:null}</p></details>
-   </li>)}</ul>:<p>No verified payments yet. Completed payments appear here after verification.</p>}
+   </li>)}</ul>:<p>No purchases yet. Your payments will appear here.</p>}
    {history.hasMorePayments?<p>Only the latest 50 payments are shown. Contact support for older records.</p>:null}
    {history.nativeSchedule?<section aria-label="Saved and scheduled monthly access">
     <h4>Saved and scheduled monthly access</h4>
@@ -103,17 +103,15 @@ export default function ClueraBillingHistory({accountId,enabled=false,disabled=f
     </li>)}</ul>:<p>No saved or scheduled monthly periods are shown in this snapshot.</p>}
     {history.nativeSchedule.hasMoreTerms?<p>Only the latest 50 monthly periods are shown. Contact support for older records.</p>:null}
    </section>:null}
-   <h4>Subscription records</h4>
-   <p>A subscription status alone does not prove a paid charge; verified payments determine paid usage.</p>
-   {history.subscriptions.length?<ul>{history.subscriptions.map(subscription=><li key={subscription.subscriptionId}>
+   {history.subscriptions.length?<><h4>Monthly plans</h4><ul>{history.subscriptions.map(subscription=><li key={subscription.subscriptionId}>
     <strong>{subscription.revision.name}</strong> · {states[subscription.state]} · {clueraPrice(subscription.revision.amountPaise)} per month
     {subscription.paidThrough?<p>Paid through <time dateTime={subscription.paidThrough}>{new Date(subscription.paidThrough).toLocaleString()}</time>.</p>:null}
     {subscription.graceUntil?<p>Recorded grace ends <time dateTime={subscription.graceUntil}>{new Date(subscription.graceUntil).toLocaleString()}</time>.</p>:null}
     {subscription.cancelFuture?<p>Renewal is stopped in the current server record.</p>:null}
     {cancellationEnabled&&!subscription.cancelFuture&&subscription.state!=='CANCELED'&&accountId?<SubscriptionCancellation mode={mode} accountId={accountId} subscriptionId={subscription.subscriptionId} enabled={cancellationEnabled} disabled={disabled||busy}/>:null}
-   </li>)}</ul>:<p>No subscriptions yet. Choose an available monthly plan when you need more time.</p>}
+   </li>)}</ul></>:null}
    {history.hasMoreSubscriptions?<p>Only the latest 50 subscriptions are shown. Contact support for older records.</p>:null}
   </>:null}
-  <p>{cancellationEnabled?'Invoice downloads, refunds, pause and plan-change controls are not available here yet.':'Invoice downloads and subscription-change controls are not available here yet.'} Contact <a href="mailto:clueraaisupport@gmail.com">Cluera support</a>; never send card details, passwords or verification codes.</p>
+  <p>Need an invoice or help? Contact <a href="mailto:clueraaisupport@gmail.com">Cluera support</a>. Never share card details or passwords.</p>
  </section>;
 }

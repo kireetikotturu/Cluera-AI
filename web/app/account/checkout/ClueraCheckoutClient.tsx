@@ -450,11 +450,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     <header className={styles.checkoutHeader}>
       <p className={styles.eyebrow}>Cluera billing · Razorpay{mode==='test'?' Test':''}</p>
       <h2>{pricing?'Your next great conversation starts here.':'Time for your next session'}</h2>
-      <p>Choose a one-time pack or an available monthly plan. Review the price and terms before continuing.</p>
+      <p>Pick the time you need. Pay securely and your hours are added to your account automatically.</p>
     </header>
     <ol className={styles.steps} aria-label="Purchase steps"><li>01 <span>Choose your time</span></li><li>02 <span>Secure checkout</span></li><li>03 <span>Balance updated</span></li></ol>
     <div className={styles.status} id={statusId} role="status" aria-live="polite"><p>{message}</p></div>
-    {busy&&(preparing||!quietRead)?<p className={styles.reading}>{preparing?'Preparing your secure checkout…':'Refreshing payment status…'}</p>:null}
+    {busy&&(preparing||!quietRead)?<div className={styles.progress} role="progressbar" aria-label={preparing?'Preparing your secure checkout…':'Refreshing payment status…'}><span/></div>:null}
     {cooldown>0?<p role="status" className={styles.availability}>Please wait {cooldown}s before another billing check. Your order and balance are preserved.</p>:null}
     {remaining!==null?<p className={styles.windowNotice}>Payment window: <strong>{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</strong> remaining.</p>:null}
     {firstSubscriptionOnly&&(catalog.some(row=>row.kind==='RECURRING')||!catalogLoaded)?<details className={styles.purchasePolicy}><summary>Monthly plans and changes</summary><p>One monthly subscription at a time. Change plans after cancellation is confirmed and your paid term ends. Automatic upgrades are unavailable.</p>
@@ -528,15 +528,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       </article>;
     })}</div>
     <div className={styles.safetyNote}><p>Pay with UPI, card, netbanking or wallet in the secure Razorpay window. Your hours are added automatically after payment, usually within 2 minutes. If you close the window without paying, you are not charged: continue the payment or cancel it. Need help? <a href="mailto:clueraaisupport@gmail.com">Contact support</a>.</p></div>
-    <p className={styles.windowNotice}>Each payment window stays open for {windowSeconds/60} minutes.</p>
-    <details className={styles.history} aria-label="Preserved server-confirmed history"><summary>Earlier payment attempts</summary>
-      <h3>Preserved server-confirmed history</h3>
-      <p>Recent attempts are kept here while their payment status is checked. Old drafts are not resumed, canceled or retried here.</p>
-      <p>Earlier Account and Paddle database history was not imported; provider-side obligations remain subject to independent reconciliation.</p>
-      {credits?.payments.length ? <ul>{credits.payments.map((payment, index) => <li key={`${payment.createdAt}:${index}`}>
-        <span>{payment.offerCode}</span><span className={styles.badge}>{payment.state}</span><time dateTime={payment.createdAt}>{payment.createdAt}</time>
-      </li>)}</ul> : <p>No historical entries are displayed in this snapshot.</p>}
-    </details>
-    <ClueraBillingHistory key={mode} mode={mode} accountId={credits?.userId??null} enabled={historyEnabled} disabled={busy} cancellationEnabled={cancellationEnabled} autoLoad refreshKey={historyVersion} onLoaded={historyLoaded}/>
+    {/* On the pricing page the history stays mounted (it confirms a finished payment) but is not shown. */}
+    <div hidden={pricing}><ClueraBillingHistory key={mode} mode={mode} accountId={credits?.userId??null} enabled={historyEnabled} disabled={busy} cancellationEnabled={cancellationEnabled} autoLoad refreshKey={historyVersion} onLoaded={historyLoaded}/></div>
   </section>;
 }

@@ -82,14 +82,14 @@ it('missing sessions, rate limits and malformed backend DTOs expose only fixed m
 });
 it('disabled or signed-out history renders honest unavailable state without automatic fetch',async()=>{
  const request=vi.fn();vi.stubGlobal('fetch',request);await render(user,false);expect(button().disabled).toBe(true);expect(host.textContent).toContain('read-only setup awaits approval');
- await render(null,true);expect(button().disabled).toBe(true);expect(host.textContent).not.toContain('No verified payments');expect(request).not.toHaveBeenCalled();
+ await render(null,true);expect(button().disabled).toBe(true);expect(host.textContent).not.toContain('No purchases yet');expect(request).not.toHaveBeenCalled();
 });
 it('history is explicit-refresh, single-flight and GET-only; an empty state requires a confirmed DTO',async()=>{
  let finish!:(response:Response)=>void;const request=vi.fn((_url:RequestInfo|URL,_init?:RequestInit)=>new Promise<Response>(resolve=>{finish=resolve;}));vi.stubGlobal('fetch',request);
- await render();expect(request).not.toHaveBeenCalled();expect(host.textContent).not.toContain('No verified payments');
- await act(async()=>{button().click();button().click();});expect(request).toHaveBeenCalledOnce();expect(button().disabled).toBe(true);expect(host.textContent).toContain('Loading server-confirmed');
+ await render();expect(request).not.toHaveBeenCalled();expect(host.textContent).not.toContain('No purchases yet');
+ await act(async()=>{button().click();button().click();});expect(request).toHaveBeenCalledOnce();expect(button().disabled).toBe(true);expect(host.textContent).toContain('Loading your purchases');
  expect(request.mock.calls[0][0]).toBe('/api/account/payments/cluera/history?expectedAccountId='+user);expect(request.mock.calls[0][1]).toMatchObject({method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error'});
- await act(async()=>finish(json({history:empty()})));expect(host.textContent).toContain('No verified payments yet');expect(button().disabled).toBe(false);
+ await act(async()=>finish(json({history:empty()})));expect(host.textContent).toContain('No purchases yet');expect(button().disabled).toBe(false);
 });
 it('customer sees saved Pro calendar window and unused allowance separately from current spendable Enterprise, without a renewal promise or mutation',async()=>{
  const fetcher=vi.fn(async()=>json({history:savedHistory()}));vi.stubGlobal('fetch',fetcher);await render();expect(fetcher).not.toHaveBeenCalled();await act(async()=>button().click());
@@ -100,7 +100,7 @@ it('native saved-time history is cleared on account change and never rendered fr
 });
 it('malformed, foreign-owner or unavailable history never becomes fake empty or raw error output',async()=>{
  for(const response of [json({history:empty(foreign)}),json({history:{...empty(),secret:'SYNTHETIC_PRIVATE'}}),json({error:'SYNTHETIC_PRIVATE'},503)]){
-  vi.stubGlobal('fetch',vi.fn(async()=>response));await render();await act(async()=>button().click());expect(host.textContent).toContain('Billing history is unavailable');expect(host.textContent).not.toContain('No verified payments');expect(host.textContent).not.toContain('SYNTHETIC_PRIVATE');
+  vi.stubGlobal('fetch',vi.fn(async()=>response));await render();await act(async()=>button().click());expect(host.textContent).toContain('Purchase history is unavailable');expect(host.textContent).not.toContain('No purchases yet');expect(host.textContent).not.toContain('SYNTHETIC_PRIVATE');
  }
 });
 it('account changes abort and fence late foreign history without reading automatically for the new owner',async()=>{
@@ -117,7 +117,7 @@ it('parent verification hides and clears loaded history until another explicit r
 it('a current-owner timeout aborts the request and shows a persistent understandable error',async()=>{
  vi.useFakeTimers();let signal:AbortSignal|null|undefined;const request=vi.fn((_url:RequestInfo|URL,init?:RequestInit)=>{signal=init?.signal;return new Promise<Response>(()=>{});});vi.stubGlobal('fetch',request);
  await render();await act(async()=>button().click());await act(async()=>{await vi.advanceTimersByTimeAsync(10000);});
- expect(signal?.aborted).toBe(true);expect(host.textContent).toContain('Billing history is unavailable');expect(button().disabled).toBe(false);expect(request).toHaveBeenCalledOnce();
+ expect(signal?.aborted).toBe(true);expect(host.textContent).toContain('Purchase history is unavailable');expect(button().disabled).toBe(false);expect(request).toHaveBeenCalledOnce();
 });
 it('checkout history loads automatically only after owner verification, then refreshes once per snapshot without a write',async()=>{
  const request=vi.fn(async()=>json({history:populated()}));vi.stubGlobal('fetch',request);
@@ -137,5 +137,5 @@ it('automatic history cannot display a late response belonging to the previous a
  await act(async()=>root.render(createElement(ClueraBillingHistory,{accountId:foreign,enabled:true,autoLoad:true})));
  await act(async()=>old(json({history:populated()})));
  expect(host.textContent).not.toContain('Synthetic verified pack');expect(request).toHaveBeenCalledTimes(2);
- await act(async()=>finish(json({history:empty(foreign)})));expect(host.textContent).toContain('No verified payments');
+ await act(async()=>finish(json({history:empty(foreign)})));expect(host.textContent).toContain('No purchases yet');
 });
