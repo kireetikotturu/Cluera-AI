@@ -30,7 +30,11 @@ export async function handleLiveWebhook(request: Request, input = process.env, i
 }
 export async function handleLiveTick(request: Request, input = process.env,
   deps: Parameters<typeof handleClueraBillingTick>[2] = {}) {
-  if (!configured(input)) return json({ error: 'Not found.' }, 404);
+  if (!configured(input)) { logLiveTick('LIVE_NOT_CONFIGURED', 404); return json({ error: 'Not found.' }, 404); }
   try { return await handleClueraBillingTick(request, createLiveBillingScope(input), deps); }
-  catch { return json({ error: 'Worker unavailable.' }, 503); }
+  catch { logLiveTick('LIVE_PROFILE_INVALID', 503); return json({ error: 'Worker unavailable.' }, 503); }
+}
+function logLiveTick(reason: string, httpStatus: number) {
+  try { console.warn('[cluera-billing] tick-rejected', { component: 'cluera-billing-tick', mode: 'live', reason, httpStatus }); }
+  catch { /* Logging never changes the response. */ }
 }
