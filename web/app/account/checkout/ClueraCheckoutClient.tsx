@@ -72,6 +72,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const balanceCurrent = useRef(false);
   const [resumeRevisionId, setResumeRevisionId] = useState<string | null>(null);
   const [cancellable, setCancellable] = useState(false), [cancelling, setCancelling] = useState(false);
+  const cancelNotice = useRef<string | null>(null);
   const [message, setMessage] = useState('Checking your verified Cluera account…');
   const alive = useRef(false), epoch = useRef(0), owner = useRef<string | null>(null);
   const desktopOwner = useRef<string | null>(null), invalidHint = useRef(false), enabledRef = useRef(enabled);
@@ -201,7 +202,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         : status.code === 'PENDING' || binding.current ? exitNotice.current ?? (callbackObserved.current ? 'Payment received. We are confirming it and will add your hours automatically, usually within 2 minutes.' : 'You have an unfinished payment. Continue it, or cancel it to start a new one.')
           : status.code === 'DISABLED' ? 'Purchases are not currently available for this account.'
             : completed.current ? 'Payment verified. Your available time and billing history are up to date.'
-              : `Review your plan, then continue to secure Razorpay ${mode==='test'?'Test ':''}checkout.`);
+              : cancelNotice.current ?? `Review your plan, then continue to secure Razorpay ${mode==='test'?'Test ':''}checkout.`);
     } catch {
       if (current()) { setResumeRevisionId(null);setEligible(false); const notice = !enabledRef.current
         ? 'Cluera payment acceptance is pending. Checkout is disabled; no payment is requested.'
@@ -268,7 +269,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     const accountId = credits.userId, generation = epoch.current, controller = new AbortController();
     const current = () => alive.current && modeRef.current===mode && enabledRef.current && !controller.signal.aborted
       && epoch.current === generation && owner.current === accountId;
-    write.current = controller;
+    write.current = controller; cancelNotice.current = null;
     if (!resume) { requestId.current ??= crypto.randomUUID(); uncertain.current = true; }
     setResumeRevisionId(null);
     verifiedCallback.current=null;callbackObserved.current=false;completed.current=false;balanceCurrent.current=false;
@@ -429,7 +430,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         : result === 'PAYMENT_IN_PROGRESS' ? 'A payment for this order is already being processed, so it cannot be cancelled. Your hours will be added automatically once it is confirmed, usually within 2 minutes.'
         : result === 'TOO_SOON' ? 'This checkout was started a moment ago. Please wait a few minutes, then try cancelling again.'
         : 'This order is already finished. Your balance is up to date.';
-      if (result === 'PAYMENT_IN_PROGRESS' || result === 'TOO_SOON') exitNotice.current = notice;
+      if (result === 'PAYMENT_IN_PROGRESS' || result === 'TOO_SOON') exitNotice.current = notice; else cancelNotice.current = notice;
       setMessage(notice);
     } catch { if (alive.current) setMessage('Could not cancel the order right now. Please try again in a moment.'); }
     finally {
