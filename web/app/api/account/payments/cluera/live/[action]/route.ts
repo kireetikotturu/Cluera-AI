@@ -9,7 +9,7 @@ import { createLiveBillingScope } from '@/lib/payments/cluera/modeProfile';
 import { json } from '@/lib/http';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const actions: LiveBillingAction[] = ['catalog', 'checkout', 'callback', 'resume', 'history', 'cancellation'];
+const actions: LiveBillingAction[] = ['catalog', 'checkout', 'callback', 'resume', 'history', 'cancellation', 'abandon'];
 async function route(request: Request, context: { params: Promise<{ action: string }> }) {
   const { action } = await context.params;
   if (action === 'admin' || action === 'report' || action === 'plans') {

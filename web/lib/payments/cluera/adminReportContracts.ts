@@ -11,7 +11,7 @@ const payment=z.object({paymentId:z.string().regex(/^pay_[A-Za-z0-9]{8,64}$/),
  subscriptionId:z.string().regex(/^sub_[A-Za-z0-9]{8,64}$/).nullable(),state:z.enum(['VERIFIED','REFUNDED']),
  amountPaise:integer.min(100).max(10_000_000),currency:z.literal('INR'),paidAt:reportTimestamp.nullable()}).strict();
 export const financialReportRow=z.object({intentId:z.uuid(),userId:z.uuid(),createdAt:reportTimestamp,
- intentState:z.enum(['CREATING','BOUND','UNCERTAIN','VERIFIED','REFUNDED']),revision,payment:payment.nullable()}).strict()
+ intentState:z.enum(['CREATING','BOUND','UNCERTAIN','VERIFIED','REFUNDED','REJECTED']),revision,payment:payment.nullable()}).strict()
  .superRefine((row,ctx)=>{
   if((row.revision.kind==='PACK')!==(row.revision.offerCode==='cluera_pack_3h_v2')
    ||row.payment&&(row.payment.amountPaise!==row.revision.amountPaise

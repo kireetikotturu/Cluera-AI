@@ -11,12 +11,12 @@ import { callbackSchema, clueraBillingCatalog, clueraBillingStatus, createCluera
 import { readClueraRawBody } from './events';
 import { onSaleCatalog } from './purchaseAvailability';
 import { readClueraBillingHistory } from './history';
-import { resumeClueraCheckout } from './checkoutResume';
+import { cancelClueraPendingCheckout, resumeClueraCheckout } from './checkoutResume';
 import { cancellationInput, cancelClueraSubscription, readClueraCancellation } from './cancellation';
 import { ClueraBillingError } from './contracts';
 import { ClueraResumeError } from './adapter';
 
-export type LiveBillingAction = 'catalog' | 'checkout' | 'callback' | 'resume' | 'history' | 'cancellation';
+export type LiveBillingAction = 'catalog' | 'checkout' | 'callback' | 'resume' | 'history' | 'cancellation' | 'abandon';
 /** Separate Live routes; the existing Test receipt destination stays Test.
  * Server identities and an independently read mode/merchant/ledger proof are
  * required. Nothing in a URL, browser body or public catalog enables charging. */
@@ -29,8 +29,8 @@ export async function handleLiveBilling(request: Request, action: LiveBillingAct
     const url = new URL(request.url);
     if (url.origin !== profile.origin || url.pathname !== `/api/account/payments/cluera/live/${action}`
       || !['GET', 'POST'].includes(request.method)) return json({ error: 'Not found.' }, 404);
-    if (request.method === 'POST' && !['checkout', 'callback', 'cancellation'].includes(action)
-      || request.method === 'GET' && action === 'callback') return json({ error: 'Not found.' }, 404);
+    if (request.method === 'POST' && !['checkout', 'callback', 'cancellation', 'abandon'].includes(action)
+      || request.method === 'GET' && (action === 'callback' || action === 'abandon')) return json({ error: 'Not found.' }, 404);
     const config = stagingAccountConfig();
     // Initial Live launch uses the existing staging origin. A future origin
     // requires the corresponding reviewed Auth/cookie redirect deployment.
@@ -68,6 +68,11 @@ export async function handleLiveBilling(request: Request, action: LiveBillingAct
     const raw = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readClueraRawBody(request, 2048)));
     if (raw?.expectedAccountId !== account.userId) return cookies.apply(json({ code: 'ACCOUNT_MISMATCH', error: 'Account does not match.' }, 403));
     if (action === 'cancellation') return cookies.apply(json(await cancelClueraSubscription(rpc, account, cancellationInput.parse(raw), env)));
+    // Cancelling one's own unpaid order is always allowed (even if sales were just paused).
+    if (action === 'abandon') {
+      z.object({ expectedAccountId: z.uuid() }).strict().parse(raw);
+      return cookies.apply(json({ result: await cancelClueraPendingCheckout(rpc, account, env) }));
+    }
     if (!liveRuntimeApproved(env, 'checkout')) return cookies.apply(json({ code: 'CHECKOUT_DISABLED', error: 'New purchases are currently unavailable.' }, 404));
     if (!clueraCheckoutAllowed(account.userId, env)) return cookies.apply(json({ code: 'LIVE_PURCHASER_REQUIRED', error: 'Public sales are not open for this account.' }, 403));
     const payment = action === 'callback' ? await verifyClueraCallback(rpc, account, callbackSchema.parse(raw), env)

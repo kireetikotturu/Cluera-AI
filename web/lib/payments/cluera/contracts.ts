@@ -17,7 +17,7 @@ export const revisionSchema = z.object({ revisionId: z.uuid(), offerCode, name: 
       context.addIssue({ code: 'custom', message: 'Invalid catalog policy.' });
   });
 export type Revision = z.infer<typeof revisionSchema>;
-export const bindingSchema = z.object({ code: z.enum(['BOUND', 'VERIFIED', 'REFUNDED']), intentId: z.uuid(), userId: z.uuid(),
+export const bindingSchema = z.object({ code: z.enum(['BOUND', 'VERIFIED', 'REFUNDED', 'REJECTED']), intentId: z.uuid(), userId: z.uuid(),
   orderId: orderId.nullable(), subscriptionId: subscriptionId.nullable(), revision: revisionSchema }).strict()
   .superRefine((value, context) => {
     if (value.revision.kind === 'PACK' ? !value.orderId || value.subscriptionId !== null : !value.subscriptionId || value.orderId !== null)

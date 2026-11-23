@@ -71,6 +71,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const completed=useRef(false);
   const balanceCurrent = useRef(false);
   const [resumeRevisionId, setResumeRevisionId] = useState<string | null>(null);
+  const [cancellable, setCancellable] = useState(false), [cancelling, setCancelling] = useState(false);
   const [message, setMessage] = useState('Checking your verified Cluera account…');
   const alive = useRef(false), epoch = useRef(0), owner = useRef<string | null>(null);
   const desktopOwner = useRef<string | null>(null), invalidHint = useRef(false), enabledRef = useRef(enabled);
@@ -101,7 +102,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       if(response.status===429){cooldownUntil.current=Date.now()+response.retryAfterSeconds*1000;setCooldown(response.retryAfterSeconds);}
       if (reason) deny(reason);
       else { setEligible(false); const notice = resuming && response.status >= 500
-        ? 'The existing order cannot safely continue. Verification or configuration is unavailable. Preserve it; do not create or retry a payment.'
+        ? 'We could not reopen this order right now. Try again in a moment, or cancel it and start a new one.'
         : checkoutFailureMessage(response.status,body);
         if (write.current || resuming) { preparationFailure.current=notice;resumeProof.current=null;setResumeRevisionId(null); }
         setMessage(notice); }
@@ -163,6 +164,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       // reads cannot leave the displayed balance behind the verified payment.
       if (resolvedKnown || pendingObserved.current && status.code === 'AVAILABLE') trailing.current = true;
       pendingObserved.current = status.code === 'PENDING';
+      setCancellable(mode==='live' && status.code === 'PENDING' && Boolean(status.pending) && !status.pending?.legacy && status.pending?.kind === 'PACK' && !callbackObserved.current);
       setWatchPayment(status.code === 'PENDING' || Boolean(binding.current) || uncertain.current);
       // This is only a candidate for an explicit read-only verification. The
       // server must still prove an untouched same order with zero payments.
@@ -194,16 +196,16 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       // History alone must not attest a stale or failed credits snapshot.
       balanceCurrent.current = canBuy && !trailing.current;
       setEligible(canBuy);
-      setMessage(uncertain.current ? 'A checkout outcome is unknown. Keep this attempt for verification; do not retry.'
-        : status.pending?.legacy ? 'An existing Account-era Razorpay attempt still requires verification. It is preserved, not resumed or recreated here. New checkout stays locked.'
-        : status.code === 'PENDING' || binding.current ? exitNotice.current ?? 'Your payment or mandate is awaiting authoritative verification. Do not create another attempt.'
+      setMessage(uncertain.current ? 'We could not confirm your last checkout. Tap Refresh billing status, or cancel it below and start again.'
+        : status.pending?.legacy ? 'An older payment attempt is still being checked. Contact Cluera support if this does not clear.'
+        : status.code === 'PENDING' || binding.current ? exitNotice.current ?? (callbackObserved.current ? 'Payment received. We are confirming it and will add your hours automatically, usually within 2 minutes.' : 'You have an unfinished payment. Continue it, or cancel it to start a new one.')
           : status.code === 'DISABLED' ? 'Purchases are not currently available for this account.'
             : completed.current ? 'Payment verified. Your available time and billing history are up to date.'
               : `Review your plan, then continue to secure Razorpay ${mode==='test'?'Test ':''}checkout.`);
     } catch {
       if (current()) { setResumeRevisionId(null);setEligible(false); const notice = !enabledRef.current
         ? 'Cluera payment acceptance is pending. Checkout is disabled; no payment is requested.'
-        : 'Account or payment verification is unavailable. Refresh status only; do not retry a payment.';
+        : 'Could not load your payment status. Tap Refresh billing status to try again.';
         if(checkingResume){preparationFailure.current=notice;resumeProof.current=null;}setMessage(notice); }
     } finally {
       if (read.current === controller) read.current = null;
@@ -341,7 +343,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         description: `${revision.name} · ${clueraAllowance(revision.allowanceSeconds)}`,
         ...(checkout.orderId ? { order_id: checkout.orderId, amount: checkout.amountPaise, currency: checkout.currency }
           : { subscription_id: checkout.subscriptionId }),
-        retry: { enabled: false }, timeout: windowSeconds, theme: { color: '#8b5cf6', backdrop_color: '#080b14' },
+        retry: { enabled: true, max_count: 3 }, timeout: windowSeconds, theme: { color: '#8b5cf6', backdrop_color: '#080b14' },
         handler: async (raw: unknown) => {
           if (!current() || callbackStarted) return;
           callbackStarted = true;callbackObserved.current=true;
@@ -362,7 +364,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
               verifiedCallback.current={paymentId:callback.razorpay_payment_id,revisionId:checkout.revisionId,amountPaise:checkout.amountPaise};
               setMessage('Payment processing. We are confirming your payment and updating your balance automatically.');
             }
-          } catch { if (current()) setMessage('The payment outcome needs verification. Do not retry or start another order.'); }
+          } catch { if (current()) setMessage('Payment received. We are confirming it and will add your hours automatically, usually within 2 minutes.'); }
           if (current()) {
             // Checkout may have remained open longer than the original read
             // window. Observe delayed receipts from this return, not from Buy.
@@ -370,12 +372,12 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
             void refresh(true);
           }
         }, modal: { backdropclose: false, escape: true,
-          ondismiss: () => observeExit('Checkout closed. We are checking whether a payment completed.') },
+          ondismiss: () => observeExit('Payment window closed. If you did not finish paying, you were not charged. Continue the payment or cancel the order below.') },
       });
+      // Razorpay keeps its window open with a retry option after a failed attempt.
       instance.on('payment.failed', () => {
         if (!current() || exitObserved) return;
-        observeExit('Payment failed or is incomplete. Do not retry.');
-        instance.close();
+        setMessage('That payment did not go through and you were not charged. Try again in the Razorpay window, or close it and cancel the order.');
       });
       if (!current()) { instance.close(); return; }
       overlay.current = instance; instance.open();
@@ -384,7 +386,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       windowTimer.current=setInterval(()=>{
         const seconds=Math.max(0,Math.ceil(((windowDeadline.current??Date.now())-Date.now())/1000));setRemaining(seconds);
         if(seconds===0&&current()){
-          observeExit('Checkout window expired. Your order was not canceled. Checking payment status; continue the same order only when offered below.');
+          observeExit('The payment window timed out. If you did not finish paying, you were not charged. Continue the payment or cancel the order below.');
           instance.close();
         }
       },1000);
@@ -392,15 +394,46 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         :'Razorpay checkout is open. Your balance updates after payment verification.');
     } catch { if (current()) {
       const notice=stage==='sdk'
-        ? 'The Razorpay window could not load. Check your connection or browser content blocker, then refresh billing status to verify this same order. No replacement order will be created.'
-        : resume ? 'The existing order could not be verified. Refresh billing status to check it again. Do not create another order or repeat a payment.'
-          : 'Checkout is incomplete or unknown. Keep this attempt for verification; do not retry.';
+        ? 'The Razorpay window could not load. Check your connection or ad blocker, then tap Continue payment.'
+        : resume ? 'We could not reopen this order. Tap Refresh billing status, or cancel it and start a new one.'
+          : 'We could not start checkout. Tap Refresh billing status, or cancel the unfinished order and try again.';
       preparationFailure.current=notice;needsReconcile.current=false;setResumeRevisionId(null);setMessage(notice);
     } }
     finally {
       if (write.current === controller) write.current = null;
       if (alive.current && epoch.current === generation) {setBusy(false);setPreparing(false);}
       if (alive.current && trailing.current) { trailing.current = false; void refresh(false, true); }
+    }
+  };
+
+  const cancelOrder = async () => {
+    if (!credits || cancelling || write.current || overlay.current || mode !== 'live') return;
+    const accountId = credits.userId;
+    read.current?.abort(); read.current = null; trailing.current = false;
+    setCancelling(true); setBusy(true); setMessage('Cancelling your unfinished order…');
+    try {
+      const response = await checkoutRequest(`${endpoint}/abandon`, { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+        signal: AbortSignal.timeout(20_000), headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedAccountId: accountId }) });
+      if (!alive.current) return;
+      if (await rejectResponse(response, () => alive.current)) return;
+      const result = z.object({ result: z.object({ code: z.enum(['CANCELLED','PAYMENT_IN_PROGRESS','TOO_SOON','ALREADY_RESOLVED','NOTHING_PENDING']) }) })
+        .parse(await response.json()).result.code;
+      if (result === 'CANCELLED' || result === 'NOTHING_PENDING' || result === 'ALREADY_RESOLVED') {
+        clearWindow(); overlayAbort.current?.abort();
+        binding.current = null; requestId.current = null; uncertain.current = false; callbackObserved.current = false;
+        preparationFailure.current = null; resumeProof.current = null; needsReconcile.current = false;
+        setResumeRevisionId(null); setCancellable(false);
+      }
+      exitNotice.current = null;
+      const notice = result === 'CANCELLED' ? 'Order cancelled. You were not charged. You can choose a plan and buy again.'
+        : result === 'PAYMENT_IN_PROGRESS' ? 'A payment for this order is already being processed, so it cannot be cancelled. Your hours will be added automatically once it is confirmed, usually within 2 minutes.'
+        : result === 'TOO_SOON' ? 'This checkout was started a moment ago. Please wait a few minutes, then try cancelling again.'
+        : 'This order is already finished. Your balance is up to date.';
+      if (result === 'PAYMENT_IN_PROGRESS' || result === 'TOO_SOON') exitNotice.current = notice;
+      setMessage(notice);
+    } catch { if (alive.current) setMessage('Could not cancel the order right now. Please try again in a moment.'); }
+    finally {
+      if (alive.current) { setCancelling(false); setBusy(false); setHistoryVersion(value => value + 1); void refresh(false, true); }
     }
   };
 
@@ -422,7 +455,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     <div className={styles.status} id={statusId} role="status" aria-live="polite"><p>{message}</p></div>
     {busy&&(preparing||!quietRead)?<p className={styles.reading}>{preparing?'Preparing your secure checkout…':'Refreshing payment status…'}</p>:null}
     {cooldown>0?<p role="status" className={styles.availability}>Please wait {cooldown}s before another billing check. Your order and balance are preserved.</p>:null}
-    {remaining!==null?<p className={styles.windowNotice}>Payment window: <strong>{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</strong> remaining. Closing this window does not cancel your order.</p>:null}
+    {remaining!==null?<p className={styles.windowNotice}>Payment window: <strong>{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</strong> remaining.</p>:null}
     {firstSubscriptionOnly&&(catalog.some(row=>row.kind==='RECURRING')||!catalogLoaded)?<details className={styles.purchasePolicy}><summary>Monthly plans and changes</summary><p>One monthly subscription at a time. Change plans after cancellation is confirmed and your paid term ends. Automatic upgrades are unavailable.</p>
       {monthlyBlocked&&credits?<p>Your current subscription must be resolved before another monthly checkout. One-time packs remain separate.</p>:null}</details>:null}
     {selection?<aside className="cluera-plan-handoff" aria-label="Selected Cluera plan"><p>Selected plan: <strong>{checkoutSelectionName(selection)}</strong></p>
@@ -431,9 +464,13 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       {credits ? <dl><div><dt>Signed in as</dt><dd>{credits.displayName?.trim() || 'verified customer'}</dd></div><div className={styles.balance}><dt>Available time</dt><dd>{usageDuration(credits.availableMilliseconds)}</dd><p>Shared across your devices</p></div></dl>
         : <a className={styles.signIn} href={selection?checkoutSelectionHref(selection,true):'/account#login'}>Sign in to Cluera AI</a>}
       <button className={styles.refresh} type="button" disabled={busy||cooldown>0} onClick={() => {needsReconcile.current=true;void refresh();}}>Refresh billing status</button>
-      {enabled && resumeRevisionId ? <div className={styles.resumePanel}><div><strong>Your existing checkout is saved</strong><p>Continue this order. Other purchases stay paused until its payment status is resolved.</p></div><button className={styles.resume} type="button" disabled={preparing||cooldown>0||remaining!==null} onClick={() => {
-        const revision = catalog.find(row => row.revisionId === resumeRevisionId); if (revision) void buy(revision, true);
-      }}>Continue existing checkout</button></div> : null}
+      {enabled && (resumeRevisionId || cancellable) && remaining===null ? <div className={styles.resumePanel}><div><strong>You have an unfinished payment</strong>
+        <p>{resumeRevisionId?'Continue it to finish paying, or cancel it to start over.':'Cancel it to start a new purchase. You will not be charged.'}</p></div>
+        {resumeRevisionId?<button className={styles.resume} type="button" disabled={preparing||cancelling||cooldown>0} onClick={() => {
+          const revision = catalog.find(row => row.revisionId === resumeRevisionId); if (revision) void buy(revision, true);
+        }}>Continue payment</button>:null}
+        {cancellable?<button className={styles.refresh} type="button" disabled={preparing||cancelling||cooldown>0} onClick={() => void cancelOrder()}>{cancelling?'Cancelling…':'Cancel order'}</button>:null}
+      </div> : null}
     </div>
     <div className={`account-pricing-grid ${styles.grid}`}>{rows ? rows.map(revision => {
       const canPurchase = enabled && eligible && !busy && !cooldown && revision.enabled && revision.testPlanValidated&&!(revision.kind==='RECURRING'&&monthlyBlocked);
@@ -448,10 +485,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         : cooldown > 0 ? `Please wait ${cooldown}s before continuing.`
         : remaining !== null ? 'Your Razorpay payment window is open.'
         : preparing ? 'Preparing secure payment…'
-        : savedOrder ? 'Continue your saved order in the Razorpay popup. No new order is created.'
+        : savedOrder ? 'Finish your unfinished payment for this plan.'
         : busy && !quietRead ? 'Checking payment availability…'
         : revision.kind === 'RECURRING' && monthlyBlocked && credits ? 'Another subscription cannot start until your current plan is resolved.'
         : canPurchase || canSignIn ? 'Pay securely in the Razorpay popup.'
+        : cancellable ? 'Finish or cancel your unfinished payment above to buy this plan.'
         : 'See the payment status above before continuing.';
       return <article key={revision.revisionId} aria-label={revision.name} className={`account-plan-card ${styles.card}${selection?.offerCode===revision.offerCode?' cluera-plan-selected':''}`}>
         {selection?.offerCode===revision.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
@@ -488,8 +526,8 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         <button className={styles.action} data-offer-code={plan.offerCode} data-checkout-action="purchase" type="button" disabled aria-label={`${plan.interval?'Subscribe':'Buy Now'}: ${plan.name}`} aria-describedby={statusId}>{plan.interval?'Subscribe':'Buy Now'}</button>
       </article>;
     })}</div>
-    <div className={styles.safetyNote}><p>Razorpay shows the payment methods available for this plan and merchant. Your balance and billing history update automatically after verification. If a payment remains pending, keep its reference and <a href="mailto:clueraaisupport@gmail.com">contact support</a> before attempting another purchase.</p></div>
-    <p className={styles.windowNotice}>Each payment window lasts {windowSeconds/60} minutes. If it closes, we check the same order before offering continuation. A timeout never cancels a payment or starts another order.</p>
+    <div className={styles.safetyNote}><p>Pay with UPI, card, netbanking or wallet in the secure Razorpay window. Your hours are added automatically after payment, usually within 2 minutes. If you close the window without paying, you are not charged: continue the payment or cancel it. Need help? <a href="mailto:clueraaisupport@gmail.com">Contact support</a>.</p></div>
+    <p className={styles.windowNotice}>Each payment window stays open for {windowSeconds/60} minutes.</p>
     <details className={styles.history} aria-label="Preserved server-confirmed history"><summary>Earlier payment attempts</summary>
       <h3>Preserved server-confirmed history</h3>
       <p>Recent attempts are kept here while their payment status is checked. Old drafts are not resumed, canceled or retried here.</p>

@@ -85,8 +85,27 @@ export function clueraRazorpayAdapter(env = process.env, request: typeof fetch =
       && (!subscription.ended_at || subscription.ended_at * 1000 > Date.now() + 5000)) throw new ClueraBillingError('PENDING');
     return { subscriptionId: subscription.id, providerState: subscription.status, observedAt: new Date().toISOString() };
   };
+  /** Fresh provider read of the exact server-bound pack order. "Open" payments are
+   * every attempt that is not definitively failed (created/authorized/captured/refunded):
+   * those may still move money, so the order can be neither retried nor cancelled. */
+  const inspectPackOrder = async (binding: Binding) => {
+    if (binding.revision.kind !== 'PACK' || binding.code !== 'BOUND' || !binding.orderId || binding.subscriptionId !== null)
+      throw new ClueraBillingError('INVALID');
+    const order = orderSchema.parse(await api(`/orders/${binding.orderId}`)), notes = noteSchema.parse(order.notes);
+    if (order.id !== binding.orderId || order.receipt !== binding.intentId || order.amount !== binding.revision.amountPaise
+      || notes.cluera_environment !== mode
+      || notes.cluera_intent !== binding.intentId || notes.cluera_revision !== binding.revision.revisionId)
+      throw new ClueraResumeError('ORDER_BINDING_MISMATCH');
+    const payments = z.object({ entity: z.literal('collection'), count: z.number().int().nonnegative().max(100),
+      items: z.array(z.object({ id: paymentId, status: z.string().max(32) }).passthrough()).max(100) })
+      .parse(await api(`/orders/${binding.orderId}/payments`));
+    return { orderId: order.id, orderStatus: order.status, attempts: order.attempts, amountPaidPaise: order.amount_paid,
+      duePaise: order.amount_due, openPayments: payments.items.filter(payment => payment.status !== 'failed').length };
+  };
   return {
     verifyPlan,
+    inspectPackOrder,
+    /** Strict audit read: only a never-attempted order with zero payments qualifies. */
     async resumeUntouchedPack(binding: Binding) {
       if (binding.revision.kind !== 'PACK' || binding.code !== 'BOUND' || !binding.orderId || binding.subscriptionId !== null)
         throw new ClueraBillingError('INVALID');
@@ -98,11 +117,18 @@ export function clueraRazorpayAdapter(env = process.env, request: typeof fetch =
       const observation={state:order.status,attempts:order.attempts,paidPaise:order.amount_paid,duePaise:order.amount_due};
       if (order.status !== 'created' || order.attempts !== 0) throw new ClueraResumeError('ORDER_ALREADY_ATTEMPTED',observation);
       if (order.amount_paid !== 0 || order.amount_due !== binding.revision.amountPaise) throw new ClueraResumeError('ORDER_BALANCE_CHANGED',observation);
-      // Any associated payment, including authorized/failed/unknown, requires
-      // reconciliation. Continuing an untouched order never means retrying one.
       z.object({ entity: z.literal('collection'), count: z.literal(0), items: z.array(z.unknown()).length(0) })
         .parse(await api(`/orders/${binding.orderId}/payments`));
       return { orderId: order.id, subscriptionId: null };
+    },
+    /** Continue (retry) the SAME order from checkout. Razorpay accepts a new attempt on an
+     * order whose earlier attempts all failed; any non-failed attempt is reconciled instead. */
+    async resumeRetryablePack(binding: Binding) {
+      const order = await inspectPackOrder(binding);
+      const observation={state:order.orderStatus,attempts:order.attempts,paidPaise:order.amountPaidPaise,duePaise:order.duePaise};
+      if (order.orderStatus === 'paid' || order.openPayments !== 0) throw new ClueraResumeError('ORDER_ALREADY_ATTEMPTED',observation);
+      if (order.amountPaidPaise !== 0 || order.duePaise !== binding.revision.amountPaise) throw new ClueraResumeError('ORDER_BALANCE_CHANGED',observation);
+      return { orderId: order.orderId, subscriptionId: null };
     },
     async cancellationStatus(binding: Binding) {
       if (binding.revision.kind !== 'RECURRING' || binding.code !== 'VERIFIED') throw new ClueraBillingError('INVALID');

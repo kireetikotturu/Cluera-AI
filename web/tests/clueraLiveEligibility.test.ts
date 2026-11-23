@@ -30,7 +30,7 @@ it.each(['checkout', 'resume'])('Live %s rejects an unapproved acceptance accoun
   const response = await handleLiveBilling(request(path), path as 'checkout' | 'resume', env);
   expect(response.status).toBe(403); const body = await response.json();
   expect(checkoutDenial(response.status, body)).toBe('LIVE_PURCHASER_REQUIRED');
-  expect(checkoutDenialMessage.LIVE_PURCHASER_REQUIRED).toContain('Your existing balance is unchanged');
+  expect(checkoutDenialMessage.LIVE_PURCHASER_REQUIRED).toContain('Your balance is unchanged');
   expect(clear).not.toHaveBeenCalled(); expect(mocks.status).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
 });
 it('public Live approval permits verified customers without either purchaser list or a Test approval', async () => {

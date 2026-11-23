@@ -53,11 +53,16 @@ it('does not require a nonexistent recurring-plan verification for a one-time pa
  const request=provider();expect((await resumeClueraCheckout(rpc,account,env,clueraRazorpayAdapter(env,request))).orderId).toBe(orderId);
  expect(request).toHaveBeenCalledTimes(2);
 });
-it.each([{status:'attempted'},{status:'paid',amount_paid:54900,amount_due:0},{attempts:1},{amount_paid:'0'},{amount_paid:null},{amount_due:54899},{amount:1},
+it.each([{status:'paid',amount_paid:54900,amount_due:0},{amount_paid:'0'},{amount_paid:null},{amount_due:54899},{amount:1},
  {receipt:foreign},{notes:{...notes,cluera_intent:foreign}},{notes:{...notes,cluera_revision:foreign}},{notes:{...notes,cluera_environment:'live'}},{id:'order_foreign0001'}])('strict original-order proof refuses%j with no normalization or mutation',async patch=>{
  const request=provider(patch);await expect(resumeClueraCheckout(rpc,account,env,clueraRazorpayAdapter(env,request))).rejects.toThrow();expect(request.mock.calls.every(([,init])=>init?.method==='GET')).toBe(true);
 });
-it.each(['authorized','failed','captured','unknown'])('any associated%s payment blocks continuation even if the order claims zero attempts',async state=>{
+it('an order whose earlier attempts all failed can be retried as the SAME order',async()=>{
+ const request=provider({status:'attempted',attempts:2},{entity:'collection',count:2,items:[{id:'pay_resumefailed00001',status:'failed'},{id:'pay_resumefailed00002',status:'failed'}]});
+ expect((await resumeClueraCheckout(rpc,account,env,clueraRazorpayAdapter(env,request))).orderId).toBe(orderId);
+ expect(request.mock.calls.every(([,init])=>init?.method==='GET')).toBe(true);
+});
+it.each(['authorized','captured','created','refunded','unknown'])('any associated%s payment blocks continuation even if the order claims zero attempts',async state=>{
  const request=provider({}, {entity:'collection',count:1,items:[{id:'pay_resumeexisting0001',status:state}]});
  await expect(resumeClueraCheckout(rpc,account,env,clueraRazorpayAdapter(env,request))).rejects.toThrow();expect(request).toHaveBeenCalledTimes(2);
 });
@@ -81,13 +86,13 @@ it('guarded GET route independently authorizes the current owner and returns no-
  const response=await handleClueraCheckoutResume(request());expect(response.status).toBe(200);expect((await response.json()).payment.orderId).toBe(orderId);expect(response.headers.get('cache-control')).toBe('no-store');
  expect(network.mock.calls.every(([,init])=>init?.method==='GET')).toBe(true);
 });
-it('an attempted order returns a fixed reconciliation reason without provider observations or sign-out',async()=>{
- const network=provider({status:'attempted',attempts:1});vi.stubGlobal('fetch',network);
+it('an order with an open payment returns a fixed reconciliation reason without provider observations or sign-out',async()=>{
+ const network=provider({status:'attempted',attempts:1},{entity:'collection',count:1,items:[{id:'pay_resumeopen000001',status:'authorized'}]});vi.stubGlobal('fetch',network);
  const clear=vi.spyOn(AccountCookies.prototype,'clear'),response=await handleClueraCheckoutResume(request());
  expect(response.status).toBe(409);expect(response.headers.get('cache-control')).toBe('no-store');
  const body=await response.json();expect(body.code).toBe('ORDER_RECONCILIATION_REQUIRED');
  expect(Object.keys(body).sort()).toEqual(['code','error']);expect(JSON.stringify(body)).not.toContain(orderId);
- expect(clear).not.toHaveBeenCalled();expect(network).toHaveBeenCalledOnce();
+ expect(clear).not.toHaveBeenCalled();expect(network).toHaveBeenCalledTimes(2);
  expect(console.info).toHaveBeenCalledExactlyOnceWith('[cluera-billing] checkout-resume',{
   component:'cluera-checkout-resume',mode:'test',outcome:'ORDER_ALREADY_ATTEMPTED',httpStatus:409,elapsedMs:expect.any(Number),financialMutations:0});
  const logged=JSON.stringify(vi.mocked(console.info).mock.calls);

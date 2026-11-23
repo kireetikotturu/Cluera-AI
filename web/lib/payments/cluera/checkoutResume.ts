@@ -12,7 +12,7 @@ import { stagingAccountConfig } from '../../accounts/workspace';
 import { json } from '../../http';
 
 type Account={userId:string;sessionId:string};
-type Gateway=Pick<ReturnType<typeof clueraRazorpayAdapter>,'resumeUntouchedPack'>;
+type Gateway=Pick<ReturnType<typeof clueraRazorpayAdapter>,'resumeRetryablePack'>;
 function eligible(binding:Binding,account:Account,intentId:string,orderId:string,revisionId:string) {
   if(binding.userId!==account.userId||binding.intentId!==intentId||binding.orderId!==orderId||binding.subscriptionId!==null
     ||binding.revision.revisionId!==revisionId||binding.code!=='BOUND'||binding.revision.kind!=='PACK'
@@ -33,7 +33,7 @@ export async function resumeClueraCheckout(rpc:PaymentRpc,account:Account,env=pr
     const raw=z.object({legacy:z.literal(false)}).passthrough().parse(value);const projected={...raw};delete (projected as Record<string,unknown>).legacy;
     return eligible(bindingSchema.parse(projected),account,pending.intentId,pending.orderId!,pending.revisionId);
   };
-  const binding=await read(),resource=await gateway.resumeUntouchedPack(binding);
+  const binding=await read(),resource=await gateway.resumeRetryablePack(binding);
   if(resource.orderId!==pending.orderId||resource.subscriptionId!==null)throw new ClueraBillingError('PENDING');
   // Provider reads can take time. Re-attest owner/epoch, current session and
   // exact still-unresolved original binding before releasing SDK metadata.
@@ -45,6 +45,33 @@ export async function resumeClueraCheckout(rpc:PaymentRpc,account:Account,env=pr
   if(!clueraCheckoutAllowed(account.userId,env))throw new ClueraBillingError('CONFIGURATION');
   return {code:'BOUND' as const,kind:'PACK' as const,...resource,keyId:clueraBillingConfig(env).keyId,
     amountPaise:binding.revision.amountPaise,currency:'INR' as const,revisionId:binding.revision.revisionId,offerCode:binding.revision.offerCode};
+}
+export type CancelOutcome = 'CANCELLED' | 'PAYMENT_IN_PROGRESS' | 'TOO_SOON' | 'ALREADY_RESOLVED' | 'NOTHING_PENDING';
+/** Customer cancels their own UNPAID checkout so a new purchase can start. Razorpay is
+ * asked first: an order with any non-failed payment is never cancelled. A late genuine
+ * payment on a cancelled order is still credited by the ledger (REJECTED pack intent). */
+export async function cancelClueraPendingCheckout(rpc:PaymentRpc,account:Account,env=process.env,
+  gateway:Pick<ReturnType<typeof clueraRazorpayAdapter>,'inspectPackOrder'>=clueraRazorpayAdapter(env)):Promise<{code:CancelOutcome}> {
+  const {accountDigest,epoch}=await billingOwner(rpc,env);
+  const pending=(await clueraBillingStatus(rpc,account)).pending;
+  if(!pending)return {code:'NOTHING_PENDING'};
+  if(pending.legacy||pending.kind!=='PACK')throw new ClueraBillingError('PENDING');
+  let evidence:Record<string,unknown>|null=null;
+  if(pending.state==='BOUND'){
+    if(!pending.orderId)throw new ClueraBillingError('PENDING');
+    const value=await billingRpc(rpc,'cluera_billing_binding',{p_resource:pending.orderId,p_account_digest:accountDigest});
+    const raw=z.object({legacy:z.literal(false)}).passthrough().parse(value);const projected={...raw};delete (projected as Record<string,unknown>).legacy;
+    const binding=bindingSchema.parse(projected);
+    if(binding.userId!==account.userId||binding.intentId!==pending.intentId||binding.code!=='BOUND')throw new ClueraBillingError('PENDING');
+    const order=await gateway.inspectPackOrder(binding);
+    if(order.orderStatus==='paid'||order.amountPaidPaise!==0||order.openPayments!==0)return {code:'PAYMENT_IN_PROGRESS'};
+    evidence={orderId:order.orderId,orderStatus:order.orderStatus,amountPaidPaise:0,openPayments:0};
+  }
+  const result=z.object({code:z.string()}).passthrough().parse(await billingRpc(rpc,'cluera_billing_intent_cancel',{
+    p_user:account.userId,p_session:account.sessionId,p_intent:pending.intentId,p_account_digest:accountDigest,p_epoch:epoch,p_evidence:evidence}));
+  if(result.code==='CANCELLED'||result.code==='PAYMENT_IN_PROGRESS'||result.code==='TOO_SOON')return {code:result.code};
+  if(['VERIFIED','REFUNDED','REJECTED'].includes(result.code))return {code:'ALREADY_RESOLVED'};
+  throw new ClueraBillingError('UNAVAILABLE');
 }
 export async function handleClueraCheckoutResume(request:Request):Promise<Response> {
   if(!clueraCheckoutEnabled())return json({code:'CHECKOUT_DISABLED',error:'Not found.'},404);

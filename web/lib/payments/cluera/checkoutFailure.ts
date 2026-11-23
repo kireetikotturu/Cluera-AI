@@ -13,15 +13,15 @@ export const checkoutDenialMessage: Record<CheckoutDenial, string> = {
   ACCOUNT_MISMATCH: 'The signed-in account does not match this checkout. Return to your account and open checkout again. For a desktop purchase, use the same account in Windows and your browser.',
   RECOVERY_SESSION: 'Finish resetting your password, then sign in normally before buying time.',
   TEST_PURCHASER_REQUIRED: 'You are signed in. Test checkout is currently limited to the approved Test purchaser. This account cannot buy yet. Your existing balance is unchanged. Use the approved account or contact Cluera support.',
-  LIVE_PURCHASER_REQUIRED: 'You are signed in. Purchases are currently limited to approved launch testers. Public sales are not open yet. Your existing balance is unchanged. Contact Cluera support.',
+  LIVE_PURCHASER_REQUIRED: 'You are signed in, but purchases are not open for this account yet. Your balance is unchanged. Contact Cluera support if you need help.',
   FORBIDDEN: 'Checkout access was denied. Return to your account or contact Cluera support. Do not repeat a payment.',
 };
 
 export function checkoutFailureMessage(status: number, body?: unknown): string {
   if(status===409 && body && typeof body==='object' && 'code' in body && body.code==='ORDER_RECONCILIATION_REQUIRED')
-    return 'This order already has a payment attempt. It cannot be continued automatically. Check billing status or contact Cluera support before making another payment.';
+    return 'A payment for this order is already being processed. Your hours will be added automatically once it is confirmed, usually within 2 minutes. If nothing changes, contact Cluera support.';
   if (status === 404) return 'Checkout is not enabled for this deployment. Your sign-in is unchanged. Contact Cluera support.';
-  if (status === 409) return 'An existing payment or order needs verification. Refresh billing status; do not create another attempt.';
-  if (status === 429) return 'Too many billing requests. Wait before refreshing status. Do not retry a payment.';
-  return 'Payment verification or configuration is unavailable. Your sign-in is unchanged. Refresh status only; do not retry a payment.';
+  if (status === 409) return 'You have an unfinished payment. Continue it, or cancel it to start a new one.';
+  if (status === 429) return 'Too many requests. Please wait a moment and try again.';
+  return 'Payments are temporarily unavailable. Please try again in a few minutes.';
 }
