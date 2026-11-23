@@ -74,7 +74,7 @@ it('Cluera target pricing is explicitly unavailable and never loads a payment SD
  const html=renderToStaticMarkup(AccountPricing());
  for(const price of ['₹549','₹5,499','₹9,599','₹19,549'])expect(html).toContain(price);
  expect(html).toContain('100 hours per month');expect(html).toContain('Paid plans are coming soon');
- expect(html).toContain('Payments are not enabled for this preview');
+ expect(html).toContain('This plan is not on sale yet');
  expect(html).toContain('Check availability');
  expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
  expect((html.match(/disabled=""/g)??[])).toHaveLength(0);

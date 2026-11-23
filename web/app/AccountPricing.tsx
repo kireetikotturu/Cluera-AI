@@ -30,17 +30,17 @@ export function AccountPricing({catalog=null}:{catalog?:ClueraPublicRevision[]|n
     <p className={styles.availability} id={`pricing-${plan.offerCode}`}>Secure payment with UPI, cards or netbanking.</p>
     <Link className={`button ${styles.action}`} href={`/account/checkout?offer=${encodeURIComponent(plan.offerCode)}`} aria-label={`${plan.kind==='PACK'?'Buy Now':'Subscribe'}: ${plan.name}`} aria-describedby={`pricing-${plan.offerCode}`}>{plan.kind==='PACK'?'Buy Now':'Subscribe'}</Link>
    </article>):clueraTargetPlans.map(plan=>{const display=offerDisplay(plan);return <article key={plan.id} className={styles.card} aria-label={plan.name}>
-    <div className={styles.cardTop}><p className={styles.eyebrow}>{plan.interval?'Planned monthly allowance':'Planned no-expiry pack'}</p><span className={styles.badge}>Preview</span></div>
+    <div className={styles.cardTop}><p className={styles.eyebrow}>{plan.interval?'Monthly plan':'One-time pack'}</p><span className={styles.badge}>Coming soon</span></div>
     <h3>{plan.name}</h3>
     <p className={styles.price}>{clueraPrice(Number(plan.amount))}<span>{plan.interval?' / month':' one time'}</span></p>
     <p className={styles.allowance}>{display.hours} hours{plan.interval?' per month':''}</p>
     <ul className={styles.features}>
-     <li><span aria-hidden="true">✓</span>{plan.interval?'Monthly hours do not roll over':'No expiry; verified packs stack'}</li>
-     <li><span aria-hidden="true">✓</span>One account balance across devices</li>
+     <li><span aria-hidden="true">✓</span>{plan.interval?'Monthly hours do not roll over':'Never expires, packs stack'}</li>
+     <li><span aria-hidden="true">✓</span>Use on all your devices</li>
      <li><span aria-hidden="true">✓</span>{plan.interval?'Monthly allowance':'Flexible one-time top-up'}</li>
     </ul>
     <p className={styles.terms}>{display.terms}</p>
-    <p className={styles.availability} id={`pricing-${plan.offerCode}`}>Payments are not enabled for this preview. Open checkout to see the current server status; no payment starts here.</p>
+    <p className={styles.availability} id={`pricing-${plan.offerCode}`}>This plan is not on sale yet.</p>
     <Link className={`button secondary ${styles.action}`} href={`/account/checkout?offer=${encodeURIComponent(plan.offerCode)}`} aria-label={`Check availability: ${plan.name}`} aria-describedby={`pricing-${plan.offerCode}`}>Check availability</Link>
    </article>;})}
   </div>
