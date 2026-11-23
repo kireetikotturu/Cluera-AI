@@ -9,7 +9,7 @@ export function checkoutDenial(status: number, body: unknown): CheckoutDenial | 
 }
 
 export const checkoutDenialMessage: Record<CheckoutDenial, string> = {
-  SIGNED_OUT: 'Your session has ended. Sign in to continue checkout.',
+  SIGNED_OUT: 'Sign in to your Cluera account to buy time.',
   ACCOUNT_MISMATCH: 'The signed-in account does not match this checkout. Return to your account and open checkout again. For a desktop purchase, use the same account in Windows and your browser.',
   RECOVERY_SESSION: 'Finish resetting your password, then sign in normally before buying time.',
   TEST_PURCHASER_REQUIRED: 'You are signed in. Test checkout is currently limited to the approved Test purchaser. This account cannot buy yet. Your existing balance is unchanged. Use the approved account or contact Cluera support.',

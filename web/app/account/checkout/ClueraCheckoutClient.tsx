@@ -448,7 +448,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   const rows = catalog.length ? catalog : null;
   return <section className={`account-checkout-console ${styles.checkout} ${pricing?styles.pricingSection:''}`} aria-label="Cluera billing" aria-busy={preparing}>
     <header className={styles.checkoutHeader}>
-      <p className={styles.eyebrow}>Cluera billing · Razorpay{mode==='test'?' Test':''}</p>
+      <p className={styles.eyebrow}>{mode==='test'?'Pricing · Test mode':'Pricing'}</p>
       <h2>{pricing?'Your next great conversation starts here.':'Time for your next session'}</h2>
       <p>Pick the time you need. Pay securely and your hours are added to your account automatically.</p>
     </header>

@@ -68,7 +68,7 @@ it.each([['TEST_PURCHASER_REQUIRED','You are signed in. Test checkout'],['LIVE_P
 });
 
 it.each([
-  [401,undefined,'Your session has ended'],[403,'ACCOUNT_MISMATCH','does not match this checkout'],
+  [401,undefined,'Sign in to your Cluera account'],[403,'ACCOUNT_MISMATCH','does not match this checkout'],
   [403,'RECOVERY_SESSION','Finish resetting your password'],[403,undefined,'Checkout access was denied'],
   [404,undefined,'not enabled for this deployment'],[409,undefined,'unfinished payment'],
   [429,undefined,'Too many requests'],[503,undefined,'temporarily unavailable'],
