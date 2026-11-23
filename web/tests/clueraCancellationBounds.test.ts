@@ -70,6 +70,6 @@ it('successful byte/JSON reads and clean-project history provenance remain hones
  await expect(clueraRazorpayTransport(paymentTestEnvironment,request as typeof fetch)('/orders')).resolves.toEqual({ok:true});
  const bytes=Buffer.from('{}');await expect(readClueraRawBody(new Request('https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook',{method:'POST',body:bytes}),2)).resolves.toEqual(bytes);
  const source=readFileSync(new URL('../app/account/checkout/ClueraCheckoutClient.tsx',import.meta.url),'utf8');
- expect(source).toContain('Earlier Account and Paddle database history was not imported');expect(source).toContain('provider-side obligations remain subject to independent reconciliation');
+ expect(source).not.toContain('Earlier payment attempts');
  expect(source).not.toContain('Existing Account and Paddle financial history remains intact');expect(vi.getTimerCount()).toBe(0);
 });

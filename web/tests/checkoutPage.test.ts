@@ -19,7 +19,7 @@ describe('disabled staging checkout landing page',()=>{
     vi.mocked(readAccountCatalog).mockResolvedValue(sandboxOffers.map((offer,priority)=>({...offer,enabled:true,priority})));
     const html=renderToStaticMarkup(await CheckoutPage());expect(html).toContain('Test payments are paused');
     expect((html.match(/<button[^>]*disabled[^>]*>(Buy Now|Subscribe)<\/button>/g)||[])).toHaveLength(4);
-    expect((html.match(/<button[^>]*disabled[^>]*>Refresh billing history<\/button>/g)||[])).toHaveLength(1);
+    expect((html.match(/<button[^>]*disabled[^>]*>Refresh<\/button>/g)||[])).toHaveLength(1);
     expect((html.match(/disabled=""/g)||[])).toHaveLength(5);
     expect(html).not.toMatch(/<script|<iframe|<form/);expect(html).toContain('Recurring offers and Stripe are unavailable');
     expect(html).toContain('not active catalog offers');expect(html).toContain('100 hours per month');

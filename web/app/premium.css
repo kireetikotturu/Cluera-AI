@@ -99,7 +99,7 @@ body.cluera-site{font-family:var(--font-sans),Inter,ui-sans-serif,system-ui,-app
 .float-card{position:absolute;display:grid;gap:2px;padding:12px 16px;border:1px solid var(--line-strong);border-radius:14px;background:rgba(18,19,30,.82);backdrop-filter:blur(14px);box-shadow:0 20px 50px -10px #000;animation:float2 6s ease-in-out infinite}
 .float-card b{font-size:18px;letter-spacing:-.02em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 .float-card span{font-size:12px;color:var(--muted)}
-.float-a{left:-28px;bottom:42px}.float-b{right:-18px;top:-22px;animation-delay:-3s}
+.float-a{left:-34px;bottom:-22px}.float-b{right:-18px;top:-22px;animation-delay:-3s}
 @keyframes float2{50%{transform:translateY(-10px)}}
 
 /* Sections */
@@ -185,3 +185,30 @@ body.cluera-site{font-family:var(--font-sans),Inter,ui-sans-serif,system-ui,-app
  .typing{width:auto;white-space:normal;border:0}
  .cluera-site .button:after{display:none}
 }
+
+/* Overrides for legacy base rules */
+.cluera-site .feature>.feature-icon{color:#d8d2ff;font:inherit}
+.cluera-site .feature-grid{border:0}
+.cluera-site .feature{min-height:0;border:1px solid var(--line)}
+.site-header-shell.scrolled{background:rgba(7,8,13,.86)}
+.cluera-site .feature-grid .feature:nth-child(2n) .feature-icon{background:linear-gradient(145deg,#33d1dc33,#7c6cff1f);border-color:#33d1dc44;color:#bff4f8}
+.cluera-site .feature-grid .feature:nth-child(3n) .feature-icon{background:linear-gradient(145deg,#f08bd033,#7c6cff1f);border-color:#f08bd044;color:#ffd6f1}
+/* Replace every legacy serif with the premium sans; serif is reserved for .accent-serif */
+.cluera-site :is(h1,h2,h3,h4,h5,b,strong,summary,.steps b,.guide-step h2,.download-card h2,.feature h3){font-family:var(--font-sans),system-ui,sans-serif}
+.cluera-site :is(h1,h2) .accent-serif{font-family:var(--font-serif),Georgia,serif}
+.cluera-site .steps li{display:flex;border-bottom:1px solid var(--line)}
+.cluera-site .steps{border-top:0}
+.cluera-site .steps li>span{font:800 15px var(--font-sans),sans-serif;color:#0b0b16}
+.cluera-site .steps b{font-weight:700;font-size:17px}
+.cluera-site .split-section h2,.cluera-site .content-hero h1,.cluera-site .final-cta h2{font-weight:800;letter-spacing:-.04em}
+.cluera-site .content-hero h1{font-size:clamp(38px,5.4vw,64px);line-height:1.05}
+.cluera-site .content-hero>p{font-size:17px}
+.cluera-site .guide-step h2{font-weight:700;font-size:24px;letter-spacing:-.03em}
+.cluera-site .guide-step>span{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--grad);color:#0b0b16;font:800 13px var(--font-sans),sans-serif}
+.cluera-site .guide-step{padding:30px 0;border-top-color:var(--line);background:none}
+.cluera-site .guide-grid aside a:hover{color:var(--ink)}
+.cluera-site .download-card{max-width:680px;padding:36px;border:1px solid #7c6cff44;background:radial-gradient(ellipse at 0 0,#7c6cff22,transparent 60%),linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.01))}
+.cluera-site .download-card h2{font-weight:800;font-size:30px;letter-spacing:-.03em}
+.cluera-site .download-icon{margin-bottom:18px;border:0;background:none;width:auto;height:auto}
+.cluera-site .download-meta span{border-color:var(--line-strong);background:rgba(255,255,255,.04);color:#d9d6f5;border-radius:999px}
+.cluera-site.account-site footer{font-size:13px}
