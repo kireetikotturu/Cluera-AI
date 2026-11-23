@@ -41,7 +41,7 @@ export function AiQuickSetup({disabled=false,models,onApplied,active=false}:{dis
   try{
    const data=await read();if(!alive.current)return;
    setRows(data.providers);setFactors(data.factors);
-   setMessage(note??(data.factors.length?'Status loaded. Paste a key below, enter the 6-digit code from your authenticator app and press Save and enable.':'No authenticator is set up for this Admin account. Add one in the Admin sign-in screen first.'));
+   setMessage(note??(data.factors.length?'Status loaded. Paste a key below, enter the 6-digit code from your authenticator app and press Save and connect.':'No authenticator is set up for this Admin account. Add one in the Admin sign-in screen first.'));
   }catch(error){
    if(!alive.current)return;setRows(null);setFailed(true);
    setMessage((error as {notReady?:boolean}).notReady?'The encrypted key vault is not switched on for this deployment yet. Follow the "AI provider keys" steps in docs/GO_LIVE_GUIDE.md, then check again.':'Could not load the AI setup. Make sure you are signed in as Admin with your authenticator, then try again.');
