@@ -14,11 +14,12 @@ export function providerRuntime(rpc:Rpc,env:NodeJS.ProcessEnv=process.env,clock=
    catch{cache.delete(provider);throw Error('Provider unavailable.');}
   })().finally(()=>{pending.delete(provider);});pending.set(provider,loading);return loading;
  };
- return {async resolve(provider:'gemini'|'deepgram',requested?:string,fresh=false){
+ // The Admin model list is the authority for WHICH model runs; the vault only proves a
+ // working, enabled key for the provider. Any model the Admin approved may use it.
+ return {async resolve(provider:ProviderId,requested?:string,fresh=false){
   if(fresh)cache.delete(provider);
   const row=await read(provider),model=requested??row.default_model;
-  if(!row.enabled||row.probe_status!=='VERIFIED'||!row.complete||!model||model!==row.default_model
-   ||!row.models.some(m=>m.id===model&&m.runtimeCompatible))throw Error('Provider unavailable.');
+  if(!row.enabled||row.probe_status!=='VERIFIED'||!model||!/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/.test(model))throw Error('Provider unavailable.');
   return {provider,model,revision:row.revision,credentialId:row.credential_id,
    key:vault.open(row.sealed,{provider,credentialId:row.credential_id})};
  }};

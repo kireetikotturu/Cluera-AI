@@ -10,10 +10,11 @@ import {providerTelemetry} from '../aiProviders/telemetry';
  * current revision every 10s and close on disable/change/read failure. */
 export function vaultProviders(config:RelayConfig,rpc:Rpc,env:NodeJS.ProcessEnv=process.env):Providers{
  const runtime=providerRuntime(rpc,env),registry=modelRegistry(()=>rpc('account_models_read',{})),telemetry=providerTelemetry(rpc,env);
- const resolve=async(provider:'gemini'|'deepgram',input?:Parameters<Providers['generate']>[0])=>{
-  const snapshot=await runtime.resolve(provider,input?.modelId);
-  const model=await registry.resolve(provider,snapshot.model,Boolean(input?.image));
-  if(model!==snapshot.model)throw Error('Provider unavailable.');return snapshot;
+ // The Admin model list chooses the model and its provider (Gemini, ChatGPT, Claude or
+ // Deepgram); the vault supplies that provider's enabled key. No cross-provider fallback.
+ const resolve=async(kind:'gemini'|'deepgram',input?:Parameters<Providers['generate']>[0])=>{
+  const chosen=kind==='deepgram'?await registry.resolveAudio():await registry.resolveText(input?.modelId,Boolean(input?.image));
+  return runtime.resolve(chosen.provider,chosen.modelId);
  };
  function lease(snapshot:Awaited<ReturnType<typeof resolve>>,guard:Guard,onFailure:()=>void){
   const controller=new AbortController(),signal=AbortSignal.any([guard.signal,controller.signal]);let stopped=false;
@@ -31,9 +32,12 @@ export function vaultProviders(config:RelayConfig,rpc:Rpc,env:NodeJS.ProcessEnv=
    const held=lease(snapshot,guard,()=>{});
    let receipt:Awaited<ReturnType<typeof telemetry.start>>|undefined,succeeded=false;
    try{
-    receipt=await telemetry.start({runId:guard.runId,provider:snapshot.provider,credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model});
+    // Usage metadata is recorded for Gemini; ChatGPT/Claude sessions are still metered by the account time ledger.
+    if(snapshot.provider==='gemini')receipt=await telemetry.start({runId:guard.runId,provider:'gemini',credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model});
     held.guard.assertActive();
-    await providerAdapters({...config,geminiKey:snapshot.key},{resolveModel:async()=>snapshot.model,receipt:value=>receipt!.observe(value)}).generate(input,held.guard,emit);succeeded=true;
+    const keys=snapshot.provider==='openai'?{openaiKey:snapshot.key}:snapshot.provider==='anthropic'?{anthropicKey:snapshot.key}:{geminiKey:snapshot.key};
+    await providerAdapters({...config,...keys},{resolveModel:async()=>snapshot.model,textProvider:snapshot.provider as 'gemini'|'openai'|'anthropic',
+     receipt:value=>receipt?.observe(value)}).generate(input,held.guard,emit);succeeded=true;
    }finally{held.close();await receipt?.finish(succeeded?'SUCCEEDED':guard.signal.aborted?'CANCELLED':'FAILED');}
   },
   audio(guard,emit,failed,ready){
@@ -44,9 +48,9 @@ export function vaultProviders(config:RelayConfig,rpc:Rpc,env:NodeJS.ProcessEnv=
    guard.signal.addEventListener('abort',close,{once:true});
    void resolve('deepgram').then(async snapshot=>{
     if(closed||guard.signal.aborted)return;guard.assertActive();const held=lease(snapshot,guard,fail);cleanup=()=>{held.close();guard.signal.removeEventListener('abort',close);};
-    receipt=await telemetry.start({runId:guard.runId,provider:snapshot.provider,credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model});
+    receipt=await telemetry.start({runId:guard.runId,provider:'deepgram',credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model});
     if(closed||guard.signal.aborted){await receipt.finish('STOPPED');return;}
-    held.guard.assertActive();peer=providerAdapters({...config,deepgramKey:snapshot.key},{receipt:value=>receipt!.observe(value)}).audio(held.guard,emit,fail,ready);
+    held.guard.assertActive();peer=providerAdapters({...config,deepgramKey:snapshot.key},{audioModel:snapshot.model,receipt:value=>receipt!.observe(value)}).audio(held.guard,emit,fail,ready);
    }).catch(fail);
    return {write(bytes){if(peer&&!closed)peer.write(bytes);},forceEndTurn(){if(peer&&!closed)peer.forceEndTurn();},close};
   },

@@ -220,7 +220,7 @@ it('catalog edits cover only the four approved offers and never accept browser p
   expect((await accountAdminRequest(request({...base,input}))).status).toBe(400);
 });
 it('rejects unsupported model policy before privileged mutation',async()=>{
- const base={action:'MODEL',operationId:crypto.randomUUID(),subjectId:null,reason:'Review account model policy',input:{modelId:'flux-unknown',displayName:'Internal audio',provider:'deepgram',enabled:true,isDefault:true,priority:100,capabilities:['audio'],health:'UNVERIFIED'}};
+ const base={action:'MODEL',operationId:crypto.randomUUID(),subjectId:null,reason:'Review account model policy',input:{modelId:'nova-3-general',displayName:'Internal audio',provider:'deepgram',enabled:true,isDefault:true,priority:100,capabilities:['audio'],health:'UNVERIFIED'}};
  expect((await accountAdminRequest(request(base))).status).toBe(400);
  expect(rpc.mock.calls.some(([name])=>name==='account_admin_mutate')).toBe(false);
 });

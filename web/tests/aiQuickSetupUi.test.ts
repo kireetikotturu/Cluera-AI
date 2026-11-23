@@ -25,7 +25,7 @@ async function fill(provider:'gemini'|'deepgram',key='synthetic-quick-setup-key-
 it('makes no request until Check status and then offers both providers',async()=>{
  const request=api(()=>Response.json({}));await render();expect(request).not.toHaveBeenCalled();expect(host.querySelector('form')).toBeNull();
  await act(async()=>button('Check status').click());
- expect(request).toHaveBeenCalledTimes(2);expect(host.textContent).toContain('Google Gemini');expect(host.textContent).toContain('Deepgram');expect(host.textContent).toContain('Key saved · not enabled');
+ expect(request).toHaveBeenCalledTimes(2);expect(host.textContent).toContain('Google Gemini');expect(host.textContent).toContain('Deepgram');expect(host.textContent).toContain('Key saved · not connected');expect(host.textContent).toContain('ChatGPT (OpenAI)');expect(host.textContent).toContain('Claude (Anthropic)');
 });
 it('explains when the vault is not switched on',async()=>{
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>url.includes('factors')?Response.json({factors:[]}):Response.json({error:'VAULT_BOOTSTRAP_REQUIRED'},{status:503})));
@@ -39,7 +39,7 @@ it('sends one SETUP request, clears secrets, refreshes and tells the admin to re
  await render(applied);await act(async()=>button('Check status').click());
  const form=await fill('gemini');
  expect((form.elements.namedItem('key') as HTMLInputElement).value).toBe('');expect((form.elements.namedItem('code') as HTMLInputElement).value).toBe('');
- expect(setups).toBe(1);expect(applied).toHaveBeenCalledOnce();expect(host.textContent).toContain('Restart the Cluera desktop app');
+ expect(setups).toBe(1);expect(applied).toHaveBeenCalledOnce();expect(host.textContent).toContain('now appears in the Cluera app');
  expect(request.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);expect(host.textContent).not.toContain('synthetic-quick-setup-key');
 });
 it.each([

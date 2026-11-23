@@ -6,7 +6,7 @@ import type {accountModelPolicy} from '../../../lib/accounts/modelPolicy';
 export type ModelPolicy=z.infer<typeof accountModelPolicy>;
 type Props={models:ModelPolicy[];disabled:boolean;onSave:(model:ModelPolicy,reason:string)=>void};
 export function ModelPolicyEditor({models,disabled,onSave}:Props){
- const [selected,setSelected]=useState(''),[provider,setProvider]=useState<'gemini'|'deepgram'>('gemini');
+ const [selected,setSelected]=useState(''),[provider,setProvider]=useState<ModelPolicy['provider']>('gemini');
  const current=models.find(item=>`${item.provider}:${item.modelId}`===selected);
  // A confirmed policy refresh remounts the form with authoritative values;
  // pending operations are locked by the parent until reconciliation succeeds.
@@ -15,13 +15,13 @@ export function ModelPolicyEditor({models,disabled,onSave}:Props){
   <h2 id="model-policy-heading">AI model registry</h2>
   <p>Gemini choices are available to customers. Deepgram is internal transcription only. Health is an administrator-declared label, not a live provider test.</p>
   <ul>{models.map(item=><li key={`${item.provider}:${item.modelId}`}>
-   <strong>{item.displayName}</strong> · {item.provider} · {item.modelId} · {item.enabled?'enabled':'disabled'}{item.isDefault?' · default':''}
-   {' · '}priority {item.priority} · {item.capabilities.join(', ')} · {item.health}
+   <strong>{item.displayName}</strong> Â· {item.provider} Â· {item.modelId} Â· {item.enabled?'enabled':'disabled'}{item.isDefault?' Â· default':''}
+   {' Â· '}priority {item.priority} Â· {item.capabilities.join(', ')} Â· {item.health}
   </li>)}</ul>
   <fieldset disabled={disabled} style={{border:0,padding:0,margin:0}}>
    <label>Model policy<select aria-label="Model policy" value={selected} onChange={event=>{
     const value=event.target.value;setSelected(value);const chosen=models.find(item=>`${item.provider}:${item.modelId}`===value);setProvider(chosen?.provider??'gemini');
-   }}><option value="">Add a model</option>{models.map(item=><option key={`${item.provider}:${item.modelId}`} value={`${item.provider}:${item.modelId}`}>{item.displayName} · {item.modelId}</option>)}</select></label>
+   }}><option value="">Add a model</option>{models.map(item=><option key={`${item.provider}:${item.modelId}`} value={`${item.provider}:${item.modelId}`}>{item.displayName} Â· {item.modelId}</option>)}</select></label>
    <form key={formKey} onSubmit={event=>{
     event.preventDefault();if(disabled)return;
     const values=new FormData(event.currentTarget);
@@ -30,7 +30,7 @@ export function ModelPolicyEditor({models,disabled,onSave}:Props){
      capabilities:provider==='deepgram'?['audio']:values.get('image')==='on'?['text','image']:['text'],
      health:String(values.get('health')) as ModelPolicy['health']},String(values.get('reason')??''));
    }}>
-    <label>Provider<select name="provider" value={provider} disabled={Boolean(current)} onChange={event=>setProvider(event.target.value as 'gemini'|'deepgram')}>
+    <label>Provider<select name="provider" value={provider} disabled={Boolean(current)} onChange={event=>setProvider(event.target.value as ModelPolicy['provider'])}>
      <option value="gemini">Gemini</option><option value="deepgram">Deepgram (internal)</option>
     </select></label>
     <label>Model ID<input name="modelId" required maxLength={100} pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,99}" defaultValue={current?.modelId??(provider==='deepgram'?'flux-general-en':'')} readOnly={Boolean(current)||provider==='deepgram'}/></label>

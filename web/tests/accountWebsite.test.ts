@@ -63,8 +63,8 @@ it('uses Account branding, navigation, CTAs and setup copy without legacy onboar
  expect(home).toContain('href="/download"');expect(home).toContain('one shared time balance');
  expect(setup).toContain('Windows protected your PC');expect(setup).toContain('No API keys');
  expect(layout).not.toContain('href="/account/admin"');expect(layout).not.toContain('>Admin<');expect(layout).toContain('My account');
- expect(layout).toContain('class="account-site cluera-site"');
- expect(siteMetadata.description).toContain('managed AI');expect(downloadMetadata.title).toContain('Cluera');expect(setupMetadata.description).not.toContain('activate');
+ expect(layout).toContain('account-site cluera-site');
+ expect(siteMetadata.description).toContain('instant AI answers');expect(downloadMetadata.title).toContain('Cluera');expect(setupMetadata.description).not.toContain('activate');
  expect(mocks.rpc).not.toHaveBeenCalled();expect(mocks.legacy).not.toHaveBeenCalled();
 });
 it('always presents Cluera without a License fallback when Account access is disabled',()=>{

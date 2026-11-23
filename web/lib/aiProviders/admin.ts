@@ -17,7 +17,7 @@ const inputSchema=z.discriminatedUnion('action',[
  z.object({...common,action:z.literal('REPLACE'),apiKey}).strict(),
  z.object({...common,action:z.literal('TEST'),retry:z.literal(true).optional()}).strict(),
  z.object({...common,action:z.literal('CONFIGURE'),enabled:z.boolean(),defaultModel:modelId.nullable(),fallback:z.literal('NONE'),retry:z.literal(true).optional()}).strict(),
- z.object({...common,provider:z.enum(['gemini','deepgram']),action:z.literal('SETUP'),apiKey}).strict(),
+ z.object({...common,action:z.literal('SETUP'),apiKey,modelId:modelId.optional()}).strict(),
 ]);
 async function readBody(request:Request){
  const declared=Number(request.headers.get('content-length'));if(declared>8192||!request.body)throw new AccountError('INVALID_INPUT',400);
@@ -85,7 +85,7 @@ export async function providerAdminRequest(request:Request):Promise<Response>{
   cookies.set('refresh',step.data.refresh_token,30*86400);
   if(input.action==='SETUP'){
    mutationSubmitted=true;
-   const result=await runProviderSetup({provider:input.provider,revision:input.revision,apiKey:input.apiKey,operationId:input.operationId},
+   const result=await runProviderSetup({provider:input.provider,revision:input.revision,apiKey:input.apiKey,operationId:input.operationId,modelId:input.modelId},
     {rpc,actor:account.userId,session:account.sessionId,reauthenticatedAt,digest:value=>vault.digest(value),seal:(key,binding)=>vault.seal(key,binding),
      discover:(provider,key)=>discoverModels(provider,key)});
    return cookies.apply(json(result));

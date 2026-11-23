@@ -7,7 +7,7 @@ import {stagingAccountConfig} from './workspace';
 import {apiError,json,readJsonBody} from '../http';
 import {SupabaseOperationError} from '../supabase/diagnostics';
 import {sandboxOffers} from '../billing/sandboxCatalog';
-import {accountModelPolicy} from './modelPolicy';
+import {accountModelPolicy,modelDelete} from './modelPolicy';
 import {readProviderStatus} from './providerStatus';
 import {accountReleaseInput,accountReleasePublish,accountReleaseSigningKey} from './releases';
 import {assertTrustedInstallerUrl} from '../releases/policy';
@@ -15,7 +15,7 @@ import {ReleaseInputError,releaseValidationCode,logReleaseDiagnostic} from './re
 import {adminReadFailure} from './adminReadDiagnostics';
 
 const model=accountModelPolicy;
-const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','ADD_MINUTES','REMOVE_MINUTES','CATALOG','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
+const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','ADD_MINUTES','REMOVE_MINUTES','CATALOG','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
  subjectId:z.uuid().nullable(),reason:z.string().trim().min(10).max(500),input:z.unknown()}).strict();
 /** Staging BFF administration. Live session + explicit allowlist + AAL2 are
  * independently checked by SQL; customer metadata never defines authority. */
@@ -147,6 +147,8 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
   }
   if(input.action==='MODEL'){
    if(input.subjectId!==null)throw new AccountError('FORBIDDEN',403);values=model.parse(input.input);
+  }else if(input.action==='MODEL_DELETE'){
+   if(input.subjectId!==null)throw new AccountError('FORBIDDEN',403);values=modelDelete.parse(input.input);
   }else if(input.action==='CATALOG'){
    if(input.subjectId!==null)throw new AccountError('FORBIDDEN',403);
    values=z.object({code:z.enum(['pro_3_hours','pro_40_hours','enterprise_weekly','enterprise_monthly']),name:z.string().trim().min(2).max(80),enabled:z.boolean(),priority:z.number().int().min(0).max(1000)}).strict().parse(input.input);

@@ -36,7 +36,7 @@ it('rechecks the protected assurance fence before loading controls after verifie
  const select=host.querySelector('select')!;await act(async()=>{select.value=factor;select.dispatchEvent(new Event('change',{bubbles:true}));});
  const form=host.querySelector('form')!;(form.elements.namedItem('code') as HTMLInputElement).value='123456';
  await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
- expect(role.recheck).toHaveBeenCalledOnce();expect(host.textContent).toContain('AI model registry');
+ expect(role.recheck).toHaveBeenCalledOnce();expect(host.textContent).toContain('Models in the Cluera app');
 });
 function submit(){const form=host.querySelector('select[name="action"]')!.closest('form')!;
  (form.querySelector('[name="reason"]') as HTMLTextAreaElement).value='Synthetic staging test reason';
@@ -59,9 +59,9 @@ it('ignores older account responses and binds the mutation only to displayed ver
 it('blocks stale forms during loading and clears old controls after a failed selection',async()=>{
  const failing=pending(),fetcher=vi.fn((url:string,init?:RequestInit)=>init?.method==='POST'?Promise.resolve(Response.json({})):url.includes(a)?Promise.resolve(Response.json(view(a))):url.includes(b)?failing.promise:Promise.resolve(Response.json(view())));
  vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
- await act(async()=>{button('All recent accounts').click();});
+ await act(async()=>{button('Show recent').click();});
  await act(async()=>button(users[1].email).click());
- expect(host.querySelector('fieldset')?.disabled).toBe(true);
+ expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(true);
  await act(async()=>failing.resolve(Response.json({},{status:401})));
  expect(host.querySelector('select[name="action"]')).toBeNull();expect(button('Refresh account administration')).toBeTruthy();
  expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(0);
@@ -71,23 +71,23 @@ it('locks all new mutations after an uncertain write and retries only the identi
  vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
  await act(async()=>{submit();submit();});
  expect(fetcher.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
- expect(host.querySelector('fieldset')?.disabled).toBe(true);expect(button('All recent accounts').disabled).toBe(true);
- await act(async()=>button('Verify/retry the same operation').click());
+ expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(true);expect(button('Show recent').disabled).toBe(true);
+ await act(async()=>button('Try again').click());
  const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(2);expect(posts[0][1]?.body).toBe(posts[1][1]?.body);
 });
 it('ignores the first StrictMode effect response after cleanup',async()=>{
  const stale=pending();let count=0;vi.stubGlobal('fetch',vi.fn(()=>++count===1?stale.promise:Promise.resolve(Response.json(view()))));
  await act(async()=>root.render(createElement(StrictMode,null,createElement(AccountAdmin))));
  await act(async()=>stale.resolve(Response.json({needsMfa:true,factors:[]})));
- expect(host.textContent).toContain('AI model registry');expect(host.textContent).not.toContain('Enroll authenticator');
+ expect(host.textContent).toContain('Models in the Cluera app');expect(host.textContent).not.toContain('Enroll authenticator');
 });
 it('allows correction after a first definitely rejected operation and bounds POST transport',async()=>{
  const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({code:'INSUFFICIENT_UNUSED'},{status:409}):Response.json(view(url.includes(a)?a:undefined)));
  vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
  await act(async()=>submit());
  const first=fetcher.mock.calls.find(([,init])=>init?.method==='POST')!;
- expect(first[1]?.signal).toBeInstanceOf(AbortSignal);expect(host.querySelector('fieldset')?.disabled).toBe(false);
- expect(host.textContent).toContain('rejected without being applied');expect(host.textContent).not.toContain('An audited change is pending confirmation');
+ expect(first[1]?.signal).toBeInstanceOf(AbortSignal);expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(false);
+ expect(host.textContent).toContain('was not accepted');expect(host.textContent).not.toContain('Saving your change');
  await act(async()=>submit());
  const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(2);
  expect(JSON.parse(String(posts[0][1]?.body)).operationId).not.toBe(JSON.parse(String(posts[1][1]?.body)).operationId);
@@ -97,10 +97,10 @@ it('retains the same uncertain operation after a later rate-limit or authenticat
  const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({}, {status:++attempts===1?503:attempts===2?429:403}):Response.json(view(url.includes(a)?a:undefined)));
  vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
  await act(async()=>submit());
- for(let retry=0;retry<2;retry++)await act(async()=>button('Verify/retry the same operation').click());
+ for(let retry=0;retry<2;retry++)await act(async()=>button('Try again').click());
  const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(3);
  expect(posts[1][1]?.body).toBe(posts[0][1]?.body);expect(posts[2][1]?.body).toBe(posts[0][1]?.body);
- expect(host.querySelector('fieldset')?.disabled).toBe(true);expect(host.textContent).toContain('An audited change is pending confirmation');
+ expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(true);expect(host.textContent).toContain('Saving your change');
 });
 it('does not treat a malformed success response or timed-out mutation as confirmation',async()=>{
  let attempts=0;
@@ -110,22 +110,22 @@ it('does not treat a malformed success response or timed-out mutation as confirm
   return Response.json({ok:true});
  });
  vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());
- await act(async()=>submit());await act(async()=>button('Verify/retry the same operation').click());
- expect(host.querySelector('fieldset')?.disabled).toBe(true);
+ await act(async()=>submit());await act(async()=>button('Try again').click());
+ expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(true);
  const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts[1][1]?.body).toBe(posts[0][1]?.body);
 });
 it('provides anchored navigation and local audit filtering without extra requests or writes',async()=>{
  const fetcher=vi.fn(async()=>Response.json({...view(),audit:[{id:'one',action:'CATALOG',reason:'Synthetic catalog update',createdAt:'2026-10-12T00:00:00Z'},{id:'two',action:'SUSPEND',reason:'Synthetic suspension reason',createdAt:'2026-10-12T00:00:01Z'}]}));
  vi.stubGlobal('fetch',fetcher);await render();
- const links=host.querySelectorAll('nav[aria-label="Admin sections"] a');expect(links).toHaveLength(7);
- expect([...links].some(link=>link.getAttribute('href')==='#account-admin-billing')).toBe(true);
- for(const link of links)expect(host.querySelector(link.getAttribute('href')!)).not.toBeNull();
+ const links=host.querySelectorAll('nav[aria-label="Admin sections"] button');expect(links).toHaveLength(7);
+ expect([...links].map(link=>link.textContent)).toEqual(['Overview','Plans & pricing','AI models & keys','Customers','Payments','App updates','History']);
+ await act(async()=>(links[6] as HTMLButtonElement).click());expect(links[6].getAttribute('aria-selected')).toBe('true');
  const filter=host.querySelector('input[type="search"]') as HTMLInputElement;
  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
  await act(async()=>{setter.call(filter,'catalog');filter.dispatchEvent(new Event('input',{bubbles:true}));});
  expect(host.querySelector('.account-admin-audit')?.textContent).toContain('CATALOG');expect(host.querySelector('.account-admin-audit')?.textContent).not.toContain('SUSPEND');
- expect(fetcher).toHaveBeenCalledTimes(1);expect(host.textContent).toContain('recurring checkout is unavailable');
- expect(host.querySelector('#account-admin-billing-tools')?.textContent).toContain('Future');
+ expect(fetcher).toHaveBeenCalledTimes(1);expect(host.textContent).not.toContain('recurring checkout is unavailable');
+ expect(host.querySelector('#account-admin-billing-tools')).toBeNull();
 });
 
 it('includes releases in the parent uncertain-operation lock without allocating another mutation',async()=>{
@@ -134,7 +134,7 @@ it('includes releases in the parent uncertain-operation lock without allocating 
  await act(async()=>submit());const releaseForm=host.querySelector('#account-admin-releases form')!;
  expect(releaseForm.closest('fieldset')?.disabled).toBe(true);expect(button('Refresh Cluera releases').disabled).toBe(true);
  const before=fetcher.mock.calls.length;await act(async()=>releaseForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
- expect(fetcher).toHaveBeenCalledTimes(before);await act(async()=>button('Verify/retry the same operation').click());
+ expect(fetcher).toHaveBeenCalledTimes(before);await act(async()=>button('Try again').click());
  const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(2);expect(posts[1][1]?.body).toBe(posts[0][1]?.body);
 });
 
@@ -142,7 +142,7 @@ it('fences a release submission in the same event turn before the parent lock ha
  const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({},{status:503}):Response.json(view(url.includes(a)?a:undefined)));
  vi.stubGlobal('fetch',fetcher);await render();await act(async()=>button(users[0].email).click());const releaseForm=host.querySelector('#account-admin-releases form')!;
  await act(async()=>{submit();releaseForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
- const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(1);expect(JSON.parse(String(posts[0][1]?.body)).action).toBe('SUSPEND');
+ const posts=fetcher.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(1);expect(JSON.parse(String(posts[0][1]?.body)).action).toBe('ADD_MINUTES');
 });
 
 it('blocks release submissions while a parent Admin read is awaiting authorization',async()=>{

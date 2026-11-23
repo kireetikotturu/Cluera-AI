@@ -67,7 +67,7 @@ it('keeps an existing model display name, priority and declared health',async()=
  expect(rpc.mock.calls.find(([name]:any)=>name==='account_admin_mutate')[1].p_input).toMatchObject({displayName:'Meeting transcription',priority:7,health:'DEGRADED',enabled:true,isDefault:true});
 });
 it('rejects an unsupported provider and a wrong authenticator without touching the vault',async()=>{
- expect((await providerAdminRequest(post({...setup('gemini'),provider:'openai'}))).status).toBe(400);
+ expect((await providerAdminRequest(post({...setup('gemini'),provider:'mistral'}))).status).toBe(400);
  mfa.challengeAndVerify.mockResolvedValueOnce({data:null,error:Error('bad code')});
  expect((await providerAdminRequest(post(setup('gemini')))).status).toBe(403);
  expect(rpc.mock.calls.some(([name]:any)=>name==='cluera_provider_mutate')).toBe(false);
@@ -75,7 +75,6 @@ it('rejects an unsupported provider and a wrong authenticator without touching t
 it.each([
  ['REJECTED','CHECK_KEY','KEY_REJECTED',{status:'REJECTED',models:[],complete:false}],
  ['UNAVAILABLE','CHECK_KEY','PROVIDER_UNAVAILABLE',{status:'UNAVAILABLE',models:[],complete:false}],
- ['a listing without the required model','CHECK_KEY','MODEL_NOT_AVAILABLE',{status:'VERIFIED',models:[{id:'gemini-2.0-flash',runtimeCompatible:false}],complete:true}],
 ])('stops safely when the provider check is %s and never enables or approves a model',async(_name,stage,reason,probe)=>{
  fixture('gemini',probe);
  const result=await (await providerAdminRequest(post(setup('gemini')))).json();

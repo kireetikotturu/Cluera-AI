@@ -4,7 +4,7 @@ import {providerReceiptMetadata} from '../aiProviders/telemetry';
 import type {ReceiptMetadata} from '../aiProviders/usageMetadata';
 
 export type Guard = { signal: AbortSignal; assertActive(): void; runId?:string };
-export type ProviderSecrets = { geminiKey?: string; deepgramKey?: string; serviceKey: string; rateKey: string };
+export type ProviderSecrets = { geminiKey?: string; deepgramKey?: string; openaiKey?: string; anthropicKey?: string; serviceKey: string; rateKey: string };
 export type AudioConnection = { write(bytes: Buffer): void; forceEndTurn(): void; close(): void };
 export type Providers = {
   prepare?(kind:'gemini'|'deepgram',input?:Generate):Promise<void>;
@@ -21,13 +21,24 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
   fetch?: typeof fetch; connect?: (url: string, options: WebSocket.ClientOptions) => WebSocket;
   resolveModel?: (input: Generate) => Promise<string>;
   receipt?: (metadata:ReceiptMetadata)=>void;
+  /** Which answer provider serves this request (default Gemini). */
+  textProvider?: 'gemini' | 'openai' | 'anthropic';
+  /** Deepgram Flux model for live transcription (default flux-general-en). */
+  audioModel?: string;
 } = {}): Providers {
   const request = dependencies.fetch ?? fetch;
   const connect = dependencies.connect ?? ((url, options) => new WebSocket(url, options));
-  const privateValues = [secrets.geminiKey, secrets.deepgramKey, secrets.serviceKey, secrets.rateKey].filter((v):v is string=>Boolean(v));
+  const privateValues = [secrets.geminiKey, secrets.deepgramKey, secrets.openaiKey, secrets.anthropicKey, secrets.serviceKey, secrets.rateKey].filter((v):v is string=>Boolean(v));
   return {
     async generate(input, guard, emit) {
       guard.assertActive();
+      if (dependencies.textProvider === 'openai' || dependencies.textProvider === 'anthropic') {
+        const key = dependencies.textProvider === 'openai' ? secrets.openaiKey : secrets.anthropicKey;
+        if (!key || !dependencies.resolveModel) throw unavailable();
+        const selected = await dependencies.resolveModel(input);
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/.test(selected)) throw unavailable();
+        return chatGenerate(dependencies.textProvider, key, selected, input, guard, emit, request, privateValues);
+      }
       if(!secrets.geminiKey)throw unavailable();
       const selectedModel = dependencies.resolveModel ? await dependencies.resolveModel(input) : GEMINI_MODEL;
       if (!dependencies.resolveModel && input.modelId && input.modelId !== GEMINI_MODEL) throw unavailable();
@@ -118,7 +129,9 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
       guard.signal.addEventListener('abort', close, { once: true });
       try {
         active();
-        upstream = connect(`wss://api.deepgram.com/v2/listen?model=${DEEPGRAM_MODEL}&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eot_timeout_ms=4500`, {
+        const audioModel = dependencies.audioModel ?? DEEPGRAM_MODEL;
+        if (!/^flux-[a-z0-9-]{1,60}$/.test(audioModel)) throw unavailable();
+        upstream = connect(`wss://api.deepgram.com/v2/listen?model=${encodeURIComponent(audioModel)}&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eot_timeout_ms=4500`, {
           headers: { Authorization: `Token ${secrets.deepgramKey}` }, handshakeTimeout: 8000,
           followRedirects: false, maxPayload: 128000, perMessageDeflate: false,
         });
@@ -165,4 +178,80 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
       };
     },
   };
+}
+
+const ANSWER_SYSTEM = 'You are Cluera, a concise interview copilot. Answer clearly and directly.';
+/** Streaming answers from OpenAI (Chat Completions) or Anthropic (Messages). Fixed hosts,
+ * no redirects, bounded size and idle/total timeouts, secrets filtered from output. */
+async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model: string, input: Generate, guard: Guard,
+  emit: (text: string) => void, request: typeof fetch, privateValues: string[]) {
+  const controller = new AbortController();
+  const signal = AbortSignal.any([controller.signal, guard.signal]);
+  const cancel = () => controller.abort();
+  const total = setTimeout(cancel, 60000);
+  let idle = setTimeout(cancel, 20000);
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  const filter = secretFilter(privateValues);
+  try {
+    const image = input.image;
+    const response = provider === 'openai'
+      ? await request('https://api.openai.com/v1/chat/completions', {
+        method: 'POST', redirect: 'error', signal, cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ model, stream: true, max_completion_tokens: 3000, messages: [
+          { role: 'system', content: ANSWER_SYSTEM },
+          { role: 'user', content: image ? [{ type: 'text', text: input.prompt },
+            { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}` } }] : input.prompt },
+        ] }),
+      })
+      : await request('https://api.anthropic.com/v1/messages', {
+        method: 'POST', redirect: 'error', signal, cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model, stream: true, max_tokens: 3000, system: ANSWER_SYSTEM, messages: [
+          { role: 'user', content: [...(image ? [{ type: 'image', source: { type: 'base64', media_type: image.mimeType, data: image.data } }] : []),
+            { type: 'text', text: input.prompt }] },
+        ] }),
+      });
+    guard.assertActive();
+    if (!response.ok || !response.body) { await response.body?.cancel(); throw unavailable(); }
+    reader = response.body.getReader();
+    let buffer = '', totalBytes = 0, hasAnswer = false;
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    const event = (raw: string) => {
+      guard.assertActive();
+      const data = raw.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5)).join('\n').trim();
+      if (!data || data === '[DONE]') return;
+      const value = JSON.parse(data);
+      if (value.error || value.type === 'error') throw unavailable();
+      const text = provider === 'openai' ? value.choices?.[0]?.delta?.content
+        : value.type === 'content_block_delta' && value.delta?.type === 'text_delta' ? value.delta.text : undefined;
+      if (typeof text !== 'string' || !text) return;
+      if (text.trim()) hasAnswer = true;
+      const safe = filter.push(text);
+      if (safe) emit(safe);
+    };
+    while (true) {
+      guard.assertActive();
+      const { done, value } = await reader.read();
+      guard.assertActive();
+      if (signal.aborted) throw unavailable();
+      if (done) break;
+      clearTimeout(idle); idle = setTimeout(cancel, 20000);
+      totalBytes += value.byteLength;
+      if (totalBytes > 2_000_000) throw unavailable();
+      buffer += decoder.decode(value, { stream: true });
+      let boundary: RegExpExecArray | null;
+      while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
+        if (boundary.index > 128000) throw unavailable();
+        event(buffer.slice(0, boundary.index)); buffer = buffer.slice(boundary.index + boundary[0].length);
+      }
+      if (buffer.length > 128000) throw unavailable();
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) event(buffer);
+    guard.assertActive();
+    if (!hasAnswer) throw unavailable();
+    const final = filter.push('', true); if (final) emit(final);
+  } catch { throw unavailable(); }
+  finally { clearTimeout(total); clearTimeout(idle); cancel(); await reader?.cancel().catch(() => undefined); }
 }
