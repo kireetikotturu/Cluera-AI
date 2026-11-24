@@ -40,6 +40,12 @@ export type StagingRelayConnection = {
   stop(): void;
 };
 const unavailable = () => new Error('Account relay unavailable.');
+/** While more than this is waiting to be sent (for example a screenshot still uploading), audio chunks are skipped. */
+const AUDIO_BACKLOG_BYTES = 256_000;
+/** A command (a screenshot can be several MB) may wait behind this much; more means the link is not coping. */
+const COMMAND_BACKLOG_BYTES = 9_000_000;
+/** A link that stays blocked this long is dead, not busy. */
+const LINK_STALL_MS = 30_000;
 
 /** Main-process only. A WSS upgrade is NOT account authorization. No automatic
  * reconnect/replay (which could duplicate usage), credentials in headers/URLs,
@@ -76,9 +82,20 @@ export function openStagingRelay(accessToken: string, owner: AbortSignal,
         socket.close(1000, 'Session ended.');
       } catch { socket.terminate(); }
     }
-    function send(bytes: string | Buffer) {
+    let backedUpSince = 0;
+    /**
+     * Audio is skipped, not queued, while the link is busy: ending the whole session because a screenshot was still
+     * uploading is what used to cut the live audio. Only a link that is truly stuck ends the session.
+     */
+    function send(bytes: string | Buffer, audio = false): void {
       if (ended || !authorized || peer?.readyState !== WebSocket.OPEN) throw unavailable();
-      if (peer.bufferedAmount > 256000) { finish(false); throw unavailable(); }
+      const backlog = peer.bufferedAmount;
+      if (backlog > AUDIO_BACKLOG_BYTES) {
+        const now = Date.now();
+        backedUpSince ||= now;
+        if (backlog > COMMAND_BACKLOG_BYTES || now - backedUpSince > LINK_STALL_MS) { finish(false); throw unavailable(); }
+        if (audio) return;
+      } else backedUpSince = 0;
       try { peer.send(bytes, error => { if (error) finish(false); }); }
       catch { finish(false); throw unavailable(); }
     }
@@ -118,7 +135,7 @@ export function openStagingRelay(accessToken: string, owner: AbortSignal,
               },
               writeAudio(source, pcm) {
                 if (!readyAudio.has(source) || !channel.safeParse(source).success || !Buffer.isBuffer(pcm) || !pcm.length || pcm.length > 8192 || pcm.length % 2) throw unavailable();
-                send(Buffer.concat([Buffer.from([source === 'interviewer' ? 0 : 1]), pcm]));
+                send(Buffer.concat([Buffer.from([source === 'interviewer' ? 0 : 1]), pcm]), true);
               },
               stop: () => finish(true) });
           } else {

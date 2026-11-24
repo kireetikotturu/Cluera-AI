@@ -244,6 +244,29 @@ describe('staging account relay boundaries', () => {
     expect(h.audio.close).toHaveBeenCalled();
     expect(h.command.mock.calls.map(([c]) => c.action)).toEqual(['START', 'CHECKPOINT', 'STOP']);
   });
+  it('keeps a session alive while a large upload is still arriving, but not a connection that went quiet', async () => {
+    const h = harness(); await h.login();
+    const socket = { bytesRead: 0 }; (h.peer as unknown as { _socket: typeof socket })._socket = socket;
+    h.peer.ping = vi.fn();                                  // the reply is stuck behind the screenshot being uploaded
+    h.peer.input({ type: 'openAudio', channel: 'interviewer' }); await tick();
+    await vi.advanceTimersByTimeAsync(20000); expect(h.peer.ping).toHaveBeenCalledOnce();
+    socket.bytesRead = 200_000;                             // the screenshot is arriving
+    await vi.advanceTimersByTimeAsync(10000); expect(h.peer.readyState).toBe(WebSocket.OPEN);
+    socket.bytesRead = 400_000;
+    await vi.advanceTimersByTimeAsync(10000); expect(h.peer.readyState).toBe(WebSocket.OPEN);
+    await vi.advanceTimersByTimeAsync(10000);               // nothing more arrived: it really is dead
+    expect(h.peer.readyState).toBe(WebSocket.CLOSED);
+    expect(h.command.mock.calls.map(([c]) => c.action)).toContain('STOP');
+  });
+  it('does not end an idle limit while upload bytes keep arriving', async () => {
+    const h = harness(); await h.login();
+    const socket = { bytesRead: 0 }; (h.peer as unknown as { _socket: typeof socket })._socket = socket;
+    h.peer.ping = vi.fn(() => { h.peer.emit('pong'); });
+    h.peer.input({ type: 'openAudio', channel: 'interviewer' }); await tick();
+    for (let step = 1; step <= 3; step++) { socket.bytesRead = step * 500_000; await vi.advanceTimersByTimeAsync(44000); expect(h.peer.readyState).toBe(WebSocket.OPEN); }
+    await vi.advanceTimersByTimeAsync(46000);               // no more bytes: the idle limit applies again
+    expect(h.peer.readyState).toBe(WebSocket.CLOSED);
+  });
 });
 
 describe('managed account provider adapters', () => {

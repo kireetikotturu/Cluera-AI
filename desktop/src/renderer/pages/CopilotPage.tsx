@@ -1041,6 +1041,23 @@ export function CopilotPage(): JSX.Element {
     panel.scrollBy({ top: direction * lineHeight * 3, behavior: 'smooth' });
   }), []);
 
+  // The app ended the live session itself because its connection could not be restored. Make the page match, so
+  // the Start button works at once: not running, devices prepared again on Start, and the live window mode (and with
+  // it the shortcuts) switched back on, which the shutdown turned off.
+  const interruptedRef = useRef<() => void>(() => undefined);
+  useLayoutEffect(() => {
+    interruptedRef.current = (): void => {
+      pauseSessionTimer();
+      setRunning(false); setDeviceCheckActive(false); setCollapsed(false);
+      preparedSessionId.current = null; deviceCheckPromise.current = null; microphoneEpoch.current += 1;
+      setSystemAudioStatus('error'); setMicrophoneStatus(microphoneMode === 'off' ? 'disabled' : 'error');
+      void audio.current.stop(); void candidateAudio.current.stop();
+      void Promise.resolve(window.electronAPI.setSessionWindowMode(true)).catch(() => undefined);
+      store.setError('The connection to Cluera was lost and could not be restored. Press Start to continue.');
+    };
+  });
+  useEffect(() => window.electronAPI.onEvent('session:interrupted', () => interruptedRef.current()), []);
+
   const control = async (mode: AnswerStyleMode): Promise<void> => {
     if (running && activeId && currentQuestion && !analyzingScreen) {
       await window.electronAPI.requestAnswer({ sessionId: activeId, question: currentQuestion, mode });

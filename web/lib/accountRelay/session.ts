@@ -29,6 +29,12 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
   let pongDeadline: ReturnType<typeof setTimeout> | undefined;
   let awaitingPong = false;
   let idle = setTimeout(() => end('authorization_failed'), 10000);
+  // A large screenshot from a slow connection can hold up the reply to a ping and leave no room for audio for a
+  // while. Bytes still arriving mean the client is alive, so neither the idle limit nor the ping check ends a
+  // session while an upload is in progress. A connection that really went quiet still ends as before.
+  const UPLOAD_PROGRESS_BYTES = 32768;
+  const bytesRead = (): number => (peer as unknown as { _socket?: { bytesRead?: number } })._socket?.bytesRead ?? 0;
+  let idleMark = 0, pongMark = 0;
   let closedTimer: ReturnType<typeof setTimeout> | undefined;
   // Diagnostics must never prevent credential denial, cancellation or closure.
   function observe(event: RelayEvent) { try { dependencies.observe?.(event); } catch { /* fixed event only */ } }
@@ -67,15 +73,23 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
   }
   function touch() {
     clearTimeout(idle);
+    idleMark = bytesRead();
     // Only real audio/commands/output, not client keepalive, refresh the idle limit.
-    idle = setTimeout(() => end(), 45000);
+    idle = setTimeout(() => { if (!ended && bytesRead() - idleMark > UPLOAD_PROGRESS_BYTES) touch(); else end(); }, 45000);
+  }
+  function waitForPong(started: number) {
+    pongDeadline = setTimeout(() => {
+      if (ended || !awaitingPong) return;
+      if (bytesRead() - pongMark > UPLOAD_PROGRESS_BYTES && performance.now() - started < 90000) { pongMark = bytesRead(); waitForPong(started); return; }
+      end();
+    }, 10000);
   }
   function schedulePing() {
     if (ended) return;
     heartbeat = setTimeout(() => {
       try {
-        active(); awaitingPong = true;
-        pongDeadline = setTimeout(() => end(), 10000);
+        active(); awaitingPong = true; pongMark = bytesRead();
+        waitForPong(performance.now());
         peer.ping();
       } catch { end(); }
     }, 20000);

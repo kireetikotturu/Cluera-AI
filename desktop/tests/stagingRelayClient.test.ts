@@ -119,7 +119,8 @@ it('refuses an already-ended owner without creating a socket', async () => {
 it('fails closed on backpressure and send failure without replay or reconnect', async () => {
   for (const mode of ['backpressure', 'send-error']) {
     const test = setup(); test.socket.message({ type: 'ready', protocol: 1 }); const session = await test.result;
-    if (mode === 'backpressure') test.socket.bufferedAmount = 256001;
+    // A command (a screenshot can be several MB) may queue behind a lot; far more than that means the link is stuck.
+    if (mode === 'backpressure') test.socket.bufferedAmount = 9_000_001;
     else test.socket.send.mockImplementation(() => { throw Error('sensitive'); });
     expect(() => session.send({ type: 'openAudio', channel: 'interviewer' })).toThrow('Account relay unavailable.');
     expect(session.signal.aborted).toBe(true); expect(test.connect).toHaveBeenCalledOnce();

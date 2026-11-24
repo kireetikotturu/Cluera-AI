@@ -4,10 +4,12 @@ import { z } from 'zod';
 import type { AudioSourceDescriptor, TranscriptEvent, TurnEvent } from '../../shared/types';
 import { parseFluxMessage } from '../stt/DeepgramRecognizer';
 import type { SpeechRecognizer } from '../stt/SpeechRecognizer';
-import { openStagingRelay, type RelayOutput, type StagingRelayConnection } from './StagingRelayClient';
+import { openStagingRelay, type RelayCommand, type RelayOutput, type StagingRelayConnection } from './StagingRelayClient';
 
 type Channel = 'interviewer' | 'candidate';
 type Authority = { authorizeWork(): Promise<{ accessToken: string; signal: AbortSignal }> };
+/** What the live page is told while the audio connection is being restored. */
+export type ConnectionState = 'reconnecting' | 'restored' | 'failed';
 const failure = () => new Error('Account provider session ended. Check your connection and account balance.');
 /** One answer failed on the provider's side; audio and the session are still running. */
 const answerFailure = () => new Error('The AI model could not answer this time. Please ask again, or choose another model in Settings.');
@@ -17,22 +19,37 @@ const requestBody = z.object({ contents: z.array(z.object({ role: z.literal('use
     z.object({ inlineData: image }).strict()])).min(1).max(2) }).strict()).length(1),
   generationConfig: z.unknown().optional(), modelId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/).optional() }).strict();
 
+/** The relay ends a connection when its sign-in token runs out, when the network blinks, when the server restarts
+ * or when a large screenshot upload starves the heartbeat. While the account is still signed in, live audio is
+ * reconnected after these waits; once they are used up, or too many reconnects happen in a short time, the
+ * session ends exactly as it always did. */
+export const RECONNECT_DELAYS_MS = [300, 1_200, 3_000, 6_000, 10_000] as const;
+export const MAX_RECONNECTS = 6;
+export const RECONNECT_WINDOW_MS = 120_000;
+
 /** One account owner, one WSS session, one server usage reservation shared by
- * Gemini and both audio channels. Never replays commands or reconnects itself. */
+ * Gemini and both audio channels. Commands are never replayed: after a lost connection only the audio channels
+ * are opened again, on a new connection with a freshly authorized token. */
 export class AccountProviderRuntime {
   private connection?: StagingRelayConnection;
   private connecting?: Promise<StagingRelayConnection>;
   private lifetime = new AbortController();
+  private authSignal?: AbortSignal;
   private epoch = 0;
   private preparing = false;
+  private recovering = false;
+  private recoveries: number[] = [];
   private lastGeneration = -Infinity;
   private readonly listeners = new Map<Channel, (event: RelayOutput) => void>();
+  private readonly interrupted = new Map<Channel, (reconnecting: boolean) => void>();
   private generation?: { id: string; chunk(text: string): void; finish(error?: Error): void };
   private cancellation?: { id:string; settled:Promise<boolean>; resolve(value:boolean):void; timer:ReturnType<typeof setTimeout> };
   constructor(private readonly account: Authority, private readonly connect = openStagingRelay,
     private readonly stopped: () => void = () => undefined,
     private readonly context?: (prompt:string,signal:AbortSignal)=>Promise<string>,
-    private readonly activity:(active:boolean)=>void=()=>undefined) {}
+    private readonly activity:(active:boolean)=>void=()=>undefined,
+    private readonly notify:(state:ConnectionState)=>void=()=>undefined,
+    private readonly reconnectDelays: readonly number[] = RECONNECT_DELAYS_MS) {}
 
   private receive = (event: RelayOutput): void => {
     if(event.type==='answerDone' && event.id===this.cancellation?.id){
@@ -50,15 +67,62 @@ export class AccountProviderRuntime {
     const attempt = (async () => {
       const auth = await this.account.authorizeWork();
       if (epoch !== this.epoch) throw failure();
+      this.authSignal = auth.signal;
       const owner = AbortSignal.any([auth.signal, this.lifetime.signal]);
       const connection = await this.connect(auth.accessToken, owner, this.receive);
       if (epoch !== this.epoch || owner.aborted || connection.signal.aborted) { connection.stop(); throw failure(); }
       this.connection = connection;
       this.activity(true);
-      connection.signal.addEventListener('abort', () => { if (epoch === this.epoch) { this.stop(); this.stopped(); } }, { once: true });
+      connection.signal.addEventListener('abort', () => { if (epoch === this.epoch) void this.lost(connection); }, { once: true });
       return connection;
     })().catch(() => { throw failure(); }).finally(() => { if (this.connecting === attempt) this.connecting = undefined; });
     this.connecting = attempt; return attempt;
+  }
+  /**
+   * The connection ended. If the account is still signed in and audio was live, open it again so a transient problem
+   * does not end the interview or assignment. Logout, account changes and a deliberate stop end everything at once.
+   */
+  private async lost(failed: StagingRelayConnection): Promise<void> {
+    if (this.connection !== failed) return;
+    const epoch = this.epoch;
+    const channels = [...this.listeners.keys()];
+    this.connection = undefined; this.connecting = undefined;
+    this.activity(false);
+    if (this.cancellation) { clearTimeout(this.cancellation.timer); this.cancellation.resolve(false); this.cancellation = undefined; }
+    this.generation?.finish(failure()); // only the answer being written is lost
+    if (this.authSignal?.aborted) { this.stop(); this.stopped(); return; }
+    if (!channels.length) { this.stop(); return; } // nothing live to keep: the next question connects again by itself
+    if (this.recovering) return; // the running recovery tries again with this connection gone
+    const now = Date.now();
+    this.recoveries = this.recoveries.filter(at => now - at < RECONNECT_WINDOW_MS);
+    if (this.recoveries.length >= MAX_RECONNECTS) { this.giveUp(epoch); return; }
+    this.recoveries.push(now);
+    this.recovering = true;
+    try {
+      this.notify('reconnecting');
+      for (const interrupt of this.interrupted.values()) interrupt(true);
+      for (const wait of this.reconnectDelays) {
+        try { await delay(wait, undefined, { signal: this.lifetime.signal }); } catch { return; }
+        if (epoch !== this.epoch) return;
+        try {
+          const connection = await this.ensure();
+          if (epoch !== this.epoch) return;
+          for (const channel of channels) if (this.listeners.has(channel)) connection.send({ type: 'openAudio', channel });
+          this.notify('restored');
+          return;
+        } catch {
+          if (epoch !== this.epoch) return;
+          if (this.authSignal?.aborted) break; // signed out meanwhile: no point trying again
+        }
+      }
+      this.giveUp(epoch);
+    } finally { this.recovering = false; }
+  }
+  private giveUp(epoch: number): void {
+    if (epoch !== this.epoch) return;
+    for (const interrupt of [...this.interrupted.values()]) interrupt(false);
+    this.notify('failed');
+    this.stop(); this.stopped();
   }
   stop(): void {
     ++this.epoch;
@@ -66,8 +130,19 @@ export class AccountProviderRuntime {
     const old = this.connection; this.connection = undefined; this.connecting = undefined;
     this.lifetime.abort(); this.lifetime = new AbortController();
     if(this.cancellation){clearTimeout(this.cancellation.timer);this.cancellation.resolve(false);this.cancellation=undefined;}
-    this.generation?.finish(failure()); this.listeners.clear(); old?.stop();
+    this.generation?.finish(failure()); this.listeners.clear(); this.interrupted.clear(); old?.stop();
     if(old)this.activity(false);
+  }
+  /** The live connection, or an error while it is being restored. Audio is simply skipped during that time. */
+  writeAudio(channel: Channel, pcm: Buffer): void {
+    const connection = this.connection;
+    if (!connection || connection.signal.aborted) throw failure();
+    connection.writeAudio(channel, pcm);
+  }
+  sendControl(command: RelayCommand): void {
+    const connection = this.connection;
+    if (!connection || connection.signal.aborted) throw failure();
+    connection.send(command);
   }
   /** Adapts existing prompt/screenshot construction to the bounded relay protocol.
    * Server chooses provider/model/generation policy; no URL or key is accepted. */
@@ -113,9 +188,10 @@ export class AccountProviderRuntime {
         else {
           let resolve!:(value:boolean)=>void;
           const settled=new Promise<boolean>(done=>{resolve=done;});
-          const timer=setTimeout(()=>this.stop(),5000);timer.unref?.();
+          // If the relay does not confirm the cancellation in time, drop this connection; live audio is then reopened.
+          const timer=setTimeout(()=>connection.stop(),5000);timer.unref?.();
           this.cancellation={id,settled,resolve,timer};
-          try { connection.send({ type: 'cancelGeneration' }); } catch { this.stop(); }
+          try { connection.send({ type: 'cancelGeneration' }); } catch { connection.stop(); }
         }
       }
       if (!consumerCancelled) { if (error) control.error(error); else control.close(); }
@@ -146,24 +222,27 @@ export class AccountProviderRuntime {
   recognizer(source: AudioSourceDescriptor): SpeechRecognizer {
     return new AccountSpeechRecognizer(this, source);
   }
-  async openAudio(channel: Channel, receive: (event: RelayOutput) => void, signal: AbortSignal): Promise<StagingRelayConnection> {
+  async openAudio(channel: Channel, receive: (event: RelayOutput) => void, signal: AbortSignal,
+    interrupted?: (reconnecting: boolean) => void): Promise<StagingRelayConnection> {
     const epoch = this.epoch, connection = await this.ensure();
     if (epoch !== this.epoch || signal.aborted || this.listeners.has(channel)) {
       if (epoch === this.epoch && !this.generation && this.listeners.size === 0) this.stop();
       throw failure();
     }
     this.listeners.set(channel, receive);
+    if (interrupted) this.interrupted.set(channel, interrupted);
     try { connection.send({ type: 'openAudio', channel }); } catch {
-      this.listeners.delete(channel);
+      this.listeners.delete(channel); this.interrupted.delete(channel);
       if (!this.generation && this.listeners.size === 0) this.stop();
       throw failure();
     }
     return connection;
   }
   closeAudio(channel: Channel): void {
+    this.interrupted.delete(channel);
     if (!this.listeners.delete(channel)) return;
     if (this.connection && !this.connection.signal.aborted) {
-      try { this.connection.send({ type: 'closeAudio', channel }); } catch { this.stop(); }
+      try { this.connection.send({ type: 'closeAudio', channel }); } catch { this.connection.stop(); }
     }
     if(this.listeners.size===0&&!this.generation)this.stop();
   }
@@ -175,10 +254,8 @@ class AccountSpeechRecognizer implements SpeechRecognizer {
   private turn: (value: TurnEvent) => void = () => undefined;
   private error: (error: Error) => void = () => undefined;
   private owner = new AbortController();
-  private connection?: StagingRelayConnection;
   private ready = false;
   private channel: Channel;
-  private closeListener?: () => void;
   private forceEnd?: ReturnType<typeof setTimeout>;
   private lastTranscript = '';
   constructor(private readonly runtime: AccountProviderRuntime, private readonly source: AudioSourceDescriptor) {
@@ -205,29 +282,28 @@ class AccountSpeechRecognizer implements SpeechRecognizer {
             clearTimeout(this.forceEnd); this.lastTranscript = event.transcript;
             this.forceEnd = setTimeout(() => {
               if (!this.ready || this.owner.signal.aborted) return;
-              try { this.connection?.send({ type:'forceEndTurn', channel:this.channel }); }
-              catch { this.error(failure()); void this.stop(); }
+              // A failed send only means the connection is being restored; the next turn will force-end normally.
+              try { this.runtime.sendControl({ type:'forceEndTurn', channel:this.channel }); } catch { /* connection restoring */ }
             }, 3200);
             this.forceEnd.unref?.();
           }
         }
-      }, this.owner.signal).then(connection => {
-        this.connection = connection;
-        this.closeListener = () => { this.ready = false; fail(); if (!this.owner.signal.aborted) this.error(failure()); };
-        connection.signal.addEventListener('abort', this.closeListener, { once: true });
-        if (connection.signal.aborted) this.closeListener();
-      }, fail);
+      }, this.owner.signal, reconnecting => {
+        // The connection was lost. Audio is skipped until it is restored (the relay then confirms with audioReady
+        // again); only when it cannot be restored does this source fail, as it always did.
+        this.ready = false; clearTimeout(this.forceEnd); this.lastTranscript = '';
+        if (!reconnecting && !this.owner.signal.aborted) { fail(); this.error(failure()); }
+      }).then(undefined, fail);
     });
   }
   sendAudio(pcm: Buffer): void {
     if (!this.ready || this.owner.signal.aborted) return; // no unbounded pre-readiness PCM queue
-    try { this.connection?.writeAudio(this.channel, pcm); } catch { this.ready = false; this.error(failure()); void this.stop(); }
+    // While the link is busy or being restored this chunk is skipped; the runtime reports a real, final failure.
+    try { this.runtime.writeAudio(this.channel, pcm); } catch { /* skipped; a lost connection is reported through the runtime */ }
   }
   async stop(): Promise<void> {
     clearTimeout(this.forceEnd); this.lastTranscript = '';
     this.ready = false; this.owner.abort(); this.runtime.closeAudio(this.channel);
-    if (this.closeListener) this.connection?.signal.removeEventListener('abort', this.closeListener);
-    this.connection = undefined;
   }
   onPartialTranscript(callback: (value: TranscriptEvent) => void): void { this.partial = callback; }
   onFinalTranscript(callback: (value: TranscriptEvent) => void): void { this.final = callback; }

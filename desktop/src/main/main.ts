@@ -126,7 +126,14 @@ async function createWindow(): Promise<void> {
   }
   const accountProviders = account ? new AccountProviderRuntime(account, undefined, () => { void stopAccountWork(); },
     accountContext ? (prompt, signal) => accountContext.augment(prompt, signal) : undefined,
-    active=>accountCredits?.activity(active)) : undefined;
+    active=>accountCredits?.activity(active),
+    // A lost connection is restored in the background; the live page only needs to know it is happening.
+    state => {
+      emit('copilot:status', state === 'reconnecting' ? { status: 'recovering', message: 'Reconnecting audio…' }
+        : state === 'restored' ? { status: 'listening', message: 'Audio reconnected' } : { status: 'recovering', message: 'Audio connection lost' });
+      // Reconnecting gave up: the session is about to end, so tell the live page to match (a logout is not this).
+      if (state === 'failed') emit('session:interrupted', null);
+    }) : undefined;
   const applyMode = (): void => {
     if (!accountProviders) throw new Error('Cluera account provider runtime is unavailable.');
     config.accountManaged = true; config.providerMode = 'managed'; config.demoMode = false;
