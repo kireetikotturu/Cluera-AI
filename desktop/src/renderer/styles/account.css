@@ -81,3 +81,19 @@
   .account-session .wizard-actions { padding: 12px 16px 18px; }
 }
 @media (max-height: 600px) { .account-login-scroll { padding-block: 18px; } .account-login-card { padding-block: 22px; } }
+
+/* Small time/limits card (Settings) */
+.account-credits-small { margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.account-credits-small .acs-main { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 22px; }
+.account-credits-small .acs-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 10px; color: var(--accent-text); background: rgba(var(--accent-rgb), 0.12); }
+.account-credits-small small { display: block; color: var(--faint); font-size: 9px; }
+.account-credits-small strong { font-size: 15px; letter-spacing: -.3px; }
+.account-credits-small .acs-actions { margin-left: auto; display: flex; gap: 6px; }
+.account-credits-small .acs-actions button { min-height: 30px; padding: 0 11px; border-radius: 9px; font-size: 10px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.account-credits-small .acs-details { margin-top: 8px; font-size: 10px; color: var(--muted); }
+.account-credits-small .acs-details summary { cursor: pointer; color: var(--faint); }
+.account-credits-small .acs-bucket { display: grid; grid-template-columns: 130px 1fr auto; align-items: center; gap: 10px; padding: 5px 0; }
+.account-credits-small .acs-bucket progress { width: 100%; height: 5px; }
+.account-credits-small .acs-bucket em { font-style: normal; color: var(--faint); }
+.account-credits-small .acs-note { margin: 8px 0 0; color: var(--warning); font-size: 10px; }
+.account-login-bar .account-login-logo { width: 28px; height: 28px; border-radius: 9px; }

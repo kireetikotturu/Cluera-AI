@@ -2,6 +2,7 @@ import { ArrowLeft, FileText, Plus, Shrink, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { LibraryFile, LibraryFileCategory } from '../../shared/types';
 import { useAppStore } from '../stores/appStore';
+import clueraLogo from '../assets/cluera-ai.svg';
 
 const fileSize = (bytes: number): string => bytes >= 1_048_576
   ? `${(bytes / 1_048_576).toFixed(1)} MB`
@@ -61,7 +62,7 @@ export function FileLibraryPage({ onCollapse }: FileLibraryPageProps): JSX.Eleme
   return <main className="file-library-page">
     <header className="file-library-header">
       <button className="library-back" onClick={() => setPage('home')}><ArrowLeft size={16}/>Dashboard</button>
-      <div><span className="dashboard-mark">M</span><strong>Files</strong></div>
+      <div><span className="dashboard-mark"><img src={clueraLogo} alt=""/></span><strong>Files</strong></div>
       <div className="library-header-actions">
         <button className="library-collapse" aria-label="Collapse Cluera AI" title="Collapse to floating logo" onClick={onCollapse}><Shrink size={16}/></button>
         <button className="library-close" aria-label="Close Cluera AI" title="Close Cluera AI" onClick={() => void window.electronAPI.closeWindow()}><X size={17}/></button>

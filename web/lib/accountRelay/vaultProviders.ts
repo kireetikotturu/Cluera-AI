@@ -31,14 +31,18 @@ export function vaultProviders(config:RelayConfig,rpc:Rpc,env:NodeJS.ProcessEnv=
    const snapshot=await resolve('gemini',input);guard.assertActive();
    const held=lease(snapshot,guard,()=>{});
    let receipt:Awaited<ReturnType<typeof telemetry.start>>|undefined,succeeded=false;
+   // Usage metadata is recorded for Gemini (ChatGPT/Claude are still metered by the account time ledger).
+   // It is logged alongside the provider request instead of before it, so it never delays the first word;
+   // a logging failure is only metadata and never blocks an answer.
+   const receiptReady=snapshot.provider==='gemini'
+    ?telemetry.start({runId:guard.runId,provider:'gemini',credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model})
+      .then(handle=>{receipt=handle;},()=>undefined):Promise.resolve();
    try{
-    // Usage metadata is recorded for Gemini; ChatGPT/Claude sessions are still metered by the account time ledger.
-    if(snapshot.provider==='gemini')receipt=await telemetry.start({runId:guard.runId,provider:'gemini',credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model});
     held.guard.assertActive();
     const keys=snapshot.provider==='openai'?{openaiKey:snapshot.key}:snapshot.provider==='anthropic'?{anthropicKey:snapshot.key}:{geminiKey:snapshot.key};
     await providerAdapters({...config,...keys},{resolveModel:async()=>snapshot.model,textProvider:snapshot.provider as 'gemini'|'openai'|'anthropic',
      receipt:value=>receipt?.observe(value)}).generate(input,held.guard,emit);succeeded=true;
-   }finally{held.close();await receipt?.finish(succeeded?'SUCCEEDED':guard.signal.aborted?'CANCELLED':'FAILED');}
+   }finally{held.close();await receiptReady;await receipt?.finish(succeeded?'SUCCEEDED':guard.signal.aborted?'CANCELLED':'FAILED');}
   },
   audio(guard,emit,failed,ready){
    let peer:AudioConnection|undefined,closed=false,cleanup:()=>void=()=>{},receipt:Awaited<ReturnType<typeof telemetry.start>>|undefined;

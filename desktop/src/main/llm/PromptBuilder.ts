@@ -14,9 +14,13 @@ export class PromptBuilder {
       interviewer: 'INTERVIEWER', candidate: 'CANDIDATE ACTUALLY SAID', copilot: 'PREVIOUS AI SUGGESTION',
     })[speaker];
     const completeConversation = context.recentConversation.map((turn) => `${speakerLabel(turn.speaker)}: ${turn.text.slice(0, 2_500)}`).join('\n');
-    const conversationMemory = completeConversation.length <= 60_000
+    // Fewer input tokens means a faster first word. Keep the opening turns and the most recent
+    // conversation; the middle of a long interview rarely changes the next answer.
+    const conversationMemory = completeConversation.length <= 20_000
       ? completeConversation
-      : `${completeConversation.slice(0, 15_000)}\n[Older middle turns omitted to keep the request bounded.]\n${completeConversation.slice(-45_000)}`;
+      : `${completeConversation.slice(0, 2_000)}
+[Older middle turns omitted to keep the request fast.]
+${completeConversation.slice(-18_000)}`;
     return `You are an interview practice and authorized-session copilot helping a student or candidate formulate truthful, useful answers. Write only the candidate's suggested answer.
 
 NON-NEGOTIABLE RULES

@@ -2,6 +2,7 @@ import {ArrowRight, Eye, EyeOff, ShieldCheck, X} from 'lucide-react';
 import {useEffect, useRef, useState} from 'react';
 import type {AccountAuthOptions, AccountView, AccountWebAction} from '../../shared/accounts';
 import {SupportDialog} from './SupportDialog';
+import clueraLogo from '../assets/cluera-ai.svg';
 
 /** Credentials live only in this form; main still owns all authentication. */
 export function AccountLogin({state,onState}:{state:AccountView;onState(state:AccountView):void}):JSX.Element {
@@ -33,7 +34,7 @@ export function AccountLogin({state,onState}:{state:AccountView;onState(state:Ac
   };
   const locked=busy||state.state==='checking';
   return <main className="account-login">
-    <header className="account-login-bar"><span><b aria-hidden="true">Σ</b>Cluera AI</span>
+    <header className="account-login-bar"><span><img className="account-login-logo" src={clueraLogo} alt=""/>Cluera AI</span>
       <button type="button" aria-label="Close Cluera AI" onClick={()=>void window.electronAPI.closeWindow()}><X size={18}/></button></header>
     <div className="account-login-scroll">
       <section className="activation-card account-login-card" aria-labelledby="account-login-title" aria-busy={locked}>

@@ -12,7 +12,6 @@ import { filterSessions } from '../services/sessionSearch';
 import { requireSessionProviderSetup } from '../services/providerSetup';
 import clueraLogo from '../assets/cluera-ai.svg';
 import type {AccountView} from '../../shared/accounts';
-import {AccountCreditsSection} from '../components/AccountCreditsSection';
 
 const formatDate = (value: string): string => new Intl.DateTimeFormat(undefined, {
   month: 'short', day: 'numeric', year: 'numeric',
@@ -208,7 +207,6 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
     </header>
 
     <section className="dashboard-content">
-      {account&&<AccountCreditsSection key={account.userId} userId={account.userId}/>}
       {checkingSetup && <p role="status">Checking session setup…</p>}
       {setupError && <div className="settings-note" role="alert" tabIndex={-1} ref={setupErrorRef}><p>{setupError.message}</p><button className="ghost" onClick={() => setPage('settings')}>Open Settings</button>{setupError.sessionId && <button className="ghost" onClick={() => { setActive(setupError.sessionId!); setPage('create'); }}>Edit saved session</button>}</div>}
       <div className="dashboard-intro"><div><p>SESSION WORKSPACE</p><h1>Your interviews</h1></div><span role="status">{search.trim() ? `${filteredSessions.length} of ${sessions.length}` : sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}</span></div>

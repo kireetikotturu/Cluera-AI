@@ -1245,6 +1245,7 @@ export function CopilotPage(): JSX.Element {
     <aside className="live-side-rail" aria-label="Live controls">
       <div className="live-rail-scroll">
         <span className="live-drag-handle" title="Drag Cluera AI"><Move size={15}/></span>
+        <button className="rail-collapse" aria-label="Collapse to floating logo" title="Collapse to floating logo" onClick={() => void setLiveCollapsed(true)}><Minimize2 size={15}/></button>
         <span className="live-session-timer" aria-label={`Session time ${sessionTimer}`} title="Live session time">{sessionTimer}</span>
         <button
           className={running ? 'stop-listening' : `start-listening${deviceCheckReady ? ' ready-to-start' : ''}`}
@@ -1260,7 +1261,6 @@ export function CopilotPage(): JSX.Element {
         <button disabled={capturingShot || analyzingScreen} aria-label="Take screenshot" aria-keyshortcuts="Alt+C" title="Capture and automatically answer the current screen (Alt+C)" onClick={quickShot}><Camera size={15}/></button>
         <button ref={moreButtonRef} className={showLiveMenu ? 'active' : ''} aria-label="More controls" title="More controls" onClick={() => { setShowAnswerStyle(false); setShowLiveMenu((open) => !open); }}><MoreHorizontal size={16}/></button>
         <span className="rail-spacer"/>
-        <button aria-label="Collapse to floating logo" title="Collapse to floating logo" onClick={() => void setLiveCollapsed(true)}><Minimize2 size={15}/></button>
       </div>
       {showLiveMenu && <div ref={liveMenuRef} className="live-menu" role="menu">
         <div className="live-menu-control" role="group" aria-label="Zoom controls">

@@ -4,7 +4,7 @@ import {allowancePercent,bucketName,creditDuration,emptyCredits,type CreditsView
 
 /** Isolated one-second paint while active. Estimates never authorize work or
  * replace server balances. Main deduplicates all refresh/foreground requests. */
-export function AccountCreditsSection({userId,compact=false}:{userId?:string;compact?:boolean}):JSX.Element {
+export function AccountCreditsSection({userId,compact=false,small=false}:{userId?:string;compact?:boolean;small?:boolean}):JSX.Element {
  const [view,setView]=useState<CreditsView>(emptyCredits),[elapsed,setElapsed]=useState(0),[error,setError]=useState('');
  const ownerEpoch=useRef(0);
  useEffect(()=>{
@@ -30,6 +30,19 @@ export function AccountCreditsSection({userId,compact=false}:{userId?:string;com
   <span>{view.active?`Active AI estimate ${creditDuration(elapsed)}`:'AI usage idle'}</span>
   <span>{snapshot?`${creditDuration(snapshot.availableMilliseconds)} available`:'Balance syncing'}</span>
   {view.state==='unavailable'&&<span>Sync unavailable</span>}</section>;
+ if(small)return <section className="account-credits-small" aria-label="Time and usage">
+  <div className="acs-main"><span className="acs-icon"><Wallet size={16}/></span>
+   <div><small>Time left</small><strong>{snapshot?creditDuration(snapshot.availableMilliseconds):'—'}</strong></div>
+   <div><small>Used</small><strong>{snapshot?creditDuration(snapshot.spentMilliseconds):'—'}</strong></div>
+   {snapshot&&snapshot.reservedMilliseconds>0&&<div><small>In use now</small><strong>{creditDuration(snapshot.reservedMilliseconds)}</strong></div>}
+   <span className="acs-actions"><button className="ghost" disabled={view.refreshing} onClick={refresh} aria-label="Refresh credits"><RefreshCw size={13}/>{view.refreshing?'Syncing':'Refresh'}</button>
+    <button className="primary" onClick={buy}>Buy time<ArrowUpRight size={13}/></button></span></div>
+  {snapshot&&snapshot.buckets.length>0&&<details className="acs-details"><summary>Details</summary>
+   {snapshot.buckets.map(bucket=>{const percent=allowancePercent(bucket);return <div className="acs-bucket" key={bucket.kind}>
+    <span>{bucketName[bucket.kind]}</span><progress value={percent??0} max={100} aria-label={`${bucketName[bucket.kind]} used`}/><em>{creditDuration(bucket.availableMilliseconds)} left</em></div>;})}
+  </details>}
+  {(error||view.state==='unavailable')&&<p className="acs-note" role="status">{error||'Could not sync just now. Showing the last known balance.'}</p>}
+ </section>;
  return <section className="account-credits" aria-label="Credits & Usage">
   <div className="account-credits-heading"><div><p className="eyebrow">CLUERA AI</p><h2><Wallet size={20}/>Credits & Usage</h2></div>
    <div className="account-credits-actions"><button className="ghost" disabled={view.refreshing} onClick={refresh} aria-label="Refresh credits"><RefreshCw size={14}/>{view.refreshing?'Syncing':'Refresh'}</button>

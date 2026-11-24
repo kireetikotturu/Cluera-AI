@@ -38,7 +38,7 @@ export function SettingsPage({onUpdateStatus,account}:{onUpdateStatus?(status:Up
   <div className="page-heading"><div><p className="eyebrow">Your workspace</p><h1>Settings</h1><p>Account-managed AI. Your history stays on this device.</p></div>
    <button className="primary" disabled={busy} onClick={()=>void save()}>{saved?<CheckCircle2 size={16}/>:null}{busy?'Saving…':saved?'Saved':'Save appearance'}</button></div>
   <UpdatesSection onStatus={onUpdateStatus}/>
-  <AccountCreditsSection userId={account.userId}/>
+  <AccountCreditsSection userId={account.userId} small/>
   <AccountSettings account={account}/>
   <section className="settings-section"><h2>Managed AI models</h2><p>Cluera supplies provider access securely. No personal keys or BYOK fallback.</p>
    <label>Approved answer model <select aria-label="Approved answer model" value={settings.geminiModel??provider?.defaultGeminiModel??''} disabled={busy||!provider?.modelOptions?.length} onChange={event=>void save(event.target.value)}>

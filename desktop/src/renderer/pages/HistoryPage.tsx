@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ConversationTurn, SessionDetail } from '../../shared/types';
 import { useAppStore } from '../stores/appStore';
 import { RoundHistorySection } from '../components/RoundHistorySection';
+import clueraLogo from '../assets/cluera-ai.svg';
 
 const sessionDuration = (detail: SessionDetail): string => {
   const times = detail.conversation
@@ -72,7 +73,7 @@ export function HistoryPage({ onCollapse }: HistoryPageProps): JSX.Element {
     <header className="transcript-window-header">
       <div className="transcript-header-left">
         <button className="transcript-back" onClick={() => setPage('home')}><ArrowLeft size={15}/>Back</button>
-        <div className="transcript-brand"><span>S</span><div><strong>Cluera AI</strong><small>Session transcript</small></div></div>
+        <div className="transcript-brand"><span className="brand-logo"><img src={clueraLogo} alt=""/></span><div><strong>Cluera AI</strong><small>Session transcript</small></div></div>
       </div>
       <div className="transcript-header-actions">
         <button aria-label="Collapse Cluera AI" title="Collapse to floating logo" onClick={onCollapse}><Shrink size={16}/></button>
