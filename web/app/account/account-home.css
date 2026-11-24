@@ -82,3 +82,8 @@
   .acct-hero { border-radius: 22px; }
 }
 @media (prefers-reduced-motion: reduce) { .acct-skeleton span { animation: none; } .acct-actions a, .acct-ghost, .acct-btn { transition: none; } }
+
+.acct-boot { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 220px; color: var(--muted); font-size: 14px; }
+.acct-spinner { width: 18px; height: 18px; border: 2px solid var(--line-strong); border-top-color: var(--brand); border-radius: 50%; animation: acct-spin .8s linear infinite; }
+@keyframes acct-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .acct-spinner { animation-duration: 2s; } }

@@ -70,16 +70,13 @@ it('disabled or wrong-target Razorpay cannot claim events when no valid provider
   expect(payment).not.toHaveBeenCalled();expect(reconcile).not.toHaveBeenCalled();expect(rpc).not.toHaveBeenCalled();
  }
 });
-it('Cluera target pricing is explicitly unavailable and never loads a payment SDK',()=>{
+it('Cluera pricing never invents plans and never loads a payment SDK',()=>{
  const html=renderToStaticMarkup(AccountPricing());
- for(const price of ['₹549','₹5,499','₹9,599','₹19,549'])expect(html).toContain(price);
- expect(html).toContain('100 hours per month');expect(html).toContain('Paid plans are coming soon');
- expect(html).toContain('This plan is not on sale yet');
- expect(html).toContain('Check availability');
+ for(const price of ['₹549','₹5,499','₹9,599','₹19,549'])expect(html).not.toContain(price);
+ expect(html).toContain('We could not load the plans just now');expect(html).not.toContain('Coming soon');
  expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
  expect((html.match(/disabled=""/g)??[])).toHaveLength(0);
- expect((html.match(/href="\/account\/checkout\?offer=/g)??[])).toHaveLength(4);
- expect(html).not.toContain('View availability');
+ expect((html.match(/href="\/account\/checkout\?offer=/g)??[])).toHaveLength(0);
 });
 it('Cluera presentation is independent of old provider selection and does not alter financial policies',()=>{
  vi.stubEnv('SIGMAROUND_PAYMENT_PROVIDER','razorpay');const first=renderToStaticMarkup(AccountPricing());

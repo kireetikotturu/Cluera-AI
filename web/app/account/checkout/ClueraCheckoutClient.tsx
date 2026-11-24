@@ -258,6 +258,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
       window.removeEventListener('focus', focus); window.removeEventListener('online', focus);
     };
   }, [refresh,clearWindow]);
+  // A visitor who is not signed in goes straight to sign-in and comes back to the same plan afterwards.
+  useEffect(() => {
+    if (!signedOut || pricing || credits) return;
+    try { window.location.replace(selection ? checkoutSelectionHref(selection, true) : '/account#login'); } catch { /* The sign-in link stays visible. */ }
+  }, [signedOut, pricing, credits, selection]);
   useEffect(() => {
     if (!watchPayment || !enabled) return;
     // A signed receipt can finish after the browser callback. Bounded GET-only

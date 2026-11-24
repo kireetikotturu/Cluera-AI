@@ -2,14 +2,10 @@ import {notFound} from 'next/navigation';
 import {accountWebsite} from '../../lib/accounts/site';
 import {AccountPricing} from '../AccountPricing';
 import {readClueraBillingPresentation} from '../../lib/cluera/billingPresentation';
-import ClueraCheckoutClient from '../account/checkout/ClueraCheckoutClient';
-import {billingUiCapabilities} from '../../lib/payments/cluera/billingUi';
 export const dynamic='force-dynamic';
-export default function PricingPage(){
+/** Public prices: exactly the plans that are On in Admin, rendered on the server so they appear at once. */
+export default async function PricingPage(){
  if(!accountWebsite())notFound();
- if(process.env.CLUERA_BILLING_V2_ENABLED==='true')return currentCatalogPricing();
- return <main><AccountPricing/></main>;
+ const catalog=await readClueraBillingPresentation();
+ return <main className="pricing-page"><h1 className="sr-only">Cluera plans and pricing</h1><AccountPricing catalog={catalog}/></main>;
 }
-async function currentCatalogPricing(){const billing=billingUiCapabilities(),offers=await readClueraBillingPresentation();return <main className="account-page pricing-page"><h1 className="sr-only">Cluera plans and pricing</h1>
- <ClueraCheckoutClient key={billing.mode} offers={offers??[]} catalogKnown={offers!==null} {...billing} firstSubscriptionOnly pricing/>
- </main>;}

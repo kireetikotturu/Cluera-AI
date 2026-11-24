@@ -7,8 +7,14 @@ import {z} from 'zod';
 export const ACCOUNT_SESSION_STORAGE_KEY='cluera-account-session-change-v1';
 const changedEvent='cluera-account-session-changed',endpoint='/api/account/admin/access';
 const roleSchema=z.object({admin:z.literal(true),mfaVerified:z.boolean(),navigationSession:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
-type Access={admin:boolean;navigationSession:string|null;checking:boolean;result:'unresolved'|'allowed'|'denied'|'signin'|'unavailable';recheck:()=>void};
-const RoleContext=createContext<Access>({admin:false,navigationSession:null,checking:true,result:'unresolved',recheck:()=>{}});
+type Access={admin:boolean;navigationSession:string|null;checking:boolean;result:'unresolved'|'allowed'|'denied'|'signin'|'unavailable';recheck:()=>void;signedIn:boolean|null};
+const RoleContext=createContext<Access>({admin:false,navigationSession:null,checking:true,result:'unresolved',recheck:()=>{},signedIn:null});
+const HINT_KEY='cluera-signed-in-hint-v1';
+/** A presentation-only hint so pages can show the right buttons at once. It holds no identity and never grants access. */
+function readHint():boolean|null{try{const value=window.localStorage.getItem(HINT_KEY);return value==='1'?true:value==='0'?false:null;}catch{return null;}}
+function writeHint(value:boolean){try{window.localStorage.setItem(HINT_KEY,value?'1':'0');}catch{/* Optional. */}}
+/** True when the visitor is signed in, false when signed out, null while that is still unknown. */
+export function useSignedIn():boolean|null{return useContext(RoleContext).signedIn;}
 
 /** Revalidate assurance before showing controls after an explicit MFA change. */
 export function useAdminAccessRecheck(){return useContext(RoleContext).recheck;}
@@ -41,7 +47,15 @@ async function readRole(controller:AbortController):Promise<Pick<Access,'admin'|
  finally{clearTimeout(timer);controller.abort();void reader?.cancel().catch(()=>{});try{reader?.releaseLock();}catch{/* Never await cancellation. */}}
 }
 export function AdminRoleProvider({children}:{children:ReactNode}){
- const [state,setState]=useState<Omit<Access,'recheck'>>({admin:false,navigationSession:null,checking:true,result:'unresolved'});
+ const [state,setState]=useState<Omit<Access,'recheck'|'signedIn'>>({admin:false,navigationSession:null,checking:true,result:'unresolved'});
+ const [hint,setHint]=useState<boolean|null>(null);
+ useEffect(()=>{setHint(readHint());},[]);
+ useEffect(()=>{
+  if(state.result==='allowed'||state.result==='denied'){writeHint(true);setHint(true);}
+  else if(state.result==='signin'){writeHint(false);setHint(false);}
+ },[state.result]);
+ const signedIn=state.result==='allowed'||state.result==='denied'?true:state.result==='signin'?false:hint;
+ useEffect(()=>{if(signedIn===true)document.documentElement.setAttribute('data-signed-in','1');else if(signedIn===false)document.documentElement.removeAttribute('data-signed-in');},[signedIn]);
  const refreshRef=useRef<()=>void>(()=>{});
  useEffect(()=>{
   let alive=true,generation=0,request:AbortController|null=null;
@@ -68,7 +82,7 @@ export function AdminRoleProvider({children}:{children:ReactNode}){
    window.removeEventListener(changedEvent,invalidate);window.removeEventListener('storage',storage);
    window.removeEventListener('focus',focus);window.removeEventListener('pageshow',focus);document.removeEventListener('visibilitychange',visibility);};
  },[]);
- return <RoleContext.Provider value={{...state,recheck:()=>refreshRef.current()}}>{children}</RoleContext.Provider>;
+ return <RoleContext.Provider value={{...state,signedIn,recheck:()=>refreshRef.current()}}>{children}</RoleContext.Provider>;
 }
 export function AdminRoleLink({children='Admin',className,onClick}:{children?:ReactNode;className?:string;onClick?:()=>void}){
  const access=useContext(RoleContext);

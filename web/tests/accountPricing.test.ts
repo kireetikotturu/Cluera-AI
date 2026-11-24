@@ -7,17 +7,14 @@ import {offerDisplay} from '../lib/billing/offerDisplay';
 import type {ClueraPublicRevision} from '../lib/payments/cluera/publicCatalog';
 vi.mock('next/navigation',()=>({notFound:()=>{throw Error('NOT_FOUND');}}));
 afterEach(()=>vi.unstubAllEnvs());
-it('shows four reviewed prices/hours, honest terms and no payment SDK or promised Remote Desktop',()=>{
+it('never shows invented plans when the live list cannot be read',()=>{
  const html=renderToStaticMarkup(AccountPricing());
- for(const offer of clueraTargetPlans){const display=offerDisplay(offer);expect(html).toContain(offer.name);expect(html).toContain(display.price);expect(html).toContain(`${display.hours} hours`);expect(html).toContain(display.terms);}
- expect(html).toContain('do not roll over');expect(html).toContain('15 free minutes');expect(html).toContain('Paid plans are coming soon');
- expect(html).toContain('Create your free account');expect(html).not.toMatch(/<script|<iframe|<form|SigmaEnterprise Weekly/);
- expect((html.match(/disabled=""/g)??[])).toHaveLength(0);expect(html).not.toContain('View availability');
- expect(html).not.toContain('Checkout unavailable');expect(html).toContain('Check availability');expect(html).toContain('100 hours per month');
- for(const plan of clueraTargetPlans)expect(html).toContain(`href="/account/checkout?offer=${plan.offerCode}"`);
+ for(const offer of clueraTargetPlans){expect(html).not.toContain(offer.name);expect(html).not.toContain(offerDisplay(offer).price);}
+ expect(html).toContain('We could not load the plans just now');expect(html).toContain('15 free minutes');
+ expect(html).not.toMatch(/<script|<iframe|<form|Buy Now|Coming soon|Check availability/);
 });
-it('always presents Cluera pricing without enabling a financial route',()=>{
- vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','false');const html=renderToStaticMarkup(PricingPage());expect(html).toContain('Cluera 3 Hours');expect(html).toContain('Paid plans are coming soon');expect(html).not.toMatch(/<form|<script|<iframe/);
+it('always presents Cluera pricing without enabling a financial route',async()=>{
+ vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','false');const html=renderToStaticMarkup(await PricingPage());expect(html).toContain('We could not load the plans just now');expect(html).not.toContain('Cluera 3 Hours');expect(html).not.toMatch(/<form|<script|<iframe/);
 });
 it('uses current immutable Admin revisions for future presentation without changing target/history aliases or starting checkout',()=>{
  const codes=['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2'] as const;

@@ -17,16 +17,11 @@ afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAl
 const action=(code:typeof codes[number]=codes[0])=>host.querySelector<HTMLButtonElement>(`button[data-offer-code="${code}"]`)!;
 async function render(enabled=true){await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled})));}
 function installReadFixture(rows=catalog,status=available){const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>init?.method==='POST'?new Response(null,{status:503}):Response.json(String(url).endsWith('/catalog')?{catalog:rows}:String(url).includes('/checkout?')?status:credits));vi.stubGlobal('fetch',request);return request;}
-it('public pricing links to guarded checkout availability instead of dead disabled buttons',()=>{
- host.innerHTML=renderToStaticMarkup(AccountPricing());expect(host.querySelectorAll('article')).toHaveLength(4);
- for(const [index,code] of codes.entries()){
-  const link=host.querySelectorAll<HTMLAnchorElement>('article a')[index];
-  expect(link?.getAttribute('aria-label')).toBe(`Check availability: ${catalog[index].name}`);
-  expect(link?.getAttribute('href')).toBe(`/account/checkout?offer=${code}`);
- }
- for(const amount of ['549','5,499','9,599','19,549'])expect(host.textContent).toContain(`\u20b9${amount}`);
- expect(host.textContent).toContain('Paid plans are coming soon');expect(host.querySelectorAll('article button')).toHaveLength(0);
- expect(host.textContent).toContain('Check availability');expect(host.textContent).not.toMatch(/View availability|Checkout unavailable/);expect(host.querySelector('script,iframe,form')).toBeNull();
+it('public pricing shows no invented plans or buttons when the live list is unavailable',()=>{
+ host.innerHTML=renderToStaticMarkup(AccountPricing());expect(host.querySelectorAll('article')).toHaveLength(0);
+ for(const amount of ['549','5,499','9,599','19,549'])expect(host.textContent).not.toContain(`₹${amount}`);
+ expect(host.textContent).toContain('We could not load the plans just now');expect(host.querySelectorAll('article button')).toHaveLength(0);
+ expect(host.textContent).not.toMatch(/Check availability|Paid plans are coming soon|Checkout unavailable/);expect(host.querySelector('script,iframe,form')).toBeNull();
 });
 it('reviewed catalog cards route to guarded checkout without creating orders or loading payment SDK',()=>{
  host.innerHTML=renderToStaticMarkup(AccountPricing({catalog}));expect(host.querySelectorAll('article a')).toHaveLength(4);

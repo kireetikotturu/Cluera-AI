@@ -301,7 +301,7 @@ export function AccountPanel() {
       if(current()){inFlight.current=false;setPendingAction(null);setVisible(false);}
     }
   }
-  if (loading) return <p role="status">Checking your account…</p>;
+  if (loading) return <div className="acct-boot" role="status"><span className="acct-spinner" aria-hidden="true"/>Checking your account…</div>;
   const feedbackRegion=<div id="account-auth-feedback" ref={feedbackElement} tabIndex={-1} role="status" aria-live="polite" aria-atomic="true"
     className={`account-auth-feedback${feedback?` account-auth-feedback-${feedback.tone}`:''}`}>
     {feedback?<><p>{feedback.message}</p>{feedback.maskedEmail?<p className="account-auth-feedback-address">Submitted email: <strong>{feedback.maskedEmail}</strong></p>:null}

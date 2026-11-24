@@ -11,7 +11,7 @@ export function AccountHome({catalog=null}:{catalog?:ClueraPublicRevision[]|null
    <p className="pill"><span className="pill-dot" aria-hidden="true"/>Your AI interview copilot for Windows</p>
    <h1>Walk into every interview <span className="accent-serif">ready.</span></h1>
    <p className="lede">Cluera listens to the conversation, transcribes it live and gives you clear, tailored answers in seconds, built from your résumé and the job description. One Cluera account, one shared time balance.</p>
-   <div className="hero-actions"><Link className="button" href="/download">Download for Windows</Link><Link className="button secondary" href="/account">Sign in / create account</Link></div>
+   <div className="hero-actions"><Link className="button" href="/download">Download for Windows</Link><Link className="button secondary when-signed-out" href="/account">Sign in / create account</Link></div>
    <div className="trust-row"><span>15 free minutes to start</span><span>No API keys needed</span><span>Pay only for the time you use</span></div>
   </div>
   <div className="hero-visual reveal" style={{'--d':'.15s'} as React.CSSProperties} aria-hidden="true">
@@ -55,7 +55,7 @@ export function AccountHome({catalog=null}:{catalog?:ClueraPublicRevision[]|null
    <Faq q="Which computers are supported?" a="Cluera runs on Windows 10 and 11 and needs an internet connection during sessions."/>
    <Faq q="Can I get a refund?" a="See our refund policy for details, or contact support and we will help."/>
   </div></section>
-  <section className="final-cta reveal"><p className="kicker">Get started</p><h2>Your next interview starts <span className="accent-serif">here.</span></h2><p>Create your free account and try Cluera with 15 free minutes.</p><div className="hero-actions"><Link className="button" href="/account#signup">Create free account</Link><Link className="button secondary" href="/pricing">See pricing</Link></div></section>
+  <section className="final-cta reveal"><p className="kicker">Get started</p><h2>Your next interview starts <span className="accent-serif">here.</span></h2><p>Create your free account and try Cluera with 15 free minutes.</p><div className="hero-actions"><Link className="button when-signed-out" href="/account#signup">Create free account</Link><Link className="button when-signed-in" href="/download">Download for Windows</Link><Link className="button secondary" href="/pricing">See pricing</Link></div></section>
  </main>;
 }
 const icons:Record<string,React.ReactNode>={
@@ -69,9 +69,16 @@ const icons:Record<string,React.ReactNode>={
 function Feature({icon,title,text}:{icon:string;title:string;text:string}){return <article className="feature reveal"><span className="feature-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icons[icon]}</svg></span><h3>{title}</h3><p>{text}</p></article>;}
 function Faq({q,a}:{q:string;a:string}){return <details className="faq-item reveal"><summary>{q}</summary><p>{a}</p></details>;}
 
+type Release=Awaited<ReturnType<typeof approvedAccountRelease>>;
+let lastRelease:{value:Release;at:number}|null=null;
+/** The page may show a release up to 15 seconds old so it opens at once; the download button itself always uses the live record. */
+async function pageRelease():Promise<Release>{
+ if(process.env.NODE_ENV!=='test'&&lastRelease&&Date.now()-lastRelease.at<15_000)return lastRelease.value;
+ const value=await approvedAccountRelease();lastRelease={value,at:Date.now()};return value;
+}
 export async function AccountDownload(){
- let release:Awaited<ReturnType<typeof approvedAccountRelease>>=null,unavailable=false;
- try{release=await approvedAccountRelease();}catch{unavailable=true;}
+ let release:Release=null,unavailable=false;
+ try{release=await pageRelease();}catch{unavailable=true;}
  return <main className="content-page download-page"><div className="content-hero"><p className="kicker">Download</p><h1>Get Cluera for <span className="accent-serif">Windows.</span></h1><p>Install the app, sign in with your Cluera account and start your first session. Your first 15 minutes are free.</p></div>
   <article className="download-card"><div className="download-icon"><BrandMark size={56}/></div>
    {release?<><p className="kicker">Version {release.version}</p><h2>Latest version {release.version}</h2><p>{release.releaseNotes||'The latest Cluera AI app for Windows.'}</p>
@@ -79,7 +86,7 @@ export async function AccountDownload(){
     <a className="button" href="/account/download">Download for Windows</a>
     <p>The first time you open it, Windows may show “Windows protected your PC”. Click <b>More info</b> and then <b>Run anyway</b>.</p></>
     :<><h2>{unavailable?'Download temporarily unavailable':'Download coming soon'}</h2><p>{unavailable?'We could not load the download right now. Please try again in a few minutes.':'The Windows app will be available here shortly. Create your account now so you are ready.'}</p></>}
-   <p><Link href="/account">Sign in / create account</Link> · <Link href="/setup">Setup guide</Link></p>
+   <p><Link className="when-signed-out" href="/account">Sign in / create account</Link><Link className="when-signed-in" href="/account">My account</Link> · <Link href="/setup">Setup guide</Link></p>
   </article>
  </main>;
 }
