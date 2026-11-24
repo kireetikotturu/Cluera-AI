@@ -53,7 +53,7 @@ const audio=(ms:number)=>usageDuration(ms);
 const providerName:Record<string,string>={gemini:'Gemini',deepgram:'Deepgram',openai:'ChatGPT',anthropic:'Claude'};
 export function usageLine(row:CostedRow){
  return row.provider==='deepgram'
-  ?`${audio(row.audioMs)} of speech`
+  ?`${audio(row.audioMs)} of audio`
   :`${tokens(row.inputTokens)} in · ${tokens(row.outputTokens+row.thinkingTokens)} out`;
 }
 
@@ -67,10 +67,10 @@ function UsageTable({group,empty='No usage recorded yet.'}:{group:CostedGroup;em
 export function UsageAssumptions({assumptions}:{assumptions:Assumptions}){
  const g=assumptions.gemini;
  return <details className="usage-assumptions"><summary>How the cost is estimated</summary>
-  <p>Providers do not bill per customer, so this adds up the tokens and speech time Cluera recorded for each customer and multiplies them by list prices. It is an estimate for your planning, not an invoice, and it never changes what a customer pays.</p>
+  <p>Providers do not bill per customer, so this adds up the tokens and audio time Cluera recorded for each customer and multiplies them by list prices. It is an estimate for your planning, not an invoice, and it never changes what a customer pays.</p>
   <ul>
    <li>Gemini Flash: ${g.flash.inputPerMillion}/M input, ${g.flash.outputPerMillion}/M output (Flash-Lite ${g.flashLite.inputPerMillion}/${g.flashLite.outputPerMillion}, Pro ${g.pro.inputPerMillion}/{g.pro.outputPerMillion}). Thinking tokens count as output.</li>
-   <li>Deepgram speech: ${assumptions.deepgramUsdPerMinute} per minute of audio sent.</li>
+   <li>Deepgram: ${assumptions.deepgramUsdPerMinute} per minute of audio sent (your voice and the interviewer’s are two streams).</li>
    <li>ChatGPT ${assumptions.openai.inputPerMillion}/${assumptions.openai.outputPerMillion} and Claude ${assumptions.anthropic.inputPerMillion}/${assumptions.anthropic.outputPerMillion} per million tokens, used once those models are switched on.</li>
    <li>₹ shown at {assumptions.usdToInr} per US dollar. Tell support if a price or the rate changes.</li>
   </ul></details>;

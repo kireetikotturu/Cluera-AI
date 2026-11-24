@@ -162,7 +162,6 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
    <UsageDetailPanel detail={usage.detail}/>
    {state.plans?.length?<><h4>Monthly plans</h4>{state.plans.map((plan,i)=><p key={i}>{plan.tier} · {plan.state}{plan.endsAt?` · ends ${new Date(plan.endsAt).toLocaleDateString()}`:''}{plan.cancelFuture?' · cancelling':''}</p>)}</>:null}
    {state.billing?.length?<><h4>Purchases</h4>{state.billing.map(item=><p key={item.id}>{item.offerCode} · {item.state} · {new Date(item.createdAt).toLocaleString()}</p>)}</>:null}
-   {state.sessions?.length?<><h4>Recent sessions</h4>{state.sessions.slice(0,10).map(run=><p key={run.id}>{new Date(run.startedAt).toLocaleString()} · {run.state}</p>)}</>:null}
    <h4>Change this account</h4>
    {(()=>{const blocked=(state.users?.find(u=>u.userId===subject)?.state??'ACTIVE')!=='ACTIVE';return <>
    <form key={`time-${subject}`} className="admin-model-form" onSubmit={event=>{event.preventDefault();const values=new FormData(event.currentTarget);const kind=String(values.get('action'));mutate(kind,{minutes:Number(values.get('minutes'))},String(values.get('reason')));}}>

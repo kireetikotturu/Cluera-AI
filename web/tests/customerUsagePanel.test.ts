@@ -21,6 +21,6 @@ it('shows a customer’s models, sessions and the time an admin removed without 
 it('formats money in rupees with the dollar figure and describes token and speech use',()=>{
  expect(money({totalInr:0.5,totalUsd:0.0057})).toBe('₹0.50 ($0.0057)');
  expect(money({totalInr:1234.4,totalUsd:14.03})).toBe('₹1,234 ($14.03)');
- expect(usageLine({...group(1).rows[0],provider:'deepgram',audioMs:180_000})).toBe('3m of speech');
+ expect(usageLine({...group(1).rows[0],provider:'deepgram',audioMs:180_000})).toBe('3m of audio');
  expect(usageLine(group(1).rows[0])).toBe('12.0k in · 3.5k out');
 });
