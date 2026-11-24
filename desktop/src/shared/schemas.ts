@@ -17,6 +17,9 @@ export const sessionInputSchema = z.object({
   saveTranscript: z.boolean().optional(),
   interviewUrl: z.string().trim().max(2048).refine((value) => !value || /^https?:\/\//i.test(value) && URL.canParse(value), 'Enter an http or https interview URL.').optional(),
   resumeFileName: z.string().trim().max(500).optional(),
+  answerPreferences: z.object({
+    fullScript: z.boolean(), scriptWithBullets: z.boolean(), bullets: z.boolean(), fillerWords: z.boolean(),
+  }).optional(),
 });
 
 export const answerRequestSchema = z.object({

@@ -1,3 +1,5 @@
+import type { AnswerPreferences } from './answerPreferences';
+export type { AnswerPreferences } from './answerPreferences';
 export type AnswerLength = 'short' | 'medium' | 'detailed';
 export type InterviewType = 'technical' | 'behavioral' | 'mixed' | 'system-design' | 'coding';
 export type DocumentType = 'resume' | 'job-description' | 'supporting' | 'round-context';
@@ -55,6 +57,7 @@ export interface Session {
   saveTranscript?: boolean;
   interviewUrl?: string;
   resumeFileName?: string;
+  answerPreferences?: AnswerPreferences;
   createdAt: string;
   updatedAt: string;
 }

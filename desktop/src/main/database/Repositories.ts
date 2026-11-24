@@ -6,6 +6,7 @@ import type {
   ScreenContext, InterviewRound, RoundHistory,
 } from '../../shared/types';
 import { Database } from './Database';
+import { normalizeAnswerPreferences, serializeAnswerPreferences } from '../../shared/answerPreferences';
 
 interface SessionRow extends Record<string, string> {
   interview_type: Session['interviewType']; answer_style: string; answer_length: Session['answerLength'];
@@ -39,6 +40,7 @@ const mapSession = (r: SessionRow): Session => ({
   instructions: r.instructions, selectedModel: r.selected_model, createdAt: r.created_at, updatedAt: r.updated_at,
   autoAnswer: Number(r.auto_answer) === 1, saveTranscript: Number(r.save_transcript) !== 0,
   interviewUrl: r.interview_url ?? '', resumeFileName: r.resume_file_name ?? '',
+  answerPreferences: normalizeAnswerPreferences(r.answer_preferences),
 });
 const mapDocument = (r: DocumentRow): DocumentRecord => ({
   id: String(r.id), sessionId: String(r.session_id), name: String(r.name), type: String(r.type) as DocumentType,
@@ -158,17 +160,19 @@ export class Repositories {
       saveTranscript: input.saveTranscript ?? previous?.saveTranscript ?? false,
       interviewUrl: input.interviewUrl ?? previous?.interviewUrl ?? '',
       resumeFileName: input.resumeFileName ?? previous?.resumeFileName ?? '',
+      answerPreferences: normalizeAnswerPreferences(input.answerPreferences ?? previous?.answerPreferences),
     };
     this.database.mutate(`INSERT INTO sessions
-      (id,title,role,company,interview_type,language,answer_style,answer_length,job_description,resume_text,instructions,selected_model,created_at,updated_at,auto_answer,save_transcript,interview_url,resume_file_name)
-      VALUES ($id,$title,$role,$company,$interviewType,$language,$answerStyle,$answerLength,$jobDescription,$resumeText,$instructions,$selectedModel,$createdAt,$updatedAt,$autoAnswer,$saveTranscript,$interviewUrl,$resumeFileName)
+      (id,title,role,company,interview_type,language,answer_style,answer_length,job_description,resume_text,instructions,selected_model,created_at,updated_at,auto_answer,save_transcript,interview_url,resume_file_name,answer_preferences)
+      VALUES ($id,$title,$role,$company,$interviewType,$language,$answerStyle,$answerLength,$jobDescription,$resumeText,$instructions,$selectedModel,$createdAt,$updatedAt,$autoAnswer,$saveTranscript,$interviewUrl,$resumeFileName,$answerPreferences)
       ON CONFLICT(id) DO UPDATE SET
         title=excluded.title, role=excluded.role, company=excluded.company, interview_type=excluded.interview_type,
         language=excluded.language, answer_style=excluded.answer_style, answer_length=excluded.answer_length,
         job_description=excluded.job_description, resume_text=excluded.resume_text, instructions=excluded.instructions,
         selected_model=excluded.selected_model, updated_at=excluded.updated_at,
         auto_answer=excluded.auto_answer, save_transcript=excluded.save_transcript,
-        interview_url=excluded.interview_url, resume_file_name=excluded.resume_file_name`, this.values(session));
+        interview_url=excluded.interview_url, resume_file_name=excluded.resume_file_name,
+        answer_preferences=excluded.answer_preferences`, this.values(session));
     return session;
   }
 
@@ -401,6 +405,7 @@ export class Repositories {
       $answerStyle:s.answerStyle,$answerLength:s.answerLength,$jobDescription:s.jobDescription,$resumeText:s.resumeText,
       $instructions:s.instructions,$selectedModel:s.selectedModel,$createdAt:s.createdAt,$updatedAt:s.updatedAt,
       $autoAnswer:s.autoAnswer ? 1 : 0,$saveTranscript:s.saveTranscript === false ? 0 : 1,
-      $interviewUrl:s.interviewUrl ?? '',$resumeFileName:s.resumeFileName ?? '' };
+      $interviewUrl:s.interviewUrl ?? '',$resumeFileName:s.resumeFileName ?? '',
+      $answerPreferences:serializeAnswerPreferences(s.answerPreferences) };
   }
 }

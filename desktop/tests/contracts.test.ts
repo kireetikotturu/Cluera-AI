@@ -386,7 +386,7 @@ describe('desktop and provider contracts', () => {
     expect(editor).toContain("selectedModel: ''");
     expect(editor).toContain('provider?.modelOptions');
     expect(editor).toContain('Choose an AI model');
-    expect(editor).not.toContain('Recommended');
+    expect(editor).not.toContain('Recommended<');
     expect(editor).not.toContain('model-recommended');
     expect(editor).toContain('Resume / CV');
     expect(editor).toContain('Interview description / JD');

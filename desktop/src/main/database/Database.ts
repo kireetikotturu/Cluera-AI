@@ -146,6 +146,7 @@ export class Database {
     this.ensureColumn('sessions', 'save_transcript', 'INTEGER NOT NULL DEFAULT 1');
     this.ensureColumn('sessions', 'interview_url', "TEXT NOT NULL DEFAULT ''");
     this.ensureColumn('sessions', 'resume_file_name', "TEXT NOT NULL DEFAULT ''");
+    this.ensureColumn('sessions', 'answer_preferences', "TEXT NOT NULL DEFAULT ''");
     this.ensureColumn('conversation_turns', 'source_id', 'TEXT');
     this.ensureColumn('conversation_turns', 'source_kind', 'TEXT');
     this.ensureColumn('conversation_turns', 'source_role', 'TEXT');

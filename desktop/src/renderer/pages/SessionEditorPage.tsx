@@ -1,21 +1,30 @@
-import { modelLabel } from '../services/modelLabel';
 import {
-  ArrowLeft, ArrowRight, FileText,
+  ArrowLeft, ArrowRight, FileText, MessageSquareText,
   Plus, Shrink, Trash2, Upload, Video, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { DocumentRecord, ExtractedDocument, LibraryFile, LibraryFileCategory, SessionInput } from '../../shared/types';
 import { useAppStore } from '../stores/appStore';
 import { requireSessionProviderSetup } from '../services/providerSetup';
+import { ModelPicker } from '../components/ModelPicker';
+import { AnswerPreferencesDialog } from '../components/AnswerPreferencesDialog';
+import { DEFAULT_ANSWER_PREFERENCES, DEFAULT_SESSION_CONTEXT, normalizeAnswerPreferences } from '../../shared/answerPreferences';
 
 const defaults: SessionInput = {
   title: '', role: '', company: '', interviewType: 'mixed', language: 'English',
   answerStyle: 'Natural and confident', answerLength: 'medium', jobDescription: '', resumeText: '',
   instructions: '',
   selectedModel: '', autoAnswer: false, saveTranscript: false, interviewUrl: '', resumeFileName: '',
+  answerPreferences: DEFAULT_ANSWER_PREFERENCES,
 };
 
 const SUPPORTING_CONTEXT_NAME = 'Session supporting context';
+
+function answerPreferenceSummary(value: SessionInput['answerPreferences']): string {
+  const prefs = normalizeAnswerPreferences(value);
+  const formats = [prefs.fullScript && 'Full script', prefs.scriptWithBullets && 'Script + bullets', prefs.bullets && 'Bullet points'].filter(Boolean);
+  return `${formats.length ? formats.join(' · ') : 'Script + bullets'}${prefs.fillerWords ? ' · Filler words' : ''}`;
+}
 
 interface SessionEditorPageProps { onCollapse(): void; account?: boolean }
 
@@ -32,6 +41,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
   const [pendingSupportingFiles, setPendingSupportingFiles] = useState<ExtractedDocument[]>([]);
   const [libraryFiles, setLibraryFiles] = useState<LibraryFile[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(true);
+  const [showPreferences, setShowPreferences] = useState(false);
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<'resume' | 'supporting' | null>(null);
@@ -61,7 +71,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
     if (!activeId) {
       const enabledDefault = provider?.modelOptions?.some((model) => model.modelId === provider.defaultGeminiModel)
         ? provider.defaultGeminiModel : '';
-      setForm({ ...defaults, selectedModel: enabledDefault ?? '' }); setDocuments([]); setResumeFileName(''); setSupportingText('');
+      setForm({ ...defaults, selectedModel: enabledDefault ?? '' }); setDocuments([]); setResumeFileName(''); setSupportingText(DEFAULT_SESSION_CONTEXT);
       setOriginalSupportingText(''); setSupportingTextDocumentId(null); setPendingSupportingFiles([]); setLoading(false); return;
     }
     let disposed = false;
@@ -77,6 +87,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
         instructions: session.instructions, selectedModel: session.selectedModel,
         autoAnswer: session.autoAnswer ?? false, saveTranscript: session.saveTranscript ?? true,
         interviewUrl: session.interviewUrl ?? '', resumeFileName: session.resumeFileName ?? '',
+        answerPreferences: normalizeAnswerPreferences(session.answerPreferences),
       });
       const typedContext = detail.documents.find((document) => document.type === 'supporting' && document.name === SUPPORTING_CONTEXT_NAME);
       setResumeFileName(session.resumeFileName || (session.resumeText.trim() ? 'Resume on file' : ''));
@@ -250,6 +261,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
             <div className="context-composer-heading"><span><FileText size={15}/>Supporting context <small className="field-required">Required</small></span><div className="context-composer-actions"><button type="button" disabled={uploading !== null} onClick={() => void chooseFile('supporting')} aria-label="Upload supporting file" title="Upload supporting file"><Plus size={14}/><span>{uploading === 'supporting' ? 'Reading...' : 'Upload file'}</span></button><select aria-label="Choose saved supporting file" value="" disabled={uploading !== null || libraryLoading || savedSupportingFiles.length === 0} onChange={(event) => void chooseSavedFile('supporting', event.target.value)}><option value="">{libraryLoading ? 'Loading saved files...' : savedSupportingFiles.length ? 'Choose saved file...' : 'No saved files'}</option>{savedSupportingFiles.map((file) => <option value={file.id} key={file.id}>{file.name}</option>)}</select></div></div>
             <textarea aria-label="Supporting context text" value={supportingText} onChange={(event) => setSupportingText(event.target.value)} placeholder="Type context or attach a PDF, DOCX, TXT, or Markdown file..."/>
             <small className="context-requirement">Type context or attach at least one supporting file.</small>
+            <button type="button" className="answer-pref-button" onClick={() => setShowPreferences(true)}><MessageSquareText size={15}/><span><strong>Answer preferences</strong><small>{answerPreferenceSummary(form.answerPreferences)}</small></span><ArrowRight size={14}/></button>
           </section>
         </div>
         {(documents.length > 0 || pendingSupportingFiles.length > 0) && <div className="supporting-files">
@@ -261,7 +273,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
       <fieldset className="wizard-step preferences-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
         <h2 className="session-section-label">Output settings</h2>
         <div className="wizard-fields">
-          <label className="model-field compact-select-field"><span className="field-label">AI model</span><div className="model-select-row"><select value={form.selectedModel} onChange={(event) => update('selectedModel', event.target.value)}><option value="">{models.length ? 'Choose an AI model' : 'No enabled AI models available'}</option>{form.selectedModel && !selectedModelEnabled && <option value={form.selectedModel}>{form.selectedModel} · unavailable</option>}{models.map((model) => <option value={model.modelId} key={model.modelId}>{model.displayName === model.modelId ? modelLabel(model) : `${modelLabel(model)} · ${model.modelId}`}</option>)}</select></div></label>
+          <div className="model-field compact-select-field"><span className="field-label" id="session-model-label">AI model</span><div className="model-select-row"><ModelPicker models={models} value={form.selectedModel} recommendedId={provider?.defaultGeminiModel} ariaLabel="AI model" placeholder="Choose an AI model" unavailableLabel={form.selectedModel && !selectedModelEnabled ? `${form.selectedModel} · unavailable` : undefined} onChange={(modelId) => update('selectedModel', modelId)}/></div></div>
           <label className="compact-select-field"><span className="field-label">Answer language</span><input list="answer-languages" value={form.language} onChange={(event) => update('language', event.target.value)} aria-label="Answer language"/><datalist id="answer-languages">{['English', 'Hindi', 'Spanish', 'French', 'German', 'Telugu'].map((language) => <option value={language} key={language}/>)}</datalist></label>
         </div>
         <h2 className="session-section-label">Behavior</h2>
@@ -276,5 +288,6 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
     </section>
     {account && error && <div role="alert" className="form-error account-session-error">{error}</div>}
     {account && actions}
+    {showPreferences && <AnswerPreferencesDialog value={normalizeAnswerPreferences(form.answerPreferences)} onChange={(next) => update('answerPreferences', next)} onClose={() => setShowPreferences(false)}/>}
   </main>;
 }

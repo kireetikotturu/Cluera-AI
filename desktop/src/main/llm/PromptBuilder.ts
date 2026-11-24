@@ -1,5 +1,6 @@
 import type { AnswerContext } from '../../shared/types';
 import { SPOKEN_ANSWER_STYLE } from './spokenAnswerStyle';
+import { answerPreferenceRules } from '../../shared/answerPreferences';
 
 export class PromptBuilder {
   build(context: AnswerContext): string {
@@ -41,6 +42,7 @@ ${SPOKEN_ANSWER_STYLE}
 - Use STAR structure for behavioral questions when the supplied facts support it.
 - When approved screen context contains a coding problem, follow the user's requested language and format. Include correctness reasoning and time/space complexity when requested.
 - For follow-ups such as "How do I fix it?", resolve "it" from the latest relevant approved screen problem and recent conversation. Use retained screen evidence without claiming to see changes made since that capture. If the reference is ambiguous, state the assumption briefly.
+${answerPreferenceRules(context.session.answerPreferences)}
 
 SESSION
 Target role: ${context.session.role}

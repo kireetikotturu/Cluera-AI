@@ -74,6 +74,7 @@ export class ContextBuilder {
         language: session.language,
         answerStyle: session.answerStyle,
         answerLength: session.answerLength,
+        answerPreferences: session.answerPreferences,
         selectedModel: session.selectedModel,
         instructions: `${session.instructions.slice(0, 800)}\nCurrent round brief: ${this.repositories.currentRound(session.id)?.note ?? ''}`.slice(0, 2800),
       },
