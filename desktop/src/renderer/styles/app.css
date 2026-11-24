@@ -1567,10 +1567,10 @@ button.chat-message-text:hover { background: rgba(var(--neutral-rgb), 0.1); }
   user-select: none;
   -webkit-app-region: no-drag;
 }
-.live-collapsed-logo::before { content: ''; position: absolute; inset: 2px; border: 1px solid rgba(255, 166, 9, .72); border-radius: 50%; background: radial-gradient(circle at 35% 28%, #242016 0%, #111216 48%, #090a0c 100%); box-shadow: 0 7px 20px rgba(var(--shadow-rgb), 0.34), inset 0 1px 0 rgba(255, 224, 131, .12), 0 0 0 2px rgba(255, 166, 9, .08); pointer-events: none; }
+.live-collapsed-logo::before { content: ''; position: absolute; inset: 2px; border: 1px solid rgba(143, 125, 255, .8); border-radius: 50%; background: radial-gradient(circle at 35% 28%, #1c1b2e 0%, #10101c 48%, #090a10 100%); box-shadow: 0 7px 20px rgba(var(--shadow-rgb), 0.34), inset 0 1px 0 rgba(255, 224, 131, .12), 0 0 0 2px rgba(143, 125, 255, .14); pointer-events: none; }
 .live-collapsed-logo:active { cursor: default; }
 .live-collapsed-logo:focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.72); outline-offset: -3px; }
-.collapsed-sigma-mark { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; color: #ffa609; font-family: Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 700; line-height: 1; letter-spacing: -1px; text-shadow: 0 0 8px rgba(255, 166, 9, .28); transform: translateY(-1px); pointer-events: none; user-select: none; }
+.collapsed-sigma-mark, .collapsed-cluera-mark { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; color: #ffa609; font-family: Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 700; line-height: 1; letter-spacing: -1px; text-shadow: 0 0 8px rgba(255, 166, 9, .28); transform: translateY(-1px); pointer-events: none; user-select: none; }
 .live-collapsed-logo i { position: absolute; z-index: 2; right: 5px; bottom: 5px; width: 6px; height: 6px; border: 1.5px solid var(--bg); border-radius: 50%; background: var(--success); }
 .live-collapsed-logo i.paused { background: var(--warning); }
 

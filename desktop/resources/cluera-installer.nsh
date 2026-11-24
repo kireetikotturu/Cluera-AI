@@ -25,6 +25,17 @@
     Quit
   ${EndIf}
   !insertmacro GetDParameter $R0
+  ; The command line can carry a trailing space, quote or backslash after the folder; ignore those.
+  ${Do}
+    StrCpy $R9 $R0 1 -1
+    ${If} $R9 == " "
+    ${OrIf} $R9 == "$\""
+    ${OrIf} $R9 == "\"
+      StrCpy $R0 $R0 -1
+    ${Else}
+      ${Break}
+    ${EndIf}
+  ${Loop}
   ${If} $R0 != ""
   ${AndIf} $R0 != $R2
     MessageBox MB_OK|MB_ICONSTOP "Cluera AI can only be installed in its default folder."

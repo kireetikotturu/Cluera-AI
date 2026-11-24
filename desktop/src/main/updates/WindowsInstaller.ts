@@ -18,8 +18,9 @@ export async function verifyWindowsPublisher(file: string, publisher: string | u
 export function installerArguments(executable: string): string[] {
   const directory = path.win32.dirname(executable);
   if (!path.win32.isAbsolute(directory) || /["\r\n\0]/.test(directory)) throw new Error('Invalid installation directory.');
+  // /S installs silently and --force-run reopens Cluera AI when it finishes, so "Update now" is one click.
   // NSIS requires /D= to be the last argument, without quotes, even with spaces.
-  return ['--updated', `/D=${directory}`];
+  return ['/S', '--updated', '--force-run', `/D=${directory}`];
 }
 
 export async function launchWindowsInstaller(file: string, executable: string): Promise<void> {

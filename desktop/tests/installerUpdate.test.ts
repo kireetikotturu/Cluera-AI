@@ -89,7 +89,7 @@ describe('verified installer download', () => {
   });
   it('keeps the existing installation directory as the final unquoted NSIS argument', () => {
     expect(installerArguments('C:\\Users\\Test User\\Apps\\Cluera AI\\Cluera AI.exe'))
-      .toEqual(['--updated', '/D=C:\\Users\\Test User\\Apps\\Cluera AI']);
+      .toEqual(['/S', '--updated', '--force-run', '/D=C:\\Users\\Test User\\Apps\\Cluera AI']);
     expect(() => installerArguments('C:\\bad\npath\\app.exe')).toThrow();
   });
 });

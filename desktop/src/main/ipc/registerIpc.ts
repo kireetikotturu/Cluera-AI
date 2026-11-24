@@ -251,7 +251,24 @@ export function registerIpc(
   ipcMain.handle(IPC.app.liveCollapse, (_event, collapsed: boolean) => {
     keepWindowOffTaskbar();
     const next = Boolean(collapsed);
-    if (next === liveCollapsed) return;
+    if (next === liveCollapsed) {
+      // Safety net: if the page asks to restore but the window is still launcher-sized (the two sides
+      // disagreed about the state), grow it back instead of leaving a tiny window the user cannot use.
+      if (!next) {
+        const current = window.getBounds();
+        if (current.width <= FLOATING_LAUNCHER_SIZE + 12 || current.height <= FLOATING_LAUNCHER_SIZE + 12) {
+          const area = screen.getDisplayMatching(current).workArea;
+          window.setMinimumSize(sessionModeActive ? 320 : 420, sessionModeActive ? 240 : 360);
+          window.setMaximumSize(0, 0);
+          window.setBounds(sessionModeActive ? sessionWindowBounds(area) : dashboardWindowBounds(area), false);
+          window.setHasShadow(sessionModeActive ? false : true);
+          window.setBackgroundColor('#00000000');
+          keepWindowPinned();
+        }
+      }
+      keepWindowOffTaskbar();
+      return;
+    }
     if (next) {
       expandedLiveBounds = window.getBounds();
       expandedLiveZoomFactor = window.webContents.getZoomFactor();

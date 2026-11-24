@@ -11,6 +11,7 @@ export function FloatingLogo({ label, onRestore, status }: FloatingLogoProps): J
   const pendingMove = useRef<{ x: number; y: number } | null>(null);
   const moveFrame = useRef<number | null>(null);
   const suppressClick = useRef(false);
+  const restoredByPointer = useRef(false);
 
   const flushMove = (): void => {
     moveFrame.current = null;
@@ -53,6 +54,12 @@ export function FloatingLogo({ label, onRestore, status }: FloatingLogoProps): J
     if (current.moved) setTimeout(() => { suppressClick.current = false; }, 0);
     drag.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    // A plain press-and-release restores the window right away; the click handler below stays for keyboard use.
+    if (!current.moved && event.button === 0) {
+      restoredByPointer.current = true;
+      setTimeout(() => { restoredByPointer.current = false; }, 400);
+      onRestore();
+    }
   };
 
   return <main className="live-collapsed-shell">
@@ -71,10 +78,16 @@ export function FloatingLogo({ label, onRestore, status }: FloatingLogoProps): J
       }}
       onClick={() => {
         if (suppressClick.current) { suppressClick.current = false; return; }
+        if (restoredByPointer.current) { restoredByPointer.current = false; return; }
         onRestore();
       }}
     >
-      <span className="collapsed-sigma-mark" aria-hidden="true">Σ</span>
+      <svg className="collapsed-cluera-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <defs><linearGradient id="cluera-collapsed-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#8f7dff"/><stop offset=".55" stopColor="#6b5cf6"/><stop offset="1" stopColor="#2fc6d4"/></linearGradient></defs>
+        <rect width="48" height="48" rx="24" fill="url(#cluera-collapsed-bg)"/>
+        <path d="M33.6 16.4a12 12 0 1 0 0 15.2" fill="none" stroke="#fff" strokeWidth="5" strokeLinecap="round"/>
+        <circle cx="34.5" cy="24" r="3.2" fill="#fff"/>
+      </svg>
       {status && <i className={status === 'paused' ? 'paused' : ''}/>}
     </button>
   </main>;
