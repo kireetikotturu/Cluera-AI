@@ -141,9 +141,10 @@ export function registerIpc(
     if (!selected) { callback({}); return; }
     callback({ video: selected, audio: 'loopback' });
   });
-  ipcMain.handle(IPC.app.status, async () => {
+  ipcMain.handle(IPC.app.status, async (_event, fresh?: unknown) => {
     requireAccess();
-    await models.refresh();
+    // Opening or saving a session reloads the list, so a change made in Admin shows at once. Every other read keeps the short-lived copy.
+    await models.refresh(fresh === true);
     requireAccess();
     return {
     providerMode: config.providerMode ?? 'byok',

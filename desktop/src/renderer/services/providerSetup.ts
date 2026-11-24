@@ -23,7 +23,7 @@ export async function requireSessionProviderSetup(geminiModel?: string): Promise
     // This IPC only reads metadata. Late results cannot overwrite the catalog
     // or open a session after the user has seen a timeout and retried.
     const status = await Promise.race([
-      window.electronAPI.getProviderStatus(),
+      window.electronAPI.getProviderStatus(true),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('The session setup check timed out. Check your connection and try again.')), 10_000); }),
     ]);
     useAppStore.getState().setProviderStatus(status);

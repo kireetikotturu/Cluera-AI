@@ -111,6 +111,17 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
     }
   }, [activeId, provider?.defaultGeminiModel, provider?.modelOptions]);
 
+  // Creating a session reloads the model list on the way in. Editing one does not, so reload it here
+  // and show the labels and models the Admin has set now. A failure keeps the list already shown.
+  useEffect(() => {
+    if (!activeId) return undefined;
+    let disposed = false;
+    void Promise.resolve(window.electronAPI.getProviderStatus?.(true))
+      .then((status) => { if (!disposed && status?.modelOptions) useAppStore.getState().setProviderStatus(status); })
+      .catch(() => { /* keep the list already on screen */ });
+    return () => { disposed = true; };
+  }, [activeId]);
+
   const models = provider?.modelOptions ?? [];
   const selectedModelEnabled = models.some((model) => model.modelId === form.selectedModel);
   const update = <K extends keyof SessionInput>(key: K, value: SessionInput[K]): void => setForm((old) => ({ ...old, [key]: value }));

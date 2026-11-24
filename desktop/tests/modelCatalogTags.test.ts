@@ -29,4 +29,19 @@ describe('model labels from the Admin', () => {
     expect(choices[0].tag!.length).toBeLessThanOrEqual(24);
     expect(choices[1].tag).toBeUndefined();
   });
+  it('shows a label changed in Admin on a forced reload, while an ordinary read keeps the cached list', async () => {
+    let tag = 'Fast';
+    let calls = 0;
+    const fetcher = (async () => { calls += 1; return new Response(JSON.stringify({ models: [{ ...base, modelId: 'g-1', displayName: 'Gemini One', isDefault: true, tag }] }), { status: 200 }); }) as unknown as typeof fetch;
+    const catalog = new ModelCatalog('https://example.test', { gemini: 'g-1', deepgram: 'flux-general-en' }, fetcher, false, () => false, '/api/account/models');
+    await catalog.refresh();
+    expect(catalog.choices('gemini')[0].tag).toBe('Fast');
+    tag = 'Slow';
+    await catalog.refresh();                       // an answer or other ordinary read: no new request, no waiting
+    expect(calls).toBe(1);
+    expect(catalog.choices('gemini')[0].tag).toBe('Fast');
+    await catalog.refresh(true);                   // opening or saving a session
+    expect(calls).toBe(2);
+    expect(catalog.choices('gemini')[0].tag).toBe('Slow');
+  });
 });

@@ -67,3 +67,21 @@ it('orders the picker by the labels the Admin set', () => {
   expect(groups.more.map((c) => c.model.modelId)).toEqual(['gemini-3.5-flash', 'gpt-6-luna']);
   expect(groups.more[0].tag).toBeNull();
 });
+
+it('shows exactly the labels the Admin saved for the real model list', () => {
+  const row = (displayName: string, modelId: string, description: string, tag: string) => ({ ...option(displayName, modelId, description), tag });
+  const list = [
+    row('Gemini 3.5 Flash', 'gemini-3.5-flash', 'Google Gemini model', 'Recommended'),
+    row('Claude claude-haiku-5-5', 'claude-haiku-5-5', 'Claude model', '-'),
+    row('Gemini 3.6 Flash', 'gemini-3.6-flash', 'Google Gemini model', '-'),
+    row('Gemini 4 Argon', 'gemini-4-argon', 'Google Gemini model', 'Slow'),
+    row('GPT-5.6 Terra', 'gpt-5.6-terra', 'ChatGPT model', '-'),
+    row('ChatGPT gpt-6-luna', 'gpt-6-luna', 'ChatGPT model', 'Fast'),
+    row('GPT-6.1 Terra', 'gpt-6.1-terra', 'ChatGPT model', 'Slow'),
+  ];
+  const { quick, more } = groupModelChoices(list, 'gemini-3.5-flash');
+  const shown = (choice: (typeof quick)[number]) => `${modelTitle(choice.model)}|${choice.tag?.text ?? ''}`;
+  expect(quick.map(shown)).toEqual(['Gemini 3.5 Flash|Recommended', 'GPT-6 Luna|Fast']);
+  expect(more.map(shown)).toEqual(['Claude Haiku 5.5|', 'Gemini 3.6 Flash|', 'GPT-5.6 Terra|', 'Gemini 4 Argon|Slow', 'GPT-6.1 Terra|Slow']);
+});
+

@@ -48,7 +48,8 @@ export const IPC = {
 
 export interface ElectronAPI {
   readonly bridgeVersion: string;
-  getProviderStatus(): Promise<ProviderStatus>;
+  /** `fresh` asks the app to reload the approved model list before answering instead of using its short-lived copy. */
+  getProviderStatus(fresh?: boolean): Promise<ProviderStatus>;
   closeWindow(): Promise<void>;
   openExternal(kind: 'tutorial' | 'support' | 'supportGmail' | 'supportMail'): Promise<void>;
   toggleOverlay(): Promise<void>;

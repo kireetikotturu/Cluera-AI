@@ -21,7 +21,7 @@ const IPC = {
 
 const api: ElectronAPI = {
   bridgeVersion: '2.0.0',
-  getProviderStatus: () => ipcRenderer.invoke(IPC.app.status),
+  getProviderStatus: (fresh?: boolean) => ipcRenderer.invoke(IPC.app.status, fresh === true),
   closeWindow: () => ipcRenderer.invoke(IPC.app.close), openExternal: (kind) => ipcRenderer.invoke(IPC.app.openExternal, kind), toggleOverlay: () => ipcRenderer.invoke(IPC.app.toggleOverlay),
   adjustZoom: (direction) => ipcRenderer.invoke(IPC.app.adjustZoom, direction),
   setSessionWindowMode: (active) => ipcRenderer.invoke(IPC.app.sessionMode, active),
