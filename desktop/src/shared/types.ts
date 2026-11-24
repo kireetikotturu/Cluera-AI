@@ -287,6 +287,8 @@ export interface ProviderModelOption {
   modelId: string;
   displayName: string;
   description: string;
+  /** Label the Admin chose for the picker. Blank or missing = automatic, "-" = no label. */
+  tag?: string;
 }
 
 export interface ProviderCredentialState {

@@ -65,8 +65,10 @@ export class ModelCatalog {
           if (approvedDefaults[model.provider]) return;
           approvedDefaults[model.provider] = model.modelId;
         }
+        // A label is cosmetic: a missing or odd one never invalidates the approved model list.
+        const tag = typeof model.tag === 'string' ? model.tag.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 24) : '';
         parsed.push({ provider: model.provider, modelId: model.modelId, displayName: model.displayName,
-          description: model.description });
+          description: model.description, ...(tag ? { tag } : {}) });
       }
       this.remoteModels = parsed;
       this.approvedDefaults = approvedDefaults;

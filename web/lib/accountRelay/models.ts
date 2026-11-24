@@ -10,7 +10,7 @@ export const isTextProvider=(value:string):value is TextProvider=>(TEXT_PROVIDER
 const model=z.object({modelId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/),displayName:z.string().min(1).max(80),
  provider:z.enum(['gemini','openai','anthropic','deepgram']),
  enabled:z.boolean(),isDefault:z.boolean(),priority:z.number().int().min(0).max(1000),capabilities:z.array(z.enum(['text','image','audio'])).max(3),
- health:z.enum(['UNVERIFIED','HEALTHY','DEGRADED','UNAVAILABLE'])}).strict();
+ health:z.enum(['UNVERIFIED','HEALTHY','DEGRADED','UNAVAILABLE']),tag:z.string().max(24).optional()}).strict();
 export type AccountModel=z.infer<typeof model>;
 const usable=(m:AccountModel)=>m.enabled&&m.health!=='UNAVAILABLE';
 

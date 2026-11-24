@@ -58,17 +58,35 @@ export function modelSpeed(model: ModelLike): ModelSpeed {
 
 export const SPEED_LABEL: Record<Exclude<ModelSpeed, null>, string> = { fast: 'Fast', slow: 'Slow', 'very-slow': 'Very slow' };
 
-export interface ModelChoice<T extends ModelLike> { model: T; vendor: ModelVendor | null; speed: ModelSpeed; recommended: boolean }
+export type TagKind = 'recommended' | 'fast' | 'slow' | 'very-slow' | 'custom';
+export interface ModelTag { text: string; kind: TagKind }
+type TaggedModel = ModelLike & { tag?: string };
 
-/** Two groups for the picker: the recommended model and the quick ones first, everything else after. */
-export function groupModelChoices<T extends ModelLike>(models: T[], recommendedId?: string): { quick: ModelChoice<T>[]; more: ModelChoice<T>[] } {
-  const choices = models.map((model): ModelChoice<T> => ({
-    model, vendor: modelVendor(model), speed: modelSpeed(model), recommended: model.modelId === recommendedId,
-  }));
-  const rank = (choice: ModelChoice<T>): number => (choice.recommended ? 0 : choice.speed === 'fast' ? 1 : choice.speed === null ? 2 : choice.speed === 'slow' ? 3 : 4);
-  const sorted = choices.map((choice, index) => ({ choice, index })).sort((a, b) => rank(a.choice) - rank(b.choice) || a.index - b.index).map((entry) => entry.choice);
-  return {
-    quick: sorted.filter((choice) => choice.recommended || choice.speed === 'fast'),
-    more: sorted.filter((choice) => !choice.recommended && choice.speed !== 'fast'),
+const KIND_BY_TEXT: Record<string, TagKind> = {
+  recommended: 'recommended', fast: 'fast', quick: 'fast', slow: 'slow', 'very slow': 'very-slow', 'very-slow': 'very-slow',
+};
+
+/** The label beside a model name. The Admin's choice wins ("-" hides it); with no choice the default model is
+ * Recommended and the rest get Fast or Slow guessed from the name. */
+export function modelTag(model: TaggedModel, isDefault = false): ModelTag | null {
+  const set = (model.tag ?? '').trim();
+  if (set === '-') return null;
+  if (set) return { text: set, kind: KIND_BY_TEXT[set.toLowerCase()] ?? 'custom' };
+  if (isDefault) return { text: 'Recommended', kind: 'recommended' };
+  const speed = modelSpeed(model);
+  return speed ? { text: SPEED_LABEL[speed], kind: speed } : null;
+}
+
+export interface ModelChoice<T extends TaggedModel> { model: T; vendor: ModelVendor | null; tag: ModelTag | null }
+
+/** Two groups for the picker: Recommended and Fast models first, everything else after a divider. */
+export function groupModelChoices<T extends TaggedModel>(models: T[], defaultId?: string): { quick: ModelChoice<T>[]; more: ModelChoice<T>[] } {
+  const choices = models.map((model): ModelChoice<T> => ({ model, vendor: modelVendor(model), tag: modelTag(model, model.modelId === defaultId) }));
+  const rank = (choice: ModelChoice<T>): number => {
+    const kind = choice.tag?.kind;
+    return kind === 'recommended' ? 0 : kind === 'fast' ? 1 : kind === 'slow' ? 3 : kind === 'very-slow' ? 4 : 2;
   };
+  const sorted = choices.map((choice, index) => ({ choice, index })).sort((a, b) => rank(a.choice) - rank(b.choice) || a.index - b.index).map((entry) => entry.choice);
+  const quick = (choice: ModelChoice<T>): boolean => choice.tag?.kind === 'recommended' || choice.tag?.kind === 'fast';
+  return { quick: sorted.filter(quick), more: sorted.filter((choice) => !quick(choice)) };
 }

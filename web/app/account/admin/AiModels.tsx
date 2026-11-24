@@ -1,6 +1,7 @@
 'use client';
 import {useState} from 'react';
 import type {ModelPolicy} from './ModelPolicyEditor';
+import {ModelTagField,describeModelTag} from './ModelTagField';
 
 type Provider=ModelPolicy['provider'];
 const providers:{id:Provider;name:string;example:string;help:string}[]=[
@@ -22,18 +23,20 @@ export function AiModels({models,disabled,onSave,onDelete}:Props){
  const groups=providers.map(p=>({...p,rows:models.filter(m=>m.provider===p.id).sort((a,b)=>a.priority-b.priority||a.modelId.localeCompare(b.modelId))}));
  return <section className="admin-models" aria-labelledby="admin-models-heading">
   <div className="admin-panel-head"><div><p className="account-ui-kicker">AI MODELS</p><h2 id="admin-models-heading">Models in the Cluera app</h2>
-   <p>Turn models on or off, rename them, choose the default, add new ones (for example a new Gemini, ChatGPT or Claude model) or delete them. Changes reach the desktop app within about a minute.</p></div>
+   <p>Turn models on or off, rename them, set the label shown next to each name in the app (Recommended, Fast, Slow, or your own text), choose the default, add new ones (for example a new Gemini, ChatGPT or Claude model) or delete them. Changes reach the desktop app within about a minute.</p></div>
    <button className="button" type="button" disabled={disabled} onClick={()=>{setAdding(!adding);setEditing(null);}}>{adding?'Close':'+ Add a model'}</button></div>
   {adding?<form className="admin-model-form" onSubmit={event=>{event.preventDefault();if(disabled)return;const v=new FormData(event.currentTarget);
     const modelId=String(v.get('modelId')).trim(),makeDefault=v.get('default')==='on';
     save({provider,modelId,displayName:String(v.get('name')).trim(),enabled:true,isDefault:makeDefault,priority:Number(v.get('priority')||100),
-     capabilities:provider==='deepgram'?['audio']:v.get('image')==='on'?['text','image']:['text'],health:'UNVERIFIED'},'added model');
+     capabilities:provider==='deepgram'?['audio']:v.get('image')==='on'?['text','image']:['text'],health:'UNVERIFIED',
+     tag:provider==='deepgram'?'':String(v.get('tag')??'')},'added model');
     setAdding(false);}}>
    <h3>Add a model</h3>
    <label>Provider<select value={provider} onChange={event=>setProvider(event.target.value as Provider)}>{providers.map(p=><option key={p.id} value={p.id}>{p.name} · {p.help}</option>)}</select></label>
    <label>Model ID (exactly as the provider names it)<input name="modelId" required maxLength={100} pattern={provider==='deepgram'?'flux-[a-z0-9-]{1,60}':'[A-Za-z0-9][A-Za-z0-9._-]{1,99}'} placeholder={providers.find(p=>p.id===provider)!.example} autoComplete="off" spellCheck={false}/></label>
    <label>Name shown in the app<input name="name" required minLength={2} maxLength={80} placeholder="e.g. Gemini 3.8 Flash"/></label>
    <label>Order (lower shows first)<input name="priority" type="number" min={0} max={1000} defaultValue={100}/></label>
+   {provider!=='deepgram'?<ModelTagField disabled={disabled}/>:null}
    {provider!=='deepgram'?<label className="admin-check"><input name="image" type="checkbox" defaultChecked/> Can read screenshots</label>:null}
    <label className="admin-check"><input name="default" type="checkbox"/> Make this the default {provider==='deepgram'?'transcription':'answer'} model</label>
    <p className="admin-note">Connect the provider's API key in <a href="#admin-ai-keys">AI keys</a> first. A wrong model ID only affects that model.</p>
@@ -44,14 +47,17 @@ export function AiModels({models,disabled,onSave,onDelete}:Props){
    {group.rows.length?<ul>{group.rows.map(model=><li key={model.modelId} className={model.enabled?'on':'off'}>
     {editing===model.modelId?<form className="admin-model-edit" onSubmit={event=>{event.preventDefault();const v=new FormData(event.currentTarget);
       save({...model,displayName:String(v.get('name')).trim(),priority:Number(v.get('priority')),
-       capabilities:model.provider==='deepgram'?['audio']:v.get('image')==='on'?['text','image']:['text']},'edited model');setEditing(null);}}>
+       capabilities:model.provider==='deepgram'?['audio']:v.get('image')==='on'?['text','image']:['text'],
+       tag:model.provider==='deepgram'?'':String(v.get('tag')??'')},'edited model');setEditing(null);}}>
       <label>Name<input name="name" defaultValue={model.displayName} required minLength={2} maxLength={80}/></label>
       <label>Order<input name="priority" type="number" min={0} max={1000} defaultValue={model.priority}/></label>
+      {model.provider!=='deepgram'?<ModelTagField defaultValue={model.tag??''} disabled={disabled}/>:null}
       {model.provider!=='deepgram'?<label className="admin-check"><input name="image" type="checkbox" defaultChecked={model.capabilities.includes('image')}/> Screenshots</label>:null}
       <div className="admin-row-actions"><button className="button small" disabled={disabled}>Save</button><button type="button" onClick={()=>setEditing(null)}>Cancel</button></div>
      </form>:<>
      <div className="admin-model-main"><strong>{model.displayName}</strong><code>{model.modelId}</code>
       <div className="admin-tags">{model.isDefault?<span className="tag-default">Default</span>:null}<span className={model.enabled?'tag-on':'tag-off'}>{model.enabled?'On':'Off'}</span>
+       {model.provider!=='deepgram'?<span className="tag-label" title="Label shown in the app">App label: {describeModelTag(model.tag)}</span>:null}
        {model.capabilities.includes('image')?<span>Screenshots</span>:null}</div></div>
      <div className="admin-row-actions">
       <button type="button" disabled={disabled||(model.isDefault&&model.enabled)} title={model.isDefault?'Choose another default first':undefined}

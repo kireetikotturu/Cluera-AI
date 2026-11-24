@@ -22,7 +22,7 @@ export async function GET(){
    const answer=isTextProvider(m.provider),enabled=m.enabled&&m.health!=='UNAVAILABLE';
    const slot=answer?'answer':'audio',isDefault=enabled&&m.isDefault&&!defaults[slot];if(isDefault)defaults[slot]=true;
    return {provider:answer?'gemini':'deepgram',modelId:m.modelId,displayName:m.displayName,
-    description:`${providerLabel[m.provider]} model`,enabled,isDefault};
+    description:`${providerLabel[m.provider]} model`,enabled,isDefault,tag:m.tag??''};
   })});
  }catch(error){return error instanceof AccountError?json({error:error.code},error.status):apiError(error);}
 }

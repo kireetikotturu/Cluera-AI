@@ -1,7 +1,7 @@
 import { Check, ChevronDown } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { ProviderModelOption } from '../../shared/types';
-import { groupModelChoices, modelTitle, SPEED_LABEL, type ModelChoice, type ModelVendor } from '../services/modelLabel';
+import { groupModelChoices, modelTitle, type ModelChoice, type ModelVendor } from '../services/modelLabel';
 
 /** Simple company marks drawn inline, so the picker needs no image files. */
 export function VendorIcon({ vendor, size = 16 }: { vendor: ModelVendor | null; size?: number }): JSX.Element {
@@ -32,7 +32,7 @@ interface ModelPickerProps {
   models: ProviderModelOption[];
   value: string;
   onChange(modelId: string): void;
-  /** The server's default model, shown first with a Recommended tag. */
+  /** The server's default model. It is Recommended unless the Admin set a label for it. */
   recommendedId?: string;
   disabled?: boolean;
   ariaLabel?: string;
@@ -42,9 +42,7 @@ interface ModelPickerProps {
 }
 
 function Tag({ choice }: { choice: ModelChoice<ProviderModelOption> }): JSX.Element | null {
-  if (choice.recommended) return <span className="model-tag recommended">Recommended</span>;
-  if (choice.speed) return <span className={`model-tag ${choice.speed}`}>{SPEED_LABEL[choice.speed]}</span>;
-  return null;
+  return choice.tag ? <span className={`model-tag ${choice.tag.kind}`} title={choice.tag.text}>{choice.tag.text}</span> : null;
 }
 
 export function ModelPicker({ models, value, onChange, recommendedId, disabled, ariaLabel = 'AI model', placeholder = 'Choose an AI model', unavailableLabel }: ModelPickerProps): JSX.Element {

@@ -98,3 +98,5 @@ button.admin-stat:hover{transform:translateY(-3px);border-color:#8b7cff77}
 .button.danger { background: rgba(242,125,117,.16); border-color: rgba(242,125,117,.5); color: #f5a29b; box-shadow: none; }
 .button.danger:hover:not(:disabled) { background: rgba(242,125,117,.28); }
 @media (prefers-reduced-motion: reduce) { .tag-live { animation: none; } }
+.admin-tag-field{display:contents}
+.admin-tags span.tag-label{color:#b9bdd6;font-weight:500}

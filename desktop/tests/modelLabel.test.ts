@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { groupModelChoices, modelLabel, modelSpeed, modelTitle, modelVendor } from '../src/renderer/services/modelLabel';
+import { groupModelChoices, modelLabel, modelSpeed, modelTag, modelTitle, modelVendor } from '../src/renderer/services/modelLabel';
 const option = (displayName: string, modelId: string, description: string) => ({ provider: 'gemini' as const, displayName, modelId, description });
 it('shows the company next to a model name that does not already say it', () => {
   expect(modelLabel(option('Fast answers', 'gpt-5-mini', 'ChatGPT model'))).toBe('Fast answers');   // the model ID says GPT
@@ -39,6 +39,31 @@ it('puts the recommended and fast models first and the rest in a second group', 
   ];
   const groups = groupModelChoices(list, 'gemini-4-argon');
   expect(groups.quick.map((c) => c.model.modelId)).toEqual(['gemini-4-argon', 'gemini-3.5-flash', 'gpt-6-luna']);
-  expect(groups.quick[0].recommended).toBe(true);
+  expect(groups.quick[0].tag).toEqual({ text: 'Recommended', kind: 'recommended' });
   expect(groups.more.map((c) => c.model.modelId)).toEqual(['claude-sonnet-5', 'claude-opus-5']);
+});
+
+it('shows the label the Admin chose, and falls back to automatic labels when none is set', () => {
+  const m = (modelId: string, tag?: string) => ({ ...option('x', modelId, 'x'), ...(tag === undefined ? {} : { tag }) });
+  expect(modelTag(m('gemini-3.5-flash', 'Best for coding'))).toEqual({ text: 'Best for coding', kind: 'custom' });
+  expect(modelTag(m('claude-sonnet-5', 'Fast'))).toEqual({ text: 'Fast', kind: 'fast' });
+  expect(modelTag(m('gpt-6-luna', 'very slow'))).toEqual({ text: 'very slow', kind: 'very-slow' });
+  expect(modelTag(m('gpt-6-luna', '-'))).toBeNull();
+  expect(modelTag(m('gpt-6-luna', ''), true)).toEqual({ text: 'Recommended', kind: 'recommended' });
+  expect(modelTag(m('gpt-6-luna', 'Fast'), true)).toEqual({ text: 'Fast', kind: 'fast' });
+  expect(modelTag(m('claude-opus-5'))).toEqual({ text: 'Very slow', kind: 'very-slow' });
+  expect(modelTag(m('gemini-4-argon'))).toBeNull();
+});
+
+it('orders the picker by the labels the Admin set', () => {
+  const list = [
+    { ...option('Sonnet', 'claude-sonnet-5', 'Claude model'), tag: 'Recommended' },
+    { ...option('Flash', 'gemini-3.5-flash', 'Google Gemini model'), tag: '-' },
+    { ...option('Luna', 'gpt-6-luna', 'ChatGPT model'), tag: 'Best for coding' },
+    { ...option('Haiku', 'claude-haiku-5-5', 'Claude model'), tag: 'Fast' },
+  ];
+  const groups = groupModelChoices(list, 'gemini-3.5-flash');
+  expect(groups.quick.map((c) => c.model.modelId)).toEqual(['claude-sonnet-5', 'claude-haiku-5-5']);
+  expect(groups.more.map((c) => c.model.modelId)).toEqual(['gemini-3.5-flash', 'gpt-6-luna']);
+  expect(groups.more[0].tag).toBeNull();
 });

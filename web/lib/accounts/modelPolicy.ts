@@ -8,6 +8,8 @@ export const accountModelPolicy=z.object({
  enabled:z.boolean(),isDefault:z.boolean(),priority:z.number().int().min(0).max(1000),
  capabilities:z.array(z.enum(['text','image','audio'])).min(1).max(3),
  health:z.enum(['UNVERIFIED','HEALTHY','DEGRADED','UNAVAILABLE']),
+ /** Label shown next to the name in the app. Blank = automatic, "-" = no label. */
+ tag:z.string().trim().max(24).refine(value=>!/[<>]/.test(value)&&![...value].some(char=>char.charCodeAt(0)<32),'Tags cannot contain control characters or angle brackets.').optional(),
 }).strict().superRefine((value,ctx)=>{
  const capabilities=new Set(value.capabilities);
  if(capabilities.size!==value.capabilities.length)ctx.addIssue({code:'custom',message:'Duplicate capabilities.'});
