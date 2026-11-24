@@ -130,7 +130,7 @@ export class AccountProviderRuntime {
       if (emitted > 1500000 || (control.desiredSize ?? 0) < bytes.length) { finish(failure(), true); return; }
       control.enqueue(bytes);
     } };
-    timeout = setTimeout(abort, 65000); timeout.unref?.();
+    timeout = setTimeout(abort, 100000); timeout.unref?.();
     signal.addEventListener('abort', abort, { once: true });
     try { connection.send({ type: 'generate', id, prompt, ...(parsed.modelId ? { modelId: parsed.modelId } : {}), ...(images[0] ? { image: images[0].inlineData } : {}) }); }
     catch { finish(failure()); }

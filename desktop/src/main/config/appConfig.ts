@@ -35,7 +35,7 @@ export function createAppConfig():AppConfig {
   accountManaged:true,providerMode:'managed',databasePath:path.join(app.getPath('userData'),ACCOUNT_DISTRIBUTION.database),
   isProduction,demoMode:false,debugMode:!isProduction&&process.env.DEBUG_MODE==='true',
   deepgram:{apiKey:'',model:'flux-general-en',language:'en',eotThreshold:.75,maxReconnects:4},
-  gemini:{apiKey:'',model:'gemini-3.5-flash',timeoutMs:30000,managedModelSelection:true},
+  gemini:{apiKey:'',model:'gemini-3.5-flash',timeoutMs:60000,managedModelSelection:true},
   retrieval:{chunkSize:850,chunkOverlap:120,topK:5},
   screen:{enabled:true,maxBytes:5000000,maxDimension:2560,model:'gemini-3.5-flash'},
   links:{tutorial:ACCOUNT_DISTRIBUTION.apiOrigin+'/setup',support:ACCOUNT_DISTRIBUTION.apiOrigin+'/support'},

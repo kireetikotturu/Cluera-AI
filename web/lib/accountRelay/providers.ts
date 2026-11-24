@@ -47,8 +47,8 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
       const controller = new AbortController();
       const signal = AbortSignal.any([controller.signal, guard.signal]);
       const cancel = () => controller.abort();
-      const total = setTimeout(cancel, 60000);
-      let idle = setTimeout(cancel, 15000);
+      const total = setTimeout(cancel, 90000);
+      let idle = setTimeout(cancel, 45000);
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
       const filter = secretFilter(privateValues);
       const timing: { headersMs?: number; firstTokenMs?: number } = {}, begun = performance.now();
@@ -68,7 +68,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
         if (response.status === 400 && fastThinking) { await response.body?.cancel().catch(() => undefined); response = await post(undefined); }
         guard.assertActive();
         timing.headersMs = Math.round(performance.now() - started);
-        if (!response.ok || !response.body) { await response.body?.cancel(); throw unavailable(); }
+        if (!response.ok || !response.body) { logAnswerFailure('gemini', selectedModel, `http-${response.status}`, begun); await response.body?.cancel(); throw unavailable(); }
         reader = response.body.getReader();
         let buffer = '', totalBytes = 0, hasAnswer = false;
         const decoder = new TextDecoder('utf-8', { fatal: true });
@@ -100,7 +100,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
           guard.assertActive();
           if (signal.aborted) throw unavailable();
           if (done) break;
-          clearTimeout(idle); idle = setTimeout(cancel, 15000);
+          clearTimeout(idle); idle = setTimeout(cancel, 45000);
           totalBytes += value.byteLength;
           if (totalBytes > 1_000_000) throw unavailable();
           buffer += decoder.decode(value, { stream: true });
@@ -118,7 +118,10 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
         if (!hasAnswer) throw unavailable();
         const final = filter.push('', true); if (final) emit(final);
         logAnswerTiming('gemini', selectedModel, timing, begun);
-      } catch { throw unavailable(); }
+      } catch {
+        if (!guard.signal.aborted) logAnswerFailure('gemini', selectedModel, timing.firstTokenMs === undefined ? (timing.headersMs === undefined ? 'no-reply-from-google' : 'no-words-after-reply') : 'stream-stopped', begun);
+        throw unavailable();
+      }
       finally { clearTimeout(total); clearTimeout(idle); cancel(); await reader?.cancel().catch(() => undefined); }
     },
     audio(guard, emit, failed, ready = () => {}) {
@@ -196,6 +199,10 @@ export function geminiFastThinking(model: string): Record<string, unknown> | und
   return undefined;
 }
 /** Secret-free speed log: how long the provider took to answer and to send the first words. */
+function logAnswerFailure(provider: string, model: string, stage: string, begun: number) {
+  try { console.warn(JSON.stringify({ component: 'cluera-answer-failure', provider, model, stage, afterMs: Math.round(performance.now() - begun) })); }
+  catch { /* Logging never affects an answer. */ }
+}
 function logAnswerTiming(provider: string, model: string, timing: { headersMs?: number; firstTokenMs?: number }, begun: number) {
   try { console.info(JSON.stringify({ component: 'cluera-answer-timing', provider, model, providerReplyMs: timing.headersMs ?? null,
     firstWordsMs: timing.firstTokenMs ?? null, totalMs: Math.round(performance.now() - begun) })); } catch { /* Logging never affects an answer. */ }
@@ -208,8 +215,8 @@ async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model
   const controller = new AbortController();
   const signal = AbortSignal.any([controller.signal, guard.signal]);
   const cancel = () => controller.abort();
-  const total = setTimeout(cancel, 60000);
-  let idle = setTimeout(cancel, 20000);
+  const total = setTimeout(cancel, 90000);
+  let idle = setTimeout(cancel, 45000);
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   const filter = secretFilter(privateValues);
   try {
@@ -256,7 +263,7 @@ async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model
       guard.assertActive();
       if (signal.aborted) throw unavailable();
       if (done) break;
-      clearTimeout(idle); idle = setTimeout(cancel, 20000);
+      clearTimeout(idle); idle = setTimeout(cancel, 45000);
       totalBytes += value.byteLength;
       if (totalBytes > 2_000_000) throw unavailable();
       buffer += decoder.decode(value, { stream: true });
