@@ -7,11 +7,11 @@ import type { AppEventMap, AppEventName } from '../shared/types';
 // Keep channel values in this self-contained file so the compiled preload does
 // not call require('../shared/ipc') and silently fail before exposing the bridge.
 const IPC = {
-  app: { status: 'app:status', close: 'app:close', openExternal: 'app:open-external', toggleOverlay: 'app:toggle-overlay', adjustZoom: 'app:adjust-zoom', sessionMode: 'app:session-mode', liveCollapse: 'app:live-collapse', moveLiveCollapse: 'app:move-live-collapse', resizeLive: 'app:resize-live', focusLiveTranscript: 'app:focus-live-transcript' },
+  app: { status: 'app:status', close: 'app:close', openExternal: 'app:open-external', toggleOverlay: 'app:toggle-overlay', adjustZoom: 'app:adjust-zoom', sessionMode: 'app:session-mode', liveCollapse: 'app:live-collapse', moveLiveCollapse: 'app:move-live-collapse', resizeLive: 'app:resize-live', focusLiveTranscript: 'app:focus-live-transcript', sendShortcut: 'app:send-shortcut' },
   sessions: { roundHistory: 'sessions:round-history', startRound: 'sessions:start-round', list: 'sessions:list', get: 'sessions:get', save: 'sessions:save', delete: 'sessions:delete', summary: 'sessions:summary' },
   documents: { select: 'documents:select', read: 'documents:read', addExtracted: 'documents:add-extracted', addText: 'documents:add-text', remove: 'documents:remove' },
   library: { list: 'library:list', upload: 'library:upload', get: 'library:get', delete: 'library:delete' },
-  interview: { start: 'interview:start', stop: 'interview:stop', pause: 'interview:pause', interaction: 'interview:interaction', autoAnswer: 'interview:auto-answer', answer: 'interview:answer', clear: 'interview:clear' },
+  interview: { start: 'interview:start', stop: 'interview:stop', pause: 'interview:pause', interaction: 'interview:interaction', autoAnswer: 'interview:auto-answer', answer: 'interview:answer', clear: 'interview:clear', discardInput: 'interview:discard-input' },
   audio: { chunk: 'audio:chunk', error: 'audio:error', selectSystemSource: 'audio:select-system-source' },
   screen: { sources: 'screen:sources', captureDesktop: 'screen:capture-desktop', captureCurrent: 'screen:capture-current', selectedSource: 'screen:selected-source', approve: 'screen:approve', discard: 'screen:discard', firstVisible: 'screen:first-visible', shot: 'screen:shot', clearContext: 'screen:clear-context' },
   settings: { get: 'settings:get', save: 'settings:save' },
@@ -45,6 +45,8 @@ const api: ElectronAPI = {
   startInterview: (id, source, interactionEnabled) => ipcRenderer.invoke(IPC.interview.start, id, source, interactionEnabled), stopInterview: () => ipcRenderer.invoke(IPC.interview.stop),
   pauseInterview: (paused) => ipcRenderer.invoke(IPC.interview.pause, paused), setInterviewInteractionEnabled: (enabled) => ipcRenderer.invoke(IPC.interview.interaction, enabled), setAutoAnswer: (enabled) => ipcRenderer.invoke(IPC.interview.autoAnswer, enabled), requestAnswer: (input) => ipcRenderer.invoke(IPC.interview.answer, input),
   clearCurrentAnswer: () => ipcRenderer.invoke(IPC.interview.clear),
+  discardTranscriptInput: () => ipcRenderer.invoke(IPC.interview.discardInput),
+  setSendShortcut: (enabled) => ipcRenderer.invoke(IPC.app.sendShortcut, enabled === true),
   sendAudioChunk: (source, chunk) => ipcRenderer.send(IPC.audio.chunk, source, chunk), reportAudioError: (message) => ipcRenderer.send(IPC.audio.error, message),
   selectSystemAudioSource: (sourceId) => ipcRenderer.invoke(IPC.audio.selectSystemSource, sourceId),
   listDesktopCaptureSources: () => ipcRenderer.invoke(IPC.screen.sources), captureDesktopSource: (sourceId) => ipcRenderer.invoke(IPC.screen.captureDesktop, sourceId),

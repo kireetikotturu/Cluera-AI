@@ -16,6 +16,8 @@ export class ReadingFocus {
   word = 0;
 
   hold(word: number): void { this.heldAt = word; }
+  /** The customer is writing or editing the question: keep the question, not the old answer, in view. */
+  focusQuestion(): void { this.mode = 'question'; this.blockedAnswer = this.previous?.questionId; this.heldAt = null; }
   update(next: ReadingState): boolean {
     const previous = this.previous;
     this.previous = next;
@@ -78,6 +80,13 @@ export class EyeContactScroll {
     this.schedule();
   }
   hold(): void { this.focus.hold(this.state?.word ?? -1); this.cancel(); }
+  focusQuestion(): void {
+    if (!this.state?.enabled || this.state.hidden) return;
+    this.focus.focusQuestion();
+    this.alignImmediately = true;
+    this.cancel();
+    this.schedule();
+  }
   private cancel(): void { cancelAnimationFrame(this.frame); this.frame = 0; this.lastTime = 0; this.remeasure = false; }
   private schedule(): void {
     if (this.disposed || !this.state?.enabled || this.state.hidden || document.hidden) return;

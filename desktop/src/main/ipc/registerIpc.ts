@@ -103,16 +103,35 @@ export function registerIpc(
       });
     }
   };
+  // Alt+S sends the question shown on the live page when Auto Answer is off. It is registered only while the
+  // page asks for it (a running session with Auto Answer off), so the key is free for other apps the rest of the time.
+  let sendShortcutRegistered = false;
+  const releaseSendShortcut = (): void => {
+    if (!sendShortcutRegistered) return;
+    globalShortcut.unregister('Alt+S');
+    sendShortcutRegistered = false;
+  };
+  const enableSendShortcut = (): boolean => {
+    if (sendShortcutRegistered) return true;
+    sendShortcutRegistered = globalShortcut.register('Alt+S', () => {
+      if (!sessionModeActive || !authorization.isEntitled() || applicationQuitting || window.isDestroyed()
+        || window.webContents.isDestroyed()) return;
+      // Dispatch the existing Send action without activating the window, so the meeting keeps keyboard focus.
+      window.webContents.send(IPC.events, 'answer:send-shortcut', null);
+    });
+    return sendShortcutRegistered;
+  };
   const keepWindowOffTaskbar = (): void => {
     enforceTaskbarInvariant(window);
   };
   const keepWindowPinned = (): void => {
     if (!window.isDestroyed()) window.setAlwaysOnTop(true, 'screen-saver', 1);
   };
-  const allowApplicationQuit = (): void => { applicationQuitting = true; releaseQuickShotShortcut(); };
+  const allowApplicationQuit = (): void => { applicationQuitting = true; releaseQuickShotShortcut(); releaseSendShortcut(); };
   app.on('before-quit', allowApplicationQuit);
   window.once('closed', () => {
     releaseQuickShotShortcut();
+    releaseSendShortcut();
     app.removeListener('before-quit', allowApplicationQuit);
   });
   window.on('close', (event) => {
@@ -209,7 +228,7 @@ export function registerIpc(
     }
     sessionModeActive = nextSessionMode;
     if (sessionModeActive) enableQuickShotShortcut();
-    else releaseQuickShotShortcut();
+    else { releaseQuickShotShortcut(); releaseSendShortcut(); }
     overlayMode = false;
     if (!sessionModeActive && liveCollapsed) {
       liveCollapsed = false;
@@ -541,6 +560,14 @@ export function registerIpc(
   });
   ipcMain.handle(IPC.interview.answer, (_event, input: unknown) => { requireAccess(); assertProviderSetup(config, 'gemini'); return interview.answer(answerRequestSchema.parse(input)); });
   ipcMain.handle(IPC.interview.clear, () => { requireAccess(); return interview.clear(); });
+  ipcMain.handle(IPC.interview.discardInput, () => { requireAccess(); interview.discardInput(); });
+  ipcMain.handle(IPC.app.sendShortcut, (event, enabled: unknown) => {
+    if (event.sender !== window.webContents) throw new Error('Unauthorized shortcut request.');
+    requireAccess();
+    if (typeof enabled !== 'boolean') throw new Error('The send shortcut must be enabled or disabled explicitly.');
+    if (!enabled || !sessionModeActive) { releaseSendShortcut(); return false; }
+    return enableSendShortcut();
+  });
   ipcMain.on(IPC.audio.chunk, (_event, sourceId: string, chunk: ArrayBuffer) => {
     if (!authorization.isEntitled()) return;
     if ((sourceId === 'system' || sourceId === 'candidate') && chunk.byteLength === 2_560) {

@@ -27,7 +27,7 @@ import type {
 } from './types';
 
 export const IPC = {
-  app: { status: 'app:status', close: 'app:close', openExternal: 'app:open-external', toggleOverlay: 'app:toggle-overlay', adjustZoom: 'app:adjust-zoom', sessionMode: 'app:session-mode', liveCollapse: 'app:live-collapse', moveLiveCollapse: 'app:move-live-collapse', resizeLive: 'app:resize-live', focusLiveTranscript: 'app:focus-live-transcript' },
+  app: { status: 'app:status', close: 'app:close', openExternal: 'app:open-external', toggleOverlay: 'app:toggle-overlay', adjustZoom: 'app:adjust-zoom', sessionMode: 'app:session-mode', liveCollapse: 'app:live-collapse', moveLiveCollapse: 'app:move-live-collapse', resizeLive: 'app:resize-live', focusLiveTranscript: 'app:focus-live-transcript', sendShortcut: 'app:send-shortcut' },
   sessions: {
     startRound: 'sessions:start-round',
     roundHistory: 'sessions:round-history',
@@ -36,7 +36,7 @@ export const IPC = {
   documents: { select: 'documents:select', read: 'documents:read', addExtracted: 'documents:add-extracted', addText: 'documents:add-text', remove: 'documents:remove' },
   library: { list: 'library:list', upload: 'library:upload', get: 'library:get', delete: 'library:delete' },
   interview: {
-    start: 'interview:start', stop: 'interview:stop', pause: 'interview:pause', interaction: 'interview:interaction', autoAnswer: 'interview:auto-answer', answer: 'interview:answer', clear: 'interview:clear',
+    start: 'interview:start', stop: 'interview:stop', pause: 'interview:pause', interaction: 'interview:interaction', autoAnswer: 'interview:auto-answer', answer: 'interview:answer', clear: 'interview:clear', discardInput: 'interview:discard-input',
   },
   audio: { chunk: 'audio:chunk', error: 'audio:error', selectSystemSource: 'audio:select-system-source' },
   screen: { sources: 'screen:sources', captureDesktop: 'screen:capture-desktop', captureCurrent: 'screen:capture-current', selectedSource: 'screen:selected-source', approve: 'screen:approve', discard: 'screen:discard', firstVisible: 'screen:first-visible', shot: 'screen:shot', clearContext: 'screen:clear-context' },
@@ -82,6 +82,10 @@ export interface ElectronAPI {
   setAutoAnswer(enabled: boolean): Promise<boolean>;
   requestAnswer(input: AnswerRequest): Promise<boolean>;
   clearCurrentAnswer(): Promise<void>;
+  /** Clear pressed: forget what has been captured so far in the current spoken turn so it never comes back. */
+  discardTranscriptInput(): Promise<void>;
+  /** Registers the Alt+S shortcut that sends the shown question, even while another app has focus. Returns whether it is active. */
+  setSendShortcut(enabled: boolean): Promise<boolean>;
   sendAudioChunk(sourceId: string, chunk: ArrayBuffer): void;
   reportAudioError(message: string): void;
   selectSystemAudioSource(sourceId: string): Promise<string>;

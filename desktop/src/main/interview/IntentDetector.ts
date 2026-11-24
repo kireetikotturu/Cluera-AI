@@ -1,4 +1,5 @@
 import type { QuestionIntent, QuestionIntentName } from '../../shared/types';
+import { SCENARIO_CUE } from './autoQuestionAssembler';
 
 const SMALL_TALK = /^(okay|ok|great|good|nice|thanks|thank you|perfect|sounds good|all right|alright)[.! ]*$/i;
 const INCOMPLETE = /\b(and|or|also|because|when|while|with|about|to|for|on|in|using|through|how you|what you|tell me)\s*$/i;
@@ -25,7 +26,9 @@ export class IntentDetector {
     else if (/^(and|also|why|how about|what about)\b/i.test(text)) intent = 'FOLLOW_UP';
     if ((text.match(/\?/g) ?? []).length > 1 || (!/^and\b/i.test(text) && /\b(and also|as well as|and (?:then )?(?:how|what|why|when|where|can|could|would|did|do))\b/i.test(text))) intent = 'MULTI_PART_QUESTION';
     const sentences = text.split(/(?<=[.!?])\s+/);
-    const realQuestion = intent !== 'MULTI_PART_QUESTION' && sentences.length > 1
+    // A situation described first and asked about last is one question: keep all of it, not just the final sentence.
+    const keepWhole = text.length >= 160 || SCENARIO_CUE.test(text);
+    const realQuestion = intent !== 'MULTI_PART_QUESTION' && sentences.length > 1 && !keepWhole
       ? [...sentences].reverse().find((part) => part.includes('?') || QUESTION_START.test(part)) ?? text : text;
     return this.result(true, intent, text.includes('?') ? 0.94 : 0.87, realQuestion, true, intent === 'FOLLOW_UP');
   }

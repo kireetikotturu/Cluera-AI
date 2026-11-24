@@ -61,6 +61,7 @@ interface AppState {
   clearDeviceCheckTranscript(): void;
   clearCandidateTranscript(): void;
   clearInterviewerMessages(): void;
+  discardLiveInput(): void;
   finishInterviewerInteraction(): void;
   markInterviewerMessageHandled(text: string): void;
   selectQa(index: number): void;
@@ -127,6 +128,8 @@ export const useAppStore = create<AppState>((set) => ({
     ...(state.activeTranscriptRole === 'candidate' ? { activeTranscript: '', activeTranscriptRole: null } : {}),
   })),
   clearInterviewerMessages: () => set({ interviewerMessages: [], transcript: '', pendingInterviewerTranscript: '' }),
+  // Clear pressed on the live input: drop the unsent spoken text everywhere so it cannot be shown or sent again.
+  discardLiveInput: () => set({ interviewerSpeaking: false, transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', activeTranscript: '', activeTranscriptRole: null }),
   finishInterviewerInteraction: () => set({ pendingInterviewerTranscript: '' }),
   markInterviewerMessageHandled: (text) => set((state) => {
     const target = normalizedTranscript(text);

@@ -65,6 +65,12 @@ function formatSessionTime(totalSeconds: number): string {
     : `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 }
 
+/** Space the scroll area itself adds around its content (padding), which must not be counted as content height. */
+function scrollChromeHeight(panel: HTMLElement): number {
+  const style = window.getComputedStyle(panel);
+  return (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+}
+
 export function CopilotPage(): JSX.Element {
   const store = useAppStore();
   const activeId = store.activeSessionId;
@@ -95,6 +101,8 @@ export function CopilotPage(): JSX.Element {
   const [showAnswerStyle, setShowAnswerStyle] = useState(false);
   const [answerStyleLabel, setAnswerStyleLabel] = useState('Natural');
   const [autoAnswerEnabled, setAutoAnswerEnabled] = useState(() => store.sessions.find((session) => session.id === activeId)?.autoAnswer ?? false);
+  const autoAnswerRef = useRef(autoAnswerEnabled);
+  autoAnswerRef.current = autoAnswerEnabled;
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(false);
   const readingController = useRef<EyeContactScroll | null>(null);
   const readingFocus = useRef(new ReadingFocus());
@@ -103,6 +111,7 @@ export function CopilotPage(): JSX.Element {
   const [answerRequestPending, setAnswerRequestPending] = useState(false);
   const topQuestionSending = useRef(false);
   const manualSendShortcut = useRef<(event: KeyboardEvent) => void>(() => {});
+  const sendShortcutRef = useRef<() => boolean>(() => false);
   const [collapsed, setCollapsed] = useState(false);
   const [microphones, setMicrophones] = useState<MicrophoneDevice[]>([]);
   const [showMicrophones, setShowMicrophones] = useState(false);
@@ -458,7 +467,7 @@ export function CopilotPage(): JSX.Element {
     const controller = new EyeContactScroll(answerPanelRef.current, qaContentRef.current, readingFocus.current);
     readingController.current = controller;
     if (!autoScrollEnabled && manualViewport.current > 0) {
-      qaContentRef.current.style.minHeight = `${manualViewport.current + answerPanelRef.current.clientHeight}px`;
+      qaContentRef.current.style.minHeight = `${Math.max(0, manualViewport.current + answerPanelRef.current.clientHeight - scrollChromeHeight(answerPanelRef.current))}px`;
       answerPanelRef.current.scrollTop = manualViewport.current;
     }
     return () => { controller.dispose(); readingController.current = null; };
@@ -485,7 +494,9 @@ export function CopilotPage(): JSX.Element {
       manualViewport.current = panel.scrollTop;
       // Keep the scroll range when a long answer is replaced by a short one.
       // Otherwise Chromium clamps scrollTop even with all effects disabled.
-      const minimum = panel.scrollTop + panel.clientHeight;
+      // Count only the content: the panel's own padding is added on top, so including it would let every
+      // scroll to the bottom add a little more room and the page would never end.
+      const minimum = panel.scrollTop + panel.clientHeight - scrollChromeHeight(panel);
       if (minimum > (Number.parseFloat(content.style.minHeight) || 0)) content.style.minHeight = `${minimum}px`;
     }
   };
@@ -493,7 +504,7 @@ export function CopilotPage(): JSX.Element {
     const panel = answerPanelRef.current;
     if (autoScrollEnabled && panel && qaContentRef.current) {
       manualViewport.current = panel.scrollTop;
-      qaContentRef.current.style.minHeight = `${panel.scrollHeight}px`;
+      qaContentRef.current.style.minHeight = `${qaContentRef.current.offsetHeight}px`;
       panel.scrollTo({ top: panel.scrollTop, behavior: 'instant' }); // cancel an in-flight smooth scroll
     }
     holdManualScroll();
@@ -958,6 +969,35 @@ export function CopilotPage(): JSX.Element {
     return () => window.removeEventListener('keydown', shortcut, true);
   }, []);
 
+  // Alt+S sends what is in the question box, or what was typed in the box below when the question box is empty.
+  // It only acts while Auto Answer is off. The main process also registers it system-wide while a session runs,
+  // so it works while the meeting has keyboard focus; the window listener below covers the case where it could not.
+  const sendByShortcut = (): boolean => {
+    if (autoAnswerEnabled || collapsed) return false;
+    if (!running || analyzingScreen || document.hidden || showLiveMenu || showAnswerStyle || showSources || showMicrophones || store.screenPreview) return true;
+    if ((questionEditorRef.current?.value ?? questionDraft).trim()) { void sendTopQuestion(); return true; }
+    const typed = transcriptDraftActive ? manual.trim() : '';
+    if (typed) void ask(typed);
+    return true;
+  };
+  useLayoutEffect(() => { sendShortcutRef.current = sendByShortcut; });
+  useEffect(() => window.electronAPI.onEvent('answer:send-shortcut', () => { sendShortcutRef.current(); }), []);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || event.code !== 'KeyS' || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+        || event.isComposing || event.keyCode === 229) return;
+      if (event.repeat) { if (!autoAnswerRef.current) { event.preventDefault(); event.stopPropagation(); } return; }
+      if (sendShortcutRef.current()) { event.preventDefault(); event.stopPropagation(); }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, []);
+  useEffect(() => {
+    // Hold the system-wide Alt+S only while it can do something, so the key stays free for other apps otherwise.
+    void Promise.resolve(window.electronAPI.setSendShortcut?.(running && !autoAnswerEnabled && !collapsed)).catch(() => undefined);
+  }, [running, autoAnswerEnabled, collapsed]);
+  useEffect(() => () => { void Promise.resolve(window.electronAPI.setSendShortcut?.(false)).catch(() => undefined); }, []);
+
   const control = async (mode: AnswerStyleMode): Promise<void> => {
     if (running && activeId && currentQuestion && !analyzingScreen) {
       await window.electronAPI.requestAnswer({ sessionId: activeId, question: currentQuestion, mode });
@@ -1351,6 +1391,7 @@ export function CopilotPage(): JSX.Element {
                       questionOwnership.current.edit(useAppStore.getState().interviewerTurnSequence);
                       questionFocusEpoch.current += 1;
                       setQuestionDraft(event.target.value);
+                      readingController.current?.focusQuestion();
                     }}
                     onKeyDown={(event) => {
                       if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
@@ -1360,7 +1401,7 @@ export function CopilotPage(): JSX.Element {
                   />}
             </div>
             <div className="question-actions">
-              <button aria-label="Send shown question" aria-keyshortcuts={autoAnswerEnabled ? undefined : 'Alt+Enter'} title={autoAnswerEnabled ? 'Send shown question' : 'Send shown question · Alt+Enter'} disabled={!running || !(autoAnswerEnabled ? hasDisplayedQuestion : questionDraft.trim()) || analyzingScreen} onMouseDown={(event) => { if (!autoAnswerEnabled) event.preventDefault(); }} onClick={() => void sendTopQuestion()}><Send size={13}/></button>
+              <button aria-label="Send shown question" aria-keyshortcuts={autoAnswerEnabled ? undefined : 'Alt+S Alt+Enter'} title={autoAnswerEnabled ? 'Send shown question' : 'Send shown question · Alt+S'} disabled={!running || !(autoAnswerEnabled ? hasDisplayedQuestion : questionDraft.trim()) || analyzingScreen} onMouseDown={(event) => { if (!autoAnswerEnabled) event.preventDefault(); }} onClick={() => void sendTopQuestion()}><Send size={13}/></button>
               <button aria-label="Copy question" title="Copy question" onClick={copyQuestion}>{questionCopied ? <Check size={13}/> : <Clipboard size={13}/>}</button>
             </div>
           </div>
@@ -1455,11 +1496,16 @@ export function CopilotPage(): JSX.Element {
         />
         <button type="button" className="transcript-clear" aria-label="Clear transcript input" title="Clear" disabled={!transcriptInputValue} onMouseDown={(event) => event.preventDefault()} onClick={() => {
           transcriptDraftBaseline.current = activeTranscriptText;
-          transcriptDraftReleaseArmed.current = false;
+          // Armed on purpose: the cleared words are gone for good, so the next new words of the live speech flow
+          // back into this box. Typing disarms it again, so a draft the customer writes is never overwritten.
+          transcriptDraftReleaseArmed.current = true;
           transcriptDraftEditedRef.current = true;
           setTranscriptDraftActive(true);
           setManual('');
           manualInputRef.current?.focus();
+          // Also forget what was captured so far, or the next words of the same spoken turn bring it straight back.
+          void Promise.resolve(window.electronAPI.discardTranscriptInput?.()).catch(() => undefined);
+          useAppStore.getState().discardLiveInput();
         }}>Clear</button>
         {autoAnswerEnabled && <button type="submit" className="transcript-answer" aria-label="Send current question" title="Send current question" disabled={!running || !transcriptAnswerText || analyzingScreen} onMouseDown={(event) => event.preventDefault()}>
           Send

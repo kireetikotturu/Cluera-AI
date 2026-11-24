@@ -12,6 +12,9 @@ import type { SpeechRecognizer } from '../stt/SpeechRecognizer';
 import { Telemetry } from '../telemetry/Telemetry';
 import { IntentDetector } from './IntentDetector';
 import { TurnGate } from './TurnGate';
+import { AutoQuestionAssembler } from './autoQuestionAssembler';
+import { mergeFinalTranscriptText } from './mergeTranscript';
+import { TurnPrefixFilter } from './turnPrefixFilter';
 
 type Emitter = <K extends AppEventName>(name: K, payload: AppEventMap[K]) => void;
 const CANDIDATE_SOURCE: AudioSourceDescriptor = {
@@ -42,22 +45,7 @@ export function resolveScreenQuestion(context: ScreenContext, fallback = SCREEN_
   return cleanScreenQuestion(fallback).slice(0, 320) || SCREEN_QUESTION_FALLBACK;
 }
 
-export function mergeFinalTranscriptText(current: string, incoming: string): string {
-  const previous = current.trim().replace(/\s+/g, ' ');
-  const next = incoming.trim().replace(/\s+/g, ' ');
-  if (!previous) return next;
-  if (!next || previous === next || previous.endsWith(next)) return previous;
-  if (next.startsWith(previous)) return next;
-  const previousWords = previous.split(' ');
-  const nextWords = next.split(' ');
-  const maximumOverlap = Math.min(12, previousWords.length, nextWords.length);
-  for (let size = maximumOverlap; size > 0; size -= 1) {
-    if (previousWords.slice(-size).join(' ').toLowerCase() === nextWords.slice(0, size).join(' ').toLowerCase()) {
-      return [...previousWords, ...nextWords.slice(size)].join(' ');
-    }
-  }
-  return `${previous} ${next}`;
-}
+export { mergeFinalTranscriptText };
 
 export const mergeFinalCandidateText = mergeFinalTranscriptText;
 
@@ -82,6 +70,11 @@ export class InterviewOrchestrator {
   private source: AudioSourceDescriptor | null = null;
   private screenContext: ScreenContext | undefined;
   private screenContextSessionId: string | undefined;
+  // Joins the pieces of a question the interviewer pauses in (Auto Answer only).
+  private readonly assembler = new AutoQuestionAssembler({ ready: (question) => { void this.answerAssembledQuestion(question); } });
+  // Remember what the customer cleared so it cannot come back with the next words of the same turn.
+  private readonly interviewerFilter = new TurnPrefixFilter();
+  private readonly candidateFilter = new TurnPrefixFilter();
 
   constructor(
     private readonly config: AppConfig,
@@ -114,6 +107,9 @@ export class InterviewOrchestrator {
     this.candidateTurnQuestionId = undefined;
     this.candidateTurnText = '';
     this.paused = false;
+    this.assembler.discard();
+    this.interviewerFilter.endTurn();
+    this.candidateFilter.endTurn();
     this.candidateRecognizerUnavailable = false;
     this.latestQuestionId = undefined;
     this.candidatePendingQuestionId = undefined;
@@ -131,29 +127,51 @@ export class InterviewOrchestrator {
     this.recognizer = recognizer;
     recognizer.onPartialTranscript((event) => {
       if (this.paused) return;
-      if (this.interactionEnabled && event.canTriggerAnswers && this.autoAnswerEnabled) this.turnGate.update(event.text, 'partial');
-      this.emit('transcript:partial', this.interviewerTranscriptForDisplay(event));
+      const spoken = this.interviewerFilter.observe(event.text);
+      // Only words the customer already cleared: nothing new to show or to send.
+      if (!spoken.trim()) return;
+      const visible = spoken === event.text ? event : { ...event, text: spoken };
+      if (this.interactionEnabled && event.canTriggerAnswers && this.autoAnswerEnabled) {
+        // The interviewer is still talking: keep the question collected so far and wait for the rest.
+        this.assembler.hold();
+        this.turnGate.update(visible.text, 'partial');
+      }
+      this.emit('transcript:partial', this.interviewerTranscriptForDisplay(visible));
       if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: this.interactionEnabled ? 'Interviewer speaking' : 'Device check - interviewer audio detected' });
     });
     recognizer.onFinalTranscript((event) => {
-      if (!this.paused && event.text) this.acceptFinalTranscript(this.interviewerTranscriptForDisplay(event));
+      if (this.paused || !event.text) return;
+      const spoken = this.interviewerFilter.observe(event.text);
+      if (!spoken.trim()) return;
+      this.acceptFinalTranscript(this.interviewerTranscriptForDisplay(spoken === event.text ? event : { ...event, text: spoken }));
     });
     recognizer.onTurnEvent((event) => {
+      // The turn is over for the customer's clear-memory whether or not anything else happens with it.
+      const spoken = event.type === 'end' || event.type === 'resume' ? this.interviewerFilter.observe(event.transcript) : event.transcript;
+      if (event.type === 'end') this.interviewerFilter.endTurn();
       if (this.paused) return;
       if (!this.interactionEnabled) { this.turnGate.reset(); return; }
-      if (event.type === 'resume') { if (this.answerInterruptible) this.answerAbort?.abort(); this.lastQuestion = ''; this.turnGate.update(event.transcript, 'resume'); return; }
+      if (event.type === 'start') { this.assembler.hold(); return; }
+      if (event.type === 'resume') {
+        this.assembler.hold();
+        if (this.answerInterruptible) this.answerAbort?.abort();
+        this.lastQuestion = '';
+        this.turnGate.update(spoken, 'resume');
+        return;
+      }
       if (event.type === 'end') {
         if (!event.canTriggerAnswers) return;
         if (!this.autoAnswerEnabled) {
           this.turnGate.reset();
-          if (event.transcript.trim() && this.session) this.repositories.addTurn(this.session.id, 'interviewer', event.transcript.trim(), this.source ?? undefined);
+          if (spoken.trim() && this.session) this.repositories.addTurn(this.session.id, 'interviewer', spoken.trim(), this.source ?? undefined);
           if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: 'Interviewer turn captured — press Send when the question is complete' });
           return;
         }
+        // Nothing new after Clear: do not send what was cleared.
+        if (!spoken.trim() && !this.assembler.pending) return;
         if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: 'Interviewer turn complete — checking for a question' });
-        const gate = this.turnGate.update(event.transcript, 'end');
-        if (gate.decision === 'ANSWER_NOW') void this.processQuestion(gate.transcript);
-        else if (event.transcript.trim() && this.session) this.repositories.addTurn(this.session.id, 'interviewer', event.transcript.trim(), this.source ?? undefined);
+        // Interviewers pause inside long questions. Keep the pieces together and answer once they stay quiet.
+        this.assembler.turnEnded(spoken);
       }
     });
     recognizer.onError((error) => this.emit('app:error', { title: 'Transcription connection', message: error.message, recoverable: true }));
@@ -166,6 +184,9 @@ export class InterviewOrchestrator {
     // Ignore late transcription callbacks while async socket closure settles.
     this.paused = true;
     this.turnGate.reset();
+    this.assembler.discard();
+    this.interviewerFilter.endTurn();
+    this.candidateFilter.endTurn();
     this.answerAbort?.abort();
     this.answerAbort = null;
     this.accountProviders?.stop();
@@ -199,6 +220,7 @@ export class InterviewOrchestrator {
     if (next !== this.autoAnswerEnabled) {
       this.autoAnswerEnabled = next;
       this.pendingInterviewerTranscript = '';
+      this.assembler.discard();
       this.turnGate.reset();
     }
     return this.autoAnswerEnabled;
@@ -215,6 +237,7 @@ export class InterviewOrchestrator {
     this.candidateTurnQuestionId = undefined;
     this.candidateTurnText = '';
     this.turnGate.reset();
+    this.assembler.discard();
     if (!this.interactionEnabled) {
       this.answerAbort?.abort();
       this.answerAbort = null;
@@ -244,14 +267,20 @@ export class InterviewOrchestrator {
     this.candidateRecognizer = candidateRecognizer;
     candidateRecognizer.onPartialTranscript((event) => {
       if (!this.paused && this.session?.id === owningSession.id) {
+        const spoken = this.candidateFilter.observe(event.text);
+        if (!spoken.trim()) return;
         if (this.interactionEnabled) this.beginCandidateSpeech();
-        this.emit('transcript:partial', event);
+        this.emit('transcript:partial', spoken === event.text ? event : { ...event, text: spoken });
       }
     });
     candidateRecognizer.onFinalTranscript((event) => {
       if (this.paused || !event.text || this.session?.id !== owningSession.id) return;
-      this.emit('transcript:final', event);
-      if (this.interactionEnabled) this.persistCandidateFinal(event.text, event.confidence);
+      const spoken = this.candidateFilter.observe(event.text);
+      this.candidateFilter.endTurn();
+      if (!spoken.trim()) return;
+      const visible = spoken === event.text ? event : { ...event, text: spoken };
+      this.emit('transcript:final', visible);
+      if (this.interactionEnabled) this.persistCandidateFinal(visible.text, event.confidence);
     });
     candidateRecognizer.onTurnEvent((event) => {
       if (this.interactionEnabled && (event.type === 'start' || event.type === 'resume')) this.beginCandidateSpeech();
@@ -334,6 +363,8 @@ export class InterviewOrchestrator {
       && Boolean(this.pendingInterviewerTranscript.trim())
       && normalizeQuestionText(this.pendingInterviewerTranscript) === normalizedInput;
     if (input.origin) this.pendingInterviewerTranscript = '';
+    // The customer sent a question themselves: do not also send the one still being collected.
+    this.assembler.discard();
     const suffix = {
       default: '', shorter: ' Keep the answer much shorter.', longer: ' Expand the answer with useful detail.',
       technical: ' Make the answer more technical.', conversational: ' Make the answer more conversational.', star: ' Use STAR structure.',
@@ -469,10 +500,41 @@ export class InterviewOrchestrator {
   }
 
   private interviewerTranscriptForDisplay(event: TranscriptEvent): TranscriptEvent {
-    if (this.autoAnswerEnabled || event.sourceRole !== 'remote_interviewer' || !event.text.trim()) return event;
+    if (event.sourceRole !== 'remote_interviewer' || !event.text.trim()) return event;
+    if (this.autoAnswerEnabled) {
+      // Show the whole question being put together, not just the piece after the last pause.
+      const collected = this.assembler.pending;
+      return collected ? { ...event, text: mergeFinalTranscriptText(collected, event.text) } : event;
+    }
     const combined = mergeFinalTranscriptText(this.pendingInterviewerTranscript, event.text);
     if (event.isFinal) this.pendingInterviewerTranscript = combined;
     return { ...event, text: combined };
+  }
+
+  /** The interviewer stayed quiet long enough: send the collected question to the AI. */
+  private async answerAssembledQuestion(text: string): Promise<void> {
+    const question = text.trim();
+    if (!question || !this.session || !this.interactionEnabled || this.paused || !this.autoAnswerEnabled) return;
+    this.turnGate.reset();
+    try {
+      if (question.split(/\s+/).length < 2) {
+        this.repositories.addTurn(this.session.id, 'interviewer', question, this.source ?? undefined);
+        return;
+      }
+      await this.processQuestion(question);
+    } catch (error) {
+      this.emit('copilot:status', { status: 'recovering', message: 'Could not generate the answer' });
+      this.emit('app:error', { title: 'Answer generation', message: error instanceof Error ? error.message : 'Answer generation failed.', recoverable: true });
+    }
+  }
+
+  /** The customer pressed Clear: forget what was captured so far so it is never shown or sent again. */
+  discardInput(): void {
+    this.interviewerFilter.discard();
+    this.candidateFilter.discard();
+    this.assembler.discard();
+    this.pendingInterviewerTranscript = '';
+    this.turnGate.reset();
   }
 
   private async processQuestion(questionForModel: string, displayQuestion = questionForModel, force = false, alreadySaved = false, interruptible = true): Promise<boolean> {

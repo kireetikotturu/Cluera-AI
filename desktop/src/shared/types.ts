@@ -345,6 +345,7 @@ export interface UploadedDocumentInput {
 
 export interface AppEventMap {
   'screen:quick-shot': null;
+  'answer:send-shortcut': null;
   'copilot:status': { status: CopilotStatus; message?: string };
   'transcript:partial': TranscriptEvent;
   'transcript:final': TranscriptEvent;
