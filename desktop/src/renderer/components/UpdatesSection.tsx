@@ -35,7 +35,7 @@ export function UpdatesSection({ initial, onStatus }: { initial?: UpdateStatus; 
   return <section className="settings-section" aria-labelledby="updates-title">
     <div className="settings-title"><Download size={19}/><div><h2 id="updates-title">Updates</h2>
       <p>Installed version: {status?.installedVersion ?? 'Loading…'}</p></div></div>
-    {status?.channel === 'beta' && <p className="settings-note">Test updates only. These installers may be unsigned and Windows may show Unknown Publisher. They are not production releases.</p>}
+    {status?.channel === 'beta' && <p className="settings-note">Windows may show a "Windows protected your PC" notice for updates. Choose More info, then Run anyway.</p>}
     <p>{status?.message ?? 'Loading update information…'}</p>
     {available && <p>Latest approved version: <strong>{status.version}</strong></p>}
     {available && status.releaseNotes && <details open><summary>Release notes</summary><p className="update-release-notes">{status.releaseNotes}</p></details>}

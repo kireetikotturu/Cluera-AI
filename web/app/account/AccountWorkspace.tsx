@@ -92,7 +92,7 @@ export function AccountWorkspace(){
    <button className="button secondary" disabled={locked}>Save private context</button>
   </form>
   <ul>{data.documents.map(doc=><li key={doc.id}>{doc.name} · {doc.kind} · {doc.bytes} bytes <button type="button" disabled={locked} onClick={()=>void submit({body:{action:'DELETE_CONTEXT',operationId:crypto.randomUUID(),id:doc.id}})}>Delete</button></li>)}</ul>
-  <p><a href="/account/download">Cluera TEST download / updates</a> · <AdminRoleLink>Cluera administration</AdminRoleLink></p>
-  <p>The Cluera TEST installer has its own installation and update trust. A download is available only after explicit Cluera release approval.</p>
+  <p><a href="/account/download">Download Cluera AI for Windows</a> · <AdminRoleLink>Cluera administration</AdminRoleLink></p>
+  <p>Install the Windows app, then sign in with this account. Your time balance is shared across devices.</p>
  </>:!loading?<p>No verified account snapshot is available. <a href="/account">Return to sign in</a>.</p>:null}</div>;
 }

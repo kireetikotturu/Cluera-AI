@@ -26,4 +26,4 @@ export function allowancePercent(bucket: CreditBucket): number|null {
   return bucket.grantedMilliseconds > 0
     ? Math.min(100,Math.max(0,100*bucket.spentMilliseconds/bucket.grantedMilliseconds)) : null;
 }
-export const bucketName = {TRIAL:'Lifetime trial',RECURRING:'Current recurring allowance',PACK:'Non-expiring packs',TEST:'Staging test access',MANUAL:'Manual allowance'};
+export const bucketName = {TRIAL:'Lifetime trial',RECURRING:'Current recurring allowance',PACK:'Non-expiring packs',TEST:'Bonus time',MANUAL:'Added by Cluera'};

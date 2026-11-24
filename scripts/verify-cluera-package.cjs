@@ -15,7 +15,7 @@ function verify(requireArtifact=false){
  if(key.asymmetricKeyType!=='ed25519'||createHash('sha256').update(key.export({type:'spki',format:'der'})).digest('hex')!==PIN)throw Error('Cluera trust invalid.');
  for(const file of ['main/main.js','preload/preload.js','renderer/index.html'])if(!fs.existsSync(path.join(desktop,'dist',file)))throw Error('Complete Cluera build required.');
  const out=path.join(desktop,config.directories.output,'win-unpacked/resources/app.asar');
- if(requireArtifact&&(!fs.existsSync(out)||!fs.existsSync(path.join(desktop,config.directories.output,`ClueraAITestSetup-${p.version}.exe`))))throw Error('Complete Cluera installer required.');
+ if(requireArtifact&&(!fs.existsSync(out)||!fs.existsSync(path.join(desktop,config.directories.output,`ClueraAISetup-${p.version}.exe`))))throw Error('Complete Cluera installer required.');
  if(requireArtifact&&fs.existsSync(out)){
   const asar=require(path.join(desktop,'node_modules/@electron/asar'));
   const paths=asar.listPackage(out).map(p=>p.replaceAll('\\','/'));

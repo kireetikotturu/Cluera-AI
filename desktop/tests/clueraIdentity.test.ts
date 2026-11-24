@@ -22,7 +22,7 @@ it('keeps Windows installation per-user and refuses both existing products',()=>
  const config=require('../electron-builder.cluera.cjs'),hook=fs.readFileSync('resources/cluera-installer.nsh','utf8');
  expect(config.nsis).toMatchObject({perMachine:false,allowElevation:false,allowToChangeInstallationDirectory:false,deleteAppDataOnUninstall:false});
  for(const value of ['Programs\\Cluera AI','SigmaRound AI.exe','SigmaRound Account.exe'])expect(hook).toContain(value);
- expect(config.win.artifactName).toBe('ClueraAITestSetup-${version}.${ext}');
+ expect(config.win.artifactName).toBe('ClueraAISetup-${version}.${ext}');
 });
 it('never offers personal key setup or accepts a stale BYOK status',()=>{
  expect(providerSetupProblem({providerMode:'byok'} as any)).toContain('personal API keys are not supported');

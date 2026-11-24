@@ -51,15 +51,23 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
       let idle = setTimeout(cancel, 15000);
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
       const filter = secretFilter(privateValues);
+      const timing: { headersMs?: number; firstTokenMs?: number } = {}, begun = performance.now();
       try {
-        const response = await request(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:streamGenerateContent?alt=sse`, {
+        const started = performance.now();
+        const post = (thinkingConfig: Record<string, unknown> | undefined) => request(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:streamGenerateContent?alt=sse`, {
           method: 'POST', redirect: 'error', signal, cache: 'no-store',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': secrets.geminiKey },
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': secrets.geminiKey! },
           body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: input.prompt },
             ...(input.image ? [{ inlineData: input.image }] : [])] }],
-          generationConfig: { temperature: 0.6, topP: 0.9, maxOutputTokens: 3000, thinkingConfig: { thinkingLevel: 'minimal' } } }),
+          generationConfig: { temperature: 0.6, topP: 0.9, maxOutputTokens: 3000, ...(thinkingConfig ? { thinkingConfig } : {}) } }),
         });
+        // Fastest answers: keep "thinking" minimal. A brand-new model that rejects that setting
+        // is retried once without it, so adding any new Gemini model just works.
+        const fastThinking = geminiFastThinking(selectedModel);
+        let response = await post(fastThinking);
+        if (response.status === 400 && fastThinking) { await response.body?.cancel().catch(() => undefined); response = await post(undefined); }
         guard.assertActive();
+        timing.headersMs = Math.round(performance.now() - started);
         if (!response.ok || !response.body) { await response.body?.cancel(); throw unavailable(); }
         reader = response.body.getReader();
         let buffer = '', totalBytes = 0, hasAnswer = false;
@@ -83,7 +91,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
             if (typeof part.text !== 'string' || part.thought) continue;
             if (part.text.trim()) hasAnswer = true;
             const text = filter.push(part.text);
-            if (text) emit(text);
+            if (text) { if (timing.firstTokenMs === undefined) timing.firstTokenMs = Math.round(performance.now() - begun); emit(text); }
           }
         };
         while (true) {
@@ -109,6 +117,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
         guard.assertActive();
         if (!hasAnswer) throw unavailable();
         const final = filter.push('', true); if (final) emit(final);
+        logAnswerTiming('gemini', selectedModel, timing, begun);
       } catch { throw unavailable(); }
       finally { clearTimeout(total); clearTimeout(idle); cancel(); await reader?.cancel().catch(() => undefined); }
     },
@@ -180,6 +189,17 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
   };
 }
 
+/** Gemini thinking settings per model family (mirrors the desktop app); unknown families send none. */
+export function geminiFastThinking(model: string): Record<string, unknown> | undefined {
+  if (/^gemini-2\.5-flash(?:-lite)?(?:$|-)/i.test(model)) return { thinkingBudget: 0 };
+  if (/^gemini-(?:[3-9]|\d{2,})(?:\.\d+)?-/i.test(model)) return { thinkingLevel: 'minimal' };
+  return undefined;
+}
+/** Secret-free speed log: how long the provider took to answer and to send the first words. */
+function logAnswerTiming(provider: string, model: string, timing: { headersMs?: number; firstTokenMs?: number }, begun: number) {
+  try { console.info(JSON.stringify({ component: 'cluera-answer-timing', provider, model, providerReplyMs: timing.headersMs ?? null,
+    firstWordsMs: timing.firstTokenMs ?? null, totalMs: Math.round(performance.now() - begun) })); } catch { /* Logging never affects an answer. */ }
+}
 const ANSWER_SYSTEM = 'You are Cluera, a concise interview copilot. Answer clearly and directly.';
 /** Streaming answers from OpenAI (Chat Completions) or Anthropic (Messages). Fixed hosts,
  * no redirects, bounded size and idle/total timeouts, secrets filtered from output. */

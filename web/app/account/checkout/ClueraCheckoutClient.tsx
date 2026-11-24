@@ -28,19 +28,34 @@ type CheckoutInstance = { open(): void; close(): void; on(event: string, callbac
 type CheckoutConstructor = new (options: Record<string, unknown>) => CheckoutInstance;
 const razorpay = () => (window as Window & { Razorpay?: CheckoutConstructor }).Razorpay;
 
-async function loadSdk(signal: AbortSignal): Promise<void> {
-  if (razorpay()) return;
-  await new Promise<void>((resolve, reject) => {
+const SDK_URL = 'https://checkout.razorpay.com/v1/checkout.js';
+// Pauses between automatic retries (a flaky connection usually recovers within a second or two).
+const SDK_RETRY_PAUSE_MS = process.env.NODE_ENV === 'test' ? [0, 0] : [800, 1600];
+/** One download attempt of the Razorpay window code. A slow network gets 20 seconds and a
+ * failed script tag is always removed, so the next attempt is a clean download. */
+function loadSdkOnce(signal: AbortSignal): Promise<void> {
+  if (razorpay()) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'; script.async = true;
+    script.src = SDK_URL; script.async = true;
     const cleanup = () => { clearTimeout(timer); signal.removeEventListener('abort', fail); script.onload = null; script.onerror = null; };
     const fail = () => { cleanup(); script.remove(); reject(new Error('Checkout unavailable.')); };
-    const timer = setTimeout(fail, 10_000);
+    const timer = setTimeout(fail, 20_000);
     script.onload = () => { cleanup(); razorpay() ? resolve() : fail(); }; script.onerror = fail;
     signal.addEventListener('abort', fail, { once: true });
     if (signal.aborted) { fail(); return; }
     document.head.append(script);
   });
+}
+/** Loads the Razorpay window code, retrying a flaky connection automatically (3 attempts). */
+async function loadSdk(signal: AbortSignal): Promise<void> {
+  let last: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (signal.aborted) break;
+    try { await loadSdkOnce(signal); return; } catch (error) { last = error; }
+    if (attempt < 2 && !signal.aborted) await new Promise(resolve => setTimeout(resolve, SDK_RETRY_PAUSE_MS[attempt]));
+  }
+  throw last ?? new Error('Checkout unavailable.');
 }
 
 /** Explicit user action only. Browser callbacks never fulfill or grant usage. */
@@ -218,6 +233,15 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
   useEffect(()=>{if(!cooldown)return;const timer=setInterval(()=>setCooldown(Math.max(0,Math.ceil((cooldownUntil.current-Date.now())/1000))),1000);return()=>clearInterval(timer);},[cooldown>0]);
 
   useEffect(() => {
+    if (!enabled) return;
+    // Only warm the network connection (no script runs before the customer presses Buy).
+    for (const origin of ['https://checkout.razorpay.com', 'https://api.razorpay.com']) {
+      if (!document.head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {
+        const link = document.createElement('link'); link.rel = 'preconnect'; link.href = origin; link.crossOrigin = 'anonymous'; document.head.append(link);
+      }
+    }
+  }, [enabled]);
+  useEffect(() => {
     alive.current = true;
     setSelection(selectionFromSearch(location.search));
     const query=new URLSearchParams(location.search),hint=query.get('desktopAccount');
@@ -344,7 +368,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         description: `${revision.name} · ${clueraAllowance(revision.allowanceSeconds)}`,
         ...(checkout.orderId ? { order_id: checkout.orderId, amount: checkout.amountPaise, currency: checkout.currency }
           : { subscription_id: checkout.subscriptionId }),
-        retry: { enabled: true, max_count: 3 }, timeout: windowSeconds, theme: { color: '#8b5cf6', backdrop_color: '#080b14' },
+        retry: { enabled: true, max_count: 3 }, timeout: windowSeconds, theme: { color: '#6b5cf6', backdrop_color: '#05060c' },
         handler: async (raw: unknown) => {
           if (!current() || callbackStarted) return;
           callbackStarted = true;callbackObserved.current=true;
@@ -372,7 +396,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
             setObservationCycle(value => value + 1);
             void refresh(true);
           }
-        }, modal: { backdropclose: false, escape: true,
+        }, modal: { backdropclose: false, escape: true, confirm_close: true, animation: true,
           ondismiss: () => observeExit('Payment window closed. If you did not finish paying, you were not charged. Continue the payment or cancel the order below.') },
       });
       // Razorpay keeps its window open with a retry option after a failed attempt.
@@ -395,7 +419,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         :'Razorpay checkout is open. Your balance updates after payment verification.');
     } catch { if (current()) {
       const notice=stage==='sdk'
-        ? 'The Razorpay window could not load. Check your connection or ad blocker, then tap Continue payment.'
+        ? 'The payment window is taking longer than usual to open. Please tap Continue payment to try again.'
         : resume ? 'We could not reopen this order. Tap Refresh billing status, or cancel it and start a new one.'
           : 'We could not start checkout. Tap Refresh billing status, or cancel the unfinished order and try again.';
       preparationFailure.current=notice;needsReconcile.current=false;setResumeRevisionId(null);setMessage(notice);

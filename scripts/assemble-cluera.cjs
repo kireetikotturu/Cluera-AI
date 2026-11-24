@@ -46,7 +46,7 @@ const pairs=[
  ['sigmaround-account','cluera-ai'],
  ['account-beta','cluera-beta'],
  ['account-staging','cluera-staging'],
- ['SigmaRoundAccountTestSetup','ClueraAITestSetup'],
+ ['SigmaRoundAccountTestSetup','ClueraAISetup'],
  ['SigmaRound Account','Cluera AI'],['SigmaRound AI','Cluera AI'],['SigmaRoundAI','Cluera AI'],
 ];
 let count=0;

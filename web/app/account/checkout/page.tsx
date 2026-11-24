@@ -22,7 +22,7 @@ export default async function CheckoutPage() {
       ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
     const billing=billingUiCapabilities();
     return <main className="account-page"><h1>Buy Cluera credits</h1>
-      <p>{billing.mode==='test'?'Test workspace. Purchases are limited to approved Test accounts.':'Review the price and renewal terms before continuing to payment.'}</p>
+      <p>{billing.mode==='test'?'Pick the time you need and pay securely with Razorpay.':'Review the price and renewal terms before continuing to payment.'}</p>
       <ClueraCheckoutClient key={billing.mode} {...billing} firstSubscriptionOnly/>
       <a href="/account">Return to your account</a></main>;
   }

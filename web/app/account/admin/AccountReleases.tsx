@@ -37,7 +37,7 @@ export function AccountReleases({disabled=false,canAct,onMutationLockChange}:{di
   if(running.current||operation.current||!admitted())return;
   const body={action,operationId:crypto.randomUUID(),subjectId:null,reason,input};operation.current=body;unknown.current=false;setPending(body);void execute(body);
  }
- return <section><h2>Cluera test releases</h2><p>Separate unsigned TEST product only. Upload the Cluera installer, independently verify its downloaded hash/size, then approve here. No legacy release is modified.</p>
+ return <section><h2>App releases</h2><p>Separate unsigned TEST product only. Upload the Cluera installer, independently verify its downloaded hash/size, then approve here. No legacy release is modified.</p>
  <p role="status">{message}</p><button disabled={disabled||busy} onClick={()=>void refresh()}>Refresh Cluera releases</button>
  {pending?<button disabled={disabled||busy} onClick={()=>void execute(pending)}>Verify/retry same release operation</button>:null}
  <fieldset disabled={disabled||busy||!!pending}><legend>Create immutable draft</legend><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);submit('RELEASE_DRAFT',{
@@ -54,8 +54,8 @@ export function AccountReleases({disabled=false,canAct,onMutationLockChange}:{di
  {rows.map(r=><fieldset key={r.id} disabled={disabled||busy||!!pending}><legend>{r.version} - {r.state}</legend><p>{r.downloadUrl}</p><p>{r.sha256} · {r.fileSizeBytes} bytes</p><p>{r.releaseNotes}</p>
  {r.state==='DRAFT'?<form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);submit('RELEASE_PUBLISH',{id:r.id,verifiedHostedSha256:String(f.get('hash')).trim().toLowerCase(),verifiedFileSizeBytes:Number(f.get('bytes')),confirmedAccountInstaller:f.get('confirmed')==='on'},String(f.get('reason')).trim());}}>
  <label>Independently downloaded SHA-256<input name="hash" required pattern="[a-fA-F0-9]{64}"/></label><label>Downloaded byte size<input name="bytes" type="number" min={1} required/></label>
- <label><input name="confirmed" type="checkbox" required/> I verified the separate Cluera TEST installer and its identity; it is not a SigmaRound installer.</label>
- <label>Approval reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Publish account TEST release</button></form>:null}
+ <label><input name="confirmed" type="checkbox" required/> I checked the installer file, its size and its SHA-256 hash.</label>
+ <label>Approval reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Publish release</button></form>:null}
  {r.state==='PUBLISHED'?<form onSubmit={e=>{e.preventDefault();submit('RELEASE_WITHDRAW',{id:r.id},String(new FormData(e.currentTarget).get('reason')));}}><label>Withdrawal reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Withdraw account release</button></form>:null}</fieldset>)}
  <p><a href="/api/cluera/update/test">Cluera signed test feed</a> · <a href="/account/download">Latest approved Cluera test download</a></p></section>;
 }

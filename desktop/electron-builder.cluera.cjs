@@ -16,7 +16,7 @@ module.exports={
   '!node_modules/mammoth/bin/**/*','!node_modules/argparse/**/*','!node_modules/sprintf-js/**/*'],
  asarUnpack:['node_modules/sql.js/dist/sql-wasm.wasm'],
  beforePack:'scripts/verify-cluera-package.cjs',afterPack:'scripts/after-pack.cjs',
- win:{icon:'resources/cluera.ico',target:[{target:'nsis',arch:['x64']}],artifactName:'ClueraAITestSetup-${version}.${ext}',signAndEditExecutable:true},
+ win:{icon:'resources/cluera.ico',target:[{target:'nsis',arch:['x64']}],artifactName:'ClueraAISetup-${version}.${ext}',signAndEditExecutable:true},
  nsis:{include:'resources/cluera-installer.nsh',oneClick:false,shortcutName:'Cluera AI',uninstallDisplayName:'Cluera AI',
   perMachine:false,allowElevation:false,allowToChangeInstallationDirectory:false,deleteAppDataOnUninstall:false},
 };

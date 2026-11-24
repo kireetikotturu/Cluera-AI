@@ -23,7 +23,7 @@ export function AccountRoot(): JSX.Element {
     return () => { alive = false; remove(); };
   }, []);
   if (!account) return <main className="startup-error"><h1>Opening Cluera AI…</h1></main>;
-  if (account.mode !== 'cluera-staging') return <main className="startup-error"><h1>Cluera identity unavailable</h1><p>Restart this Cluera TEST application. No License fallback is available.</p></main>;
+  if (account.mode !== 'cluera-staging') return <main className="startup-error"><h1>Cluera identity unavailable</h1><p>Please restart Cluera AI. If this keeps happening, contact support.</p></main>;
   if (account.state === 'active') return <App key={account.userId} account={account}/>;
   return <AccountLogin state={account} onState={setAccount}/>;
 }

@@ -10,12 +10,12 @@ import {json} from '../http';
 
 const version=z.string().regex(/^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/);
 export const accountReleaseInput=z.object({version,minimumSupportedVersion:version,
- downloadUrl:z.string().regex(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\/[A-Za-z0-9_.-]+\/ClueraAITestSetup-[0-9.]+\.exe$/),
+ downloadUrl:z.string().regex(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\/[A-Za-z0-9_.-]+\/ClueraAI(?:Test)?Setup-[0-9.]+\.exe$/),
  sha256:z.string().regex(/^[a-f0-9]{64}$/),fileSizeBytes:z.number().int().min(1).max(512*1024*1024),
  updateType:z.enum(['OPTIONAL','RECOMMENDED','REQUIRED']),releaseNotes:z.string().max(2000),
 }).strict().refine(v=>version.safeParse(v.minimumSupportedVersion).success&&version.safeParse(v.version).success
  &&compareVersions(v.minimumSupportedVersion,v.version)<=0,{path:['minimumSupportedVersion']})
- .refine(v=>v.downloadUrl.endsWith(`/ClueraAITestSetup-${v.version}.exe`),{path:['downloadUrl']});
+ .refine(v=>(v.downloadUrl.endsWith(`/ClueraAISetup-${v.version}.exe`)||v.downloadUrl.endsWith(`/ClueraAITestSetup-${v.version}.exe`)),{path:['downloadUrl']});
 export const accountReleaseRecord=accountReleaseInput.safeExtend({id:z.uuid(),state:z.enum(['DRAFT','PUBLISHED','WITHDRAWN']),publishedAt:z.string().nullable()});
 export const accountReleasePublish=z.object({id:z.uuid(),verifiedHostedSha256:z.string().regex(/^[a-f0-9]{64}$/),
  verifiedFileSizeBytes:z.number().int().min(1).max(512*1024*1024),confirmedAccountInstaller:z.literal(true)}).strict();

@@ -33,7 +33,7 @@ export function AccountLogin({state,onState}:{state:AccountView;onState(state:Ac
   };
   const locked=busy||state.state==='checking';
   return <main className="account-login">
-    <header className="account-login-bar"><span><b aria-hidden="true">Σ</b>Cluera AI <small>TEST</small></span>
+    <header className="account-login-bar"><span><b aria-hidden="true">Σ</b>Cluera AI</span>
       <button type="button" aria-label="Close Cluera AI" onClick={()=>void window.electronAPI.closeWindow()}><X size={18}/></button></header>
     <div className="account-login-scroll">
       <section className="activation-card account-login-card" aria-labelledby="account-login-title" aria-busy={locked}>
@@ -55,7 +55,6 @@ export function AccountLogin({state,onState}:{state:AccountView;onState(state:Ac
           <button type="button" className="account-retry" onClick={()=>setSupportOpen(true)}>Contact support</button></div>
         <p className="account-auth-note">Account creation, email verification and recovery open in your browser. AI credentials stay on the server.</p>
       </section>
-      <p className="account-login-footnote">Isolated Cluera TEST edition · not a production release</p>
     </div>
     {supportOpen&&<SupportDialog onClose={()=>setSupportOpen(false)}/>}
   </main>;

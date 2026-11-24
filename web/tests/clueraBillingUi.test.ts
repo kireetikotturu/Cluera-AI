@@ -442,13 +442,29 @@ it('continuation supersedes a slow background read, revalidates ownership and ig
  expect(request.mock.calls.filter(([url])=>String(url).includes('/resume?'))).toHaveLength(3);
  expect(request.mock.calls.every(([,init])=>init?.method!=='POST')).toBe(true);
 });
+it('one failed Razorpay download is retried automatically and the window still opens',async()=>{
+ createdBinding=makeBound().payment;
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')?Response.json(makeBound()):checkoutGet(url));
+ vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>button('Continue payment').click());
+ await act(async()=>document.querySelector<HTMLScriptElement>('script[src*="razorpay"]')!.dispatchEvent(new Event('error')));
+ await act(async()=>{await new Promise(resolve=>setTimeout(resolve,5));});
+ const retry=document.querySelector<HTMLScriptElement>('script[src*="razorpay"]');expect(retry).not.toBeNull();
+ const open=vi.fn();window.Razorpay=class{open=open;close=vi.fn();on=vi.fn();};
+ await act(async()=>retry!.dispatchEvent(new Event('load')));
+ await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20));});
+ expect(open).toHaveBeenCalledOnce();expect(host.textContent).not.toContain('taking longer than usual');
+});
 it('an SDK load failure stays visible until an explicit read rechecks the same order',async()=>{
  createdBinding=makeBound().payment;
  const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).includes('/resume?')?Response.json(makeBound()):checkoutGet(url));
  vi.stubGlobal('fetch',request);await renderCheckout();await act(async()=>button('Continue payment').click());
- const script=document.querySelector<HTMLScriptElement>('script[src*="razorpay"]')!;
- await act(async()=>script.dispatchEvent(new Event('error')));
- expect(host.textContent).toContain('Razorpay window could not load');expect(button('Continue payment')).toBeUndefined();expect(buy().disabled).toBe(true);
+ // The loader retries a flaky download automatically; fail all three attempts.
+ for(let attempt=0;attempt<3;attempt++){
+  const script=document.querySelector<HTMLScriptElement>('script[src*="razorpay"]')!;
+  await act(async()=>script.dispatchEvent(new Event('error')));
+  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,5));});
+ }
+ expect(host.textContent).toContain('payment window is taking longer than usual');expect(button('Continue payment')).toBeUndefined();expect(buy().disabled).toBe(true);
  await act(async()=>button('Refresh billing status').click());
  expect(button('Continue payment').disabled).toBe(false);expect(buy().disabled).toBe(false);expect(buy().dataset.checkoutAction).toBe('resume');
  const open=vi.fn();window.Razorpay=class{open=open;close=vi.fn();on=vi.fn();};
