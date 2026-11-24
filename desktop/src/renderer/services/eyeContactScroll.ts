@@ -50,6 +50,11 @@ export class ReadingFocus {
   }
 }
 
+/** How many of the last answer lines stay on screen when the answer is scrolled to its very end. */
+export const END_LINES_VISIBLE = 2;
+/** A little extra room so both lines are whole even when the last lines are separate paragraphs. */
+const END_SLACK_LINES = 0.6;
+
 /** One event-driven controller/RAF owner for both question and answer anchors. */
 export class EyeContactScroll {
   private state: ReadingState | null = null;
@@ -62,12 +67,36 @@ export class EyeContactScroll {
   private readonly observer: ResizeObserver;
 
   constructor(private readonly panel: HTMLElement, private readonly content: HTMLElement, private readonly focus = new ReadingFocus()) {
-    this.observer = new ResizeObserver(() => this.schedule());
+    this.observer = new ResizeObserver(() => { this.applyEndRoom(); this.schedule(); });
     this.observer.observe(panel); this.observer.observe(content);
     document.addEventListener('visibilitychange', this.visibility);
   }
+  /**
+   * Padding, not a visible placeholder block, gives the answer room to be positioned and scrolled. It leaves
+   * exactly enough room that, at the very end of the page, the last two lines of the answer are still on screen
+   * (at the top), so the reader is never left looking at an empty page. It applies with Auto Scroll on or off.
+   */
+  private applyEndRoom(): void {
+    const rich = this.content.querySelector<HTMLElement>('.answer-rich');
+    let padding = '0px';
+    if (rich) {
+      const line = renderedAnswerLineHeight(getComputedStyle(rich));
+      const inset = readingLineTopOffset(line);
+      // Space the page itself keeps below the answer text (its own bottom padding and the answer row's padding),
+      // so the last two lines end up on screen rather than just below it.
+      const panelPadding = Number.parseFloat(getComputedStyle(this.panel).paddingBottom) || 0;
+      const current = Number.parseFloat(this.content.style.paddingBottom) || 0;
+      const measured = typeof this.content.getBoundingClientRect === 'function' && typeof rich.getBoundingClientRect === 'function'
+        ? this.content.getBoundingClientRect().bottom - current - rich.getBoundingClientRect().bottom : 0;
+      const below = Number.isFinite(measured) ? Math.max(0, measured) : 0;
+      padding = `${Math.max(0, Math.round((this.panel.clientHeight - panelPadding - below - inset - line * (END_LINES_VISIBLE + END_SLACK_LINES)) * 100) / 100)}px`;
+    }
+    if (this.content.style.paddingBottom !== padding) this.content.style.paddingBottom = padding;
+  }
   private visibility = (): void => { this.cancel(); if (!document.hidden) this.schedule(); };
   update(state: ReadingState): void {
+    // Keep the room at the end of the answer current whenever the answer state changes, with Auto Scroll on or off.
+    this.applyEndRoom();
     const previous = this.state;
     const previousMode = this.focus.mode;
     this.state = state;
@@ -100,10 +129,7 @@ export class EyeContactScroll {
     const rich = this.content.querySelector<HTMLElement>('.answer-rich');
     const line = renderedAnswerLineHeight(getComputedStyle(rich ?? this.content));
     const inset = readingLineTopOffset(line);
-    // Padding, not a visible placeholder block, gives short answers positioning
-    // room. It is retained/frozen when OFF so the manual viewport cannot clamp.
-    const padding = `${Math.max(0, this.panel.clientHeight - inset - line)}px`;
-    if (this.content.style.paddingBottom !== padding) this.content.style.paddingBottom = padding;
+    this.applyEndRoom();
     this.content.style.minHeight = '';
     // Do not consume first-answer alignment on the empty streaming placeholder.
     if (this.focus.mode === 'answer' && !state.hasAnswer) return;

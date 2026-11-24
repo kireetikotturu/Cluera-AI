@@ -75,6 +75,8 @@ export function CopilotPage(): JSX.Element {
   const store = useAppStore();
   const activeId = store.activeSessionId;
   const [detail, setDetail] = useState<SessionDetail | null>(null);
+  const isAssignment = (detail?.session ?? store.sessions.find((session) => session.id === activeId))?.kind === 'assignment';
+  const [touchThrough, setTouchThrough] = useState(false);
   const [manual, setManual] = useState('');
   const [transcriptDraftActive, setTranscriptDraftActive] = useState(false);
   const [running, setRunning] = useState(false);
@@ -525,6 +527,20 @@ export function CopilotPage(): JSX.Element {
       event.preventDefault();
       holdManualScroll();
       panel.scrollBy({ top: (event.key === 'ArrowDown' ? 1 : -1) * lineHeight, behavior: 'smooth' });
+  };
+
+  // The box below the answer is a single line, where Up and Down do nothing. Let them scroll the answer there too,
+  // so the answer can be read by keyboard even while that box has focus. Typing and Alt shortcuts are unaffected.
+  const scrollAnswerFromInput = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const panel = answerPanelRef.current;
+    if (!panel || !displayedAnswer || panel.scrollHeight <= panel.clientHeight + 1) return;
+    const answerContent = panel.querySelector<HTMLElement>('.answer-copy .answer-rich') ?? panel;
+    const lineHeight = renderedAnswerLineHeight(window.getComputedStyle(answerContent));
+    event.preventDefault();
+    holdManualScroll();
+    panel.scrollBy({ top: (event.key === 'ArrowDown' ? 1 : -1) * lineHeight, behavior: 'smooth' });
   };
 
   const chooseDesktop = async (purpose: 'screen' | 'tab', keepAppVisible = false): Promise<void> => {
@@ -998,6 +1014,33 @@ export function CopilotPage(): JSX.Element {
   }, [running, autoAnswerEnabled, collapsed]);
   useEffect(() => () => { void Promise.resolve(window.electronAPI.setSendShortcut?.(false)).catch(() => undefined); }, []);
 
+  // Assignment sessions: once running, clicks pass through this window to the page behind it, and the question comes
+  // from the speakers or any microphone. Alt+M turns touch back on, Alt+Up/Down scroll, Alt+A/Alt+D change answer.
+  const assignmentActive = isAssignment && running && !collapsed;
+  useEffect(() => {
+    let disposed = false;
+    if (!assignmentActive) setTouchThrough(false);
+    void Promise.resolve(window.electronAPI.setAssignmentMode?.(assignmentActive))
+      .then((state) => { if (!disposed && state) setTouchThrough(Boolean(state.touchThrough)); })
+      .catch(() => undefined);
+    return () => { disposed = true; };
+  }, [assignmentActive]);
+  useEffect(() => () => { void Promise.resolve(window.electronAPI.setAssignmentMode?.(false)).catch(() => undefined); }, []);
+  useEffect(() => window.electronAPI.onEvent('window:touch-through', (payload) => setTouchThrough(payload.enabled)), []);
+  useEffect(() => window.electronAPI.onEvent('answer:navigate', ({ delta }) => {
+    const state = useAppStore.getState();
+    const next = state.activeQaIndex + delta;
+    if (next >= 0 && next < state.liveQaItems.length) state.selectQa(next);
+  }), []);
+  useEffect(() => window.electronAPI.onEvent('answer:scroll', ({ direction }) => {
+    const panel = answerPanelRef.current;
+    if (!panel || panel.scrollHeight <= panel.clientHeight + 1) return;
+    const answerContent = panel.querySelector<HTMLElement>('.answer-copy .answer-rich') ?? panel;
+    const lineHeight = renderedAnswerLineHeight(window.getComputedStyle(answerContent));
+    readingController.current?.hold();
+    panel.scrollBy({ top: direction * lineHeight * 3, behavior: 'smooth' });
+  }), []);
+
   const control = async (mode: AnswerStyleMode): Promise<void> => {
     if (running && activeId && currentQuestion && !analyzingScreen) {
       await window.electronAPI.requestAnswer({ sessionId: activeId, question: currentQuestion, mode });
@@ -1360,6 +1403,7 @@ export function CopilotPage(): JSX.Element {
           <span>{store.liveQaItems.length ? `${store.activeQaIndex + 1}/${store.liveQaItems.length}` : ''}</span>
           <div>
             {store.screenContext && <span className="screen-context-ready"><Sparkles size={10}/>Screen context</span>}
+            {isAssignment && running && <span className={`touch-chip${touchThrough ? ' off' : ''}`} title={touchThrough ? 'Clicks pass through this window to the page behind it. Press Alt+M to use the window.' : 'Press Alt+M to let clicks pass through this window.'}>{touchThrough ? 'Touch off · Alt+M' : 'Touch on · Alt+M'}</span>}
             {running && <span className={`live-status-dot ${store.copilotStatus}`}>{statusLabels[store.copilotStatus]}</span>}
           </div>
         </div>}
@@ -1492,6 +1536,7 @@ export function CopilotPage(): JSX.Element {
             setTranscriptDraftActive(true);
             setManual(event.target.value);
           }}
+          onKeyDown={scrollAnswerFromInput}
           placeholder={deviceCheckActive ? running ? 'Listening… or type a missed question' : 'Device check listening… Start enables AI' : 'Preparing microphone and audio output…'}
         />
         <button type="button" className="transcript-clear" aria-label="Clear transcript input" title="Clear" disabled={!transcriptInputValue} onMouseDown={(event) => event.preventDefault()} onClick={() => {

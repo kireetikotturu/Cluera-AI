@@ -900,6 +900,10 @@ button.chat-message-text:hover { background: rgba(var(--neutral-rgb), 0.1); }
 .screen-context-ready { display: flex; align-items: center; gap: 4px; color: var(--accent-text); font-size: 7px; }
 .qa-scroll { flex: 1 1 0; min-height: 0; overflow: auto; padding: 0 8px 12px; scrollbar-width: thin; scrollbar-color: rgba(var(--neutral-rgb), 0.18) transparent; }
 .qa-scroll { overflow-anchor: none; }
+.touch-chip { padding: 2px 7px; border-radius: 999px; color: var(--muted); font-size: 8px; font-weight: 600; background: rgba(var(--neutral-rgb), 0.06); }
+.touch-chip.off { color: var(--accent-text); background: rgba(var(--accent-rgb), 0.12); }
+/* The reading area takes focus for keyboard scrolling; the browser's focus line around it is not wanted. */
+.qa-scroll:focus, .qa-scroll:focus-visible { outline: 0; box-shadow: none; }
 .qa-content { display: flow-root; }
 .qa-row { position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: start; gap: 5px; color: var(--text); }
 .qa-row > svg { margin-top: 2px; }
@@ -2888,3 +2892,22 @@ button, input, select, textarea, .setting-rows label { font-weight: 500; }
 .pref-dialog-done:hover { filter: brightness(1.06); }
 @media (max-width: 480px) { .pref-dialog-content { padding: 18px; } }
 .model-picker.up .model-picker-menu { top: auto; bottom: calc(100% + 6px); max-height: min(340px, calc(100vh - 220px)); }
+
+/* ---- Interview / Assignment switch and the assignment form ---- */
+.session-kind-toggle { display: inline-flex; gap: 4px; padding: 4px; margin: 0 0 14px; border-radius: 13px; background: rgba(var(--neutral-rgb), 0.045); box-shadow: inset 0 0 0 1px rgba(var(--neutral-rgb), 0.06); }
+.session-kind-toggle button { min-width: 112px; height: 32px; padding: 0 16px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.session-kind-toggle button:hover:not(:disabled):not([aria-pressed='true']) { background: rgba(var(--neutral-rgb), 0.06); color: var(--text); }
+.session-kind-toggle button[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); }
+.session-kind-toggle button:disabled:not([aria-pressed='true']) { opacity: .4; cursor: not-allowed; }
+.session-kind-toggle button:focus-visible { outline: 2px solid rgba(var(--accent-rgb), .6); outline-offset: 2px; }
+.assignment-style { display: grid; gap: 8px; }
+.assignment-style label { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; border-radius: 12px; cursor: pointer; background: rgba(var(--neutral-rgb), 0.025); box-shadow: inset 0 0 0 1px rgba(var(--neutral-rgb), 0.05); }
+.assignment-style label:hover { background: rgba(var(--neutral-rgb), 0.04); }
+.assignment-style input[type='radio'] { flex: 0 0 15px; width: 15px; height: 15px; margin: 1px 0; padding: 0; box-shadow: none; accent-color: var(--accent); }
+.assignment-style label > span { display: grid; gap: 3px; color: var(--text); font-size: 11px; }
+.assignment-style strong { font-weight: 600; }
+.assignment-style small { color: var(--faint); font-size: 9px; line-height: 1.5; }
+/* The account form rules give every input a 42px minimum height; radio buttons must stay small. */
+.session-wizard .assignment-style input[type='radio'] { min-height: 0; height: 15px; width: 15px; }
+/* The switch above the form already says which session type this is. */
+.session-kind-toggle + .wizard-step .session-type-line { display: none; }

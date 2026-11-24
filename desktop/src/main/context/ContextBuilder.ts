@@ -75,8 +75,10 @@ export class ContextBuilder {
         answerStyle: session.answerStyle,
         answerLength: session.answerLength,
         answerPreferences: session.answerPreferences,
+        kind: session.kind,
         selectedModel: session.selectedModel,
-        instructions: `${session.instructions.slice(0, 800)}\nCurrent round brief: ${this.repositories.currentRound(session.id)?.note ?? ''}`.slice(0, 2800),
+        // An assignment's context is the whole brief for the test; an interview's custom notes stay short.
+        instructions: `${session.instructions.slice(0, session.kind === 'assignment' ? 3_000 : 800)}\nCurrent round brief: ${this.repositories.currentRound(session.id)?.note ?? ''}`.slice(0, session.kind === 'assignment' ? 5_000 : 2800),
       },
       recentConversation: this.repositories.contextTurns(session.id, 6).map((turn) => ({
         speaker: turn.speaker,

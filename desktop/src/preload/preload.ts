@@ -7,7 +7,7 @@ import type { AppEventMap, AppEventName } from '../shared/types';
 // Keep channel values in this self-contained file so the compiled preload does
 // not call require('../shared/ipc') and silently fail before exposing the bridge.
 const IPC = {
-  app: { status: 'app:status', close: 'app:close', openExternal: 'app:open-external', toggleOverlay: 'app:toggle-overlay', adjustZoom: 'app:adjust-zoom', sessionMode: 'app:session-mode', liveCollapse: 'app:live-collapse', moveLiveCollapse: 'app:move-live-collapse', resizeLive: 'app:resize-live', focusLiveTranscript: 'app:focus-live-transcript', sendShortcut: 'app:send-shortcut' },
+  app: { status: 'app:status', close: 'app:close', openExternal: 'app:open-external', toggleOverlay: 'app:toggle-overlay', adjustZoom: 'app:adjust-zoom', sessionMode: 'app:session-mode', liveCollapse: 'app:live-collapse', moveLiveCollapse: 'app:move-live-collapse', resizeLive: 'app:resize-live', focusLiveTranscript: 'app:focus-live-transcript', sendShortcut: 'app:send-shortcut', assignmentMode: 'app:assignment-mode' },
   sessions: { roundHistory: 'sessions:round-history', startRound: 'sessions:start-round', list: 'sessions:list', get: 'sessions:get', save: 'sessions:save', delete: 'sessions:delete', summary: 'sessions:summary' },
   documents: { select: 'documents:select', read: 'documents:read', addExtracted: 'documents:add-extracted', addText: 'documents:add-text', remove: 'documents:remove' },
   library: { list: 'library:list', upload: 'library:upload', get: 'library:get', delete: 'library:delete' },
@@ -47,6 +47,7 @@ const api: ElectronAPI = {
   clearCurrentAnswer: () => ipcRenderer.invoke(IPC.interview.clear),
   discardTranscriptInput: () => ipcRenderer.invoke(IPC.interview.discardInput),
   setSendShortcut: (enabled) => ipcRenderer.invoke(IPC.app.sendShortcut, enabled === true),
+  setAssignmentMode: (enabled) => ipcRenderer.invoke(IPC.app.assignmentMode, enabled === true),
   sendAudioChunk: (source, chunk) => ipcRenderer.send(IPC.audio.chunk, source, chunk), reportAudioError: (message) => ipcRenderer.send(IPC.audio.error, message),
   selectSystemAudioSource: (sourceId) => ipcRenderer.invoke(IPC.audio.selectSystemSource, sourceId),
   listDesktopCaptureSources: () => ipcRenderer.invoke(IPC.screen.sources), captureDesktopSource: (sourceId) => ipcRenderer.invoke(IPC.screen.captureDesktop, sourceId),

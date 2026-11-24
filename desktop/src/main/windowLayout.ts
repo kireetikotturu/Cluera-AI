@@ -15,6 +15,8 @@ export interface WindowSize {
 export const FLOATING_LAUNCHER_SIZE = 44;
 export const SESSION_TOP_INSET = 6;
 export const DEFAULT_SESSION_WINDOW_SIZE: WindowSize = { width: 1200, height: 800 };
+/** The window opens this share of the screen width, centered at the top. */
+export const WINDOW_WIDTH_FRACTION = 0.65;
 
 export function dashboardWindowBounds(workArea: WorkArea): WindowBounds {
   if (!Number.isFinite(workArea.width) || !Number.isFinite(workArea.height) || workArea.width <= 0 || workArea.height <= 0) {
@@ -24,7 +26,7 @@ export function dashboardWindowBounds(workArea: WorkArea): WindowBounds {
       ...DEFAULT_SESSION_WINDOW_SIZE,
     };
   }
-  const width = Math.max(420, Math.round(workArea.width * 0.45));
+  const width = Math.max(420, Math.round(workArea.width * WINDOW_WIDTH_FRACTION));
   const height = Math.max(360, Math.round(workArea.height * 0.8));
   return {
     width,
@@ -42,7 +44,7 @@ export function sessionWindowBounds(workArea: WorkArea): WindowBounds {
       ...DEFAULT_SESSION_WINDOW_SIZE,
     };
   }
-  const width = Math.max(420, Math.round(workArea.width * 0.4));
+  const width = Math.max(420, Math.round(workArea.width * WINDOW_WIDTH_FRACTION));
   const height = Math.max(360, Math.round(workArea.height * 0.7));
   return {
     width,

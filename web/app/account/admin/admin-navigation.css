@@ -100,3 +100,8 @@ button.admin-stat:hover{transform:translateY(-3px);border-color:#8b7cff77}
 @media (prefers-reduced-motion: reduce) { .tag-live { animation: none; } }
 .admin-tag-field{display:contents}
 .admin-tags span.tag-label{color:#b9bdd6;font-weight:500}
+.admin-defaults-form textarea{width:100%;min-height:110px;padding:10px 12px;border:1px solid rgba(255,255,255,.14);border-radius:11px;background:rgba(255,255,255,.04);color:inherit;font:inherit;font-size:13px;line-height:1.5;resize:vertical}
+.admin-defaults-form .admin-wide{grid-column:1/-1}
+.admin-link-button{justify-self:start;padding:0;border:0;background:transparent;color:#b9afff;font:inherit;font-size:12px;cursor:pointer;text-decoration:underline}
+.admin-link-button:disabled{opacity:.5;cursor:not-allowed}
+.admin-session-defaults{margin-top:22px}

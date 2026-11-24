@@ -4,6 +4,7 @@ import {usageDuration} from '../../../lib/usage/display';
 import type {ModelPolicy} from './ModelPolicyEditor';
 import {AiModels} from './AiModels';
 import {AiQuickSetup} from './AiQuickSetup';
+import {SessionDefaults} from './SessionDefaults';
 import {AccountReleases} from './AccountReleases';
 import {PaymentReadiness} from './PaymentReadiness';
 import {AdminPlans} from './AdminPlans';
@@ -143,6 +144,8 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
   <div hidden={tab!=='ai'}>
    <section id="account-admin-models" className="account-admin-section" aria-label="AI models"><AiModels models={state.models??[]} disabled={locked}
     onSave={(policy,reason)=>mutate('MODEL',policy,reason,null)} onDelete={(modelId,reason)=>mutate('MODEL_DELETE',{modelId},reason,null)}/></section>
+   <section id="account-admin-session-defaults" className="account-admin-section" aria-label="Session defaults"><SessionDefaults models={state.models??[]} disabled={locked} refreshKey={state}
+    onSave={(values,reason)=>mutate('SESSION_DEFAULTS',values,reason,null)}/></section>
    <section id="admin-ai-keys" className="account-admin-section" aria-label="AI keys"><AiQuickSetup disabled={locked} models={state.models} active={tab==='ai'} onApplied={()=>void load()}/></section>
   </div>
 

@@ -1,7 +1,7 @@
 import type { ContextChunk, ConversationTurn, ScreenContext, Session } from '../../shared/types';
 
 export interface CompactScreenRequestContext {
-  session: Pick<Session, 'role' | 'company' | 'interviewType' | 'language' | 'answerStyle' | 'answerLength' | 'instructions' | 'selectedModel' | 'answerPreferences'>;
+  session: Pick<Session, 'role' | 'company' | 'interviewType' | 'language' | 'answerStyle' | 'answerLength' | 'instructions' | 'selectedModel' | 'answerPreferences' | 'kind'>;
   recentConversation: Array<Pick<ConversationTurn, 'speaker' | 'text'>>;
   resumeContext: ContextChunk[];
   jobContext: ContextChunk[];

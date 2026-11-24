@@ -121,17 +121,53 @@ export function registerIpc(
     });
     return sendShortcutRegistered;
   };
+  // Assignment sessions: the window ignores the mouse, so clicks reach the page behind it (the assignment), and a few
+  // shortcuts replace the controls. Alt+M turns touch back on, and it is always registered first: if it cannot be,
+  // clicks are never blocked, so the customer cannot be locked out of the window.
+  let assignmentModeActive = false;
+  let touchThrough = false;
+  const assignmentKeys: string[] = [];
+  const setTouchThrough = (enabled: boolean): void => {
+    touchThrough = enabled;
+    if (!window.isDestroyed()) window.setIgnoreMouseEvents(enabled, { forward: true });
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send(IPC.events, 'window:touch-through', { enabled });
+  };
+  const releaseAssignmentMode = (): void => {
+    for (const key of assignmentKeys.splice(0)) globalShortcut.unregister(key);
+    assignmentModeActive = false;
+    if (touchThrough) setTouchThrough(false);
+  };
+  const enableAssignmentMode = (): boolean => {
+    if (assignmentModeActive) return true;
+    const live = (): boolean => sessionModeActive && authorization.isEntitled() && !applicationQuitting && !window.isDestroyed() && !window.webContents.isDestroyed();
+    const register = (key: string, action: () => void): boolean => {
+      if (!globalShortcut.register(key, () => { if (live()) action(); })) return false;
+      assignmentKeys.push(key);
+      return true;
+    };
+    if (!register('Alt+M', () => setTouchThrough(!touchThrough))) return false;
+    register('Alt+Up', () => window.webContents.send(IPC.events, 'answer:scroll', { direction: -1 }));
+    register('Alt+Down', () => window.webContents.send(IPC.events, 'answer:scroll', { direction: 1 }));
+    register('Alt+A', () => window.webContents.send(IPC.events, 'answer:navigate', { delta: -1 }));
+    register('Alt+D', () => window.webContents.send(IPC.events, 'answer:navigate', { delta: 1 }));
+    assignmentModeActive = true;
+    setTouchThrough(true);
+    return true;
+  };
+  // If the page crashes while clicks pass through, give the mouse back at once.
+  window.webContents.on?.('render-process-gone', releaseAssignmentMode);
   const keepWindowOffTaskbar = (): void => {
     enforceTaskbarInvariant(window);
   };
   const keepWindowPinned = (): void => {
     if (!window.isDestroyed()) window.setAlwaysOnTop(true, 'screen-saver', 1);
   };
-  const allowApplicationQuit = (): void => { applicationQuitting = true; releaseQuickShotShortcut(); releaseSendShortcut(); };
+  const allowApplicationQuit = (): void => { applicationQuitting = true; releaseQuickShotShortcut(); releaseSendShortcut(); releaseAssignmentMode(); };
   app.on('before-quit', allowApplicationQuit);
   window.once('closed', () => {
     releaseQuickShotShortcut();
     releaseSendShortcut();
+    releaseAssignmentMode();
     app.removeListener('before-quit', allowApplicationQuit);
   });
   window.on('close', (event) => {
@@ -173,6 +209,7 @@ export function registerIpc(
     defaultGeminiModel: config.accountManaged ? models.defaultModel('gemini') : config.providerMode === 'managed' ? MANAGED_GEMINI_MODEL : config.gemini.model,
     defaultDeepgramModel: config.providerMode === 'managed' ? MANAGED_DEEPGRAM_MODEL : config.deepgram.model,
     screenAnalysisEnabled: config.screen.enabled,
+    sessionDefaults: models.sessionDefaults(),
     };
   });
   ipcMain.handle(IPC.app.close, (event) => {
@@ -228,7 +265,7 @@ export function registerIpc(
     }
     sessionModeActive = nextSessionMode;
     if (sessionModeActive) enableQuickShotShortcut();
-    else { releaseQuickShotShortcut(); releaseSendShortcut(); }
+    else { releaseQuickShotShortcut(); releaseSendShortcut(); releaseAssignmentMode(); }
     overlayMode = false;
     if (!sessionModeActive && liveCollapsed) {
       liveCollapsed = false;
@@ -560,6 +597,14 @@ export function registerIpc(
   });
   ipcMain.handle(IPC.interview.answer, (_event, input: unknown) => { requireAccess(); assertProviderSetup(config, 'gemini'); return interview.answer(answerRequestSchema.parse(input)); });
   ipcMain.handle(IPC.interview.clear, () => { requireAccess(); return interview.clear(); });
+  ipcMain.handle(IPC.app.assignmentMode, (event, enabled: unknown) => {
+    if (event.sender !== window.webContents) throw new Error('Unauthorized window request.');
+    requireAccess();
+    if (typeof enabled !== 'boolean') throw new Error('Assignment mode must be enabled or disabled explicitly.');
+    if (!enabled || !sessionModeActive) { releaseAssignmentMode(); return { active: false, touchThrough: false }; }
+    const active = enableAssignmentMode();
+    return { active, touchThrough: active && touchThrough };
+  });
   ipcMain.handle(IPC.interview.discardInput, () => { requireAccess(); interview.discardInput(); });
   ipcMain.handle(IPC.app.sendShortcut, (event, enabled: unknown) => {
     if (event.sender !== window.webContents) throw new Error('Unauthorized shortcut request.');

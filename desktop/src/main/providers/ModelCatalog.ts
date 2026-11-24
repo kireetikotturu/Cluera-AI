@@ -1,5 +1,6 @@
 import type { ProviderModelOption, ProviderName } from '../../shared/types';
 import { MANAGED_GEMINI_MODEL, MANAGED_DEEPGRAM_MODEL } from '../../shared/managedProviders';
+import { BUILT_IN_SESSION_DEFAULTS, resolveSessionDefaults, type SessionDefaults } from '../../shared/sessionKinds';
 
 export class ModelCatalog {
   private remoteModels: ProviderModelOption[] | null = null;
@@ -7,12 +8,16 @@ export class ModelCatalog {
   private lastSuccess = 0;
   private pendingRefresh: Promise<void> | null = null;
   private approvedDefaults: Partial<Record<ProviderName, string>> = {};
+  private sessionDefaultsValue: SessionDefaults = BUILT_IN_SESSION_DEFAULTS;
 
   constructor(private readonly serverUrl: string, private readonly defaults: {
     gemini: string; deepgram: string;
   }, private readonly fetcher: typeof fetch = fetch, private readonly allowUnverifiedLocalDefaults = false,
     private readonly managedMode: () => boolean = () => false,
     private readonly endpointPath: '/api/public/models' | '/api/account/models' = '/api/public/models') {}
+
+  /** What new sessions start with, as set by the Admin (built-in values until the server has answered). */
+  sessionDefaults(): SessionDefaults { return this.sessionDefaultsValue; }
 
   setLocalDefault(provider: ProviderName, modelId: string): void { this.defaults[provider] = modelId; }
   defaultModel(provider: ProviderName): string { return this.hasCurrentRemoteModels() ? this.approvedDefaults[provider] ?? this.defaults[provider] : this.defaults[provider]; }
@@ -44,7 +49,7 @@ export class ModelCatalog {
       if (endpoint.protocol !== 'https:' && !local) return;
       const response = await this.fetcher(endpoint, { signal: controller.signal, redirect: 'error', cache: 'no-store' });
       if (!response.ok) return;
-      const body = await response.json() as { models?: unknown };
+      const body = await response.json() as { models?: unknown; sessionDefaults?: unknown };
       if (!Array.isArray(body.models) || body.models.length > 500) return;
       const parsed: ProviderModelOption[] = [];
       const approvedDefaults: Partial<Record<ProviderName, string>> = {};
@@ -71,6 +76,8 @@ export class ModelCatalog {
           description: model.description, ...(tag ? { tag } : {}) });
       }
       this.remoteModels = parsed;
+      // Starting texts and the recommended assignment model; anything missing or odd falls back to the built-in value.
+      this.sessionDefaultsValue = resolveSessionDefaults(body.sessionDefaults);
       this.approvedDefaults = approvedDefaults;
       this.lastSuccess = Date.now();
     } catch { /* Retain the last validated catalog during network outages. */ }

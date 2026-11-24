@@ -15,8 +15,8 @@ describe('Alt+S send shortcut wiring', () => {
     // The key is taken only while the page asks for it, never just because a session window is open.
     expect(ipc).toContain("ipcMain.handle(IPC.app.sendShortcut");
     expect(ipc).toContain('if (!enabled || !sessionModeActive) { releaseSendShortcut(); return false; }');
-    expect(ipc).toContain('else { releaseQuickShotShortcut(); releaseSendShortcut(); }');
-    expect(ipc).toContain('releaseSendShortcut();\n    app.removeListener');
+    expect(ipc).toContain('else { releaseQuickShotShortcut(); releaseSendShortcut(); releaseAssignmentMode(); }');
+    expect(ipc).toContain('releaseSendShortcut();\n    releaseAssignmentMode();\n    app.removeListener');
     expect(ipc).toContain("window.webContents.send(IPC.events, 'answer:send-shortcut', null)");
     expect(ipc).toContain("if (event.sender !== window.webContents) throw new Error('Unauthorized shortcut request.')");
   });

@@ -14,9 +14,10 @@ import {assertTrustedInstallerUrl} from '../releases/policy';
 import {ReleaseInputError,releaseValidationCode,logReleaseDiagnostic} from './releaseDiagnostics';
 import {adminReadFailure} from './adminReadDiagnostics';
 import {shapeUsageReport} from './usageCost';
+import {sessionDefaultsInput} from './sessionDefaults';
 
 const model=accountModelPolicy;
-const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','ADD_MINUTES','REMOVE_MINUTES','REDUCE_MINUTES','CATALOG','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
+const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','SESSION_DEFAULTS','ADD_MINUTES','REMOVE_MINUTES','REDUCE_MINUTES','CATALOG','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
  subjectId:z.uuid().nullable(),reason:z.string().trim().min(10).max(500),input:z.unknown()}).strict();
 /** Staging BFF administration. Live session + explicit allowlist + AAL2 are
  * independently checked by SQL; customer metadata never defines authority. */
@@ -158,6 +159,10 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
    if(input.subjectId!==null)throw new AccountError('FORBIDDEN',403);values=model.parse(input.input);
   }else if(input.action==='MODEL_DELETE'){
    if(input.subjectId!==null)throw new AccountError('FORBIDDEN',403);values=modelDelete.parse(input.input);
+  }else if(input.action==='SESSION_DEFAULTS'){
+   if(input.subjectId!==null)throw new AccountError('FORBIDDEN',403);
+   const saved=await rpc('account_admin_session_defaults',{...adminArgs,p_operation:input.operationId,p_reason:input.reason,p_input:sessionDefaultsInput.parse(input.input)});
+   return cookies.apply(json(saved,saved?.code==='APPLIED'?200:409));
   }else if(input.action==='CATALOG'){
    if(input.subjectId!==null)throw new AccountError('FORBIDDEN',403);
    values=z.object({code:z.enum(['pro_3_hours','pro_40_hours','enterprise_weekly','enterprise_monthly']),name:z.string().trim().min(2).max(80),enabled:z.boolean(),priority:z.number().int().min(0).max(1000)}).strict().parse(input.input);

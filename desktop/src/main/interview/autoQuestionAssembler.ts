@@ -1,6 +1,6 @@
 import { mergeFinalTranscriptText } from './mergeTranscript';
 
-const QUESTION_START = /^(what|why|how|when|where|which|who|can|could|would|will|do|did|have|has|are|is|tell|describe|explain|walk|give|share|design|implement|write|solve|analyze|analyse|compare)\b/i;
+const QUESTION_START = /^(what|why|how|when|where|which|who|can|could|would|will|do|did|have|has|are|is|tell|describe|explain|walk|give|share|design|implement|write|solve|analyze|analyse|compare|find|calculate|compute|solve|evaluate|predict|identify|choose|select|determine|complete|fix|convert|print|rewrite|simplify|list|define|state|prove|derive)\b/i;
 const ASK_PHRASE = /\b(tell me|walk me through|talk about|introduce yourself|your thoughts|what would you|how would you|how do you|would you|can you|could you|explain|describe)\b/i;
 export const SCENARIO_CUE =/^(?:suppose|imagine|let'?s say|consider|assume|say you|you have|you are|you're|you were|given|there is|there's|there are|we have|we are|we're|our (?:team|company|system|service|app)|in this scenario|scenario|case|a (?:client|customer|user|team|company))\b/i;
 const INCOMPLETE_TAIL = /\b(and|or|also|because|when|while|with|about|to|for|on|in|using|through|but|so|then|if|that|which|where|the|a|an|of|is|are|was|were|how you|what you|tell me|how would you|how do you|how can you|how could you|what would you|what do you|would you|could you|can you|do you|did you|have you|are you|were you|will you|should you|you)\s*[,…]*$/i;

@@ -1,9 +1,45 @@
 import type { AnswerContext } from '../../shared/types';
 import { SPOKEN_ANSWER_STYLE } from './spokenAnswerStyle';
 import { answerPreferenceRules } from '../../shared/answerPreferences';
+import { assignmentAnswerRules } from './assignmentPrompt';
 
 export class PromptBuilder {
   build(context: AnswerContext): string {
+    if (context.session.kind === 'assignment') return this.buildAssignment(context);
+    return this.buildInterview(context);
+  }
+
+  /** Assignment sessions: answer test questions (MCQ, coding, aptitude…) directly, as the user chose. */
+  private buildAssignment(context: AnswerContext): string {
+    const label = (speaker: AnswerContext['recentConversation'][number]['speaker']): string => ({
+      interviewer: 'QUESTION', candidate: 'USER SAID', copilot: 'PREVIOUS ANSWER',
+    })[speaker];
+    const memory = context.recentConversation.map((turn) => `${label(turn.speaker)}: ${turn.text.slice(0, 2_500)}`).join('\n');
+    // Fewer input tokens means a faster first word: keep the opening and the most recent part of a long history.
+    const conversationMemory = memory.length <= 16_000 ? memory : `${memory.slice(0, 1_500)}\n[Older turns omitted to keep the request fast.]\n${memory.slice(-14_000)}`;
+    const language = context.session.language && context.session.language.toLowerCase() !== 'english'
+      ? `\nAnswer language: ${context.session.language}. Keep code and technical terms in their usual form.` : '';
+    return `You are an assistant helping a student with an assignment or online test. Write only the answer to the current question.
+
+RULES
+${assignmentAnswerRules(context.session.answerStyle)}${language}
+
+ASSIGNMENT CONTEXT (from the user)
+${context.instructions || 'None'}
+
+SESSION MEMORY
+${conversationMemory || 'No earlier questions.'}
+
+APPROVED SCREEN CONTEXT
+${context.screenContext ? JSON.stringify(context.screenContext) : 'No screen was analyzed for this question. Never imply that you saw one.'}
+
+CURRENT QUESTION (${context.intent})
+${context.question}
+
+ANSWER:`;
+  }
+
+  private buildInterview(context: AnswerContext): string {
     const lengthRules = {
       short: 'Answer in 2-4 natural sentences (about 30-60 seconds spoken).',
       medium: 'Use a concise opening and a few short paragraphs or compact points (about 60-90 seconds spoken).',

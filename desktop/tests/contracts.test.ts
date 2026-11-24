@@ -432,7 +432,7 @@ describe('desktop and provider contracts', () => {
     expect(editor).not.toContain('Step 2 of 2');
     expect(editor).not.toContain('stepNames');
     expect(editor).not.toContain('>Answer length<');
-    expect(editor).toContain('autoAnswer: false, saveTranscript: false');
+    expect(editor).toContain('autoAnswer: false, saveTranscript: true');
     expect(editor).toContain("update('autoAnswer', event.target.checked)");
     expect(editor).toContain("update('saveTranscript', event.target.checked)");
     expect(home).toContain('View saved session setup');

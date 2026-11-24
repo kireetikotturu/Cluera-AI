@@ -2,20 +2,21 @@ import {
   ArrowLeft, ArrowRight, FileText, MessageSquareText,
   Plus, Shrink, Trash2, Upload, Video, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DocumentRecord, ExtractedDocument, LibraryFile, LibraryFileCategory, SessionInput } from '../../shared/types';
 import { useAppStore } from '../stores/appStore';
 import { requireSessionProviderSetup } from '../services/providerSetup';
 import { ModelPicker } from '../components/ModelPicker';
 import { AnswerPreferencesDialog } from '../components/AnswerPreferencesDialog';
-import { DEFAULT_ANSWER_PREFERENCES, DEFAULT_SESSION_CONTEXT, normalizeAnswerPreferences } from '../../shared/answerPreferences';
+import { DEFAULT_ANSWER_PREFERENCES, normalizeAnswerPreferences } from '../../shared/answerPreferences';
+import { ASSIGNMENT_STYLE_DIRECT, ASSIGNMENT_STYLE_EXPLAINED, assignmentModeOf, resolveSessionDefaults, type SessionKind } from '../../shared/sessionKinds';
 
 const defaults: SessionInput = {
   title: '', role: '', company: '', interviewType: 'mixed', language: 'English',
   answerStyle: 'Natural and confident', answerLength: 'medium', jobDescription: '', resumeText: '',
   instructions: '',
-  selectedModel: '', autoAnswer: false, saveTranscript: false, interviewUrl: '', resumeFileName: '',
-  answerPreferences: DEFAULT_ANSWER_PREFERENCES,
+  selectedModel: '', autoAnswer: false, saveTranscript: true, interviewUrl: '', resumeFileName: '',
+  answerPreferences: DEFAULT_ANSWER_PREFERENCES, kind: 'interview',
 };
 
 const SUPPORTING_CONTEXT_NAME = 'Session supporting context';
@@ -32,6 +33,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
   const activeId = useAppStore((state) => state.activeSessionId);
   const provider = useAppStore((state) => state.providerStatus);
   const editing = Boolean(activeId);
+  const sessionDefaults = useMemo(() => resolveSessionDefaults(provider?.sessionDefaults), [provider?.sessionDefaults]);
   const [form, setForm] = useState<SessionInput>(defaults);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [resumeFileName, setResumeFileName] = useState('');
@@ -42,6 +44,9 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
   const [libraryFiles, setLibraryFiles] = useState<LibraryFile[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(true);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [assignmentContext, setAssignmentContext] = useState('');
+  // The starting texts and model come from the Admin; once the customer changes one, it is theirs.
+  const interviewContextTouched = useRef(false), assignmentContextTouched = useRef(false), modelTouched = useRef(false);
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<'resume' | 'supporting' | null>(null);
@@ -71,7 +76,8 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
     if (!activeId) {
       const enabledDefault = provider?.modelOptions?.some((model) => model.modelId === provider.defaultGeminiModel)
         ? provider.defaultGeminiModel : '';
-      setForm({ ...defaults, selectedModel: enabledDefault ?? '' }); setDocuments([]); setResumeFileName(''); setSupportingText(DEFAULT_SESSION_CONTEXT);
+      interviewContextTouched.current = false; assignmentContextTouched.current = false; modelTouched.current = false;
+      setForm({ ...defaults, selectedModel: enabledDefault ?? '' }); setDocuments([]); setResumeFileName(''); setSupportingText(sessionDefaults.interviewContext); setAssignmentContext(sessionDefaults.assignmentContext);
       setOriginalSupportingText(''); setSupportingTextDocumentId(null); setPendingSupportingFiles([]); setLoading(false); return;
     }
     let disposed = false;
@@ -88,7 +94,9 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
         autoAnswer: session.autoAnswer ?? false, saveTranscript: session.saveTranscript ?? true,
         interviewUrl: session.interviewUrl ?? '', resumeFileName: session.resumeFileName ?? '',
         answerPreferences: normalizeAnswerPreferences(session.answerPreferences),
+        kind: session.kind ?? 'interview',
       });
+      if (session.kind === 'assignment') setAssignmentContext(session.instructions);
       const typedContext = detail.documents.find((document) => document.type === 'supporting' && document.name === SUPPORTING_CONTEXT_NAME);
       setResumeFileName(session.resumeFileName || (session.resumeText.trim() ? 'Resume on file' : ''));
       setSupportingText(typedContext?.text ?? '');
@@ -124,9 +132,34 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
 
   const models = provider?.modelOptions ?? [];
   const selectedModelEnabled = models.some((model) => model.modelId === form.selectedModel);
+  const isAssignment = form.kind === 'assignment';
+  const assignmentMode = assignmentModeOf(form.answerStyle);
+  const recommendedModel = isAssignment ? sessionDefaults.assignmentModel : provider?.defaultGeminiModel;
+  // Keep the Admin's starting texts current until the customer edits them (a refresh can arrive after the page opens).
+  useEffect(() => {
+    if (activeId) return;
+    if (!interviewContextTouched.current) setSupportingText(sessionDefaults.interviewContext);
+    if (!assignmentContextTouched.current) setAssignmentContext(sessionDefaults.assignmentContext);
+  }, [activeId, sessionDefaults.interviewContext, sessionDefaults.assignmentContext]);
+  const chooseKind = (kind: SessionKind): void => {
+    if (editing || kind === form.kind) return;
+    setError('');
+    setForm((old) => {
+      const preferred = kind === 'assignment' ? sessionDefaults.assignmentModel : provider?.defaultGeminiModel ?? '';
+      const usable = models.some((model) => model.modelId === preferred);
+      return { ...old, kind, autoAnswer: kind === 'assignment', selectedModel: !modelTouched.current && usable ? preferred : old.selectedModel };
+    });
+  };
   const update = <K extends keyof SessionInput>(key: K, value: SessionInput[K]): void => setForm((old) => ({ ...old, [key]: value }));
   const back = (): void => setPage(editing ? 'copilot' : 'home');
   const validationError = (): string => {
+    if (isAssignment) {
+      if (form.title.trim().length < 2) return 'Add a session name (at least two characters).';
+      if (!models.length) return 'No enabled AI models are available. Connect to Cluera and try again.';
+      if (!form.selectedModel) return 'Choose an enabled AI model.';
+      if (!selectedModelEnabled) return 'The selected AI model is no longer enabled. Choose another model.';
+      return '';
+    }
     if (form.title.trim().length < 2 || form.company.trim().length < 2 || form.role.trim().length < 2) return 'Add a session name, company, and job role (at least two characters each).';
     if (!form.resumeText.trim()) return 'Upload a resume to continue.';
     if (!form.jobDescription.trim()) return 'Add the interview description to continue.';
@@ -192,10 +225,18 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
     try {
       await requireSessionProviderSetup(form.selectedModel);
       if (!current()) return;
-      const session = await window.electronAPI.saveSession({ ...form, resumeFileName });
+      // An assignment keeps its context in the session itself and answers questions directly, so the interview
+      // fields (company, role, resume, job description) are simply empty, and Auto Answer is always on.
+      const payload: SessionInput = isAssignment
+        ? { ...form, kind: 'assignment', role: 'Assignment', company: 'Assignment', interviewType: 'mixed', jobDescription: '', resumeText: '', resumeFileName: '',
+            instructions: assignmentContext.trim(), autoAnswer: true,
+            answerStyle: assignmentMode === 'explained' ? ASSIGNMENT_STYLE_EXPLAINED : ASSIGNMENT_STYLE_DIRECT,
+            answerLength: assignmentMode === 'explained' ? 'detailed' : 'medium' }
+        : { ...form, kind: 'interview', resumeFileName };
+      const session = await window.electronAPI.saveSession(payload);
       if (!current()) return;
       setForm((current) => ({ ...current, id: session.id }));
-      if (supportingText.trim() !== originalSupportingText.trim()) {
+      if (!isAssignment && supportingText.trim() !== originalSupportingText.trim()) {
         const replacement = supportingText.trim()
           ? await window.electronAPI.addTextDocument({ sessionId: session.id, type: 'supporting', name: SUPPORTING_CONTEXT_NAME, text: supportingText })
           : null;
@@ -256,7 +297,21 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
       <div className="session-tutorial-top">
         <button type="button" className="session-tutorial" onClick={() => void tutorial()}><Video size={14}/>Video Tutorial</button>
       </div>
-      <fieldset className="wizard-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
+      <div className="session-kind-toggle" role="group" aria-label="Session type">
+        <button type="button" aria-pressed={!isAssignment} disabled={locked || (editing && isAssignment)} onClick={() => chooseKind('interview')}>Interview</button>
+        <button type="button" aria-pressed={isAssignment} disabled={locked || (editing && !isAssignment)} onClick={() => chooseKind('assignment')}>Assignment</button>
+      </div>
+      {isAssignment ? <fieldset className="wizard-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
+        <div className="session-type-line"><span>Session type</span><strong>Assignment</strong></div>
+        <div className="wizard-fields details-fields">
+          <label className="wide"><span className="field-label">Session name</span><input autoFocus value={form.title} onChange={(event) => update('title', event.target.value)} placeholder="Java, SQL and aptitude assignment"/></label>
+          <label className="context-field wide"><span><FileText size={15}/>Assignment context</span><textarea aria-label="Assignment context" maxLength={4000} value={assignmentContext} onChange={(event) => { assignmentContextTouched.current = true; setAssignmentContext(event.target.value); }} placeholder="Tell the AI about your assignment: the rounds, the languages, and how you want the answers."/></label>
+          <div className="assignment-style wide" role="radiogroup" aria-label="Answer style">
+            <label><input type="radio" name="assignment-style" checked={assignmentMode === 'direct'} onChange={() => update('answerStyle', ASSIGNMENT_STYLE_DIRECT)}/><span><strong>Simple, direct answer only</strong><small>Just the option, the value, the query or the code.</small></span></label>
+            <label><input type="radio" name="assignment-style" checked={assignmentMode === 'explained'} onChange={() => update('answerStyle', ASSIGNMENT_STYLE_EXPLAINED)}/><span><strong>Answer with explanation</strong><small>The answer first, then a short explanation.</small></span></label>
+          </div>
+        </div>
+      </fieldset> : <fieldset className="wizard-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
         <div className="session-type-line"><span>Session type</span><strong>Interview</strong></div>
         <div className="wizard-fields details-fields">
           <label className="wide"><span className="field-label">Session name</span><input autoFocus value={form.title} onChange={(event) => update('title', event.target.value)} placeholder="Frontend interview at Acme"/></label>
@@ -270,7 +325,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
           <label className="context-field wide"><span><FileText size={15}/>Interview description / JD <small className="field-required">Required</small></span><textarea value={form.jobDescription} onChange={(event) => update('jobDescription', event.target.value)} placeholder="Paste or type the job description..."/></label>
           <section className="context-field context-composer wide" aria-label="Supporting context">
             <div className="context-composer-heading"><span><FileText size={15}/>Supporting context <small className="field-required">Required</small></span><div className="context-composer-actions"><button type="button" disabled={uploading !== null} onClick={() => void chooseFile('supporting')} aria-label="Upload supporting file" title="Upload supporting file"><Plus size={14}/><span>{uploading === 'supporting' ? 'Reading...' : 'Upload file'}</span></button><select aria-label="Choose saved supporting file" value="" disabled={uploading !== null || libraryLoading || savedSupportingFiles.length === 0} onChange={(event) => void chooseSavedFile('supporting', event.target.value)}><option value="">{libraryLoading ? 'Loading saved files...' : savedSupportingFiles.length ? 'Choose saved file...' : 'No saved files'}</option>{savedSupportingFiles.map((file) => <option value={file.id} key={file.id}>{file.name}</option>)}</select></div></div>
-            <textarea aria-label="Supporting context text" value={supportingText} onChange={(event) => setSupportingText(event.target.value)} placeholder="Type context or attach a PDF, DOCX, TXT, or Markdown file..."/>
+            <textarea aria-label="Supporting context text" value={supportingText} onChange={(event) => { interviewContextTouched.current = true; setSupportingText(event.target.value); }} placeholder="Type context or attach a PDF, DOCX, TXT, or Markdown file..."/>
             <small className="context-requirement">Type context or attach at least one supporting file.</small>
             <button type="button" className="answer-pref-button" onClick={() => setShowPreferences(true)}><MessageSquareText size={15}/><span><strong>Answer preferences</strong><small>{answerPreferenceSummary(form.answerPreferences)}</small></span><ArrowRight size={14}/></button>
           </section>
@@ -279,17 +334,17 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
           {documents.map((document) => <div key={document.id}><FileText size={13}/><span>{document.name}</span><small>{Math.max(1, Math.ceil(document.sizeBytes / 1024))} KB</small><button aria-label={`Remove ${document.name}`} onClick={() => void removeDocument(document.id)}><Trash2 size={13}/></button></div>)}
           {pendingSupportingFiles.map((document, index) => <div className="pending" key={`${document.name}-${index}`}><FileText size={13}/><span>{document.name}</span><small>Ready to save</small><button aria-label={`Remove ${document.name}`} onClick={() => setPendingSupportingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={13}/></button></div>)}
         </div>}
-      </fieldset>
+      </fieldset>}
 
       <fieldset className="wizard-step preferences-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
         <h2 className="session-section-label">Output settings</h2>
         <div className="wizard-fields">
-          <div className="model-field compact-select-field"><span className="field-label" id="session-model-label">AI model</span><div className="model-select-row"><ModelPicker models={models} value={form.selectedModel} recommendedId={provider?.defaultGeminiModel} ariaLabel="AI model" placeholder="Choose an AI model" unavailableLabel={form.selectedModel && !selectedModelEnabled ? `${form.selectedModel} · unavailable` : undefined} onChange={(modelId) => update('selectedModel', modelId)}/></div></div>
-          <label className="compact-select-field"><span className="field-label">Answer language</span><input list="answer-languages" value={form.language} onChange={(event) => update('language', event.target.value)} aria-label="Answer language"/><datalist id="answer-languages">{['English', 'Hindi', 'Spanish', 'French', 'German', 'Telugu'].map((language) => <option value={language} key={language}/>)}</datalist></label>
+          <div className="model-field compact-select-field"><span className="field-label" id="session-model-label">AI model</span><div className="model-select-row"><ModelPicker models={models} value={form.selectedModel} recommendedId={recommendedModel} ariaLabel="AI model" placeholder="Choose an AI model" unavailableLabel={form.selectedModel && !selectedModelEnabled ? `${form.selectedModel} · unavailable` : undefined} onChange={(modelId) => { modelTouched.current = true; update('selectedModel', modelId); }}/></div></div>
+          {!isAssignment && <label className="compact-select-field"><span className="field-label">Answer language</span><input list="answer-languages" value={form.language} onChange={(event) => update('language', event.target.value)} aria-label="Answer language"/><datalist id="answer-languages">{['English', 'Hindi', 'Spanish', 'French', 'German', 'Telugu'].map((language) => <option value={language} key={language}/>)}</datalist></label>}
         </div>
         <h2 className="session-section-label">Behavior</h2>
         <div className="session-behavior">
-          <label><input type="checkbox" checked={form.autoAnswer ?? false} onChange={(event) => update('autoAnswer', event.target.checked)}/><span><span>Auto Answer <span className="beta-badge">Beta</span></span><small>Automatically answer completed interviewer questions after Start.</small></span></label>
+          {!isAssignment && <label><input type="checkbox" checked={form.autoAnswer ?? false} onChange={(event) => update('autoAnswer', event.target.checked)}/><span><span>Auto Answer <span className="beta-badge">Beta</span></span><small>Automatically answer completed interviewer questions after Start.</small></span></label>}
           <label><input type="checkbox" checked={form.saveTranscript ?? true} onChange={(event) => update('saveTranscript', event.target.checked)}/><span>Save Transcript<small>Save spoken turns in History. When off, speech is live context only; AI questions and answers are still saved.</small></span></label>
         </div>
       </fieldset>

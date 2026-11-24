@@ -21,6 +21,8 @@ const CANDIDATE_SOURCE: AudioSourceDescriptor = {
   id: 'candidate-microphone', kind: 'microphone', role: 'local_candidate',
   label: 'Candidate microphone', canTriggerAnswers: false,
 };
+/** While the interviewer's speakers were heard this recently, the microphone is assumed to be hearing them too. */
+const MICROPHONE_ECHO_GUARD_MS = 2_500;
 const normalizeQuestionText = (text: string): string => text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const SCREEN_QUESTION_FALLBACK = 'Answer the question detected from the screenshot';
 
@@ -75,6 +77,7 @@ export class InterviewOrchestrator {
   // Remember what the customer cleared so it cannot come back with the next words of the same turn.
   private readonly interviewerFilter = new TurnPrefixFilter();
   private readonly candidateFilter = new TurnPrefixFilter();
+  private lastSpeakerSpeechAt = 0;
 
   constructor(
     private readonly config: AppConfig,
@@ -125,55 +128,7 @@ export class InterviewOrchestrator {
     }
     const recognizer = this.accountProviders?.recognizer(source) ?? new DeepgramRecognizer(this.config.deepgram, source);
     this.recognizer = recognizer;
-    recognizer.onPartialTranscript((event) => {
-      if (this.paused) return;
-      const spoken = this.interviewerFilter.observe(event.text);
-      // Only words the customer already cleared: nothing new to show or to send.
-      if (!spoken.trim()) return;
-      const visible = spoken === event.text ? event : { ...event, text: spoken };
-      if (this.interactionEnabled && event.canTriggerAnswers && this.autoAnswerEnabled) {
-        // The interviewer is still talking: keep the question collected so far and wait for the rest.
-        this.assembler.hold();
-        this.turnGate.update(visible.text, 'partial');
-      }
-      this.emit('transcript:partial', this.interviewerTranscriptForDisplay(visible));
-      if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: this.interactionEnabled ? 'Interviewer speaking' : 'Device check - interviewer audio detected' });
-    });
-    recognizer.onFinalTranscript((event) => {
-      if (this.paused || !event.text) return;
-      const spoken = this.interviewerFilter.observe(event.text);
-      if (!spoken.trim()) return;
-      this.acceptFinalTranscript(this.interviewerTranscriptForDisplay(spoken === event.text ? event : { ...event, text: spoken }));
-    });
-    recognizer.onTurnEvent((event) => {
-      // The turn is over for the customer's clear-memory whether or not anything else happens with it.
-      const spoken = event.type === 'end' || event.type === 'resume' ? this.interviewerFilter.observe(event.transcript) : event.transcript;
-      if (event.type === 'end') this.interviewerFilter.endTurn();
-      if (this.paused) return;
-      if (!this.interactionEnabled) { this.turnGate.reset(); return; }
-      if (event.type === 'start') { this.assembler.hold(); return; }
-      if (event.type === 'resume') {
-        this.assembler.hold();
-        if (this.answerInterruptible) this.answerAbort?.abort();
-        this.lastQuestion = '';
-        this.turnGate.update(spoken, 'resume');
-        return;
-      }
-      if (event.type === 'end') {
-        if (!event.canTriggerAnswers) return;
-        if (!this.autoAnswerEnabled) {
-          this.turnGate.reset();
-          if (spoken.trim() && this.session) this.repositories.addTurn(this.session.id, 'interviewer', spoken.trim(), this.source ?? undefined);
-          if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: 'Interviewer turn captured — press Send when the question is complete' });
-          return;
-        }
-        // Nothing new after Clear: do not send what was cleared.
-        if (!spoken.trim() && !this.assembler.pending) return;
-        if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: 'Interviewer turn complete — checking for a question' });
-        // Interviewers pause inside long questions. Keep the pieces together and answer once they stay quiet.
-        this.assembler.turnEnded(spoken);
-      }
-    });
+    this.wireQuestionSource(recognizer, this.interviewerFilter, 'speaker');
     recognizer.onError((error) => this.emit('app:error', { title: 'Transcription connection', message: error.message, recoverable: true }));
     await recognizer.start();
     this.repositories.addEvent(sessionId, 'STT_CONNECTED');
@@ -258,6 +213,74 @@ export class InterviewOrchestrator {
     else this.recognizer?.sendAudio(chunk);
   }
 
+  /**
+   * Listens to one audio source for questions. The interviewer's speakers are always a source. In an assignment
+   * session the microphone is a source too: anyone talking near the microphone is treated like the speakers.
+   */
+  private wireQuestionSource(recognizer: SpeechRecognizer, filter: TurnPrefixFilter, kind: 'speaker' | 'microphone'): void {
+    const asQuestion = (event: TranscriptEvent): TranscriptEvent => (kind === 'microphone'
+      ? { ...event, sourceRole: 'remote_interviewer', canTriggerAnswers: true } : event);
+    // A microphone next to the speakers also hears them; while the speakers are talking, ignore the microphone.
+    const hearingSpeakers = (): boolean => kind === 'microphone' && Date.now() - this.lastSpeakerSpeechAt < MICROPHONE_ECHO_GUARD_MS;
+    recognizer.onPartialTranscript((raw) => {
+      if (this.paused) return;
+      const event = asQuestion(raw);
+      const spoken = filter.observe(event.text);
+      // Only words the customer already cleared: nothing new to show or to send.
+      if (!spoken.trim()) return;
+      if (kind === 'speaker') this.lastSpeakerSpeechAt = Date.now();
+      else if (hearingSpeakers()) return;
+      const visible = spoken === event.text ? event : { ...event, text: spoken };
+      if (this.interactionEnabled && event.canTriggerAnswers && this.autoAnswerEnabled) {
+        // Someone is still talking: keep the question collected so far and wait for the rest.
+        this.assembler.hold();
+        this.turnGate.update(visible.text, 'partial');
+      }
+      this.emit('transcript:partial', this.interviewerTranscriptForDisplay(visible));
+      if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: this.interactionEnabled ? 'Interviewer speaking' : 'Device check - interviewer audio detected' });
+    });
+    recognizer.onFinalTranscript((raw) => {
+      if (this.paused || !raw.text) return;
+      const event = asQuestion(raw);
+      const spoken = filter.observe(event.text);
+      if (!spoken.trim()) return;
+      if (kind === 'speaker') this.lastSpeakerSpeechAt = Date.now();
+      else if (hearingSpeakers()) return;
+      this.acceptFinalTranscript(this.interviewerTranscriptForDisplay(spoken === event.text ? event : { ...event, text: spoken }));
+    });
+    recognizer.onTurnEvent((raw) => {
+      const event = { ...raw, canTriggerAnswers: kind === 'microphone' ? true : raw.canTriggerAnswers };
+      // The turn is over for the customer's clear-memory whether or not anything else happens with it.
+      const spoken = event.type === 'end' || event.type === 'resume' ? filter.observe(event.transcript) : event.transcript;
+      if (event.type === 'end') filter.endTurn();
+      if (this.paused) return;
+      if (!this.interactionEnabled) { this.turnGate.reset(); return; }
+      if (kind === 'microphone' && hearingSpeakers()) return;
+      if (event.type === 'start') { this.assembler.hold(); return; }
+      if (event.type === 'resume') {
+        this.assembler.hold();
+        if (this.answerInterruptible) this.answerAbort?.abort();
+        this.lastQuestion = '';
+        this.turnGate.update(spoken, 'resume');
+        return;
+      }
+      if (event.type === 'end') {
+        if (!event.canTriggerAnswers) return;
+        if (!this.autoAnswerEnabled) {
+          this.turnGate.reset();
+          if (spoken.trim() && this.session) this.repositories.addTurn(this.session.id, 'interviewer', spoken.trim(), this.source ?? undefined);
+          if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: 'Interviewer turn captured — press Send when the question is complete' });
+          return;
+        }
+        // Nothing new after Clear: do not send what was cleared.
+        if (!spoken.trim() && !this.assembler.pending) return;
+        if (!this.answerAbort) this.emit('copilot:status', { status: 'listening', message: 'Interviewer turn complete — checking for a question' });
+        // People pause inside long questions. Keep the pieces together and answer once they stay quiet.
+        this.assembler.turnEnded(spoken);
+      }
+    });
+  }
+
   private ensureCandidateRecognizer(): SpeechRecognizer | null {
     if (this.candidateRecognizer) return this.candidateRecognizer;
     if (this.candidateRecognizerUnavailable) return null;
@@ -265,27 +288,30 @@ export class InterviewOrchestrator {
     if (!owningSession || (!this.accountProviders && !this.config.deepgram.apiKey && !this.config.deepgram.managed)) return null;
     const candidateRecognizer = this.accountProviders?.recognizer(CANDIDATE_SOURCE) ?? new DeepgramRecognizer(this.config.deepgram, CANDIDATE_SOURCE);
     this.candidateRecognizer = candidateRecognizer;
-    candidateRecognizer.onPartialTranscript((event) => {
-      if (!this.paused && this.session?.id === owningSession.id) {
+    if (owningSession.kind === 'assignment') this.wireQuestionSource(candidateRecognizer, this.candidateFilter, 'microphone');
+    else {
+      candidateRecognizer.onPartialTranscript((event) => {
+        if (!this.paused && this.session?.id === owningSession.id) {
+          const spoken = this.candidateFilter.observe(event.text);
+          if (!spoken.trim()) return;
+          if (this.interactionEnabled) this.beginCandidateSpeech();
+          this.emit('transcript:partial', spoken === event.text ? event : { ...event, text: spoken });
+        }
+      });
+      candidateRecognizer.onFinalTranscript((event) => {
+        if (this.paused || !event.text || this.session?.id !== owningSession.id) return;
         const spoken = this.candidateFilter.observe(event.text);
+        this.candidateFilter.endTurn();
         if (!spoken.trim()) return;
-        if (this.interactionEnabled) this.beginCandidateSpeech();
-        this.emit('transcript:partial', spoken === event.text ? event : { ...event, text: spoken });
-      }
-    });
-    candidateRecognizer.onFinalTranscript((event) => {
-      if (this.paused || !event.text || this.session?.id !== owningSession.id) return;
-      const spoken = this.candidateFilter.observe(event.text);
-      this.candidateFilter.endTurn();
-      if (!spoken.trim()) return;
-      const visible = spoken === event.text ? event : { ...event, text: spoken };
-      this.emit('transcript:final', visible);
-      if (this.interactionEnabled) this.persistCandidateFinal(visible.text, event.confidence);
-    });
-    candidateRecognizer.onTurnEvent((event) => {
-      if (this.interactionEnabled && (event.type === 'start' || event.type === 'resume')) this.beginCandidateSpeech();
-      if (event.type === 'end') this.candidatePendingQuestionId = undefined;
-    });
+        const visible = spoken === event.text ? event : { ...event, text: spoken };
+        this.emit('transcript:final', visible);
+        if (this.interactionEnabled) this.persistCandidateFinal(visible.text, event.confidence);
+      });
+      candidateRecognizer.onTurnEvent((event) => {
+        if (this.interactionEnabled && (event.type === 'start' || event.type === 'resume')) this.beginCandidateSpeech();
+        if (event.type === 'end') this.candidatePendingQuestionId = undefined;
+      });
+    }
     candidateRecognizer.onError((error) => this.emit('app:error', {
       title: 'Candidate microphone transcription', message: error.message, recoverable: true,
     }));
@@ -552,6 +578,8 @@ export class InterviewOrchestrator {
     telemetry.mark('questionStart'); telemetry.mark('intentStart');
     let intent = this.intentDetector.detect(displayQuestion);
     telemetry.mark('intentEnd');
+    // Test questions are often not phrased as questions ("Find the output of this code"): answer them all.
+    if (this.session.kind === 'assignment' && !intent.isAnswerNeeded && intent.intent === 'NO_ANSWER_NEEDED') intent = { ...intent, isAnswerNeeded: true, intent: 'GENERAL_QUESTION', confidence: 0.8 };
     if (force && (!intent.isComplete || !intent.isAnswerNeeded)) intent = { ...intent, isComplete: true, isAnswerNeeded: true, intent: 'GENERAL_QUESTION', confidence: 1 };
     if (!intent.isComplete) { this.emit('copilot:status', { status: 'listening', message: 'Waiting for the rest of the question' }); return false; }
     if (!intent.isAnswerNeeded) { this.emit('copilot:status', { status: 'listening', message: 'No answer needed' }); return false; }

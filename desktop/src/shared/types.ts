@@ -1,4 +1,6 @@
 import type { AnswerPreferences } from './answerPreferences';
+import type { SessionDefaults, SessionKind } from './sessionKinds';
+export type { SessionDefaults, SessionKind } from './sessionKinds';
 export type { AnswerPreferences } from './answerPreferences';
 export type AnswerLength = 'short' | 'medium' | 'detailed';
 export type InterviewType = 'technical' | 'behavioral' | 'mixed' | 'system-design' | 'coding';
@@ -58,6 +60,8 @@ export interface Session {
   interviewUrl?: string;
   resumeFileName?: string;
   answerPreferences?: AnswerPreferences;
+  /** Missing means an interview session. */
+  kind?: SessionKind;
   createdAt: string;
   updatedAt: string;
 }
@@ -277,6 +281,8 @@ export interface ProviderStatus {
   deepgramModelOptions?: ProviderModelOption[];
   defaultGeminiModel?: string;
   defaultDeepgramModel?: string;
+  /** Starting texts and recommended model for new sessions, as set by the Admin. */
+  sessionDefaults?: SessionDefaults;
   screenAnalysisEnabled: boolean;
 }
 
@@ -346,6 +352,9 @@ export interface UploadedDocumentInput {
 export interface AppEventMap {
   'screen:quick-shot': null;
   'answer:send-shortcut': null;
+  'answer:scroll': { direction: -1 | 1 };
+  'answer:navigate': { delta: -1 | 1 };
+  'window:touch-through': { enabled: boolean };
   'copilot:status': { status: CopilotStatus; message?: string };
   'transcript:partial': TranscriptEvent;
   'transcript:final': TranscriptEvent;

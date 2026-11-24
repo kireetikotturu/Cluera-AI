@@ -27,7 +27,7 @@ import type {
 } from './types';
 
 export const IPC = {
-  app: { status: 'app:status', close: 'app:close', openExternal: 'app:open-external', toggleOverlay: 'app:toggle-overlay', adjustZoom: 'app:adjust-zoom', sessionMode: 'app:session-mode', liveCollapse: 'app:live-collapse', moveLiveCollapse: 'app:move-live-collapse', resizeLive: 'app:resize-live', focusLiveTranscript: 'app:focus-live-transcript', sendShortcut: 'app:send-shortcut' },
+  app: { status: 'app:status', close: 'app:close', openExternal: 'app:open-external', toggleOverlay: 'app:toggle-overlay', adjustZoom: 'app:adjust-zoom', sessionMode: 'app:session-mode', liveCollapse: 'app:live-collapse', moveLiveCollapse: 'app:move-live-collapse', resizeLive: 'app:resize-live', focusLiveTranscript: 'app:focus-live-transcript', sendShortcut: 'app:send-shortcut', assignmentMode: 'app:assignment-mode' },
   sessions: {
     startRound: 'sessions:start-round',
     roundHistory: 'sessions:round-history',
@@ -86,6 +86,12 @@ export interface ElectronAPI {
   discardTranscriptInput(): Promise<void>;
   /** Registers the Alt+S shortcut that sends the shown question, even while another app has focus. Returns whether it is active. */
   setSendShortcut(enabled: boolean): Promise<boolean>;
+  /**
+   * Assignment sessions only. While active, the window ignores the mouse so clicks reach the page behind it, and
+   * Alt+M (touch on/off), Alt+Up/Down (scroll the answer) and Alt+A/Alt+D (previous/next answer) work system-wide.
+   * Returns whether it is active and whether clicks currently pass through.
+   */
+  setAssignmentMode(enabled: boolean): Promise<{ active: boolean; touchThrough: boolean }>;
   sendAudioChunk(sourceId: string, chunk: ArrayBuffer): void;
   reportAudioError(message: string): void;
   selectSystemAudioSource(sourceId: string): Promise<string>;
