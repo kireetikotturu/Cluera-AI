@@ -276,3 +276,31 @@ it('keeps trusted installer origin, token AAL2 and live database MFA mandatory',
  const mfaDenied=await accountAdminRequest(request(accountDraft()));expect(mfaDenied.status).toBe(403);expect(await mfaDenied.json()).toEqual({error:'RELEASE_MFA_REQUIRED'});
  expect(rpc.mock.calls.some(([name])=>name==='cluera_release_admin')).toBe(false);expect(log).toHaveBeenCalled();
 });
+it('reads live customer usage through the dedicated admin RPC and adds an estimated cost, never raw SQL errors',async()=>{
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_admin_usage_report'?{code:'ACTIVE',
+  overall:{customerCount:2,activeNow:1,usedMs:3600000,usage:[{provider:'gemini',model:'gemini-3.5-flash',calls:2,inputTokens:1000000,outputTokens:100000,thinkingTokens:0,audioMs:0}]},
+  customers:[{userId:actor,email:'a@example.invalid',state:'ACTIVE',usedMs:3600000,activeNow:true,lastActiveAt:null,usage:[{provider:'deepgram',model:'flux-general-en',calls:1,inputTokens:0,outputTokens:0,thinkingTokens:0,audioMs:600000}]}]}:null,error:null,status:200}));
+ const response=await accountAdminRequest(new Request(`${origin}/api/account/admin?usage=1`));
+ expect(response.status).toBe(200);
+ const body=await response.json();
+ expect(rpc).toHaveBeenCalledWith('cluera_admin_usage_report',{p_actor:actor,p_session:sid,p_subject:null});
+ expect(body.overall.activeNow).toBe(1);
+ expect(body.customers[0].usage.totalUsd).toBeCloseTo(0.077,5);
+ expect(body.overall.usage.totalUsd).toBeCloseTo(0.55,5);
+ expect(body.assumptions.usdToInr).toBe(88);
+ expect(JSON.stringify(body)).not.toMatch(/service|secret|token"/i);
+});
+it('validates the usage subject and refuses non-admin usage reads',async()=>{
+ expect((await accountAdminRequest(new Request(`${origin}/api/account/admin?usage=1&subject=bad`))).status).toBe(400);
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_admin_usage_report'?{code:'FORBIDDEN'}:null,error:null,status:200}));
+ expect((await accountAdminRequest(new Request(`${origin}/api/account/admin?usage=1`))).status).toBe(403);
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_admin_usage_report'?{code:'NOT_FOUND'}:null,error:null,status:200}));
+ expect((await accountAdminRequest(new Request(`${origin}/api/account/admin?usage=1&subject=${actor}`))).status).toBe(404);
+});
+it('routes "reduce time" to the audited adjustment RPC with only a whole number of minutes',async()=>{
+ const body={action:'REDUCE_MINUTES',operationId:crypto.randomUUID(),subjectId:actor,reason:'Reduce time after a refund was agreed',input:{minutes:30}};
+ expect((await accountAdminRequest(request(body))).status).toBe(200);
+ expect(rpc).toHaveBeenCalledWith('account_admin_adjust',{p_actor:actor,p_session:sid,p_operation:body.operationId,p_subject:actor,p_action:'REDUCE_MINUTES',p_reason:body.reason,p_input:{minutes:30}});
+ for(const input of [{minutes:0},{minutes:1.5},{minutes:60001},{minutes:30,grantId:factor}])expect((await accountAdminRequest(request({...body,operationId:crypto.randomUUID(),input}))).status).toBe(400);
+ expect((await accountAdminRequest(request({...body,operationId:crypto.randomUUID(),subjectId:null}))).status).toBe(403);
+});

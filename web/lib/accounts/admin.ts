@@ -13,9 +13,10 @@ import {accountReleaseInput,accountReleasePublish,accountReleaseSigningKey} from
 import {assertTrustedInstallerUrl} from '../releases/policy';
 import {ReleaseInputError,releaseValidationCode,logReleaseDiagnostic} from './releaseDiagnostics';
 import {adminReadFailure} from './adminReadDiagnostics';
+import {shapeUsageReport} from './usageCost';
 
 const model=accountModelPolicy;
-const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','ADD_MINUTES','REMOVE_MINUTES','CATALOG','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
+const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','ADD_MINUTES','REMOVE_MINUTES','REDUCE_MINUTES','CATALOG','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
  subjectId:z.uuid().nullable(),reason:z.string().trim().min(10).max(500),input:z.unknown()}).strict();
 /** Staging BFF administration. Live session + explicit allowlist + AAL2 are
  * independently checked by SQL; customer metadata never defines authority. */
@@ -73,6 +74,14 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
     const data=await rpc('cluera_release_admin',{...adminArgs,p_action:'LIST'});
     if(data?.code!=='ACTIVE')throw new AccountError('FORBIDDEN',403);
     return cookies.apply(json(data));
+   }
+   if(params.get('usage')==='1'){
+    // Live usage and estimated provider cost. Read only; SQL re-checks the admin session and AAL2.
+    stage='usage';const usageSubject=z.uuid().nullable().parse(params.get('subject'));
+    const report=await rpc('cluera_admin_usage_report',{...adminArgs,p_subject:usageSubject});
+    if(report?.code==='NOT_FOUND')return cookies.apply(json({error:'NOT_FOUND'},404));
+    if(report?.code!=='ACTIVE')throw new AccountError('FORBIDDEN',403);
+    return cookies.apply(json(shapeUsageReport(report)));
    }
    if(params.get('providers')==='1'){
     stage='providers';
@@ -158,11 +167,12 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
     if(process.env.SIGMAROUND_ACCOUNT_TEST_ENTITLEMENTS_ENABLED!=='true')throw new AccountError('FORBIDDEN',403);
     values={...z.object({minutes:z.number().int().min(1).max(6000)}).strict().parse(input.input),environment:'account-staging'};
    }else if(input.action==='ADD_MINUTES')values=z.object({minutes:z.number().int().min(1).max(60000)}).strict().parse(input.input);
+   else if(input.action==='REDUCE_MINUTES')values=z.object({minutes:z.number().int().min(1).max(60000)}).strict().parse(input.input);
    else if(input.action==='REMOVE_MINUTES')values=z.object({minutes:z.number().int().min(1).max(60000),grantId:z.uuid()}).strict().parse(input.input);
    else if(input.action==='REVOKE_TEST')values=z.object({grantId:z.uuid()}).strict().parse(input.input);
    else values=z.object({}).strict().parse(input.input);
   }
-  const result=await rpc(['ADD_MINUTES','REMOVE_MINUTES','CATALOG'].includes(input.action)?'account_admin_adjust':'account_admin_mutate',{...adminArgs,p_operation:input.operationId,p_subject:input.subjectId,
+  const result=await rpc(['ADD_MINUTES','REMOVE_MINUTES','REDUCE_MINUTES','CATALOG'].includes(input.action)?'account_admin_adjust':'account_admin_mutate',{...adminArgs,p_operation:input.operationId,p_subject:input.subjectId,
    p_action:input.action,p_reason:input.reason,p_input:values});
   return cookies.apply(json(result,result?.code==='APPLIED'?200:409));
  }catch(error){

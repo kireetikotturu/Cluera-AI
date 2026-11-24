@@ -79,3 +79,22 @@ button.admin-stat:hover{transform:translateY(-3px);border-color:#8b7cff77}
 .admin-grant{padding:12px 0;border-top:1px solid rgba(255,255,255,.07)}
 .admin-grant form{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 @media(max-width:640px){.admin-tabs{top:70px;overflow-x:auto;flex-wrap:nowrap}.admin-tabs button{flex:0 0 auto}}
+
+/* ---- Customer usage: live table, cost estimate, block button ---- */
+.usage-panel { display: grid; gap: 12px; margin: 4px 0 18px; }
+.usage-panel h3, .usage-panel h4 { margin: 0; }
+.usage-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.02); }
+.usage-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
+.usage-table th, .usage-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.usage-table th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.usage-table tfoot td { font-weight: 700; border-bottom: 0; }
+.usage-table tr.selected { background: rgba(139,124,255,.12); }
+.usage-table tbody tr:last-child td { border-bottom: 0; }
+.usage-link { padding: 0; border: 0; background: none; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: inherit; }
+.tag-live { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #9ee6c1; background: rgba(66,196,134,.16); animation: usage-pulse 1.6s ease-in-out infinite; }
+@keyframes usage-pulse { 50% { opacity: .55; } }
+.usage-assumptions { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.usage-assumptions summary { cursor: pointer; font-weight: 600; }
+.button.danger { background: rgba(242,125,117,.16); border-color: rgba(242,125,117,.5); color: #f5a29b; box-shadow: none; }
+.button.danger:hover:not(:disabled) { background: rgba(242,125,117,.28); }
+@media (prefers-reduced-motion: reduce) { .tag-live { animation: none; } }
