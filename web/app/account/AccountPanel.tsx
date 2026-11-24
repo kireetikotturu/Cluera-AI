@@ -9,6 +9,7 @@ import {authFailure,emailNotice,signupNotice,resendNotice,publicLoginSchema,publ
 import {MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH} from '../../lib/accounts/passwordPolicy';
 import {resolveCheckoutSelection,selectionFromSearch,clearCheckoutSelection,checkoutSelectionHref,checkoutSelectionName,type CheckoutSelection} from '../../lib/cluera/checkoutJourney';
 import './account-ui.css';
+import './account-home.css';
 
 type FormMode = 'login' | 'signup' | 'forgot-password' | 'resend-verification';
 type Feedback = {tone:'success'|'error'|'info';message:string;detail?:string;maskedEmail?:string};
@@ -309,15 +310,16 @@ export function AccountPanel() {
   const passwordSecurityPanel=account?<AccountPasswordSecurity key={`password-security:${account.userId}:${recovery}`}accountId={account.userId}passwordRecovery={recovery}
     refresh={securityRefresh}disabled={baseBusy}onChange={securityChanged}onVerified={securityVerified}
     onRestartRecovery={()=>{if(!busy&&!inFlight.current){restartRecovery.current=true;void submit('logout',{expectedAccountId:account.userId});}}}/>:null;
-  return <section className={`account-card${!account ? ' account-auth' : ''}`} aria-busy={busy}>
+  return <section className={`account-card${!account ? ' account-auth' : !recovery ? ' account-home' : ''}`} aria-busy={busy}>
     {selection&&!recovery?<aside className="cluera-plan-handoff" aria-label="Selected Cluera plan">
       <p>Selected plan: <strong>{checkoutSelectionName(selection)}</strong></p>
       <p>Prices and availability are checked again on the server. Sign-in never starts a payment.</p>
       {account?<a className="button secondary" href={checkoutSelectionHref(selection)}>Continue to selected plan</a>:null}
     </aside>:null}
     {account ? <>
-      <p>Signed in as <strong>{account.email}</strong></p>
-      {!recovery ? <><h2>Your workspace</h2><AccountWorkspace key={`workspace:${account.userId}`}/>
+      {!recovery ? <header className="acct-top"><div className="acct-avatar" aria-hidden="true">{account.email.charAt(0).toUpperCase()}</div><div><h2>Your workspace</h2><p>Signed in as <strong>{account.email}</strong></p></div></header>
+        : <p>Signed in as <strong>{account.email}</strong></p>}
+      {!recovery ? <><AccountWorkspace key={`workspace:${account.userId}`}/>
         <details key={`security:${account.userId}`} className="account-security"><summary>Account security · Change password</summary>
           <p>After changing your password, sign in again with the new one.</p>
           {passwordSecurityPanel}
@@ -348,9 +350,9 @@ export function AccountPanel() {
         <button className="button" type="submit" disabled={busy||!passwordReady}>Update password and sign out</button>
       </form>}</> : null}
       {feedbackRegion}
-      <button className="button secondary" type="button" disabled={busy} onClick={() => void submit('logout',{expectedAccountId:account.userId})}>Sign out of this browser</button>
+      <button className="button secondary acct-signout" type="button" disabled={busy} onClick={() => void submit('logout',{expectedAccountId:account.userId})}>Sign out of this browser</button>
     </> : <>
-      <div className="account-auth-heading"><div className="account-auth-brand" aria-hidden="true">C</div><span className="account-ui-kicker">CLUERA AI</span><span className="account-test-badge">Test workspace</span></div>
+      <div className="account-auth-heading"><div className="account-auth-brand" aria-hidden="true">C</div><span className="account-ui-kicker">CLUERA AI</span></div>
       <h2>{emailPending?'Check your email':mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create an account' : mode==='resend-verification'?'Verify your email':'Reset your password'}</h2>
       {!emailPending?<p className="account-auth-description">{mode === 'signup' ? 'One account for Cluera on the web and desktop.' : mode === 'forgot-password' ? 'Enter your email and we’ll help you reset your password.' : mode==='resend-verification'?'Send a new verification link to finish creating your account.':'Welcome back to Cluera.'}</p>:null}
       {!emailPending&&!emailOnly&&google==='enabled'?<><button className="button secondary" type="button" disabled={busy} onClick={() => void submit('google')}>Continue with Google</button><div className="account-auth-divider"><span>or continue with email</span></div></>:null}

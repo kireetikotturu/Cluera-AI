@@ -12,6 +12,8 @@ interface Workspace {
  documents:Array<{id:string;name:string;kind:string;bytes:number}>;
 }
 const minutes=usageDuration;
+const nice=(value:string)=>value.toLowerCase().replace(/_/g,' ').replace(/^./,letter=>letter.toUpperCase());
+const kindName:Record<string,string>={RESUME:'Résumé',JOB_DESCRIPTION:'Job description',SUPPORTING:'Supporting context',INSTRUCTIONS:'Instructions'};
 type Change = {action:'PROFILE';displayName:string}
  | {action:'SAVE_CONTEXT';operationId:string;id:string;kind:string;name:string;body:string}
  | {action:'DELETE_CONTEXT';operationId:string;id:string};
@@ -63,36 +65,56 @@ export function AccountWorkspace(){
   }finally{active.current=false;if(version.current===current){request.current=null;if(mounted.current)setBusy(false);}}
  }
  const locked=busy||loading||Boolean(pending);
- return <div className={styles.dashboard} aria-busy={busy||loading}><p role="status">{loading?'Loading account details…':message}</p>
-  {loading&&!data?<div className={styles.skeleton} aria-hidden="true"/>:null}
-  <button type="button" disabled={locked} onClick={()=>void refresh()}>Refresh balance and account</button>
-  {pending?<p>A change is awaiting confirmation. Other edits are paused. <button type="button" disabled={busy} onClick={()=>void submit(pending)}>Retry the same change</button></p>:null}
+ return <div className={`${styles.dashboard} acct-dash`} aria-busy={busy||loading}>
+  <p role="status" className="acct-status" data-empty={!(loading||message)||undefined}>{loading?'Loading account details…':message}</p>
+  {loading&&!data?<div className="acct-skeleton" aria-hidden="true"><span/><span/><span/></div>:null}
+  {pending?<div className="acct-notice" role="alert"><p>A change is awaiting confirmation. Other edits are paused.</p><button type="button" className="acct-btn" disabled={busy} onClick={()=>void submit(pending)}>Retry the same change</button></div>:null}
   {data?<>
-  <h2>Your Cluera account</h2>
-  <dl className={styles.metrics}>
-   <div className={styles.metric}><dt>Remaining time</dt><dd>{minutes(data.balance.availableMilliseconds)}</dd></div>
-   <div className={styles.metric}><dt>Reserved for active sessions</dt><dd>{minutes(data.balance.reservedMilliseconds)}</dd></div>
-   <div className={styles.metric}><dt>Used</dt><dd>{minutes(data.balance.spentMilliseconds)}</dd></div>
-  </dl>
-  <div className={styles.breakdown}><span>Trial · {minutes(data.balances.TRIAL??0)}</span><span>Monthly · {minutes(data.balances.RECURRING??0)}</span><span>No-expiry packs · {minutes(data.balances.PACK??0)}</span></div>
-  <p>Your balance is shared across devices. Reserved time is already excluded from remaining time. Refresh after desktop use.</p>
-  <nav className={styles.dashboardActions} aria-label="Billing shortcuts"><a href="/account/checkout?offer=cluera_pack_3h_v2">Buy more time</a><a href="/pricing">Compare plans</a><a href="/account/checkout#billing-history">Billing history</a></nav>
-  <form onSubmit={event=>{event.preventDefault();void submit({body:{action:'PROFILE',displayName:String(new FormData(event.currentTarget).get('name')??'')}});}}>
-   <label>Display name<input name="name" defaultValue={data.displayName} maxLength={80} disabled={locked}/></label><button className="button secondary" disabled={locked}>Save profile</button>
-  </form>
-  <h3>Plans and billing</h3>
-  {data.plans.length?data.plans.map((plan,i)=><p key={i}>{plan.tier} · {plan.state} · {plan.paymentState}{plan.endsAt?` · until ${new Date(plan.endsAt).toLocaleDateString()}`:''}{plan.cancelFuture?' · renewal stopped':''}{plan.state==='PAUSED'?` · preserved ${minutes(plan.remainingMilliseconds??0)} of access time`:''}</p>):<p>No monthly subscription is active. Your trial and available packs appear above.</p>}
-  <p>Already started a payment? <a href="/account/checkout">Check its status or continue your existing checkout</a> before making another purchase.</p>
-  <h3>Recent AI sessions</h3>
-  {data.sessions.length?<ul>{data.sessions.map((session,i)=><li key={i}>{new Date(session.startedAt).toLocaleString()} · {session.state}</li>)}</ul>:<p>No account-managed AI sessions yet.</p>}
-  <h3>Private context</h3><p>Save résumé text, a job description, supporting context or instructions. Text only here, up to 120 KB per document and 20 documents. In the account desktop, Settings → Selected account context also imports PDF/DOCX/TXT/Markdown as extracted text. Only documents you explicitly select there contribute bounded excerpts to future answers. Original files are not stored in the cloud.</p>
-  <form onSubmit={event=>{event.preventDefault();if(pendingRef.current||active.current||request.current)return;const form=event.currentTarget,values=new FormData(form);void submit({body:{action:'SAVE_CONTEXT',operationId:crypto.randomUUID(),id:crypto.randomUUID(),kind:String(values.get('kind')),name:String(values.get('name')),body:String(values.get('body'))},form});}}>
-   <label>Category<select name="kind" disabled={locked}><option value="RESUME">Résumé</option><option value="JOB_DESCRIPTION">Job description</option><option value="SUPPORTING">Supporting context</option><option value="INSTRUCTIONS">Instructions</option></select></label>
-   <label>Name<input name="name" required maxLength={120} disabled={locked}/></label><label>Text<textarea name="body" required maxLength={120000} rows={5} disabled={locked}/></label>
-   <button className="button secondary" disabled={locked}>Save private context</button>
-  </form>
-  <ul>{data.documents.map(doc=><li key={doc.id}>{doc.name} · {doc.kind} · {doc.bytes} bytes <button type="button" disabled={locked} onClick={()=>void submit({body:{action:'DELETE_CONTEXT',operationId:crypto.randomUUID(),id:doc.id}})}>Delete</button></li>)}</ul>
-  <p><a href="/account/download">Download Cluera AI for Windows</a> · <AdminRoleLink>Cluera administration</AdminRoleLink></p>
-  <p>Install the Windows app, then sign in with this account. Your time balance is shared across devices.</p>
- </>:!loading?<p>No verified account snapshot is available. <a href="/account">Return to sign in</a>.</p>:null}</div>;
+  <section className="acct-hero" aria-label="Your time">
+   <div className="acct-hero-top"><h3>Your Cluera account</h3>
+    <button type="button" className="acct-ghost" disabled={locked} onClick={()=>void refresh()}><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Refresh balance and account</button></div>
+   <dl className="acct-stats">
+    <div className="acct-stat acct-stat-main"><dt>Remaining time</dt><dd>{minutes(data.balance.availableMilliseconds)}</dd><small>Shared across all your devices</small></div>
+    {data.balance.reservedMilliseconds>0?<div className="acct-stat"><dt>Reserved for active sessions</dt><dd>{minutes(data.balance.reservedMilliseconds)}</dd></div>:null}
+    <div className="acct-stat"><dt>Used</dt><dd>{minutes(data.balance.spentMilliseconds)}</dd></div>
+   </dl>
+   {(data.balances.TRIAL??0)+(data.balances.RECURRING??0)+(data.balances.PACK??0)>0?<div className="acct-sources" aria-label="Where your time comes from">
+    {(data.balances.TRIAL??0)>0?<span>Free trial · {minutes(data.balances.TRIAL??0)}</span>:null}
+    {(data.balances.RECURRING??0)>0?<span>Monthly plan · {minutes(data.balances.RECURRING??0)}</span>:null}
+    {(data.balances.PACK??0)>0?<span>Time packs · {minutes(data.balances.PACK??0)}</span>:null}
+   </div>:null}
+   <nav className="acct-actions" aria-label="Billing shortcuts"><a className="acct-primary" href="/account/checkout?offer=cluera_pack_3h_v2">Buy more time</a><a className="acct-secondary" href="/pricing">Compare plans</a><a className="acct-secondary" href="/account/checkout#billing-history">Billing history</a><a className="acct-secondary" href="/account/download">Download Cluera AI for Windows</a></nav>
+  </section>
+  <div className="acct-grid">
+   <section className="acct-card" aria-label="Profile">
+    <h3>Profile</h3>
+    <form onSubmit={event=>{event.preventDefault();void submit({body:{action:'PROFILE',displayName:String(new FormData(event.currentTarget).get('name')??'')}});}}>
+     <label>Display name<input name="name" defaultValue={data.displayName} maxLength={80} disabled={locked} placeholder="Your name"/></label><button className="acct-btn" disabled={locked}>Save profile</button>
+    </form>
+   </section>
+   <section className="acct-card" aria-label="Your plan">
+    <h3>Your plan</h3>
+    {data.plans.length?<ul className="acct-rows">{data.plans.map((plan,i)=><li key={i}><span><strong>{nice(plan.tier)}</strong><small>{plan.endsAt?`Until ${new Date(plan.endsAt).toLocaleDateString()}`:'No end date'}{plan.cancelFuture?' · renewal stopped':''}{plan.state==='PAUSED'?` · ${minutes(plan.remainingMilliseconds??0)} of access time kept`:''}</small></span><em>{nice(plan.state)}</em></li>)}</ul>
+     :<p className="acct-empty">Pay as you go. Your free trial and time packs appear above, and packs never expire.</p>}
+    <p className="acct-hint">Paid but your time has not arrived? <a href="/account/checkout">Check your payment</a>.</p>
+   </section>
+   <section className="acct-card" aria-label="Recent sessions">
+    <h3>Recent sessions</h3>
+    {data.sessions.length?<ul className="acct-rows">{data.sessions.map((session,i)=><li key={i}><span><strong>{new Date(session.startedAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</strong><small>{new Date(session.startedAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</small></span><em>{nice(session.state)}</em></li>)}</ul>
+     :<p className="acct-empty">No sessions yet. Open the Windows app and start one when your interview begins.</p>}
+   </section>
+  </div>
+  <section className="acct-card acct-wide" aria-label="Résumé and notes">
+   <h3>Résumé and notes</h3>
+   <p className="acct-hint">Save your résumé, the job description and any notes here. In the Windows app you choose which ones to use for your answers. Text only, up to 120 KB each.</p>
+   <form onSubmit={event=>{event.preventDefault();if(pendingRef.current||active.current||request.current)return;const form=event.currentTarget,values=new FormData(form);void submit({body:{action:'SAVE_CONTEXT',operationId:crypto.randomUUID(),id:crypto.randomUUID(),kind:String(values.get('kind')),name:String(values.get('name')),body:String(values.get('body'))},form});}}>
+    <div className="acct-form-row"><label>Category<select name="kind" disabled={locked}><option value="RESUME">Résumé</option><option value="JOB_DESCRIPTION">Job description</option><option value="SUPPORTING">Supporting context</option><option value="INSTRUCTIONS">Instructions</option></select></label>
+    <label>Name<input name="name" required maxLength={120} disabled={locked} placeholder="For example: My résumé"/></label></div>
+    <label>Text<textarea name="body" required maxLength={120000} rows={5} disabled={locked} placeholder="Paste the text here"/></label>
+    <button className="acct-btn acct-btn-primary" disabled={locked}>Save private context</button>
+   </form>
+   {data.documents.length?<ul className="acct-rows acct-docs">{data.documents.map(doc=><li key={doc.id}><span><strong>{doc.name}</strong><small>{kindName[doc.kind]??nice(doc.kind)} · {Math.max(1,Math.round(doc.bytes/1024))} KB</small></span><button type="button" className="acct-danger" disabled={locked} onClick={()=>void submit({body:{action:'DELETE_CONTEXT',operationId:crypto.randomUUID(),id:doc.id}})}>Delete</button></li>)}</ul>:null}
+  </section>
+  <p className="acct-foot"><AdminRoleLink>Cluera administration</AdminRoleLink></p>
+ </>:!loading?<div className="acct-card acct-empty-state"><p>No verified account snapshot is available.</p><p><a href="/account">Return to sign in</a> or press the button below to try again.</p><button type="button" className="acct-btn" disabled={locked} onClick={()=>void refresh()}>Refresh balance and account</button></div>:null}</div>;
 }
