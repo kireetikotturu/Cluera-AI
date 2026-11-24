@@ -37,7 +37,7 @@ export function AccountReleases({disabled=false,canAct,onMutationLockChange}:{di
   if(running.current||operation.current||!admitted())return;
   const body={action,operationId:crypto.randomUUID(),subjectId:null,reason,input};operation.current=body;unknown.current=false;setPending(body);void execute(body);
  }
- return <section><h2>App releases</h2><p>Separate unsigned TEST product only. Upload the Cluera installer, independently verify its downloaded hash/size, then approve here. No legacy release is modified.</p>
+ return <section><h2>App releases</h2><p>Upload the installer to a GitHub release, check its hash and size, then publish it here. The Download button on the website uses the latest published release.</p>
  <p role="status">{message}</p><button disabled={disabled||busy} onClick={()=>void refresh()}>Refresh Cluera releases</button>
  {pending?<button disabled={disabled||busy} onClick={()=>void execute(pending)}>Verify/retry same release operation</button>:null}
  <fieldset disabled={disabled||busy||!!pending}><legend>Create immutable draft</legend><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);submit('RELEASE_DRAFT',{
@@ -57,5 +57,5 @@ export function AccountReleases({disabled=false,canAct,onMutationLockChange}:{di
  <label><input name="confirmed" type="checkbox" required/> I checked the installer file, its size and its SHA-256 hash.</label>
  <label>Approval reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Publish release</button></form>:null}
  {r.state==='PUBLISHED'?<form onSubmit={e=>{e.preventDefault();submit('RELEASE_WITHDRAW',{id:r.id},String(new FormData(e.currentTarget).get('reason')));}}><label>Withdrawal reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Withdraw account release</button></form>:null}</fieldset>)}
- <p><a href="/api/cluera/update/test">Cluera signed test feed</a> · <a href="/account/download">Latest approved Cluera test download</a></p></section>;
+ <p><a href="/api/cluera/update/test">App update feed</a> · <a href="/account/download">Latest download</a></p></section>;
 }
