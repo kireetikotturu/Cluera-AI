@@ -123,37 +123,33 @@ it('an independently loaded empty plan snapshot may show first monthly checkout 
  await act(async()=>root.render(createElement(ClueraCheckoutClient,{enabled:true,firstSubscriptionOnly:true})));expect(subscribe().disabled).toBe(false);
 });
 
-it('shows all four approved presentations while migration is unavailable, with no order, SDK, UUID input or recurring-live claim', async () => {
+it('shows no invented plans while the live plan list is unavailable, and creates no order or SDK', async () => {
   const request = vi.fn(async (url: RequestInfo | URL) => String(url).endsWith('/catalog')
     ? Response.json({ error: 'synthetic-private-diagnostic' }, { status: 503 }) : Response.json(credits));
   vi.stubGlobal('fetch', request); await renderCheckout(false);
-  expect(host.querySelectorAll('.account-plan-card')).toHaveLength(4);
-  for (const price of ['₹549', '₹5,499', '₹9,599', '₹19,549']) expect(host.textContent).toContain(price);
-  expect(host.textContent).toContain('Presentation only'); expect(host.textContent).toContain('Checkout is disabled');
+  expect(host.querySelectorAll('.account-plan-card')).toHaveLength(0);
+  for (const price of ['₹549', '₹5,499', '₹9,599', '₹19,549']) expect(host.textContent).not.toContain(price);
+  expect(host.textContent).not.toContain('Presentation only'); expect(host.textContent).toContain('Checkout is disabled');
+  expect(host.textContent).toContain('Payments are not open yet');
   expect(host.textContent).not.toContain('synthetic-private-diagnostic');
-  const unavailable=[...host.querySelectorAll<HTMLButtonElement>('button[data-checkout-action="purchase"]')];
-  expect(unavailable).toHaveLength(4);expect(unavailable.every(item=>item.disabled)).toBe(true);
-  expect(unavailable.map(item=>item.textContent)).toEqual(['Buy Now','Subscribe','Subscribe','Subscribe']);
-  expect(host.textContent).not.toContain('Checkout unavailable');
+  expect(host.querySelectorAll('button[data-checkout-action="purchase"]')).toHaveLength(0);
   expect(request.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
   expect(document.querySelector('script[src*="razorpay"]')).toBeNull(); expect(host.querySelector('input')).toBeNull();
 });
-it('a pricing selection highlights one planned offer and preserves sign-in without bypassing disabled checkout',async()=>{
+it('a pricing selection preserves sign-in without showing any invented plan', async () => {
  history.replaceState(null,'',`/account/checkout?offer=cluera_monthly_100h_v2&desktopAccount=${userId}`);
  const request=vi.fn(async()=>new Response(null,{status:401}));vi.stubGlobal('fetch',request);
  await renderCheckout(false);
- expect(host.querySelectorAll('.cluera-plan-selected')).toHaveLength(1);
- expect(host.querySelector('.cluera-plan-selected')!.textContent).toContain('Cluera Pro 100 Hours');
+ expect(host.querySelectorAll('.account-plan-card')).toHaveLength(0);
  expect(host.querySelector<HTMLAnchorElement>('a')!.getAttribute('href')).toBe(`/account?offer=cluera_monthly_100h_v2&desktopAccount=${userId}#login`);
  expect(request.mock.calls.every(([,init])=>!(init as RequestInit|undefined)?.method)).toBe(true);
- expect(document.querySelector('script')).toBeNull();expect([...host.querySelectorAll<HTMLButtonElement>('button[data-offer-code]')].every(b=>b.disabled)).toBe(true);
+ expect(document.querySelector('script')).toBeNull();expect(host.querySelectorAll('button[data-offer-code]')).toHaveLength(0);
 });
 it('duplicate desktop owner hints fail closed before any account/catalog reads',async()=>{
  history.replaceState(null,'',`/account/checkout?desktopAccount=${userId}&desktopAccount=${factorId}`);
  const request=vi.fn();vi.stubGlobal('fetch',request);await renderCheckout(true);
  expect(request).not.toHaveBeenCalled();expect(host.textContent).not.toContain('Signed in as');
- expect(host.querySelectorAll('.account-plan-card button')).toHaveLength(4);
- expect([...host.querySelectorAll<HTMLButtonElement>('.account-plan-card button')].every(b=>b.disabled)).toBe(true);
+ expect(host.querySelectorAll('.account-plan-card button')).toHaveLength(0);
 });
 it('signed-out pricing preserves the selected purchasable plan through sign-in without creating an order',async()=>{
  history.replaceState(null,'','/pricing');
@@ -624,8 +620,7 @@ it('rejects a desktop/browser owner mismatch without exposing identity or creati
   history.replaceState(null, '', '/account/checkout?desktopAccount=00000000-0000-4000-8000-000000000999');
   const request = vi.fn(async (url: RequestInfo | URL) => checkoutGet(url)); vi.stubGlobal('fetch', request);
   await renderCheckout(); expect(host.textContent).not.toContain('Signed in as');
-  expect(host.querySelectorAll('.account-plan-card')).toHaveLength(4);
-  expect([...host.querySelectorAll<HTMLButtonElement>('.account-plan-card button')].every(item => item.disabled)).toBe(true);
+  expect(host.querySelectorAll('.account-plan-card button:not([disabled])')).toHaveLength(0);
   expect(request.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
 });
 
@@ -929,4 +924,23 @@ it('downloads the payment window code in advance without running it', async () =
   await renderCheckout();
   expect(document.querySelector('link[rel="preload"][as="script"][href*="checkout.razorpay.com"]')).not.toBeNull();
   expect(document.querySelector('script[src*="razorpay"]')).toBeNull();
+});
+
+it('after the hourly limit it says nothing is pending, then unlocks Buy with a fresh request on its own', async () => {
+  vi.useFakeTimers();
+  try {
+    const bodies: string[] = [];
+    const request = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST') { bodies.push(String(init.body)); return Response.json({ payment: { code: 'RATE_LIMITED' } }, { status: 429, headers: { 'Retry-After': '300' } }); }
+      return checkoutGet(url);
+    });
+    vi.stubGlobal('fetch', request);
+    await renderCheckout(); await act(async () => buy().click());
+    expect(host.textContent).toContain('Nothing is pending');expect(host.textContent).not.toContain('unfinished payment');
+    expect(host.textContent).not.toContain('Cancel order');expect(host.textContent).not.toContain('Continue payment');
+    await act(async () => { await vi.advanceTimersByTimeAsync(301_000); });
+    expect(buy().disabled).toBe(false);
+    await act(async () => buy().click());
+    expect(bodies).toHaveLength(2);expect(JSON.parse(bodies[1]).requestId).not.toBe(JSON.parse(bodies[0]).requestId);
+  } finally { vi.useRealTimers(); }
 });

@@ -45,7 +45,9 @@ export async function handleClueraCheckout(request: Request, callback = false) {
     if (!clueraCheckoutAllowed(account.userId)) return cookies.apply(json({code:'TEST_PURCHASER_REQUIRED',error:'You are signed in, but this account is not an approved Test purchaser.'},403));
     const payment = 'requestId' in input ? await createClueraCheckout(rpc,account,input.requestId,input.revisionId)
       : await verifyClueraCallback(rpc,account,input);
-    return cookies.apply(json({payment},payment.code === 'PENDING' ? 409 : 200));
+    const reply = json({payment},payment.code === 'PENDING' ? 409 : payment.code === 'RATE_LIMITED' ? 429 : 200);
+    if (payment.code === 'RATE_LIMITED') reply.headers.set('Retry-After','300');
+    return cookies.apply(reply);
   } catch (error) {
     const status = (error as {status?:unknown})?.status;
     if (status === 401) cookies?.clear();

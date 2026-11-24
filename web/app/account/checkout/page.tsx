@@ -11,6 +11,7 @@ import {STAGING_DATABASE,STAGING_SITE} from '../../../lib/accountRelay/config';
 import ClueraCheckoutClient from './ClueraCheckoutClient';
 import {clueraBillingHistoryEnabled} from '../../../lib/payments/cluera/history';
 import {billingUiCapabilities} from '../../../lib/payments/cluera/billingUi';
+import {readClueraBillingPresentation} from '../../../lib/cluera/billingPresentation';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Secure checkout · Cluera AI', robots: { index: false, follow: false } };
@@ -20,10 +21,10 @@ export default async function CheckoutPage() {
   if(process.env.CLUERA_BILLING_V2_ENABLED==='true'){
     if(process.env.SIGMAROUND_ACCOUNTS_ENABLED!=='true'||process.env.SIGMAROUND_ACCOUNT_ORIGIN!==STAGING_SITE
       ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
-    const billing=billingUiCapabilities();
+    const billing=billingUiCapabilities(),offers=await readClueraBillingPresentation();
     return <main className="account-page"><h1>Buy Cluera credits</h1>
       <p>{billing.mode==='test'?'Pick the time you need and pay securely with Razorpay.':'Review the price and renewal terms before continuing to payment.'}</p>
-      <ClueraCheckoutClient key={billing.mode} {...billing} firstSubscriptionOnly/>
+      <ClueraCheckoutClient key={billing.mode} offers={offers??[]} catalogKnown={offers!==null} {...billing} firstSubscriptionOnly/>
       <a href="/account">Return to your account</a></main>;
   }
   // Presentation only: a paused new Cluera rollout must not need old Paddle
@@ -33,7 +34,7 @@ export default async function CheckoutPage() {
     if(process.env.SIGMAROUND_ACCOUNTS_ENABLED!=='true'||process.env.SIGMAROUND_ACCOUNT_ORIGIN!==STAGING_SITE
       ||process.env.NEXT_PUBLIC_SUPABASE_URL!==STAGING_DATABASE)notFound();
     return <main className="account-page"><h1>Buy Cluera credits</h1><p>Test payments are paused. No payment is enabled in this Cluera workspace. Recurring offers and Stripe are unavailable.</p>
-      <p>Owner-confirmed planned pricing only; these are not active catalog offers. Existing payment history and allowances are unchanged.</p>
+      <p>Existing payment history and allowances are unchanged.</p>
       <ClueraCheckoutClient enabled={false} historyEnabled={clueraBillingHistoryEnabled()}/><a href="/account">Return to your account</a></main>;
   }
   let staging = false;

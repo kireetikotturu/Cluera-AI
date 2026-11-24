@@ -22,6 +22,8 @@ export function checkoutFailureMessage(status: number, body?: unknown): string {
     return 'A payment for this order is already being processed. Your hours will be added automatically once it is confirmed, usually within 2 minutes. If nothing changes, contact Cluera support.';
   if (status === 404) return 'Checkout is not enabled for this deployment. Your sign-in is unchanged. Contact Cluera support.';
   if (status === 409) return 'You have an unfinished payment. Continue it, or cancel it to start a new one.';
+  if (status === 429 && body && typeof body === 'object' && 'payment' in body && body.payment && typeof body.payment === 'object' && 'code' in body.payment && body.payment.code === 'RATE_LIMITED')
+    return 'You have started several payments in a short time. Nothing is pending and you have not been charged. Please wait a few minutes, then try again.';
   if (status === 429) return 'Too many requests. Please wait a moment and try again.';
   return 'Payments are temporarily unavailable. Please try again in a few minutes.';
 }

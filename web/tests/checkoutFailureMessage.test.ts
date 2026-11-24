@@ -15,3 +15,10 @@ it('shows the fixed validation category only for the documented HTTP 400, withou
  expect(checkoutFailureMessage({...value,httpStatus:403})).toBe('');
  expect(checkoutFailureMessage({...value,stage:'binding'})).not.toContain('CHECKOUT_REQUEST_INVALID');
 });
+
+it('explains the hourly checkout limit plainly and never calls it an unfinished payment', async () => {
+  const {checkoutFailureMessage}=await import('../lib/payments/cluera/checkoutFailure');
+  const message=checkoutFailureMessage(429,{payment:{code:'RATE_LIMITED'}});
+  expect(message).toContain('Nothing is pending');expect(message).toContain('not been charged');expect(message).not.toContain('unfinished payment');
+  expect(checkoutFailureMessage(409,{payment:{code:'PENDING'}})).toContain('unfinished payment');
+});

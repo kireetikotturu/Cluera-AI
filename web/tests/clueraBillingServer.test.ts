@@ -172,6 +172,12 @@ it('provider creation is attempted once only for fresh CLAIMED; replay/UNCERTAIN
   const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_catalog'?[pack,recurring]:name==='cluera_billing_prepare'?{code:'PENDING'}:null,error:null}));
   const request=provider(),adapter=clueraRazorpayAdapter(env,request);expect(await createClueraCheckout(rpc,{userId:actor,sessionId:uuid(904)},uuid(905),revisionId,env,adapter)).toEqual({code:'PENDING'});expect(request).not.toHaveBeenCalled();
 });
+it('an hourly-limit refusal is reported as such (nothing was created) and never posts to the provider',async()=>{
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_catalog'?[pack,recurring]:name==='cluera_billing_prepare'?{code:'RATE_LIMITED'}:null,error:null}));
+  const request=provider();
+  expect(await createClueraCheckout(rpc,{userId:actor,sessionId:uuid(904)},uuid(905),revisionId,env,clueraRazorpayAdapter(env,request))).toEqual({code:'RATE_LIMITED'});
+  expect(request).not.toHaveBeenCalled();
+});
 it('post/bind/identity uncertainty persists without retry or grant',async()=>{
   const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==='cluera_billing_owner'?ownerResponse(args):name==='cluera_billing_catalog'?[pack,recurring]:name==='cluera_billing_prepare'?{code:'CLAIMED',intentId,attemptId,revision:pack}:name==='cluera_billing_bind'?'BOUND':{userId:uuid(999),code:'AVAILABLE',pending:null,resolvedOrderIds:[],resolvedSubscriptionIds:[]},error:null}));
   const request=provider();expect(await createClueraCheckout(rpc,{userId:actor,sessionId:uuid(904)},uuid(905),revisionId,env,clueraRazorpayAdapter(env,request))).toEqual({code:'PENDING'});

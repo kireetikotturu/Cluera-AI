@@ -38,7 +38,10 @@ export async function createClueraCheckout(rpc: PaymentRpc, account: Account, re
   const data = await billingRpc(rpc, 'cluera_billing_prepare', { p_user:account.userId, p_session:account.sessionId,
     p_request:requestId, p_revision:revisionId, p_account_digest:accountDigest, p_epoch:epoch });
   // No retry/open on replay or unknown outcomes. Only this fresh leased CLAIMED attempt may POST once.
-  if (z.object({code:z.string()}).parse(data).code !== 'CLAIMED') return { code:'PENDING' as const };
+  const prepared = z.object({code:z.string()}).parse(data).code;
+  // Nothing was created when the hourly limit is reached, so say so instead of reporting an unfinished payment.
+  if (prepared === 'RATE_LIMITED') return { code:'RATE_LIMITED' as const };
+  if (prepared !== 'CLAIMED') return { code:'PENDING' as const };
   const claimed = z.object({ code:z.literal('CLAIMED'),intentId:z.uuid(),attemptId:z.uuid(),revision:revisionSchema }).strict().parse(data);
   if (!claimed.intentId || !claimed.attemptId || !claimed.revision || claimed.revision.revisionId !== revisionId || !claimed.revision.enabled)
     throw new ClueraBillingError('UNAVAILABLE');

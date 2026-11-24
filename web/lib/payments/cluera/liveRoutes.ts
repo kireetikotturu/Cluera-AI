@@ -80,7 +80,9 @@ export async function handleLiveBilling(request: Request, action: LiveBillingAct
         const body = z.object({ expectedAccountId: z.uuid(), requestId: z.uuid(), revisionId: z.uuid() }).strict().parse(raw);
         return createClueraCheckout(rpc, account, body.requestId, body.revisionId, env);
       })();
-    return cookies.apply(json({ payment }, payment.code === 'PENDING' ? 409 : 200));
+    const reply = json({ payment }, payment.code === 'PENDING' ? 409 : payment.code === 'RATE_LIMITED' ? 429 : 200);
+    if (payment.code === 'RATE_LIMITED') reply.headers.set('Retry-After', '300');
+    return cookies.apply(reply);
   } catch (error) {
     const status = error instanceof AccountError ? error.status : error instanceof ClueraBillingError && error.code === 'PENDING' ? 409
       : error instanceof z.ZodError || error instanceof SyntaxError ? 400 : 503;

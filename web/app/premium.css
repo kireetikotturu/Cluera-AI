@@ -225,3 +225,8 @@ html:not([data-signed-in="1"]) .when-signed-in{display:none!important}
 @keyframes page-shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
 @media(max-width:700px){.page-loading-row{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.page-loading-bar,.page-loading-card,.page-loading-row i{animation:none}}
+
+/* Razorpay payment window: a medium, centred card instead of a full-screen sheet. Razorpay switches to its compact layout at this width. */
+.razorpay-container .razorpay-checkout-frame{position:fixed!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;width:min(520px,96vw)!important;height:min(660px,94dvh)!important;border-radius:22px!important;box-shadow:0 30px 90px rgba(0,0,0,.6)!important;animation:rz-pop .24s var(--ease,cubic-bezier(.22,1,.36,1)) both}
+@keyframes rz-pop{from{opacity:0;transform:translate(-50%,-47%) scale(.97)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@media(prefers-reduced-motion:reduce){.razorpay-container .razorpay-checkout-frame{animation:none}}

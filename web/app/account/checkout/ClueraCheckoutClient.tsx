@@ -8,8 +8,6 @@ import {checkoutDenial, checkoutDenialMessage, checkoutFailureMessage, type Chec
 import type {ClueraBillingHistory as BillingHistory} from '../../../lib/payments/cluera/historyContracts';
 import { z } from 'zod';
 import { usageDuration } from '../../../lib/usage/display';
-import {offerDisplay} from '../../../lib/billing/offerDisplay';
-import { clueraTargetPlans } from '../../../lib/cluera/targetPlans';
 import {selectionFromSearch,checkoutSelectionHref,checkoutSelectionName,type CheckoutSelection} from '../../../lib/cluera/checkoutJourney';
 import { clueraBoundCheckoutForMode, clueraCatalogResponse, clueraCheckoutStatus,
   clueraAllowance, clueraPrice, type ClueraPublicRevision, type ClueraBoundCheckout,
@@ -230,7 +228,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     }
   }, [deny, rejectResponse, endpoint, mode, clearWindow]);
 
-  useEffect(()=>{if(!cooldown)return;const timer=setInterval(()=>setCooldown(Math.max(0,Math.ceil((cooldownUntil.current-Date.now())/1000))),1000);return()=>clearInterval(timer);},[cooldown>0]);
+  useEffect(()=>{if(!cooldown)return;const timer=setInterval(()=>{
+    const left=Math.max(0,Math.ceil((cooldownUntil.current-Date.now())/1000));setCooldown(left);
+    // When the wait is over, check again by itself so the Buy button comes back without a manual refresh.
+    if(left===0){clearInterval(timer);void refresh(false,true);}
+  },1000);return()=>clearInterval(timer);},[cooldown>0]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -319,7 +321,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
           ...(resume ? {} : { headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ expectedAccountId: accountId, requestId: requestId.current, revisionId: revision.revisionId }) }) });
       if (!current()) return;
-      if (await rejectResponse(response, current, resume)) return;
+      if (await rejectResponse(response, current, resume)) {
+        // Too many attempts: the server created nothing, so a later attempt may start cleanly.
+        if (!resume && response.status === 429) { uncertain.current = false; requestId.current = null; }
+        return;
+      }
       const checkout = clueraBoundCheckoutForMode(mode).parse(await response.json()).payment;
       if (!current()) return;
       if (checkout.revisionId !== revision.revisionId || checkout.offerCode !== revision.offerCode
@@ -544,23 +550,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
           :<button className={styles.action} data-offer-code={revision.offerCode} data-checkout-action={savedOrder?'resume':'purchase'} type="button" disabled={!canPurchase&&!canContinue} aria-label={`${action}: ${revision.name}`} aria-describedby={`${statusId} ${availabilityId}`}
           onClick={() => void buy(revision, savedOrder)}>{action}</button>}
       </article>;
-    }) : catalogLoaded ? <p className={styles.availability} role="status">No plans are on sale right now. Please check back soon. Your existing time and billing history are unchanged.</p> : clueraTargetPlans.map(plan => {
-      const display = offerDisplay(plan);
-      return <article key={plan.id} aria-label={plan.name} className={`account-plan-card ${styles.card}${selection?.offerCode===plan.offerCode?' cluera-plan-selected':''}`}>
-        {selection?.offerCode===plan.offerCode?<p className="cluera-selection-badge">Selected plan</p>:null}
-        <div className={styles.cardTop}><p className={styles.eyebrow}>Presentation only</p><span className={styles.badge}>Not yet purchasable</span></div>
-        <h3>{plan.name}</h3>
-        <p className={styles.price}>{clueraPrice(Number(plan.amount))}<span>{plan.interval ? ' / month' : ' one time'}</span></p>
-        <p className={styles.allowance}>{display.hours} hours{plan.interval ? ' per month' : ''}</p>
-        <ul className={styles.features}>
-          <li><span aria-hidden="true">✓</span>{plan.interval ? 'Monthly hours do not roll over' : 'No expiry; verified packs stack'}</li>
-          <li><span aria-hidden="true">✓</span>One shared account balance</li>
-        </ul>
-        <p className={styles.terms}>{display.terms}</p>
-        <p className={styles.availability}>This plan is not open for purchase yet.</p>
-        <button className={styles.action} data-offer-code={plan.offerCode} data-checkout-action="purchase" type="button" disabled aria-label={`${plan.interval?'Subscribe':'Buy Now'}: ${plan.name}`} aria-describedby={statusId}>{plan.interval?'Subscribe':'Buy Now'}</button>
-      </article>;
-    })}</div>
+    }) : catalogLoaded ? <p className={styles.availability} role="status">No plans are on sale right now. Please check back soon. Your existing time and billing history are unchanged.</p> : <p className={styles.availability} role="status">{!enabled ? 'Payments are not open yet. Plans will appear here as soon as they are ready.' : busy ? 'Loading plans…' : 'We could not load the plans. Press Refresh billing status to try again.'}</p>}</div>
     <div className={styles.safetyNote}><p>Pay with UPI, card, netbanking or wallet in the secure Razorpay window. Your hours are added automatically after payment, usually within 2 minutes. If you close the window without paying, you are not charged: continue the payment or cancel it. Need help? <a href="mailto:clueraaisupport@gmail.com">Contact support</a>.</p></div>
     {/* On the pricing page the history stays mounted (it confirms a finished payment) but is not shown. */}
     <div hidden={pricing}><ClueraBillingHistory key={mode} mode={mode} accountId={credits?.userId??null} enabled={historyEnabled} disabled={busy} cancellationEnabled={cancellationEnabled} autoLoad refreshKey={historyVersion} onLoaded={historyLoaded}/></div>
