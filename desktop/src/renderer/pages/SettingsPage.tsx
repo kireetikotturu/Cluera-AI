@@ -1,3 +1,4 @@
+import { modelLabel } from '../services/modelLabel';
 import {CheckCircle2, Database, ShieldCheck} from 'lucide-react';
 import {useEffect, useRef, useState} from 'react';
 import type {UpdateStatus} from '../../shared/types';
@@ -43,7 +44,7 @@ export function SettingsPage({onUpdateStatus,account}:{onUpdateStatus?(status:Up
   <section className="settings-section"><h2>Managed AI models</h2><p>Cluera supplies provider access securely. No personal keys or BYOK fallback.</p>
    <label>Approved answer model <select aria-label="Approved answer model" value={settings.geminiModel??provider?.defaultGeminiModel??''} disabled={busy||!provider?.modelOptions?.length} onChange={event=>void save(event.target.value)}>
     {!provider?.modelOptions?.some(model=>model.modelId===settings.geminiModel)&&<option value={settings.geminiModel??''}>Choose an approved model</option>}
-    {(provider?.modelOptions??[]).map(model=><option key={model.modelId} value={model.modelId}>{model.displayName}</option>)}
+    {(provider?.modelOptions??[]).map(model=><option key={model.modelId} value={model.modelId}>{modelLabel(model)}</option>)}
    </select></label><p className="muted">Audio uses the server-approved Flux model. Availability and shared account time are enforced by the server.</p></section>
   <AccountContextSection key={account.userId}/>
   <section className="settings-section"><div className="settings-title"><ShieldCheck size={19}/><div><h2>Appearance</h2><p>Adjust your workspace without changing provider or entitlement policy.</p></div></div>

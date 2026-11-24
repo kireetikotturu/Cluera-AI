@@ -84,6 +84,25 @@ export class LocalRetriever {
       .slice(0, topK);
   }
 
+  /** One database read and one scoring pass for a whole question: the best chunks of every kind of document, plus the
+   * leading chunks of any kind. Cheaper than searching once per kind (a long interview has hundreds of chunks). */
+  search(sessionId: string, query: string, topK: number): {
+    matched: (type: ContextChunk['documentType']) => ContextChunk[];
+    leading: (type: ContextChunk['documentType'], count: number) => ContextChunk[];
+  } {
+    const vector = queryVector(query);
+    const rows = this.repositories.listChunks(sessionId, Object.keys(vector));
+    const scored = rows
+      .map(({ tokenVector, ...chunk }) => ({ ...chunk, score: cosine(vector, JSON.parse(tokenVector) as Vector) }))
+      .filter((chunk) => chunk.score > 0)
+      .sort((a, b) => b.score - a.score);
+    return {
+      matched: (type) => scored.filter((chunk) => chunk.documentType === type).slice(0, topK),
+      leading: (type, count) => rows.filter((chunk) => chunk.documentType === type).slice(0, count)
+        .map(({ tokenVector: _tokenVector, ...chunk }) => ({ ...chunk, score: 0 })),
+    };
+  }
+
   /** The first chunks of a document type in reading order (a resume starts with the candidate's name). */
   leading(sessionId: string, type: ContextChunk['documentType'], count: number): ContextChunk[] {
     return this.repositories.listChunks(sessionId)

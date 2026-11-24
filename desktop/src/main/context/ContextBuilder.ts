@@ -13,8 +13,8 @@ export class ContextBuilder {
     const { topK } = this.retriever.settings;
     // Each kind of material is searched on its own, so a long resume cannot push the job description
     // or the candidate's typed notes out of the answer (and the other way round).
-    const found = (type: ContextChunk['documentType']): ContextChunk[] => this.retriever.retrieveType(session.id, intent.question, type, topK);
-    const chunks = [...found('resume'), ...found('job-description'), ...found('supporting'), ...found('round-context')];
+    const search = this.retriever.search(session.id, intent.question, topK);
+    const chunks = [...search.matched('resume'), ...search.matched('job-description'), ...search.matched('supporting'), ...search.matched('round-context')];
     const byType = (type: ContextChunk['documentType']): ContextChunk[] => chunks.filter((c) => c.documentType === type);
     const fallback = (type: ContextChunk['documentType'], text: string, section: string, limit: number): ContextChunk[] => text.trim() ? [{
       id: `session-${type}`, sessionId: session.id, documentId: `session-${type}`, documentType: type,
@@ -22,7 +22,7 @@ export class ContextBuilder {
     }] : [];
     const needsBroadPersonalContext = ['BEHAVIORAL_QUESTION', 'EXPERIENCE_QUESTION'].includes(intent.intent) || PERSONAL_QUESTION.test(intent.question);
     // The candidate's own details (name, headline, summary) are always available to the answer.
-    const profile = this.retriever.leading(session.id, 'resume', 1);
+    const profile = search.leading('resume', 1);
     const matchedResume = byType('resume');
     const withProfile = (list: ContextChunk[]): ContextChunk[] =>
       profile.length && !list.some((chunk) => chunk.id === profile[0].id) ? [...profile, ...list.slice(0, topK - 1)] : list;
@@ -41,7 +41,7 @@ export class ContextBuilder {
     const matchedSupporting = [...byType('supporting'), ...byType('round-context')];
     const supportingContext = matchedSupporting.length || !needsBroadPersonalContext
       ? matchedSupporting
-      : this.retriever.leading(session.id, 'supporting', 3);
+      : search.leading('supporting', 3);
     const recentConversation = this.repositories.contextTurns(session.id, 30).map((turn) => ({
       ...turn,
       // Candidate/interviewer speech is more useful than repeating a whole old AI answer.

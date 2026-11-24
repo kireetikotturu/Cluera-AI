@@ -6,8 +6,8 @@ import type {ModelPolicy} from './ModelPolicyEditor';
 const endpoint='/api/account/admin/ai-providers';
 const providers=[
  {id:'gemini' as const,name:'Google Gemini',model:'gemini-3.5-flash',purpose:'AI answers and screenshots',hint:'Get a key at aistudio.google.com.'},
- {id:'openai' as const,name:'ChatGPT (OpenAI)',model:'gpt-4o-mini',purpose:'AI answers and screenshots',hint:'Get a key at platform.openai.com.'},
- {id:'anthropic' as const,name:'Claude (Anthropic)',model:'claude-3-5-haiku-latest',purpose:'AI answers and screenshots',hint:'Get a key at console.anthropic.com.'},
+ {id:'openai' as const,name:'ChatGPT (OpenAI)',model:'gpt-5-mini',purpose:'AI answers and screenshots',hint:'Get a key at platform.openai.com.'},
+ {id:'anthropic' as const,name:'Claude (Anthropic)',model:'claude-haiku-5-5',purpose:'AI answers and screenshots',hint:'Get a key at console.anthropic.com.'},
  {id:'deepgram' as const,name:'Deepgram',model:'flux-general-en',purpose:'Live transcription',hint:'Get a key at console.deepgram.com.'},
 ];
 type Id=typeof providers[number]['id'];

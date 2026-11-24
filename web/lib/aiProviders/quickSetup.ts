@@ -12,7 +12,7 @@ export type SetupResult=
  |{code:'SETUP_STOPPED';stage:SetupStage;reason:'CONFLICT'|'KEY_REJECTED'|'PROVIDER_UNAVAILABLE'|'MODEL_NOT_AVAILABLE'|'CHANGE_REJECTED';metadata:Metadata|null;modelId:string};
 
 /** Suggested first model; the Admin can type any other model ID. */
-export const setupModel=(provider:SetupProvider)=>provider==='gemini'?GEMINI_MODEL:provider==='deepgram'?DEEPGRAM_MODEL:provider==='openai'?'gpt-4o-mini':'claude-3-5-haiku-latest';
+export const setupModel=(provider:SetupProvider)=>provider==='gemini'?GEMINI_MODEL:provider==='deepgram'?DEEPGRAM_MODEL:provider==='openai'?'gpt-5-mini':'claude-haiku-5-5';
 const label={gemini:'Gemini',openai:'ChatGPT',anthropic:'Claude',deepgram:'Live transcription'} as const;
 const capabilitiesFor=(provider:SetupProvider)=>provider==='deepgram'?['audio' as const]:['text' as const,'image' as const];
 

@@ -5,8 +5,8 @@ import type {ModelPolicy} from './ModelPolicyEditor';
 type Provider=ModelPolicy['provider'];
 const providers:{id:Provider;name:string;example:string;help:string}[]=[
  {id:'gemini',name:'Google Gemini',example:'gemini-3.5-flash',help:'Answers'},
- {id:'openai',name:'ChatGPT (OpenAI)',example:'gpt-4o-mini',help:'Answers'},
- {id:'anthropic',name:'Claude (Anthropic)',example:'claude-3-5-haiku-latest',help:'Answers'},
+ {id:'openai',name:'ChatGPT (OpenAI)',example:'gpt-5-mini',help:'Answers'},
+ {id:'anthropic',name:'Claude (Anthropic)',example:'claude-haiku-5-5',help:'Answers'},
  {id:'deepgram',name:'Deepgram',example:'flux-general-en',help:'Live transcription (Flux models)'},
 ];
 const label=(id:Provider)=>providers.find(p=>p.id===id)!.name;

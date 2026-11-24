@@ -34,7 +34,7 @@ export function vaultProviders(config:RelayConfig,rpc:Rpc,env:NodeJS.ProcessEnv=
    try{
     held.guard.assertActive();
     // Usage start must be durable before the provider is called.
-    if(snapshot.provider==='gemini')receipt=await telemetry.start({runId:guard.runId,provider:'gemini',credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model});
+    receipt=await telemetry.start({runId:guard.runId,provider:snapshot.provider,credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model});
     const keys=snapshot.provider==='openai'?{openaiKey:snapshot.key}:snapshot.provider==='anthropic'?{anthropicKey:snapshot.key}:{geminiKey:snapshot.key};
     await providerAdapters({...config,...keys},{resolveModel:async()=>snapshot.model,textProvider:snapshot.provider as 'gemini'|'openai'|'anthropic',
      receipt:value=>receipt?.observe(value)}).generate(input,held.guard,emit);succeeded=true;

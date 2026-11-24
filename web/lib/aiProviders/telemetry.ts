@@ -2,7 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {z} from 'zod';
 import type {Rpc} from './repository';
 import {receiptMetadataSchema,type ReceiptMetadata,type ProviderOutcome} from './usageMetadata';
-const scopeSchema=z.object({runId:z.uuid(),provider:z.enum(['gemini','deepgram']),credentialId:z.uuid(),
+const scopeSchema=z.object({runId:z.uuid(),provider:z.enum(['gemini','deepgram','openai','anthropic']),credentialId:z.uuid(),
  revision:z.number().int().positive(),model:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/)}).strict();
 type Scope=z.infer<typeof scopeSchema>;
 const unavailable=()=>new Error('Provider telemetry unavailable.');

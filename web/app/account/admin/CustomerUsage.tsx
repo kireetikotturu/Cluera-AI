@@ -29,6 +29,9 @@ export function useUsageReport(active:boolean,subject:string){
    };
    const [all,one]=await Promise.all([read(''),subject?read(subject):Promise.resolve(null)]);
    if(mine!==version.current||signal.aborted)return;
+   // A response of an unexpected shape must never take the whole Admin page down.
+   if(!all?.overall||!Array.isArray(all.customers)||!all.assumptions)throw new Error('shape');
+   if(one&&(!one.customer||!one.models||!Array.isArray(one.sessions)||!one.assumptions))throw new Error('shape');
    setOverview(all);setDetail(one);setError('');setUpdatedAt(new Date().toLocaleTimeString());
   }catch{
    if(mine===version.current&&!signal.aborted)setError('Usage could not be loaded just now. It will try again shortly.');

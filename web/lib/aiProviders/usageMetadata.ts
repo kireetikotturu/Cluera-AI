@@ -7,7 +7,7 @@ export type ReceiptMetadata=z.infer<typeof receiptMetadataSchema>;
 export const providerOutcome=z.enum(['SUCCEEDED','FAILED','CANCELLED','STOPPED']);
 export type ProviderOutcome=z.infer<typeof providerOutcome>;
 export const providerUsageReportSchema=z.object({code:z.literal('ACTIVE'),scope:z.literal('LATEST_REQUESTS'),limit:z.literal(50),
- costStatus:z.literal('UNAVAILABLE'),rows:z.array(z.object({operationId:z.uuid(),provider:z.enum(['gemini','deepgram']),
+ costStatus:z.literal('UNAVAILABLE'),rows:z.array(z.object({operationId:z.uuid(),provider:z.enum(['gemini','deepgram','openai','anthropic']),
   model:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/),startedAt:z.iso.datetime({offset:true}),
   finishedAt:z.iso.datetime({offset:true}).nullable(),outcome:z.enum(['SUCCEEDED','FAILED','CANCELLED','STOPPED','UNCONFIRMED']),
   elapsedMilliseconds:z.number().int().min(0).max(3_600_000).nullable(),requestHash:z.string().regex(/^[a-f0-9]{64}$/).nullable(),

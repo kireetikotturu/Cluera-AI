@@ -213,6 +213,23 @@ describe('staging account relay boundaries', () => {
     second.peer.input({ type: 'generate', id: 'b', prompt: 'two' }); await tick();
     expect(second.providers.generate).toBeDefined(); expect(second.peer.readyState).toBe(WebSocket.CLOSED);
   });
+  it('fails only the one answer when the provider call fails, and keeps the live session for the next question', async () => {
+    const h = harness({ generate: vi.fn(async () => { throw new Error('provider busy'); }) }); await h.login();
+    h.peer.input({ type: 'generate', id: 'q1', prompt: 'hello' }); await tick();
+    expect(h.peer.sent.some(m => m.type === 'answerFailed' && m.id === 'q1')).toBe(true);
+    expect(h.peer.readyState).toBe(WebSocket.OPEN);
+    await vi.advanceTimersByTimeAsync(1200);
+    h.peer.input({ type: 'generate', id: 'q2', prompt: 'again' }); await tick();
+    expect(h.providers.generate).toHaveBeenCalledTimes(2);
+    expect(h.peer.sent.some(m => m.type === 'answerFailed' && m.id === 'q2')).toBe(true);
+    expect(h.peer.readyState).toBe(WebSocket.OPEN);
+  });
+  it('still ends the session when the model lookup fails before any provider call', async () => {
+    const prepare = vi.fn(async () => { throw new Error('model unavailable'); });
+    const h = harness({ prepare }); await h.login();
+    h.peer.input({ type: 'generate', id: 'q1', prompt: 'hello' }); await tick();
+    expect(h.providers.generate).not.toHaveBeenCalled(); expect(h.peer.readyState).toBe(WebSocket.CLOSED);
+  });
   it('bounds idle pre-start authentication and slow client buffers without spending', async () => {
     const h = harness(); await vi.advanceTimersByTimeAsync(10000);
     expect(h.peer.readyState).toBe(WebSocket.CLOSED); expect(h.command).not.toHaveBeenCalled();

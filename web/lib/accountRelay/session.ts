@@ -164,6 +164,9 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
       generating = true; lastGeneration = now;
       const abort = new AbortController(); generation = abort;
       void (async () => {
+        // Only a failure of the provider call itself is soft. Authorization, model lookup and usage
+        // reservation failures still end the session, exactly as before.
+        let providerCall = false;
         try {
           await dependencies.providers.prepare?.('gemini',command);
           // Cancellation during a vault/model lookup must not start a paid run.
@@ -172,11 +175,20 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
           await ensureStarted(); touch();
           if (abort.signal.aborted) return;
           const signal = AbortSignal.any([run!.signal, abort.signal]);
+          providerCall = true;
           await dependencies.providers.generate(command, { signal, runId:run!.runId, assertActive() { active(); if (signal.aborted) throw Error(); } }, text => {
             active(); if (signal.aborted) throw Error(); touch(); send({ type: 'answer', id: command.id, text });
           });
           if (!signal.aborted) send({ type: 'answerDone', id: command.id });
-        } catch { if (!abort.signal.aborted) end('provider_failed'); }
+        } catch {
+          if (abort.signal.aborted) { /* cancelled by the app: nothing more to say */ }
+          else if (providerCall && !ended) {
+            // A busy model, rate limit or empty reply fails only THIS answer. The live audio session keeps
+            // running and the next question can be asked at once. A client that does not know this frame
+            // closes the connection, which is the previous behaviour.
+            try { send({ type: 'answerFailed', id: command.id }, false); } catch { end('provider_failed'); }
+          } else end('provider_failed');
+        }
         finally {
           generating = false;
           if (generation === abort) generation = undefined;

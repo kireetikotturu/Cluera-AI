@@ -19,7 +19,9 @@ const image = z.object({ mimeType: z.enum(['image/png', 'image/jpeg', 'image/web
 });
 export const commandFrame = z.discriminatedUnion('type', [
   z.object({ type: z.literal('generate'), id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
-    prompt: z.string().min(1).max(120000), image: image.optional(), modelId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/).optional() }).strict(),
+    prompt: z.string().min(1).max(120000), image: image.optional(), modelId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/).optional(),
+    /** Upper bound for the answer length (the app sends it from the Short/Medium/Detailed setting). */
+    maxTokens: z.number().int().min(100).max(4000).optional() }).strict(),
   z.object({ type: z.literal('cancelGeneration') }).strict(),
   z.object({ type: z.literal('openAudio'), channel }).strict(),
   z.object({ type: z.literal('closeAudio'), channel }).strict(),

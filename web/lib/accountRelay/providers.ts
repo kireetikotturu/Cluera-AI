@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto';
 import WebSocket from 'ws';
 import { DEEPGRAM_MODEL, GEMINI_MODEL, secretFilter, type Generate } from './protocol';
 import {providerReceiptMetadata} from '../aiProviders/telemetry';
-import type {ReceiptMetadata} from '../aiProviders/usageMetadata';
+import {receiptMetadataSchema,type ReceiptMetadata} from '../aiProviders/usageMetadata';
 
 export type Guard = { signal: AbortSignal; assertActive(): void; runId?:string };
 export type ProviderSecrets = { geminiKey?: string; deepgramKey?: string; openaiKey?: string; anthropicKey?: string; serviceKey: string; rateKey: string };
@@ -37,7 +38,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
         if (!key || !dependencies.resolveModel) throw unavailable();
         const selected = await dependencies.resolveModel(input);
         if (!/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/.test(selected)) throw unavailable();
-        return chatGenerate(dependencies.textProvider, key, selected, input, guard, emit, request, privateValues);
+        return chatGenerate(dependencies.textProvider, key, selected, input, guard, emit, request, privateValues, dependencies.receipt);
       }
       if(!secrets.geminiKey)throw unavailable();
       const selectedModel = dependencies.resolveModel ? await dependencies.resolveModel(input) : GEMINI_MODEL;
@@ -59,7 +60,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': secrets.geminiKey! },
           body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: input.prompt },
             ...(input.image ? [{ inlineData: input.image }] : [])] }],
-          generationConfig: { temperature: 0.6, topP: 0.9, maxOutputTokens: 3000, ...(thinkingConfig ? { thinkingConfig } : {}) } }),
+          generationConfig: { temperature: 0.6, topP: 0.9, maxOutputTokens: input.maxTokens ?? 3000, ...(thinkingConfig ? { thinkingConfig } : {}) } }),
         });
         // Fastest answers: keep "thinking" minimal. A brand-new model that rejects that setting
         // is retried once without it, so adding any new Gemini model just works.
@@ -224,10 +225,42 @@ function logAnswerTiming(provider: string, model: string, timing: { headersMs?: 
     thinking: timing.thinking ?? null, firstWordsMs: timing.firstTokenMs ?? null, totalMs: Math.round(performance.now() - begun) })); } catch { /* Logging never affects an answer. */ }
 }
 const ANSWER_SYSTEM = 'You are Cluera, a concise interview copilot. Answer clearly and directly.';
+
+/** Fastest-first "reasoning effort" values to try for an OpenAI model; the last entry is "no setting".
+ * GPT-5 family models think by default, which delays the first word; "minimal" (GPT-5) or "none"
+ * (GPT-5.1 and later) switches that off. A model that rejects a value is retried with the next one and the
+ * accepted value is remembered, so new OpenAI models are tuned by their first question. Chat-style
+ * models (GPT-4o, GPT-4.1, *-chat-latest) have no such setting. */
+export function openaiReasoningLadder(model: string): Array<string | undefined> {
+  const id = model.toLowerCase();
+  if (/^gpt-(?:[5-9]|\d{2,})/.test(id) && !id.includes('chat')) return ['minimal', 'none', 'low', undefined];
+  if (/^o\d/.test(id)) return ['low', undefined];
+  return [undefined];
+}
+const openaiReasoningChoice = new Map<string, number>();
+/** Claude models that rejected a custom temperature (remembered). */
+const anthropicNoTemperature = new Set<string>();
+
+const countOf = (value: unknown): number | undefined => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 1_000_000_000 ? value : undefined;
+const requestId = (value: unknown): string | undefined => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,256}$/.test(value)
+  ? createHash('sha256').update(value).digest('hex') : undefined;
+/** Only documented numeric usage fields; never prompt, answer, headers or raw provider bodies. */
+function chatReceipt(parts: { id?: string; input?: number; output?: number; thinking?: number; cached?: number; total?: number }): ReceiptMetadata | undefined {
+  const result: Record<string, unknown> = {};
+  const hash = requestId(parts.id); if (hash) result.requestHash = hash;
+  if (parts.input !== undefined) result.inputTokens = parts.input;
+  if (parts.output !== undefined) result.outputTokens = parts.output;
+  if (parts.thinking !== undefined) result.thinkingTokens = parts.thinking;
+  if (parts.cached !== undefined) result.cachedTokens = parts.cached;
+  if (parts.total !== undefined) result.totalTokens = parts.total;
+  const parsed = receiptMetadataSchema.safeParse(result);
+  return parsed.success && Object.keys(parsed.data).length ? parsed.data : undefined;
+}
+
 /** Streaming answers from OpenAI (Chat Completions) or Anthropic (Messages). Fixed hosts,
  * no redirects, bounded size and idle/total timeouts, secrets filtered from output. */
 async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model: string, input: Generate, guard: Guard,
-  emit: (text: string) => void, request: typeof fetch, privateValues: string[]) {
+  emit: (text: string) => void, request: typeof fetch, privateValues: string[], receipt?: (metadata: ReceiptMetadata) => void) {
   const controller = new AbortController();
   const signal = AbortSignal.any([controller.signal, guard.signal]);
   const cancel = () => controller.abort();
@@ -235,30 +268,58 @@ async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model
   let idle = setTimeout(cancel, 45000);
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   const filter = secretFilter(privateValues);
+  const timing: { headersMs?: number; firstTokenMs?: number; thinking?: string } = {}, begun = performance.now();
+  const maxTokens = input.maxTokens ?? 3000;
   try {
     const image = input.image;
-    const response = provider === 'openai'
-      ? await request('https://api.openai.com/v1/chat/completions', {
+    const started = performance.now();
+    let response!: Response;
+    if (provider === 'openai') {
+      const ladder = openaiReasoningLadder(model);
+      const known = openaiReasoningChoice.get(model);
+      const post = (effort: string | undefined) => request('https://api.openai.com/v1/chat/completions', {
         method: 'POST', redirect: 'error', signal, cache: 'no-store',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model, stream: true, max_completion_tokens: 3000, messages: [
-          { role: 'system', content: ANSWER_SYSTEM },
-          { role: 'user', content: image ? [{ type: 'text', text: input.prompt },
-            { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}` } }] : input.prompt },
-        ] }),
-      })
-      : await request('https://api.anthropic.com/v1/messages', {
+        body: JSON.stringify({ model, stream: true, stream_options: { include_usage: true }, max_completion_tokens: maxTokens,
+          ...(effort ? { reasoning_effort: effort } : {}),
+          // Reasoning models only accept their default temperature; chat models answer more steadily at 0.6.
+          ...(ladder.length === 1 ? { temperature: 0.6 } : {}),
+          messages: [
+            { role: 'system', content: ANSWER_SYSTEM },
+            { role: 'user', content: image ? [{ type: 'text', text: input.prompt },
+              { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}`, detail: 'high' } }] : input.prompt },
+          ] }),
+      });
+      let used = 'default';
+      for (const step of known === undefined ? ladder.map((_, index) => index) : [known]) {
+        response = await post(ladder[step]);
+        used = ladder[step] ?? 'default';
+        if (response.status !== 400) { openaiReasoningChoice.set(model, step); break; }
+        await response.body?.cancel().catch(() => undefined);
+      }
+      timing.thinking = used;
+    } else {
+      const post = (temperature: boolean) => request('https://api.anthropic.com/v1/messages', {
         method: 'POST', redirect: 'error', signal, cache: 'no-store',
         headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model, stream: true, max_tokens: 3000, system: ANSWER_SYSTEM, messages: [
+        body: JSON.stringify({ model, stream: true, max_tokens: maxTokens, system: ANSWER_SYSTEM, ...(temperature ? { temperature: 0.6 } : {}), messages: [
           { role: 'user', content: [...(image ? [{ type: 'image', source: { type: 'base64', media_type: image.mimeType, data: image.data } }] : []),
             { type: 'text', text: input.prompt }] },
         ] }),
       });
+      response = await post(!anthropicNoTemperature.has(model));
+      if (response.status === 400 && !anthropicNoTemperature.has(model)) {
+        await response.body?.cancel().catch(() => undefined);
+        response = await post(false);
+        if (response.status !== 400) anthropicNoTemperature.add(model);
+      }
+    }
     guard.assertActive();
-    if (!response.ok || !response.body) { await response.body?.cancel(); throw unavailable(); }
+    timing.headersMs = Math.round(performance.now() - started);
+    if (!response.ok || !response.body) { logAnswerFailure(provider, model, `http-${response.status}`, begun); await response.body?.cancel(); throw unavailable(); }
     reader = response.body.getReader();
     let buffer = '', totalBytes = 0, hasAnswer = false;
+    const usage: { id?: string; input?: number; output?: number; thinking?: number; cached?: number; total?: number } = {};
     const decoder = new TextDecoder('utf-8', { fatal: true });
     const event = (raw: string) => {
       guard.assertActive();
@@ -266,12 +327,36 @@ async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model
       if (!data || data === '[DONE]') return;
       const value = JSON.parse(data);
       if (value.error || value.type === 'error') throw unavailable();
-      const text = provider === 'openai' ? value.choices?.[0]?.delta?.content
-        : value.type === 'content_block_delta' && value.delta?.type === 'text_delta' ? value.delta.text : undefined;
+      let text: unknown;
+      if (provider === 'openai') {
+        usage.id ??= value.id;
+        const u = value.usage;
+        if (u && typeof u === 'object') {
+          const reasoning = countOf(u.completion_tokens_details?.reasoning_tokens) ?? 0, completion = countOf(u.completion_tokens);
+          usage.input = countOf(u.prompt_tokens); usage.total = countOf(u.total_tokens);
+          if (completion !== undefined) { usage.output = Math.max(0, completion - reasoning); usage.thinking = reasoning; }
+          usage.cached = countOf(u.prompt_tokens_details?.cached_tokens);
+        }
+        const choice = value.choices?.[0];
+        if (choice?.delta?.refusal || (choice?.finish_reason && !['stop', 'length'].includes(choice.finish_reason))) throw unavailable();
+        text = choice?.delta?.content;
+      } else {
+        if (value.type === 'message_start') {
+          const u = value.message?.usage ?? {};
+          usage.id ??= value.message?.id;
+          const cachedRead = countOf(u.cache_read_input_tokens) ?? 0;
+          usage.input = (countOf(u.input_tokens) ?? 0) + cachedRead + (countOf(u.cache_creation_input_tokens) ?? 0);
+          usage.cached = cachedRead;
+        } else if (value.type === 'message_delta') {
+          const output = countOf(value.usage?.output_tokens); if (output !== undefined) usage.output = output;
+          if (value.delta?.stop_reason && !['end_turn', 'max_tokens', 'stop_sequence'].includes(value.delta.stop_reason)) throw unavailable();
+        }
+        text = value.type === 'content_block_delta' && value.delta?.type === 'text_delta' ? value.delta.text : undefined;
+      }
       if (typeof text !== 'string' || !text) return;
       if (text.trim()) hasAnswer = true;
       const safe = filter.push(text);
-      if (safe) emit(safe);
+      if (safe) { if (timing.firstTokenMs === undefined) timing.firstTokenMs = Math.round(performance.now() - begun); emit(safe); }
     };
     while (true) {
       guard.assertActive();
@@ -295,6 +380,11 @@ async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model
     guard.assertActive();
     if (!hasAnswer) throw unavailable();
     const final = filter.push('', true); if (final) emit(final);
-  } catch { throw unavailable(); }
+    const metadata = chatReceipt(usage); if (metadata) receipt?.(metadata);
+    logAnswerTiming(provider, model, timing, begun);
+  } catch {
+    if (!guard.signal.aborted) logAnswerFailure(provider, model, timing.firstTokenMs === undefined ? (timing.headersMs === undefined ? 'no-reply-from-provider' : 'no-words-after-reply') : 'stream-stopped', begun);
+    throw unavailable();
+  }
   finally { clearTimeout(total); clearTimeout(idle); cancel(); await reader?.cancel().catch(() => undefined); }
 }

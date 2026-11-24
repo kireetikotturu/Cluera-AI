@@ -1,3 +1,4 @@
+import { modelLabel } from '../services/modelLabel';
 import {
   ArrowLeft, ArrowRight, FileText,
   Plus, Shrink, Trash2, Upload, Video, X, ZoomIn, ZoomOut,
@@ -260,7 +261,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
       <fieldset className="wizard-step preferences-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
         <h2 className="session-section-label">Output settings</h2>
         <div className="wizard-fields">
-          <label className="model-field compact-select-field"><span className="field-label">AI model</span><div className="model-select-row"><select value={form.selectedModel} onChange={(event) => update('selectedModel', event.target.value)}><option value="">{models.length ? 'Choose an AI model' : 'No enabled AI models available'}</option>{form.selectedModel && !selectedModelEnabled && <option value={form.selectedModel}>{form.selectedModel} · unavailable</option>}{models.map((model) => <option value={model.modelId} key={model.modelId}>{model.displayName === model.modelId ? model.modelId : `${model.displayName} · ${model.modelId}`}</option>)}</select></div></label>
+          <label className="model-field compact-select-field"><span className="field-label">AI model</span><div className="model-select-row"><select value={form.selectedModel} onChange={(event) => update('selectedModel', event.target.value)}><option value="">{models.length ? 'Choose an AI model' : 'No enabled AI models available'}</option>{form.selectedModel && !selectedModelEnabled && <option value={form.selectedModel}>{form.selectedModel} · unavailable</option>}{models.map((model) => <option value={model.modelId} key={model.modelId}>{model.displayName === model.modelId ? modelLabel(model) : `${modelLabel(model)} · ${model.modelId}`}</option>)}</select></div></label>
           <label className="compact-select-field"><span className="field-label">Answer language</span><input list="answer-languages" value={form.language} onChange={(event) => update('language', event.target.value)} aria-label="Answer language"/><datalist id="answer-languages">{['English', 'Hindi', 'Spanish', 'French', 'German', 'Telugu'].map((language) => <option value={language} key={language}/>)}</datalist></label>
         </div>
         <h2 className="session-section-label">Behavior</h2>

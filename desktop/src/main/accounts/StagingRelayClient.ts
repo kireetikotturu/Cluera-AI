@@ -12,6 +12,8 @@ const incoming = z.discriminatedUnion('type', [
   z.object({ type: z.literal('sessionEnded') }).strict(),
   z.object({ type: z.literal('answer'), id, text: z.string().max(128000) }).strict(),
   z.object({ type: z.literal('answerDone'), id }).strict(),
+  /** One answer failed (busy model, rate limit, empty reply); the live session keeps running. */
+  z.object({ type: z.literal('answerFailed'), id }).strict(),
   z.object({ type: z.literal('audioReady'), channel }).strict(),
   z.object({ type: z.literal('transcript'), channel,
     event: z.enum(['StartOfTurn', 'EagerEndOfTurn', 'TurnResumed', 'EndOfTurn', 'Update']),
@@ -20,6 +22,7 @@ const incoming = z.discriminatedUnion('type', [
 const outgoing = z.discriminatedUnion('type', [
   z.object({ type: z.literal('generate'), id, prompt: z.string().min(1).max(120000),
     modelId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,99}$/).optional(),
+    maxTokens: z.number().int().min(100).max(4000).optional(),
     image: z.object({ mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
       data: z.string().min(4).max(6666668).regex(/^[A-Za-z0-9+/]+={0,2}$/) }).strict().optional() }).strict(),
   z.object({ type: z.literal('openAudio'), channel }).strict(),

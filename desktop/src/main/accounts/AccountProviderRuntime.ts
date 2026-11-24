@@ -9,6 +9,8 @@ import { openStagingRelay, type RelayOutput, type StagingRelayConnection } from 
 type Channel = 'interviewer' | 'candidate';
 type Authority = { authorizeWork(): Promise<{ accessToken: string; signal: AbortSignal }> };
 const failure = () => new Error('Account provider session ended. Check your connection and account balance.');
+/** One answer failed on the provider's side; audio and the session are still running. */
+const answerFailure = () => new Error('The AI model could not answer this time. Please ask again, or choose another model in Settings.');
 const image = z.object({ mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']), data: z.string().min(4).max(6666668) }).strict();
 const requestBody = z.object({ contents: z.array(z.object({ role: z.literal('user'),
   parts: z.array(z.union([z.object({ text: z.string().min(1).max(120000) }).strict(),
@@ -38,6 +40,7 @@ export class AccountProviderRuntime {
     }
     if (event.type === 'answer' && event.id === this.generation?.id) this.generation.chunk(event.text);
     else if (event.type === 'answerDone' && event.id === this.generation?.id) this.generation.finish();
+    else if (event.type === 'answerFailed' && event.id === this.generation?.id) this.generation.finish(answerFailure());
     else if (event.type === 'audioReady' || event.type === 'transcript') this.listeners.get(event.channel)?.(event);
   };
   private ensure(): Promise<StagingRelayConnection> {
@@ -132,7 +135,11 @@ export class AccountProviderRuntime {
     } };
     timeout = setTimeout(abort, 100000); timeout.unref?.();
     signal.addEventListener('abort', abort, { once: true });
-    try { connection.send({ type: 'generate', id, prompt, ...(parsed.modelId ? { modelId: parsed.modelId } : {}), ...(images[0] ? { image: images[0].inlineData } : {}) }); }
+    // The Short/Medium/Detailed setting already reaches this point as the request's token limit; pass it on so
+    // the model stops at the right length instead of running to the server maximum.
+    const limit = (parsed.generationConfig as { maxOutputTokens?: unknown } | undefined)?.maxOutputTokens;
+    const maxTokens = typeof limit === 'number' && Number.isInteger(limit) && limit >= 100 && limit <= 4000 ? limit : undefined;
+    try { connection.send({ type: 'generate', id, prompt, ...(parsed.modelId ? { modelId: parsed.modelId } : {}), ...(maxTokens ? { maxTokens } : {}), ...(images[0] ? { image: images[0].inlineData } : {}) }); }
     catch { finish(failure()); }
     return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' } });
   }

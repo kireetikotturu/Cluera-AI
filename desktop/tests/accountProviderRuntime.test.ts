@@ -118,3 +118,25 @@ it('injects selected fresh context before opening provider usage and fails close
  const response=await valid.generate(screenshotBody,owner.signal);expect(send).toHaveBeenCalledWith(expect.objectContaining({prompt:'Synthetic interview prompt\nSelected fresh source',image:{mimeType:'image/png',data:'cG5n'}}));
  await response.body!.cancel();
 });
+it.each([[800, true], [100, true], [4000, true], [50, false], [5000, false], [1.5, false], ['many', false], [undefined, false]])(
+  'passes a sensible answer-length limit (%s) to the server: %s', async (limit, passed) => {
+    const f = fixture();
+    const response = await f.runtime.generate(JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Synthetic interview prompt' }] }], generationConfig: { maxOutputTokens: limit } }), new AbortController().signal);
+    const command = vi.mocked(f.connection.send).mock.calls.at(-1)![0];
+    if (command.type !== 'generate') throw new Error('Expected generate');
+    if (passed) expect(command.maxTokens).toBe(limit); else expect('maxTokens' in command).toBe(false);
+    f.receive({ type: 'answerDone', id: command.id }); await response.text();
+  });
+it('fails only the one answer, in plain words, and leaves the live audio session running', async () => {
+  const f = fixture(), speech = f.runtime.recognizer(interviewer), ready = speech.start();
+  await vi.waitFor(() => expect(f.connection.send).toHaveBeenCalled()); f.receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
+  const response = await f.runtime.generate(body, new AbortController().signal);
+  const command = vi.mocked(f.connection.send).mock.calls.at(-1)![0];
+  if (command.type !== 'generate') throw new Error('Expected generate');
+  f.receive({ type: 'answer', id: command.id, text: 'Partial ' });
+  f.receive({ type: 'answerFailed', id: command.id });
+  await expect(response.text()).rejects.toThrow('The AI model could not answer this time.');
+  expect(f.connection.signal.aborted).toBe(false); expect(f.stopped).not.toHaveBeenCalled();
+  f.receive({ type: 'answerFailed', id: 'some-other-answer' }); // a stale/foreign id changes nothing
+  expect(f.connection.signal.aborted).toBe(false);
+});
