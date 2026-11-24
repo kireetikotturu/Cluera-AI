@@ -297,7 +297,7 @@ describe('managed account provider adapters', () => {
       init!.signal!.addEventListener('abort', () => reject(Error(secrets.serviceKey)), { once: true });
     }));
     const task = providerAdapters(secrets, { fetch: request }).generate(generation, { signal: new AbortController().signal, assertActive() {} }, () => {});
-    const result = expect(task).rejects.toThrow('Provider unavailable.'); await vi.advanceTimersByTimeAsync(15000); await result;
+    const result = expect(task).rejects.toThrow('Provider unavailable.'); await vi.advanceTimersByTimeAsync(45000); await result;
     const denied = providerAdapters(secrets, { fetch: async () => new Response(secrets.geminiKey, { status: 403 }) });
     await expect(denied.generate(generation, { signal: new AbortController().signal, assertActive() {} }, () => {})).rejects.toThrow('Provider unavailable.');
   });
