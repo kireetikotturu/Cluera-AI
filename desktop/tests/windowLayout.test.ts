@@ -2,42 +2,42 @@ import { describe, expect, it } from 'vitest';
 import { dashboardWindowBounds, diagonalResizeBounds, floatingLauncherBounds, sessionWindowBounds } from '../src/main/windowLayout';
 
 describe('session window layout', () => {
-  it('opens the dashboard at 65% width and 80% height at the work-area top center', () => {
+  it('opens the dashboard at 55% width and 90% height at the work-area top center', () => {
     expect(dashboardWindowBounds({ x: 0, y: 0, width: 1920, height: 1040 })).toEqual({
-      x: 336,
+      x: 432,
       y: 6,
-      width: 1248,
-      height: 832,
+      width: 1056,
+      height: 936,
     });
   });
 
-  it('uses 65% width and 70% height at the work-area top center', () => {
+  it('uses 55% width and 90% height at the work-area top center', () => {
     expect(sessionWindowBounds({ x: 0, y: 0, width: 1920, height: 1040 })).toEqual({
-      x: 336,
+      x: 432,
       y: 6,
-      width: 1248,
-      height: 728,
+      width: 1056,
+      height: 936,
     });
   });
 
   it('honors an offset display work area', () => {
     expect(sessionWindowBounds({ x: 1920, y: 20, width: 1600, height: 900 })).toEqual({
-      x: 2200,
+      x: 2280,
       y: 26,
-      width: 1040,
-      height: 630,
+      width: 880,
+      height: 810,
     });
   });
 
   it('keeps usable minimum dimensions on small logical screens', () => {
     expect(sessionWindowBounds({ x: 0, y: 0, width: 900, height: 500 })).toEqual({
-      x: 158, y: 6, width: 585, height: 360,
+      x: 203, y: 6, width: 495, height: 450,
     });
   });
 
   it('handles negative monitor coordinates and large work areas', () => {
     expect(sessionWindowBounds({ x: -3840, y: -20, width: 3840, height: 2080 })).toEqual({
-      x: -3168, y: -14, width: 2496, height: 1456,
+      x: -2976, y: -14, width: 2112, height: 1872,
     });
   });
 

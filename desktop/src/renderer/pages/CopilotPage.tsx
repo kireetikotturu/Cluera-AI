@@ -65,12 +65,6 @@ function formatSessionTime(totalSeconds: number): string {
     : `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 }
 
-/** Space the scroll area itself adds around its content (padding), which must not be counted as content height. */
-function scrollChromeHeight(panel: HTMLElement): number {
-  const style = window.getComputedStyle(panel);
-  return (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
-}
-
 export function CopilotPage(): JSX.Element {
   const store = useAppStore();
   const activeId = store.activeSessionId;
@@ -469,10 +463,10 @@ export function CopilotPage(): JSX.Element {
     if (collapsed || !answerPanelRef.current || !qaContentRef.current) return;
     const controller = new EyeContactScroll(answerPanelRef.current, qaContentRef.current, readingFocus.current);
     readingController.current = controller;
-    if (!autoScrollEnabled && manualViewport.current > 0) {
-      qaContentRef.current.style.minHeight = `${Math.max(0, manualViewport.current + answerPanelRef.current.clientHeight - scrollChromeHeight(answerPanelRef.current))}px`;
-      answerPanelRef.current.scrollTop = manualViewport.current;
-    }
+    // The same room at the end of the answer applies with Auto Scroll on or off; set it first, then go back to where
+    // the reader was (the reading area is rebuilt when the window is collapsed and opened again).
+    controller.refreshEndRoom();
+    if (!autoScrollEnabled && manualViewport.current > 0) answerPanelRef.current.scrollTop = manualViewport.current;
     return () => { controller.dispose(); readingController.current = null; };
   }, [collapsed]);
 
@@ -490,24 +484,16 @@ export function CopilotPage(): JSX.Element {
     answerRequestPending, readingProgress.currentWordIndex]);
 
   const holdManualScroll = (): void => { readingController.current?.hold(); };
-  const preserveManualScrollExtent = (): void => {
+  // The page is exactly as long as the answer plus the room that keeps its last two lines on screen. Nothing is
+  // kept from an earlier, longer answer, so it can never be scrolled into an empty page.
+  const rememberManualScroll = (): void => {
     const panel = answerPanelRef.current;
-    const content = qaContentRef.current;
-    if (!autoScrollEnabled && panel && content) {
-      manualViewport.current = panel.scrollTop;
-      // Keep the scroll range when a long answer is replaced by a short one.
-      // Otherwise Chromium clamps scrollTop even with all effects disabled.
-      // Count only the content: the panel's own padding is added on top, so including it would let every
-      // scroll to the bottom add a little more room and the page would never end.
-      const minimum = panel.scrollTop + panel.clientHeight - scrollChromeHeight(panel);
-      if (minimum > (Number.parseFloat(content.style.minHeight) || 0)) content.style.minHeight = `${minimum}px`;
-    }
+    if (!autoScrollEnabled && panel) manualViewport.current = panel.scrollTop;
   };
   const toggleAutoScroll = (): void => {
     const panel = answerPanelRef.current;
-    if (autoScrollEnabled && panel && qaContentRef.current) {
+    if (autoScrollEnabled && panel) {
       manualViewport.current = panel.scrollTop;
-      qaContentRef.current.style.minHeight = `${qaContentRef.current.offsetHeight}px`;
       panel.scrollTo({ top: panel.scrollTop, behavior: 'instant' }); // cancel an in-flight smooth scroll
     }
     holdManualScroll();
@@ -542,6 +528,23 @@ export function CopilotPage(): JSX.Element {
     event.preventDefault();
     holdManualScroll();
     panel.scrollBy({ top: (event.key === 'ArrowDown' ? 1 : -1) * lineHeight, behavior: 'smooth' });
+  };
+
+  // In the question box Up and Down move the caret; scroll the answer instead only when the caret is already at the
+  // start (Up) or the end (Down), so editing a long question still works as usual.
+  const scrollAnswerFromQuestionBox = (event: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return false;
+    const box = event.currentTarget;
+    if (box.selectionStart !== box.selectionEnd) return false;
+    if (event.key === 'ArrowDown' ? box.selectionEnd !== box.value.length : box.selectionStart !== 0) return false;
+    const panel = answerPanelRef.current;
+    if (!panel || !displayedAnswer || panel.scrollHeight <= panel.clientHeight + 1) return false;
+    const answerContent = panel.querySelector<HTMLElement>('.answer-copy .answer-rich') ?? panel;
+    event.preventDefault();
+    holdManualScroll();
+    panel.scrollBy({ top: (event.key === 'ArrowDown' ? 1 : -1) * renderedAnswerLineHeight(window.getComputedStyle(answerContent)), behavior: 'smooth' });
+    return true;
   };
 
   const chooseDesktop = async (purpose: 'screen' | 'tab', keepAppVisible = false): Promise<void> => {
@@ -1069,6 +1072,27 @@ export function CopilotPage(): JSX.Element {
   });
   useEffect(() => window.electronAPI.onEvent('session:interrupted', () => interruptedRef.current()), []);
 
+  // Up and Down scroll the answer when nothing is being typed (the reading area, the box below it, and the question box
+  // handle their own). Menus, pickers and the screenshot preview keep the arrow keys for themselves.
+  const arrowKeysBlocked = useRef(false);
+  useLayoutEffect(() => { arrowKeysBlocked.current = collapsed || showLiveMenu || showAnswerStyle || showSources || showMicrophones || Boolean(store.screenPreview); });
+  useEffect(() => {
+    const answerArrowKeys = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || arrowKeysBlocked.current || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select, [contenteditable], [role="menu"], [role="listbox"], dialog'))) return;
+      const panel = answerPanelRef.current;
+      if (!panel || panel.scrollHeight <= panel.clientHeight + 1) return;
+      const answerContent = panel.querySelector<HTMLElement>('.answer-copy .answer-rich') ?? panel;
+      event.preventDefault();
+      readingController.current?.hold();
+      panel.scrollBy({ top: (event.key === 'ArrowDown' ? 1 : -1) * renderedAnswerLineHeight(window.getComputedStyle(answerContent)), behavior: 'smooth' });
+    };
+    window.addEventListener('keydown', answerArrowKeys);
+    return () => window.removeEventListener('keydown', answerArrowKeys);
+  }, []);
+
   const control = async (mode: AnswerStyleMode): Promise<void> => {
     if (running && activeId && currentQuestion && !analyzingScreen) {
       await window.electronAPI.requestAnswer({ sessionId: activeId, question: currentQuestion, mode });
@@ -1444,7 +1468,7 @@ export function CopilotPage(): JSX.Element {
             if (event.target instanceof HTMLElement && !event.target.closest('input, textarea, select, [contenteditable], button, a')) {
               event.currentTarget.focus({ preventScroll: true });
             }
-          }} onScroll={preserveManualScrollExtent}>
+          }} onScroll={rememberManualScroll}>
           <div className="qa-content" ref={qaContentRef}>
           <div className="qa-row question-row">
             <MessageCircle size={13}/>
@@ -1467,6 +1491,7 @@ export function CopilotPage(): JSX.Element {
                       readingController.current?.focusQuestion();
                     }}
                     onKeyDown={(event) => {
+                      if (scrollAnswerFromQuestionBox(event)) return;
                       if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
                       event.preventDefault();
                       void sendTopQuestion();

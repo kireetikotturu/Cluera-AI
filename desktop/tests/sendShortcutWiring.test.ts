@@ -47,8 +47,9 @@ describe('Alt+S send shortcut wiring', () => {
   });
 
   it('keeps the scroll area from growing every time it is scrolled to the end', () => {
-    expect(page).toContain('panel.scrollTop + panel.clientHeight - scrollChromeHeight(panel)');
-    expect(page).toContain('qaContentRef.current.style.minHeight = `${qaContentRef.current.offsetHeight}px`');
+    // The page is exactly as long as the answer plus the room for its last two lines: no length is kept from an earlier answer.
+    expect(page).not.toContain('style.minHeight');
+    expect(page).toContain('controller.refreshEndRoom();');
     expect(page).toContain('readingController.current?.focusQuestion()');
   });
 });

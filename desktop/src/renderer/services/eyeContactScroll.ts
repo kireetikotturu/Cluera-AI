@@ -93,6 +93,22 @@ export class EyeContactScroll {
     }
     if (this.content.style.paddingBottom !== padding) this.content.style.paddingBottom = padding;
   }
+  /** Lets the page set the room at the end of the answer before it restores a saved scroll position. */
+  refreshEndRoom(): void { this.applyEndRoom(); }
+  /**
+   * Auto Scroll off: nothing follows the reader, but a new question being asked must still be seen. The question
+   * goes to the top of the reading area at once, wherever the answer was being read.
+   */
+  private showQuestion(): void {
+    const row = this.content.querySelector<HTMLElement>('.question-row');
+    if (!row) return;
+    const line = renderedAnswerLineHeight(getComputedStyle(this.content));
+    const inset = readingLineTopOffset(line);
+    const maximum = Math.max(0, this.panel.scrollHeight - this.panel.clientHeight);
+    const target = Math.min(maximum, Math.max(0, this.panel.scrollTop + row.getBoundingClientRect().top - this.panel.getBoundingClientRect().top - inset));
+    if (Math.abs(target - this.panel.scrollTop) < 1) return;
+    this.panel.scrollTo({ top: target, behavior: 'instant' });
+  }
   private visibility = (): void => { this.cancel(); if (!document.hidden) this.schedule(); };
   update(state: ReadingState): void {
     // Keep the room at the end of the answer current whenever the answer state changes, with Auto Scroll on or off.
@@ -103,6 +119,7 @@ export class EyeContactScroll {
     this.focus.update(state);
     if (!previous?.enabled || previous.hidden || state.questionId !== previous.questionId
       || (state.hasAnswer && !previous.hasAnswer) || this.focus.mode !== previousMode) this.alignImmediately = true;
+    if (!state.enabled && !state.hidden && previous && state.turn !== previous.turn) this.showQuestion();
     if (!state.enabled || state.hidden) { this.cancel(); return; }
     if (state.turn !== previous?.turn || state.questionId !== previous?.questionId
       || state.pendingQuestion !== previous?.pendingQuestion || state.submitting !== previous?.submitting) this.cancel();

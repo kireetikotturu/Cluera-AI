@@ -84,3 +84,37 @@ describe('eye-contact DOM controller', () => {
     expect(f.frames.size).toBe(0); f.controller.dispose();
   });
 });
+
+describe('with Auto Scroll off', () => {
+  const off: ReadingState = { ...state, enabled: false };
+  it('still brings a new question to the top, wherever the answer was being read, and moves nothing else', () => {
+    const f = fixture(); f.long();
+    f.controller.update(off);                               // the first state only sets things up
+    f.panel.scrollTop = 500;
+    f.controller.update({ ...off, word: 50 }); f.controller.update({ ...off, hasAnswer: false }); f.controller.update({ ...off, questionId: 'b' }); f.drain();
+    expect(f.panel.scrollTop).toBe(500);                    // reading progress and new answers never move the page
+    f.controller.update({ ...off, turn: 2 });               // the interviewer starts a new question
+    expect(f.panel.scrollTop).toBeCloseTo(7.6);
+    expect(f.frames.size).toBe(0);                          // no animation is left running
+    f.panel.scrollTop = 900; f.controller.update({ ...off, turn: 2, pendingQuestion: true, speaking: true });
+    expect(f.panel.scrollTop).toBe(900);                    // the same question being spoken does not keep pulling the page
+    f.controller.dispose();
+  });
+  it('keeps the room at the end of the answer, so the last two lines stay on screen and no empty page is reachable', () => {
+    const f = fixture(); f.long();
+    f.controller.update(off);
+    // 400 high, minus the first-line inset (2.4), minus two lines and a little extra (24 * 2.6)
+    expect(parseFloat(f.content.style.paddingBottom)).toBeCloseTo(400 - 2.4 - 24 * 2.6, 1);
+    const maximum = f.panel.scrollHeight - f.panel.clientHeight;
+    expect(maximum).toBeCloseTo(2000 + 335.2 - 400, 0);
+    f.controller.dispose();
+  });
+  it('does not scroll for a new question while the window is hidden', () => {
+    const f = fixture(); f.long();
+    f.controller.update({ ...off, hidden: true }); f.panel.scrollTop = 500;
+    f.controller.update({ ...off, hidden: true, turn: 2 });
+    expect(f.panel.scrollTop).toBe(500);
+    f.controller.dispose();
+  });
+});
+
