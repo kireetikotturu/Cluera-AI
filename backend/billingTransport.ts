@@ -26,7 +26,7 @@ type Dependencies = {
   observe?: (event: Event) => void;
 };
 const EMPTY = Buffer.from("{}");
-const SITE = "https://cluera-ai-staging.vercel.app";
+const SITE = "https://www.clueraai.in";
 const RELAY_HOST = "cluera-ai-relay-staging.onrender.com";
 const WAKE_PATH = new URL(RELAY_WAKE_URL).pathname,
   STATUS_PATH = new URL(RELAY_STATUS_URL).pathname;

@@ -34,7 +34,7 @@ it('supports modern keys in actual per-request clients without confusing applica
  // Install the sole transport before either client. No real auth/write request.
  vi.stubGlobal('fetch',request);
  const clients=accountClients(accountConfig({NODE_ENV:'production',SIGMAROUND_ACCOUNTS_ENABLED:'true',
-  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:url,
+  SIGMAROUND_ACCOUNT_ORIGIN:'https://www.clueraai.in',NEXT_PUBLIC_SUPABASE_URL:url,
   NEXT_PUBLIC_SUPABASE_ANON_KEY:publishable,SUPABASE_SERVICE_ROLE_KEY:secret,
   SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64:Buffer.alloc(32,1).toString('base64'),SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64:Buffer.alloc(32,2).toString('base64')}));
  try{

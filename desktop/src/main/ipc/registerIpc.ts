@@ -166,7 +166,7 @@ export function registerIpc(
       return;
     }
     if (kind !== 'tutorial' && kind !== 'support') throw new Error('Unknown external destination.');
-    const target = config.links?.[kind] ?? (kind === 'tutorial' ? 'https://www.youtube.com/' : 'https://cluera-ai-staging.vercel.app/support');
+    const target = config.links?.[kind] ?? (kind === 'tutorial' ? 'https://www.youtube.com/' : 'https://www.clueraai.in/support');
     const url = new URL(target);
     if (url.protocol !== 'https:') throw new Error('External links must use HTTPS.');
     await shell.openExternal(url.toString());

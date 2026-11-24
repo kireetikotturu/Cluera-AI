@@ -14,11 +14,11 @@ const env = () => ({ VERCEL_PROJECT_ID: 'prj_VuG3xCUQqKmPhT0LIAmLuyUwBXg6', VERC
   SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED: 'false', SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED: 'false',
   RAZORPAY_TEST_KEY_ID: 'rzp_test_synthetic123456', RAZORPAY_TEST_KEY_SECRET: 'synthetic-api-secret-not-a-real-key',
   RAZORPAY_TEST_WEBHOOK_SECRET: 'synthetic-webhook-secret-not-a-real-secret-1234', RAZORPAY_TEST_ACCOUNT_ID: accountId });
-const intakeEnv=()=>({...env(),VERCEL_PROJECT_ID:'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
+const intakeEnv=()=>({...env(),VERCEL_PROJECT_ID:'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',SIGMAROUND_ACCOUNT_ORIGIN:'https://www.clueraai.in',
   NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',
   SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:'false',SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED:'true',SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'true',
   CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',CLUERA_BILLING_V2_ENABLED:'true'});
-const intakeUrl='https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook';
+const intakeUrl='https://www.clueraai.in/api/account/payments/cluera/webhook';
 const webhook = () => ({ id: webhookId, url: 'https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook',
   owner_type: 'merchant', owner_id: accountId.slice(4), service: 'beta-api-test', active: true, disabled_at: 123,
   secret_exists: true, events: { 'payment.captured': 1, 'order.paid': 1, 'refund.processed': 1, 'payment.failed': 0 } });
@@ -57,7 +57,7 @@ it('reads only the exact Test webhook and canonical order/payments; emits no ide
 });
 it.each([
   { VERCEL_PROJECT_ID: 'other-project' }, { VERCEL_ENV: 'preview' }, { SIGMAROUND_ACCOUNTS_ENABLED: undefined, SIGMAROUND_ACCOUNT_ENABLED: 'true' },
-  { SIGMAROUND_ACCOUNT_ORIGIN: 'https://cluera-ai-staging.vercel.app' }, { NEXT_PUBLIC_SUPABASE_URL: 'https://other.supabase.co' },
+  { SIGMAROUND_ACCOUNT_ORIGIN: 'https://www.clueraai.in' }, { NEXT_PUBLIC_SUPABASE_URL: 'https://other.supabase.co' },
   { RAZORPAY_ENVIRONMENT: 'live' }, { RAZORPAY_TEST_KEY_ID: 'rzp_live_synthetic123456' }, { RAZORPAY_TEST_WEBHOOK_SECRET: 'short' },
   { SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED: 'false' }, { SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED: 'false' },
 ])('rejects wrong-target/Live/singular/disabled compatibility configuration before any provider request: %j', async change => {
@@ -65,7 +65,7 @@ it.each([
   expect(report.stopped).toBe('CONFIGURATION'); expect(report.requests).toBe(0); expect(request).not.toHaveBeenCalled();
 });
 it('supports only the fixed disabled Cluera pre-cutover phase without changing the still-old provider destination', async () => {
-  const source = { ...env(), VERCEL_PROJECT_ID: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', SIGMAROUND_ACCOUNT_ORIGIN: 'https://cluera-ai-staging.vercel.app',
+  const source = { ...env(), VERCEL_PROJECT_ID: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', SIGMAROUND_ACCOUNT_ORIGIN: 'https://www.clueraai.in',
     NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',
     SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED: 'false', SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED: 'false', SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED: 'true',
     CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED: 'false', CLUERA_BILLING_V2_ENABLED: 'false' };
@@ -114,7 +114,7 @@ it.each([
 });
 it.each([
   { active: false }, { active: 1 }, { active: 'true' }, { owner_id: 'foreignMerchant0001' }, { owner_type: 'account' }, { service: 'api-live' },
-  { url: 'https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook' }, { secret_exists: false },
+  { url: 'https://www.clueraai.in/api/payments/razorpay/test/webhook' }, { secret_exists: false },
   { events: ['payment.captured', 'order.paid', 'order.paid'] }, { events: ['payment.captured', 'order.paid', 'refund.processed', 'subscription.charged'] },
 ])('stops on unmatched/raw-inactive destination before reading any financial record: %j', async change => {
   const request = fake({ webhook: { ...webhook(), ...change } }); const report = await auditCutover(env(), request, options);

@@ -6,7 +6,7 @@ import { sandboxOffers, verifySandboxOffer } from '../lib/billing/sandboxCatalog
 // Explicit operator-only acceptance run. Never run against arbitrary env URLs.
 // Inject staging env into this process; never pull secrets into a file or log them.
 const enabled = process.env.SIGMAROUND_RUN_STAGING_ACCEPTANCE === 'true';
-const origin = 'https://cluera-ai-staging.vercel.app';
+const origin = 'https://www.clueraai.in';
 const database = 'https://yhnqlfcgrmckhyjdxegg.supabase.co';
 function assertStaging() {
   if (process.env.SIGMAROUND_ACCOUNT_ORIGIN !== origin

@@ -7,7 +7,7 @@ import {AccountError} from '../lib/accounts/config';
 const user='00000000-0000-4000-8000-000000000001',session='00000000-0000-4000-8000-000000000002';
 let rpc:ReturnType<typeof vi.fn>;
 beforeEach(()=>{
- vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','true');vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://cluera-ai-staging.vercel.app');
+ vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED','true');vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://www.clueraai.in');
  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://yhnqlfcgrmckhyjdxegg.supabase.co');vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY','sb_publishable_synthetic_public_key_00000000000000000');
  vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY','sb_secret_synthetic-service-key-placeholder');
  vi.stubEnv('SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64',Buffer.alloc(32,3).toString('base64'));
@@ -16,7 +16,7 @@ beforeEach(()=>{
  mocks.session.mockResolvedValue({account:{userId:user,sessionId:session,email:'synthetic@example.invalid'}});mocks.rate.mockResolvedValue(undefined);
 });
 afterEach(()=>{vi.unstubAllEnvs();vi.resetAllMocks();});
-const request=(body:object)=>new Request('https://cluera-ai-staging.vercel.app/api/account/workspace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+const request=(body:object)=>new Request('https://www.clueraai.in/api/account/workspace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 it('routes browser saves/deletes through the same replay journal and returns a fresh workspace snapshot',async()=>{
  const body={action:'SAVE_CONTEXT',id:user,operationId:session,kind:'RESUME',name:'CV',body:'Synthetic text'};
  expect((await workspaceRequest(request(body))).status).toBe(200);

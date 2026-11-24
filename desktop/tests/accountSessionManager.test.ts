@@ -94,7 +94,7 @@ it('does not claim all-device revocation when offline, but still ends local acce
 it('bounds API bodies, redirects and errors without logging credentials', async () => {
   const request = vi.fn(async () => new Response(JSON.stringify(tokens)));
   const api = new AccountApi(request as typeof fetch); await api.login(input);
-  expect(request).toHaveBeenCalledWith('https://cluera-ai-staging.vercel.app/api/account/native/login', expect.objectContaining({ redirect: 'error', credentials: 'omit' }));
+  expect(request).toHaveBeenCalledWith('https://www.clueraai.in/api/account/native/login', expect.objectContaining({ redirect: 'error', credentials: 'omit' }));
   request.mockResolvedValueOnce(new Response('x'.repeat(40001)));
   await expect(api.login(input)).rejects.toThrow('Account service is unavailable.');
   request.mockResolvedValueOnce(new Response(JSON.stringify({ ...tokens, privateSecret: 'do-not-expose' })));
@@ -152,7 +152,7 @@ it('reads only the bounded public capability endpoint and rejects extra or malfo
   const request=vi.fn(async(_input:string|URL|Request,_init?:RequestInit)=>Response.json({google:'enabled'})),diagnostic=vi.fn();
   const api=new AccountApi(request as typeof fetch,diagnostic);
   expect(await api.authOptions()).toEqual({google:'enabled'});
-  expect(request).toHaveBeenCalledWith('https://cluera-ai-staging.vercel.app/api/account/auth-options',expect.objectContaining({method:'GET',credentials:'omit',redirect:'error',cache:'no-store'}));
+  expect(request).toHaveBeenCalledWith('https://www.clueraai.in/api/account/auth-options',expect.objectContaining({method:'GET',credentials:'omit',redirect:'error',cache:'no-store'}));
   expect(request.mock.calls[0][1]).not.toHaveProperty('body');
   expect(request.mock.calls[0][1]?.headers).not.toHaveProperty('Authorization');
   request.mockResolvedValueOnce(Response.json({google:'enabled',accessToken:'private'}));

@@ -6,7 +6,7 @@ const mocks=vi.hoisted(()=>({clients:vi.fn(),prepare:vi.fn(),resume:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 vi.mock('../lib/billing/checkout/service',async original=>({...await original<object>(),checkoutService:()=>({prepare:mocks.prepare})}));
 vi.mock('../lib/billing/checkout/resume',()=>({resumeSandboxCheckout:mocks.resume}));
-const origin='https://cluera-ai-staging.vercel.app';
+const origin='https://www.clueraai.in';
 const uid='00000000-0000-4000-8000-000000000991',sid='00000000-0000-4000-8000-000000000992';
 const access=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.synthetic`;
 let rpc:ReturnType<typeof vi.fn>,getUser:ReturnType<typeof vi.fn>;

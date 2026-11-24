@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {createRenderBillingTransport} from '../../backend/billingTransport';
 import {RELAY_STATUS_URL,RELAY_WAKE_URL,SCHEDULER_SUPABASE_URL,WEB_DISPATCH_URL,createSchedulerProof,schedulerHeaders,schedulerNonce,verifySchedulerProof,verifySchedulerRequest,type SchedulerPurpose} from '../../shared/billingDispatch';
 const KEY='synthetic-transport-secret-0123456789-abcdefghijklmnopqrstuvwxyz';
-const NOW=Date.UTC(2026,9,17,12,0,1),IDENTITY={database:SCHEDULER_SUPABASE_URL,site:'https://cluera-ai-staging.vercel.app'};
+const NOW=Date.UTC(2026,9,17,12,0,1),IDENTITY={database:SCHEDULER_SUPABASE_URL,site:'https://www.clueraai.in'};
 const transports:ReturnType<typeof createRenderBillingTransport>[]=[];
 const reply=(status=200,body='{"processed":true}')=>new Response(body,{status,headers:{'Content-Type':'application/json'}});
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();};

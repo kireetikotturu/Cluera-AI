@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { handleNativeAccount } from '../lib/accounts/native';
 const mocks = vi.hoisted(() => ({ clients: vi.fn() }));
 vi.mock('../lib/accounts/clients', () => ({ accountClients: mocks.clients }));
-const origin = 'https://cluera-ai-staging.vercel.app';
+const origin = 'https://www.clueraai.in';
 const uid = '00000000-0000-4000-8000-000000000001', sid = '00000000-0000-4000-8000-000000000002';
 const token = `header.${Buffer.from(JSON.stringify({ sub: uid, session_id: sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600 })).toString('base64url')}.synthetic`;
 const user = { id: uid, email: 'native@example.invalid', email_confirmed_at: '2026-10-04T00:00:00Z' };

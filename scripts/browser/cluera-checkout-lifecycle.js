@@ -30,7 +30,7 @@ async (page) => {
  });
  const resume=()=>tab.getByRole('button',{name:'Continue existing checkout',exact:true});
  const refresh=()=>tab.getByRole('button',{name:'Refresh billing status',exact:true});
- const go=async()=>{await tab.goto('https://cluera-ai-staging.vercel.app/account/checkout?offer=cluera_pack_3h_v2');await resume().waitFor();};
+ const go=async()=>{await tab.goto('https://www.clueraai.in/account/checkout?offer=cluera_pack_3h_v2');await resume().waitFor();};
  const check=async(name)=>{
   if(await tab.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Horizontal overflow: '+name);
   const body=await tab.locator('body').innerText();if(body.includes('PRIVATE_DO_NOT_REFLECT')||body.includes('Foreign stale account'))throw Error('Unsafe response: '+name);

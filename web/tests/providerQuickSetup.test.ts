@@ -8,7 +8,7 @@ vi.mock('../lib/aiProviders/discovery',async original=>({...await original<typeo
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:mocks.session,rateLimit:mocks.limit}));
 
-const origin='https://cluera-ai-staging.vercel.app',actor='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002',factor='00000000-0000-4000-8000-000000000003';
+const origin='https://www.clueraai.in',actor='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002',factor='00000000-0000-4000-8000-000000000003';
 const secret='synthetic-quick-setup-provider-key';
 const keyring=Buffer.from(JSON.stringify({active:'test-1',keys:{'test-1':Buffer.alloc(32,8).toString('base64')}})).toString('base64');
 const meta=(provider:string,revision:number,extra:object={})=>({provider,revision,credentialPresent:true,enabled:false,defaultModel:null,probeStatus:'UNVERIFIED',probeAt:null,models:[],complete:false,updatedAt:'2026-10-13T00:00:00Z',...extra});

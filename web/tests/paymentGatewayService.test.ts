@@ -45,7 +45,7 @@ it.each(['VERIFIED','REFUNDED'])('webhook-before-browser callback %s race verifi
 const envelope=(event='payment.captured')=>({entity:'event',account_id:env.RAZORPAY_TEST_ACCOUNT_ID,event,created_at:Math.floor(Date.now()/1000),
  payload:{payment:{entity:{id:paymentId,order_id:orderId}},order:{entity:{id:orderId}}}});
 const webhook=(value=envelope(),signature?:string,eventId='evt_synthetic0001')=>{
- const raw=JSON.stringify(value);return new Request('https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook',{method:'POST',
+ const raw=JSON.stringify(value);return new Request('https://www.clueraai.in/api/payments/razorpay/test/webhook',{method:'POST',
  headers:{'Content-Type':'application/json','x-razorpay-event-id':eventId,'x-razorpay-signature':signature??createHmac('sha256',env.RAZORPAY_TEST_WEBHOOK_SECRET).update(raw).digest('hex')},body:raw});
 };
 it.each(['STORED','DUPLICATE'])('signed webhook acknowledges only durable %s, never paid/granted',async state=>{

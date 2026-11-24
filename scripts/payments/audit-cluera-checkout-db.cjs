@@ -2,7 +2,7 @@
 // Operator-only SDK proof: exactly two owner SELECT RPCs and one catalog SELECT.
 // No Auth API, user/status/rate/financial RPC, environment mutation or artifact.
 const path=require('node:path'),{createRequire,Module}=require('node:module');
-const SITE='https://cluera-ai-staging.vercel.app',DB='https://yhnqlfcgrmckhyjdxegg.supabase.co';
+const SITE='https://www.clueraai.in',DB='https://yhnqlfcgrmckhyjdxegg.supabase.co';
 const PROJECT='prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',TEAM='team_AksnPXhi2VBXI5UsY2xBIakc';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[0-9a-f]{12}$/;
 const ENV=['NODE_ENV','VERCEL_ENV','VERCEL_TARGET_ENV','VERCEL_PROJECT_ID','VERCEL_ORG_ID','VERCEL_GIT_COMMIT_SHA',

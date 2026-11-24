@@ -5,11 +5,11 @@
 const { createHash, timingSafeEqual } = require('node:crypto');
 const targets = Object.freeze({
   account: Object.freeze({ project: 'prj_VuG3xCUQqKmPhT0LIAmLuyUwBXg6', origin: 'https://sigmaround-account-staging.vercel.app' }),
-  cluera: Object.freeze({ project: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', origin: 'https://cluera-ai-staging.vercel.app' }),
-  'cluera-intake': Object.freeze({ project: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', origin: 'https://cluera-ai-staging.vercel.app' }),
+  cluera: Object.freeze({ project: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', origin: 'https://www.clueraai.in' }),
+  'cluera-intake': Object.freeze({ project: 'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B', origin: 'https://www.clueraai.in' }),
 });
 const endpoint = 'https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook';
-const clueraEndpoint = 'https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook';
+const clueraEndpoint = 'https://www.clueraai.in/api/account/payments/cluera/webhook';
 const webhookId = 'TmqOkUNGtvEPLz';
 const requiredEvents = ['payment.captured', 'order.paid', 'refund.processed'];
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

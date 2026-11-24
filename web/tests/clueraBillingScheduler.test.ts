@@ -33,7 +33,7 @@ it.each([
   const d = deps(); expect((await handleClueraBillingTick(request(headers), env, d)).status).toBe(401);
   expect(d.rpc).not.toHaveBeenCalled(); expect(d.reconcile).not.toHaveBeenCalled();
 });
-it.each([{ origin: 'https://cluera-ai-staging.vercel.app' }, { cookie: 'anything' }, { authorization: 'Bearer synthetic' }, { 'content-type': 'text/plain' }])
+it.each([{ origin: 'https://www.clueraai.in' }, { cookie: 'anything' }, { authorization: 'Bearer synthetic' }, { 'content-type': 'text/plain' }])
 ('rejects browser or legacy bearer requests', async headers => {
   const d = deps(); expect((await handleClueraBillingTick(request(headers), env, d)).status).toBe(400); expect(d.rpc).not.toHaveBeenCalled();
 });
@@ -41,7 +41,7 @@ it.each([' {}', '{"event":"anything"}', ' '.repeat(129)])('only accepts the exac
   const d = deps(); const response = await handleClueraBillingTick(request({}, body), env, d);
   expect(response.status).toBe(400); expect(d.rpc).not.toHaveBeenCalled(); expect(d.reconcile).not.toHaveBeenCalled();
 });
-it.each([`${CLUERA_WORKER_URL}?event=1`, CLUERA_WORKER_URL.replace('cluera-ai-staging', 'sigmaround-account-staging')])('pins the destination and forbids financial query inputs', async url => {
+it.each([`${CLUERA_WORKER_URL}?event=1`, CLUERA_WORKER_URL.replace('www.clueraai.in', 'sigmaround-account-staging.vercel.app')])('pins the destination and forbids financial query inputs', async url => {
   const d = deps(); expect((await handleClueraBillingTick(request({}, '{}', url), env, d)).status).toBe(400); expect(d.rpc).not.toHaveBeenCalled();
 });
 it.each(['REPLAY', 'INVALID', 'UNAVAILABLE'])('never processes a rejected nonce (%s)', async state => {

@@ -37,7 +37,7 @@ function inspectCurrentPins(){
   ['web/lib/accounts/config.ts','CLUERA_SUPABASE_URL'],
   ['web/lib/accountRelay/config.ts','CLUERA_SUPABASE_URL'],
   ['desktop/src/main/accounts/GoogleAccountLogin.ts',`${destinationUrl}/auth/v1/authorize`],
-  ['desktop/src/shared/accountDistribution.ts','https://cluera-ai-staging.vercel.app'],
+  ['desktop/src/shared/accountDistribution.ts','https://www.clueraai.in'],
  ];
  return checks.map(([file,pin])=>{
   const location=path.join(ROOT,file),stat=fs.lstatSync(location);

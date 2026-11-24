@@ -6,7 +6,7 @@ import {paymentTestEnvironment} from './helpers/paymentTestMode';
 const require=createRequire(import.meta.url);
 const {audit,auditMerchantPinEvidence,merchantPinEvidenceLine}=require('../../scripts/payments/audit-cluera-test-readiness.cjs');
 const SHA='a'.repeat(40),options={expectedSourceSha:SHA},NOW=Date.UTC(2026,9,17,14,0),PROJECT='yhnqlfcgrmckhyjdxegg',ID='SyntheticWebhook0001';
-const OLD='https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook',NEW='https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook';
+const OLD='https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook',NEW='https://www.clueraai.in/api/account/payments/cluera/webhook';
 function environment(overrides:Record<string,string|undefined>={}){return {...paymentTestEnvironment,VERCEL_ENV:'production',VERCEL_TARGET_ENV:'production',
  VERCEL_PROJECT_ID:'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',VERCEL_ORG_ID:'team_AksnPXhi2VBXI5UsY2xBIakc',VERCEL_GIT_COMMIT_SHA:SHA,
  CLUERA_BILLING_V2_ENABLED:'false',CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'false',SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:'false',

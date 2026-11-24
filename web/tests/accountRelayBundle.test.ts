@@ -24,7 +24,7 @@ it('bundled standalone relay rejects unauthenticated traffic and idle sockets', 
     stdio: ['pipe', 'pipe', 'pipe'], env: {
       PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, NODE_ENV: 'production', PORT: String(port),
       SIGMAROUND_ACCOUNTS_ENABLED: 'true', SIGMAROUND_ACCOUNT_RELAY_ENABLED: 'true',
-      SIGMAROUND_ACCOUNT_ORIGIN: 'https://cluera-ai-staging.vercel.app',
+      SIGMAROUND_ACCOUNT_ORIGIN: 'https://www.clueraai.in',
       NEXT_PUBLIC_SUPABASE_URL: 'https://yhnqlfcgrmckhyjdxegg.supabase.co',
       SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_synthetic-service-key-not-valid',
       SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64: Buffer.alloc(32, 9).toString('base64'),

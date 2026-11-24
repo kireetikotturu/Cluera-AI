@@ -13,7 +13,7 @@ const receiverEnv={...paymentTestEnvironment,CLUERA_BILLING_V2_ENABLED:'true',
  VERCEL_ORG_ID:'team_AksnPXhi2VBXI5UsY2xBIakc',VERCEL_GIT_COMMIT_SHA:sha};
 const financialFlags=['CLUERA_BILLING_V2_ENABLED','CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED',
  'SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED','SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED'];
-const canonical='https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook';
+const canonical='https://www.clueraai.in/api/account/payments/cluera/webhook';
 const hook={id:expectedId,url:canonical,service:'api-test',owner_type:'merchant',owner_id:paymentTestEnvironment.RAZORPAY_TEST_ACCOUNT_ID,
  active:true,disabled_at:1234567890,secret_exists:true,events:['payment.captured','order.paid','refund.processed']};
 function fixture(listed:Record<string,unknown>|Record<string,unknown>[]=hook,direct?:Record<string,unknown>){
@@ -87,7 +87,7 @@ it('compares independent expected ID BEFORE any direct-resource GET',async()=>{
  expect(r.canonical.state).toBe('OPERATOR_ID_MISMATCH');expect(r.canonical.direct).toBeNull();expect(f.calls).toHaveLength(1);
 });
 it.each([{url:'https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook'},
- {url:'https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook'}])
+ {url:'https://www.clueraai.in/api/payments/razorpay/test/webhook'}])
  ('never substitutes an old/legacy destination for canonical V2 (%j)',async patch=>{
  const f=fixture({...hook,...patch}),r=await auditReceiver(receiverEnv,f.request,options);
  expect(r.stopped).toBe('RECEIVER_REVIEW_REQUIRED');expect(r.receiverConfigurationAccepted).toBe(false);

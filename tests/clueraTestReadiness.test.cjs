@@ -3,14 +3,14 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {audit}=require('../scripts/payments/audit-cluera-test-readiness.cjs');
 const sha='a'.repeat(40),options={expectedSourceSha:sha};
 const env={VERCEL_ENV:'production',VERCEL_PROJECT_ID:'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',VERCEL_ORG_ID:'team_AksnPXhi2VBXI5UsY2xBIakc',
- VERCEL_GIT_COMMIT_SHA:sha,SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
+ VERCEL_GIT_COMMIT_SHA:sha,SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:'https://www.clueraai.in',
  NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',
  RAZORPAY_ENVIRONMENT:'test',SIGMAROUND_PAYMENT_PROVIDER:'razorpay',CLUERA_BILLING_V2_ENABLED:'false',CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'false',
  SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:'false',SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED:'false',SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'false',
  SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'true',RAZORPAY_TEST_KEY_ID:'rzp_test_synthetic123456',RAZORPAY_TEST_KEY_SECRET:'synthetic-test-api-secret-never-real',
  RAZORPAY_TEST_WEBHOOK_SECRET:'synthetic-test-webhook-secret-never-real-0000',RAZORPAY_TEST_ACCOUNT_ID:'acc_syntheticmerchant01'};
 const urls={oldAccount:'https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook',
- clueraLegacy:'https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook',clueraV2:'https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook'};
+ clueraLegacy:'https://www.clueraai.in/api/payments/razorpay/test/webhook',clueraV2:'https://www.clueraai.in/api/account/payments/cluera/webhook'};
 const pack=['payment.captured','order.paid','refund.processed'];
 const recurring=[...pack,'subscription.charged','subscription.authenticated','subscription.activated','subscription.pending','subscription.halted',
  'subscription.cancelled','subscription.paused','subscription.resumed','subscription.completed','subscription.updated'];

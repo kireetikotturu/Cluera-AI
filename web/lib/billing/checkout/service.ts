@@ -13,7 +13,7 @@ const boundSchema=z.object({code:z.literal('BOUND'),intentId:z.uuid(),transactio
 
 export function assertCheckoutStaging(env:NodeJS.ProcessEnv) {
   if(env.SIGMAROUND_ACCOUNTS_ENABLED!=='true' || env.PADDLE_ENVIRONMENT!=='sandbox'
-    || env.SIGMAROUND_ACCOUNT_ORIGIN!=='https://cluera-ai-staging.vercel.app'
+    || env.SIGMAROUND_ACCOUNT_ORIGIN!=='https://www.clueraai.in'
     || env.NEXT_PUBLIC_SUPABASE_URL!=='https://yhnqlfcgrmckhyjdxegg.supabase.co'
     || env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF!=='yhnqlfcgrmckhyjdxegg') throw new AccountError('UNAVAILABLE',503);
 }

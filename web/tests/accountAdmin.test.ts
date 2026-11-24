@@ -6,7 +6,7 @@ const mocks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn(),provi
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 vi.mock('../lib/accounts/providerStatus',()=>({readProviderStatus:mocks.providerStatus}));
 vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:mocks.session,rateLimit:mocks.limit,authorizeCustomer:mocks.authorize}));
-const origin='https://cluera-ai-staging.vercel.app';
+const origin='https://www.clueraai.in';
 const actor='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002',factor='00000000-0000-4000-8000-000000000003';
 let rpc:ReturnType<typeof vi.fn>,mfa:ReturnType<typeof makeMfa>;
 function makeMfa(){return {

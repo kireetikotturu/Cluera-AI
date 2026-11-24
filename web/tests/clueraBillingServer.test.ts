@@ -200,7 +200,7 @@ it('parses signed receipt projection only; foreign merchant and future timestamp
 it('disabled intake does no reads/mutations; enabled raw HMAC accepts only durable fixed acknowledgment',async()=>{
   const raw=Buffer.from(JSON.stringify({entity:'event',account_id:env.RAZORPAY_TEST_ACCOUNT_ID,event:'payment.captured',created_at:1767225600,payload:{payment:{entity:{id:paymentId,order_id:orderId,invoice_id:null}}}}));
   const signature=createHmac('sha256',env.RAZORPAY_TEST_WEBHOOK_SECRET).update(raw).digest('hex');
-  const req=()=>new Request('https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook',{method:'POST',headers:{'content-type':'application/json','x-razorpay-signature':signature,'x-razorpay-event-id':'event_syntheticcluera01'},body:raw});
+  const req=()=>new Request('https://www.clueraai.in/api/account/payments/cluera/webhook',{method:'POST',headers:{'content-type':'application/json','x-razorpay-signature':signature,'x-razorpay-event-id':'event_syntheticcluera01'},body:raw});
   const rpc=vi.fn(async()=>({data:'STORED',error:null}));expect((await handleClueraWebhook(req(),{...env,CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'false'},rpc)).status).toBe(404);expect(rpc).not.toHaveBeenCalled();
   const response=await handleClueraWebhook(req(),env,rpc);expect(response.status).toBe(200);expect(await response.json()).toEqual({received:true});expect(rpc).toHaveBeenCalledOnce();expect(rpc.mock.calls[0][0]).toBe('cluera_billing_event_accept');
 });

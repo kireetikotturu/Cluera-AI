@@ -10,7 +10,7 @@ import {accountConfig} from '../lib/accounts/config';
 import {seal} from '../lib/accounts/cookies';
 import {paymentTestEnvironment} from './helpers/paymentTestMode';
 const mocks=vi.hoisted(()=>({clients:vi.fn()}));vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
-const site='https://cluera-ai-staging.vercel.app',path='/api/account/admin/billing/cluera/native-commands';
+const site='https://www.clueraai.in',path='/api/account/admin/billing/cluera/native-commands';
 const first={userId:randomUUID(),sessionId:randomUUID()},second={userId:randomUUID(),sessionId:randomUUID()},digest=merchantDigest(paymentTestEnvironment);
 const created='2026-01-01T00:00:00.000Z',sub='sub_review00000001';let db:PGlite,rpc:ReturnType<typeof vi.fn>,beforeDefinitions:unknown,afterDefinitions:unknown;
 let transform:((name:string,value:unknown)=>unknown)|undefined;

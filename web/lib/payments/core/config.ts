@@ -1,7 +1,7 @@
 import { PaymentError } from './types';
 import {CLUERA_SUPABASE_PROJECT,CLUERA_SUPABASE_URL} from '../../supabase/target';
 
-export const ACCOUNT_PAYMENT_ORIGIN = 'https://cluera-ai-staging.vercel.app';
+export const ACCOUNT_PAYMENT_ORIGIN = 'https://www.clueraai.in';
 export function assertPaymentStaging(env = process.env): void {
   if (env.SIGMAROUND_ACCOUNTS_ENABLED !== 'true' || env.SIGMAROUND_ACCOUNT_ORIGIN !== ACCOUNT_PAYMENT_ORIGIN
     || env.NEXT_PUBLIC_SUPABASE_URL !== CLUERA_SUPABASE_URL

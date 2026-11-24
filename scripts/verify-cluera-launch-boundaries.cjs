@@ -3,7 +3,7 @@
 // proves public boundaries, never private customer/payment/provider acceptance.
 const path = require('node:path');
 const { detectSecrets, loadKnownSecrets } = require('./security/source-secret-scan.cjs');
-const WEB = 'https://cluera-ai-staging.vercel.app';
+const WEB = 'https://www.clueraai.in';
 const RELAY = 'https://cluera-ai-relay-staging.onrender.com';
 const checks = Object.freeze([
   ['home', WEB, '/', [200]], ['pricing', WEB, '/pricing', [200]],

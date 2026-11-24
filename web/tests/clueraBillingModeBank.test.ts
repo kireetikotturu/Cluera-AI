@@ -15,7 +15,7 @@ async function expectSqlFailure(sql: string, args: unknown[] = []) {
   await db.exec('rollback to savepoint expected_denial;release savepoint expected_denial');
 }
 async function approveFixture() {
-  await db.query(`update cluera_billing_runtime_private.live_profile set account_digest=$1,origin='https://cluera-ai-staging.vercel.app',
+  await db.query(`update cluera_billing_runtime_private.live_profile set account_digest=$1,origin='https://www.clueraai.in',
     acceptance_digest=$2,checkout_enabled=true,intake_enabled=true`, [liveDigest, 'c'.repeat(64)]);
   await db.query("update cluera_live_billing_private.processing_owner set owner='cluera',account_digest=$1", [liveDigest]);
 }
@@ -118,7 +118,7 @@ it('enforces session ownership, immutable grant provenance and service-only acce
 
 it('the review-only provisioning generator separates profile, intake and promotion with retained-order guards', async () => {
   const { prepare: profileSql } = createRequire(import.meta.url)('../../scripts/payments/prepare-cluera-live-profile.cjs');
-  const config = { phase: 'profile', merchantDigest: liveDigest, origin: 'https://cluera-ai-staging.vercel.app',
+  const config = { phase: 'profile', merchantDigest: liveDigest, origin: 'https://www.clueraai.in',
     acceptanceDigest: 'd'.repeat(64), operationId: randomUUID(), expectedEpoch: 1 };
   // Remove only transaction framing inside this synthetic rollback fixture.
   const apply = (phase: string, expectedEpoch: number) => db.exec(profileSql({ ...config, phase, expectedEpoch })

@@ -2,7 +2,7 @@ import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 
 export const SCHEDULER_PROJECT_REF='yhnqlfcgrmckhyjdxegg';
 export const SCHEDULER_SUPABASE_URL='https://yhnqlfcgrmckhyjdxegg.supabase.co';
-export const WEB_DISPATCH_URL='https://cluera-ai-staging.vercel.app/api/internal/billing/cluera/dispatch';
+export const WEB_DISPATCH_URL='https://www.clueraai.in/api/internal/billing/cluera/dispatch';
 export const RELAY_WAKE_URL='https://cluera-ai-relay-staging.onrender.com/internal/billing/wake';
 export const RELAY_STATUS_URL='https://cluera-ai-relay-staging.onrender.com/internal/billing/status';
 export type SchedulerPurpose='DISPATCH'|'WAKE'|'STATUS';
@@ -17,7 +17,7 @@ const same=(a:string,b:string)=>timingSafeEqual(createHash('sha256').update(a).d
 export const schedulerEnabled=(env:SchedulerEnv=process.env)=>env.CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED==='true';
 export const schedulerSecret=(env:SchedulerEnv=process.env):string|null=>validSecret(env.SIGMAROUND_BILLING_WORKER_SECRET)?env.SIGMAROUND_BILLING_WORKER_SECRET:null;
 export function schedulerTargetMatches(env:SchedulerEnv=process.env):boolean{
- return env.SIGMAROUND_ACCOUNTS_ENABLED==='true'&&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://cluera-ai-staging.vercel.app'&&env.NEXT_PUBLIC_SUPABASE_URL===SCHEDULER_SUPABASE_URL;
+ return env.SIGMAROUND_ACCOUNTS_ENABLED==='true'&&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://www.clueraai.in'&&env.NEXT_PUBLIC_SUPABASE_URL===SCHEDULER_SUPABASE_URL;
 }
 export function schedulerNonce(purpose:SchedulerPurpose,issuedSeconds:number,secret:string):string{
  const url=target(purpose);if(!url||!validSeconds(issuedSeconds)||!validSecret(secret))throw Error('SCHEDULER_CONFIGURATION');

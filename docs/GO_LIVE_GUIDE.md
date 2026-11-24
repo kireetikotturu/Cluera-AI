@@ -11,7 +11,7 @@ One page that takes you from "code on my PC" to "customers can pay with Razorpay
 | Website + Admin + payments API | **Vercel** project `cluera-ai-staging` (folder `web/`) | Pricing, checkout, Admin panel, Razorpay webhook |
 | Relay | **Render** service `cluera-ai-relay-staging` (folder `backend/`) | Talks to Gemini/Deepgram for the desktop app and runs the once-a-minute payment worker |
 | Database | **Supabase** project `yhnqlfcgrmckhyjdxegg` | Accounts, balances, orders, encrypted AI keys |
-| Desktop app | Windows `.exe` | Signs in to the same website address. **Do not change the website address**: the installed app points to `https://cluera-ai-staging.vercel.app` |
+| Desktop app | Windows `.exe` | Signs in to the same website address. **Do not change the website address**: the installed app points to `https://www.clueraai.in` |
 
 Never paste a secret into chat, Git or a screenshot. Secrets go only into the Vercel, Render or Razorpay dashboards.
 
@@ -52,12 +52,12 @@ You can finish everything with **Test mode** first (no real money) and switch to
 
    | Field | Test mode | Live mode |
    | --- | --- | --- |
-   | URL | `https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook` | `https://cluera-ai-staging.vercel.app/api/account/payments/cluera/live/webhook` |
+   | URL | `https://www.clueraai.in/api/account/payments/cluera/webhook` | `https://www.clueraai.in/api/account/payments/cluera/live/webhook` |
    | Secret | a random string of at least 32 characters you invent (you will reuse it in Vercel) | a different random string (generate with the helper below) |
    | Events | `payment.captured`, `order.paid`, `refund.processed` | same |
 
    Add the `subscription.*` events (authenticated, activated, charged, pending, halted, cancelled, paused, resumed, completed, updated) only when you later open monthly plans.
-4. **Live only:** complete KYC/activation and the website review. Razorpay checks that your site shows **Terms, Privacy and Refund/Cancellation** pages and a contact. They now exist at `/terms`, `/privacy` and `/refunds` and are linked in the footer. **Read them and edit them to match your real business** (`web/app/terms/page.tsx`, `privacy`, `refunds`), then submit the site address `https://cluera-ai-staging.vercel.app` to Razorpay.
+4. **Live only:** complete KYC/activation and the website review. Razorpay checks that your site shows **Terms, Privacy and Refund/Cancellation** pages and a contact. They now exist at `/terms`, `/privacy` and `/refunds` and are linked in the footer. **Read them and edit them to match your real business** (`web/app/terms/page.tsx`, `privacy`, `refunds`), then submit the site address `https://www.clueraai.in` to Razorpay.
 
 Helper that prints the Live digest, the webhook secrets and the exact Vercel/Render lists for you (it contacts nothing and writes nothing):
 
@@ -75,7 +75,7 @@ node scripts\payments\razorpay-go-live.cjs plan --key-id rzp_live_XXXX --account
 
 Vercel → project `cluera-ai-staging` → *Settings → Environment Variables* (Production). Mark every secret **Sensitive**. The accounts/Supabase/cookie variables are already set from earlier work; do not change them. Only add the block for the mode you are enabling.
 
-**Already present (leave alone):** `SIGMAROUND_ACCOUNTS_ENABLED=true`, `SIGMAROUND_ACCOUNT_ORIGIN=https://cluera-ai-staging.vercel.app`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64`, `SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64`, the AI vault pair (Step 4).
+**Already present (leave alone):** `SIGMAROUND_ACCOUNTS_ENABLED=true`, `SIGMAROUND_ACCOUNT_ORIGIN=https://www.clueraai.in`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64`, `SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64`, the AI vault pair (Step 4).
 
 ### 3A. Test mode (try the whole flow with fake money)
 
@@ -111,7 +111,7 @@ Test mode only lets the listed accounts buy.
 | `RAZORPAY_LIVE_WEBHOOK_SECRET` | the Live webhook secret |
 | `CLUERA_LIVE_WORKER_SECRET` | a different random secret; same value on Render |
 | `CLUERA_LIVE_PROJECT_REF` | `yhnqlfcgrmckhyjdxegg` |
-| `CLUERA_LIVE_ACCOUNT_ORIGIN`, `CLUERA_LIVE_APPROVED_ORIGIN` | `https://cluera-ai-staging.vercel.app` |
+| `CLUERA_LIVE_ACCOUNT_ORIGIN`, `CLUERA_LIVE_APPROVED_ORIGIN` | `https://www.clueraai.in` |
 | `CLUERA_LIVE_MERCHANT_DIGEST` | printed by the helper |
 | `CLUERA_LIVE_OWNER_APPROVED`, `CLUERA_LIVE_SECURITY_ACCEPTED`, `CLUERA_LIVE_TEST_ACCEPTED`, `CLUERA_LIVE_RUNTIME_ACCEPTED` | `true` (your written go-ahead) |
 | `CLUERA_LIVE_INTAKE_ENABLED`, `CLUERA_LIVE_SCHEDULER_ENABLED`, `CLUERA_LIVE_HISTORY_ENABLED`, `CLUERA_LIVE_ADMIN_ENABLED` | `true` |
@@ -202,7 +202,7 @@ After promote, set `CLUERA_LIVE_CHECKOUT_ENABLED=true` in Vercel (Step 3B) and r
 
 ## Step 6 - Admin panel (the simple way)
 
-Open `https://cluera-ai-staging.vercel.app/account/admin`, sign in and enter your authenticator code. The top of the page now has a **Do these in order** checklist and a **Check if payments are ready** button.
+Open `https://www.clueraai.in/account/admin`, sign in and enter your authenticator code. The top of the page now has a **Do these in order** checklist and a **Check if payments are ready** button.
 
 **Turn on payments**
 

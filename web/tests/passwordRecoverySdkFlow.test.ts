@@ -3,7 +3,7 @@ import {handleAccount} from '../lib/accounts/handler';
 import {accountConfig} from '../lib/accounts/config';
 import {unseal} from '../lib/accounts/cookies';
 
-const origin='https://cluera-ai-staging.vercel.app',authOrigin='https://yhnqlfcgrmckhyjdxegg.supabase.co';
+const origin='https://www.clueraai.in',authOrigin='https://yhnqlfcgrmckhyjdxegg.supabase.co';
 const uid='00000000-0000-4000-8000-000000000931',sid='00000000-0000-4000-8000-000000000932',factor='00000000-0000-4000-8000-000000000933';
 const token=(aal:string,lifetime=3600)=>Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')+'.'+Buffer.from(JSON.stringify({
  sub:uid,session_id:sid,iss:authOrigin+'/auth/v1',aud:'authenticated',role:'authenticated',aal,exp:Math.floor(Date.now()/1000)+lifetime,

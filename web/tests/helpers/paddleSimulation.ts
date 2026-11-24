@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
-const origin = 'https://cluera-ai-staging.vercel.app';
+const origin = 'https://www.clueraai.in';
 const sandbox = 'https://sandbox-api.paddle.com';
 const destination = `${origin}/api/billing/paddle/sandbox`;
 type Json = Record<string, any>;

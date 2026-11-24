@@ -77,7 +77,7 @@ describe.skipIf(!enabled)('hosted staging relay public acceptance', () => {
   }, 25000);
   it('rejects browser cookies/origins, header tokens, query strings and subprotocols before upgrade', async () => {
     for (const options of [
-      { headers: { Origin: 'https://cluera-ai-staging.vercel.app' } },
+      { headers: { Origin: 'https://www.clueraai.in' } },
       { headers: { Cookie: 'synthetic=not-a-session' } },
       { headers: { Authorization: 'Bearer synthetic-not-a-token' } },
       { headers: { 'Sec-WebSocket-Protocol': 'synthetic' } },

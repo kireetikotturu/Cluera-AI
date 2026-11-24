@@ -11,7 +11,7 @@ import { dispatchClueraNativeRecurringCommand, observeClueraNativeRecurringComma
 import { liveBillingProfile, liveBillingRpc } from './modeProfile';
 import { liveWorkerMessage } from '../../../../shared/liveBillingDispatch';
 
-export const CLUERA_WORKER_URL = 'https://cluera-ai-staging.vercel.app/api/internal/billing/cluera/tick';
+export const CLUERA_WORKER_URL = 'https://www.clueraai.in/api/internal/billing/cluera/tick';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const bodyDigest = createHash('sha256').update('{}').digest('hex');
 

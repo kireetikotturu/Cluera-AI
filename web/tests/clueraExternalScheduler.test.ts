@@ -66,7 +66,7 @@ it.each([{ SIGMAROUND_BILLING_WORKER_SECRET: '' }, { SIGMAROUND_BILLING_WORKER_S
 });
 it.each([{ 'x-cluera-scheduler-proof': '0'.repeat(64) }, { 'x-cluera-scheduler-proof': 'x'.repeat(64) },
   { 'x-cluera-scheduler-time': String(now / 1000 - 61) }, { 'x-cluera-scheduler-nonce': crypto.randomUUID() },
-  { origin: 'https://cluera-ai-staging.vercel.app' }, { cookie: 'synthetic' }, { authorization: 'Bearer synthetic' },
+  { origin: 'https://www.clueraai.in' }, { cookie: 'synthetic' }, { authorization: 'Bearer synthetic' },
   { 'content-type': 'text/plain' }, { 'content-encoding': 'gzip' }])('bad proof/browser request never reaches SDK or RPC: %j', async headers => {
   const d = deps(); expect((await handleClueraExternalDispatch(request(headers), env, d)).status).toBe(401);
   expect(d.rpc).not.toHaveBeenCalled(); expect(clients.create).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ it.each([' {}', '{"amount":54900}', '{}\n', 'x'.repeat(129)])('no financial/call
 });
 it('different URL, query, method or proof domain cannot reach privileged work', async () => {
   const d = deps();
-  for (const req of [request({}, '{}', WEB_DISPATCH_URL + '?event=1'), request({}, '{}', WEB_DISPATCH_URL.replace('cluera-ai-staging', 'sigmaround-account-staging')),
+  for (const req of [request({}, '{}', WEB_DISPATCH_URL + '?event=1'), request({}, '{}', WEB_DISPATCH_URL.replace('www.clueraai.in', 'sigmaround-account-staging.vercel.app')),
     request({}, '{}', WEB_DISPATCH_URL, 'WAKE'), request({}, '{}', WEB_DISPATCH_URL, 'STATUS'), new Request(WEB_DISPATCH_URL)]) {
     expect((await handleClueraExternalDispatch(req, env, d)).status).toBe(401);
   }

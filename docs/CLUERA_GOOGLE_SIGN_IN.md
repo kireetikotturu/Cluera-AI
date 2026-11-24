@@ -1,6 +1,6 @@
 # Cluera account and Google sign-in
 
-Updated October 20, 2026. This guide applies only to [Cluera staging](https://cluera-ai-staging.vercel.app/account) and Supabase project `yhnqlfcgrmckhyjdxegg`. SMTP, Supabase app keys/URLs and the existing Admin/MFA enrollment are already configured. Do not repeat them.
+Updated October 20, 2026. This guide applies only to [Cluera staging](https://www.clueraai.in/account) and Supabase project `yhnqlfcgrmckhyjdxegg`. SMTP, Supabase app keys/URLs and the existing Admin/MFA enrollment are already configured. Do not repeat them.
 
 **Current status:** the owner reports Google configuration complete, and the live Cluera capability endpoint now returns `{"google":"enabled"}`. A fresh Create account page displays **Continue with Google**. The private setup instructions below are reference only; do not repeat completed configuration. Actual application consent, callback and same-account/trial acceptance remain separate from this read-only check.
 
@@ -24,7 +24,7 @@ The email timer prevents accidental repeat requests; it cannot prove inbox deliv
 
    | Field | Exact value |
    | --- | --- |
-   | Authorized JavaScript origin | `https://cluera-ai-staging.vercel.app` |
+   | Authorized JavaScript origin | `https://www.clueraai.in` |
    | Authorized redirect URI | `https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/callback` |
 
 2. In Google Auth Platform, complete Branding with the Cluera name, support contact and actual privacy/terms details. In Audience, keep the intended staging/testing audience and add the Google accounts that will test consent. Request only `openid`, email and profile. Publishing the consent app or expanding its audience is a separate owner decision.
@@ -35,13 +35,13 @@ The email timer prevents accidental repeat requests; it cannot prove inbox deliv
 
    | Field | Value |
    | --- | --- |
-   | Site URL | `https://cluera-ai-staging.vercel.app` |
-   | Web return | `https://cluera-ai-staging.vercel.app/api/account/callback` |
+   | Site URL | `https://www.clueraai.in` |
+   | Web return | `https://www.clueraai.in/api/account/callback` |
    | Desktop return pattern | `http://127.0.0.1:43822/cluera/callback\?state=*` |
 
    Google returns to Supabase; Supabase then returns to Cluera. The Cluera web and loopback URLs belong in Supabase's allowlist, not Google's authorized redirect URI. Do not broaden the web allowlist to a wildcard.
 
-5. Open [Create account](https://cluera-ai-staging.vercel.app/account#signup) or [Sign in](https://cluera-ai-staging.vercel.app/account#login). **Continue with Google** appears when the live capability check reports enabled; no separate Cluera feature flag is needed. The page refreshes capability on tab return and switching between these forms, with a short request throttle. A full reload also refreshes older open tabs. No email or OAuth request starts automatically. Accept one real consent/sign-in, reload, sign out and test cancellation. If entering from a selected plan, check the return destination without purchasing. For an existing verified email, confirm the same customer UUID and original once-only trial; do not manually merge accounts or grant another trial to make a test pass.
+5. Open [Create account](https://www.clueraai.in/account#signup) or [Sign in](https://www.clueraai.in/account#login). **Continue with Google** appears when the live capability check reports enabled; no separate Cluera feature flag is needed. The page refreshes capability on tab return and switching between these forms, with a short request throttle. A full reload also refreshes older open tabs. No email or OAuth request starts automatically. Accept one real consent/sign-in, reload, sign out and test cancellation. If entering from a selected plan, check the return destination without purchasing. For an existing verified email, confirm the same customer UUID and original once-only trial; do not manually merge accounts or grant another trial to make a test pass.
 
 6. Accept Windows Google return/sign-out/account switching on a tested build containing the current source. The retained immutable 1.0.7 installer predates later desktop fixes and has not been rebuilt by this web follow-up.
 

@@ -2,7 +2,7 @@ import {describe,it,expect,vi} from 'vitest';
 import {resumeSandboxCheckout} from '../lib/billing/checkout/resume';
 import {sandboxOffers} from '../lib/billing/sandboxCatalog';
 const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',PADDLE_API_KEY:'sb_secret_synthetic-server-key-not-real',
-  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg'};
+  SIGMAROUND_ACCOUNT_ORIGIN:'https://www.clueraai.in',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg'};
 const who={userId:'00000000-0000-4000-8000-000000000941',sessionId:'00000000-0000-4000-8000-000000000942'};
 const intentId='00000000-0000-4000-8000-000000000943',transactionId='txn_'+'a'.repeat(26),productId='pro_'+'b'.repeat(26),offer=sandboxOffers[0];
 const canonical={code:'BOUND',intentId,transactionId,offerCode:offer.code};
@@ -40,7 +40,7 @@ describe('owned existing checkout read-only resume',()=>{
       {id:'txn_'+'e'.repeat(26)},{custom_data:{sigma_checkout_intent:who.userId}},
       {items:[{...data.items[0],quantity:2}]},{items:[{quantity:1,price:{...data.items[0].price,product_id:'pro_'+'c'.repeat(26)}}]},
       {items:[{quantity:1,price:{...data.items[0].price,unit_price:{amount:'1',currency_code:'INR'}}}]},
-      ...['https://attacker.invalid/account/checkout','https://cluera-ai-staging.vercel.app.evil.invalid/account/checkout',
+      ...['https://attacker.invalid/account/checkout','https://www.clueraai.in.evil.invalid/account/checkout',
         env.SIGMAROUND_ACCOUNT_ORIGIN+'/other',env.SIGMAROUND_ACCOUNT_ORIGIN+'/account/checkout?other=1',
         env.SIGMAROUND_ACCOUNT_ORIGIN+'/account/checkout?_ptxn=txn_'+'c'.repeat(26),env.SIGMAROUND_ACCOUNT_ORIGIN+'/account/checkout#private'].map(url=>({checkout:{url}}))];
     for(const change of variations){const rpc=vi.fn(async()=>({data:canonical,error:null}));

@@ -1,4 +1,4 @@
-export const paymentTestEnvironment = { CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true', SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
+export const paymentTestEnvironment = { CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true', SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:'https://www.clueraai.in',
  NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',
  RAZORPAY_ENVIRONMENT:'test',RAZORPAY_TEST_KEY_ID:'rzp_test_synthetic123456',RAZORPAY_TEST_KEY_SECRET:'synthetic-secret-not-a-real-key-0000',
  RAZORPAY_TEST_WEBHOOK_SECRET:'synthetic-webhook-not-a-real-secret-0000',RAZORPAY_TEST_ACCOUNT_ID:'acc_synthetic123456',

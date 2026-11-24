@@ -22,7 +22,7 @@ function paymentConfig() {
   return (config = loaded.exports);
 }
 const ENDPOINT =
-  "https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook";
+  "https://www.clueraai.in/api/payments/razorpay/test/webhook";
 const requiredEvents = ["payment.captured", "order.paid", "refund.processed"];
 const same = (a, b) =>
   typeof a === "string" &&

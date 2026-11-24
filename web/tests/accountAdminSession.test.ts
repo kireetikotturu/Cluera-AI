@@ -4,7 +4,7 @@ import {accountConfig} from '../lib/accounts/config';
 import {seal,unseal} from '../lib/accounts/cookies';
 const mocks=vi.hoisted(()=>({clients:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
-const origin='https://cluera-ai-staging.vercel.app';
+const origin='https://www.clueraai.in';
 const uid='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002',other='00000000-0000-4000-8000-000000000003';
 function token(userId=uid,sessionId=sid,suffix='original'){
  return `header.${Buffer.from(JSON.stringify({sub:userId,session_id:sessionId,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',

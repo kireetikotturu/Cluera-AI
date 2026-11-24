@@ -35,7 +35,7 @@ function destination(file){
 }
 const mappings=new Map([...expected.keys()].flatMap(file=>destination(file)?[[file,destination(file)]]:[]));
 const pairs=[
- ['https://sigmaround-account-staging.vercel.app','https://cluera-ai-staging.vercel.app'],
+ ['https://sigmaround-account-staging.vercel.app','https://www.clueraai.in'],
  ['wss://sigmaround-account-relay-staging.onrender.com/v1/session','wss://cluera-ai-relay-staging.onrender.com/v1/session'],
  ['https://sigmaround-account-relay-staging.onrender.com','https://cluera-ai-relay-staging.onrender.com'],
  ['sigmaround-account-desktop-test-update','cluera-ai-desktop-test-update'],

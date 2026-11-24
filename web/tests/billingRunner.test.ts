@@ -2,10 +2,10 @@ import {describe,it,expect,vi} from 'vitest';
 import {handleBillingTick} from '../lib/billing/reconciliation/runner';
 const secret='synthetic-worker-secret-for-tests-only';
 const env={CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',SIGMAROUND_ACCOUNTS_ENABLED:'true',PADDLE_ENVIRONMENT:'sandbox',
-  SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',
+  SIGMAROUND_ACCOUNT_ORIGIN:'https://www.clueraai.in',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',
   SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',SIGMAROUND_PADDLE_SANDBOX_RECONCILIATION_ENABLED:'true',
   SIGMAROUND_BILLING_WORKER_SECRET:secret,SUPABASE_SERVICE_ROLE_KEY:'sb_secret_synthetic-service'};
-const request=(auth=`Bearer ${secret}`,method='POST',query='')=>new Request(`https://cluera-ai-staging.vercel.app/api/internal/billing/tick${query}`,{method,headers:{authorization:auth}});
+const request=(auth=`Bearer ${secret}`,method='POST',query='')=>new Request(`https://www.clueraai.in/api/internal/billing/tick${query}`,{method,headers:{authorization:auth}});
 function deps(){return {rpc:vi.fn(),reconcile:vi.fn(async()=> 'EMPTY'),action:vi.fn(async()=> 'EMPTY')};}
 describe('private bounded staging billing runner',()=>{
   it('fails closed before any database/provider access when disabled or target differs',async()=>{

@@ -4,7 +4,7 @@ import {seal,unseal,type CookieKind} from '../lib/accounts/cookies';
 import {handlePasswordSecurity} from '../lib/accounts/passwordSecurity';
 const mocks=vi.hoisted(()=>({clients:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
-const origin='https://cluera-ai-staging.vercel.app',uid='00000000-0000-4000-8000-000000000001';
+const origin='https://www.clueraai.in',uid='00000000-0000-4000-8000-000000000001';
 const sid='00000000-0000-4000-8000-000000000002',fid='00000000-0000-4000-8000-000000000003',other='00000000-0000-4000-8000-000000000004';
 const tokenExpiry=Math.floor(Date.now()/1000)+3600;
 function token(userId=uid,sessionId=sid,aal='aal1',variant='original'){

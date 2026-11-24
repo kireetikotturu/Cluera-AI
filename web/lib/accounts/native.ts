@@ -15,7 +15,7 @@ import {CLUERA_AUTH_STORAGE_KEY,CLUERA_SUPABASE_URL} from '../supabase/target';
 export async function handleNativeAccount(request: Request, action: string): Promise<Response> {
   try {
     const config = accountConfig();
-    if (config.origin !== 'https://cluera-ai-staging.vercel.app'
+    if (config.origin !== 'https://www.clueraai.in'
       || config.url !== CLUERA_SUPABASE_URL) throw new AccountError('UNAVAILABLE', 503);
     if (request.headers.has('origin') || request.headers.has('cookie') || request.headers.has('sec-fetch-site')
       || new URL(request.url).search) throw new AccountError('FORBIDDEN', 403);

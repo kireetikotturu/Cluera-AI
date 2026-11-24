@@ -13,7 +13,7 @@ import {merchantDigest}from'../lib/payments/cluera/config';
 const hooks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:hooks.clients}));
 vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:hooks.session,rateLimit:hooks.limit}));
-const site='https://cluera-ai-staging.vercel.app',user='00000000-0000-4000-8000-000000000801',foreign='00000000-0000-4000-8000-000000000802',session='00000000-0000-4000-8000-000000000803';
+const site='https://www.clueraai.in',user='00000000-0000-4000-8000-000000000801',foreign='00000000-0000-4000-8000-000000000802',session='00000000-0000-4000-8000-000000000803';
 const endpoint=site+'/api/account/payments/cluera/history';
 const empty=(userId=user)=>({code:'ACTIVE',userId,payments:[],subscriptions:[],hasMorePayments:false,hasMoreSubscriptions:false});
 const populated=()=>({...empty(),payments:[{paymentId:'pay_synthetichistory01',invoiceId:null,subscriptionId:null,state:'VERIFIED',

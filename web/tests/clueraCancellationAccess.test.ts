@@ -14,7 +14,7 @@ const hooks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn(),cance
 vi.mock('../lib/accounts/clients',()=>({accountClients:hooks.clients}));
 vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:hooks.session,rateLimit:hooks.limit}));
 vi.mock('../lib/payments/cluera/adapter',()=>({clueraRazorpayAdapter:()=>({cancelFuture:hooks.cancel,cancellationStatus:hooks.status})}));
-const site='https://cluera-ai-staging.vercel.app',endpoint=site+'/api/account/payments/cluera/cancellation';
+const site='https://www.clueraai.in',endpoint=site+'/api/account/payments/cluera/cancellation';
 const user=paymentTestEnvironment.SIGMAROUND_PAYMENT_TESTER_IDS,session='00000000-0000-4000-8000-000000000002',foreign='00000000-0000-4000-8000-000000000003';
 const operationId='00000000-0000-4000-8000-000000000004',subscriptionId='sub_accesscancel0001';
 const env={...paymentTestEnvironment,CLUERA_BILLING_V2_ENABLED:'true',CLUERA_SUBSCRIPTION_CANCELLATION_ENABLED:'true'};

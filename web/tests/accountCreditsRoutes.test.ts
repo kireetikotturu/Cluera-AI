@@ -5,7 +5,7 @@ import {accountConfig} from '../lib/accounts/config';
 import {seal,unseal} from '../lib/accounts/cookies';
 import {paymentTestEnvironment} from './helpers/paymentTestMode';
 const mocks=vi.hoisted(()=>({clients:vi.fn()}));vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
-const origin='https://cluera-ai-staging.vercel.app',uid='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002';
+const origin='https://www.clueraai.in',uid='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002';
 const token=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.synthetic`;
 let rpc:ReturnType<typeof vi.fn>;
 const value={userId:uid,serverTime:'2026-10-09T00:00:00Z',displayName:'Synthetic',availableMilliseconds:900000,reservedMilliseconds:0,spentMilliseconds:0,buckets:[],plans:[],payments:[]};

@@ -68,7 +68,7 @@ When incident containment and shared-template change scope are accepted:
 3. Only with explicitly authorized test-email acceptance, use a controlled inbox and normal private browser: signup/latest verification, password recovery/sign-out, old callback compatibility and expected wrong-browser/expired-link denial. Test other flows only if already exposed/authorized by the application. Never send codes, links or passwords to the agent. A template save alone is not delivery/Auth acceptance.
 4. If wording/rendering causes a confirmed regression, restore only the saved subject/body for that template. If delivery fails, stop further sends and diagnose transport; never bypass Auth or change callback trust as a formatting rollback. Retain sending/provider error categories without bodies or credentials.
 
-The Cluera callback remains `https://cluera-ai-staging.vercel.app/api/account/callback`; temporary old/native callbacks remain as currently configured. Templates must neither force the Cluera hostname into a provider URL nor add wildcard redirects. [Redirect handling](https://supabase.com/docs/guides/auth/redirect-urls).
+The Cluera callback remains `https://www.clueraai.in/api/account/callback`; temporary old/native callbacks remain as currently configured. Templates must neither force the Cluera hostname into a provider URL nor add wildcard redirects. [Redirect handling](https://supabase.com/docs/guides/auth/redirect-urls).
 
 ## Verification scope
 

@@ -1,10 +1,10 @@
 import {expect,it} from 'vitest';
 import {authFailure,publicSessionSchema,safeGoogleRedirect,signupNotice,emailDeliveryNotice} from '../lib/accounts/publicAuth';
 import {MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH,weakPasswordNotice} from '../lib/accounts/passwordPolicy';
-const url='https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent('https://cluera-ai-staging.vercel.app/api/account/callback?sb_flow_id=synthetic');
+const url='https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent('https://www.clueraai.in/api/account/callback?sb_flow_id=synthetic');
 it('accepts only a bounded fixed Supabase Google redirect to the Cluera callback',()=>{
  expect(safeGoogleRedirect({redirectUrl:url})).toBe(url);
- for(const redirectUrl of ['javascript:alert(1)',url.replace('yhnqlfcgrmckhyjdxegg','foreign'),url.replace('provider=google','provider=github'),url.replace('cluera-ai-staging','evil'),url+'#fragment'])expect(()=>safeGoogleRedirect({redirectUrl})).toThrow();
+ for(const redirectUrl of ['javascript:alert(1)',url.replace('yhnqlfcgrmckhyjdxegg','foreign'),url.replace('provider=google','provider=github'),url.replace('www.clueraai.in','evil.example'),url+'#fragment'])expect(()=>safeGoogleRedirect({redirectUrl})).toThrow();
  expect(()=>safeGoogleRedirect({redirectUrl:url,access_token:'synthetic'})).toThrow();
  for(const redirectUrl of [url+'&provider=github',url+'&redirect_to=https%3A%2F%2Fevil.invalid',url.replace('sb_flow_id%3Dsynthetic','sb_flow_id%3Dsynthetic%26sb_flow_id%3Dother'),url.replace('sb_flow_id%3Dsynthetic','sb_flow_id%3D')])expect(()=>safeGoogleRedirect({redirectUrl})).toThrow();
 });

@@ -12,7 +12,7 @@ import {paymentTestEnvironment} from './helpers/paymentTestMode';
 
 const mocks=vi.hoisted(()=>({clients:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
-const site='https://cluera-ai-staging.vercel.app',path='/api/account/admin/billing/cluera/report';
+const site='https://www.clueraai.in',path='/api/account/admin/billing/cluera/report';
 const first={userId:randomUUID(),sessionId:randomUUID()},second={userId:randomUUID(),sessionId:randomUUID()};
 const digest=merchantDigest(paymentTestEnvironment),from=new Date(Date.now()-30*86400000).toISOString(),to=new Date().toISOString();
 const fixtureCreated=new Date(Date.now()-86400000).toISOString();

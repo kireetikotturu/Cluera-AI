@@ -10,6 +10,6 @@ export const ACCOUNT_DISTRIBUTION = Object.freeze({
   audience: 'cluera-ai-desktop-test-update',
   feed: '/api/cluera/update/test',
   download: '/account/download',
-  apiOrigin: 'https://cluera-ai-staging.vercel.app',
+  apiOrigin: 'https://www.clueraai.in',
   relayEndpoint: 'wss://cluera-ai-relay-staging.onrender.com/v1/session',
 } as const);

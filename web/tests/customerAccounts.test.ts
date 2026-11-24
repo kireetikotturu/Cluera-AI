@@ -20,10 +20,10 @@ function makeAuth() {
     exchangeCodeForSession: vi.fn(async () => ({ data: { session }, error: null })),
     signUp: vi.fn(async () => ({ error: null })), resend:vi.fn(async()=>({error:null})), resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     updateUser: vi.fn(async () => ({ data:{user},error: null })),
-    signInWithOAuth: vi.fn(async () => ({ data: { url: 'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google&redirect_to=https%3A%2F%2Fcluera-ai-staging.vercel.app%2Fapi%2Faccount%2Fcallback' }, error: null })) };
+    signInWithOAuth: vi.fn(async () => ({ data: { url: 'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/authorize?provider=google&redirect_to=https%3A%2F%2Fwww.clueraai.in%2Fapi%2Faccount%2Fcallback' }, error: null })) };
 }
 beforeEach(() => {
-  vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED', 'true'); vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN', 'https://cluera-ai-staging.vercel.app');
+  vi.stubEnv('SIGMAROUND_ACCOUNTS_ENABLED', 'true'); vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN', 'https://www.clueraai.in');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://yhnqlfcgrmckhyjdxegg.supabase.co'); vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'sb_publishable_synthetic_public_key_00000000000000000');
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'sb_secret_synthetic-service-placeholder');
   vi.stubEnv('SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64', Buffer.alloc(32, 3).toString('base64'));
@@ -35,8 +35,8 @@ beforeEach(() => {
     flow: () => ({ 'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier': 'synthetic-pkce-only' }), recovery: () => true });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
-function request(action: string, body: object = {}, cookie = '', method = 'POST', origin = 'https://cluera-ai-staging.vercel.app') {
-  return new Request(`https://cluera-ai-staging.vercel.app/api/account/${action}`, { method, headers: { origin, cookie, 'Content-Type': 'application/json' },
+function request(action: string, body: object = {}, cookie = '', method = 'POST', origin = 'https://www.clueraai.in') {
+  return new Request(`https://www.clueraai.in/api/account/${action}`, { method, headers: { origin, cookie, 'Content-Type': 'application/json' },
     ...(method === 'POST' ? { body: JSON.stringify(body) } : {}) });
 }
 function cookiePair(kind: 'access' | 'refresh' | 'recovery' | 'flow', value: unknown) {
@@ -74,11 +74,11 @@ describe('customer BFF authentication', () => {
     const verifier=jar.get('__Host-sr-account-flow');
     expect(unseal(verifier,'flow',accountConfig())).toEqual(pending);
     expect(unseal(verifier,'flow',accountConfig(),Date.now()+61_000)).toBeNull();
-    const callback=new Request('https://cluera-ai-staging.vercel.app/api/account/callback?code=synthetic-email-code',{
+    const callback=new Request('https://www.clueraai.in/api/account/callback?code=synthetic-email-code',{
       headers:{cookie:[...jar].map(([name,value])=>`${name}=${value}`).join('; ')}});
     const completed=await handleAccount(callback,'callback');
     expect(mocks.clients).toHaveBeenLastCalledWith(expect.anything(),pending);
-    expect(completed.status).toBe(303);expect(completed.headers.get('location')).toBe('https://cluera-ai-staging.vercel.app/account');
+    expect(completed.status).toBe(303);expect(completed.headers.get('location')).toBe('https://www.clueraai.in/account');
     expect(auth.exchangeCodeForSession).toHaveBeenCalledExactlyOnceWith('synthetic-email-code',undefined);
     expect(completed.headers.get('set-cookie')).toContain('__Host-sr-account-flow=;');
   });
@@ -167,7 +167,7 @@ describe('customer BFF authentication', () => {
   });
   it('resends only signup verification with sealed fresh PKCE, no account grant or token DTO',async()=>{
     const response=await handleAccount(request('resend-verification',{email:user.email}),'resend-verification');
-    expect(response.status).toBe(200);expect(auth.resend).toHaveBeenCalledExactlyOnceWith({type:'signup',email:user.email,options:{emailRedirectTo:'https://cluera-ai-staging.vercel.app/api/account/callback'}});
+    expect(response.status).toBe(200);expect(auth.resend).toHaveBeenCalledExactlyOnceWith({type:'signup',email:user.email,options:{emailRedirectTo:'https://www.clueraai.in/api/account/callback'}});
     expect(response.headers.get('set-cookie')).toContain('__Host-sr-account-flow=');expect(response.headers.get('set-cookie')).toContain('HttpOnly');
     const body=await response.text();expect(body).toContain('If this request is eligible');expect(body).not.toContain('synthetic-pkce-only');
     expect(rpc.mock.calls.every(([name])=>name==='customer_auth_rate_limit')).toBe(true);expect(auth.signUp).not.toHaveBeenCalled();expect(auth.updateUser).not.toHaveBeenCalled();
@@ -186,7 +186,7 @@ describe('customer BFF authentication', () => {
     expect(auth.resend).not.toHaveBeenCalled();
   });
   it('exposes only the verified account balance and never exposes public spending operations', async () => {
-    vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://cluera-ai-staging.vercel.app');
+    vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://www.clueraai.in');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://yhnqlfcgrmckhyjdxegg.supabase.co');
     const original=rpc.getMockImplementation()!;
     rpc.mockImplementation(async (name,args) => name==='customer_usage_balance'
@@ -198,7 +198,7 @@ describe('customer BFF authentication', () => {
     expect(result.status).toBe(200); expect(await result.json()).toEqual({usage:{code:'ACTIVE',availableMilliseconds:900000,reservedMilliseconds:0,spentMilliseconds:0}});
     expect(rpc).toHaveBeenCalledWith('customer_usage_balance',{p_user_id:uid,p_session_id:sid});
     expect(result.headers.get('cache-control')).toBe('no-store');
-    expect((await handleAccount(request('usage',{action:'START',userId:uid},cookies,'POST','https://cluera-ai-staging.vercel.app'),'usage')).status).toBe(404);
+    expect((await handleAccount(request('usage',{action:'START',userId:uid},cookies,'POST','https://www.clueraai.in'),'usage')).status).toBe(404);
     expect(rpc.mock.calls.some(call=>call[0]==='customer_usage_command')).toBe(false);
   });
   it('fails closed while disabled without provider or database access', async () => {
@@ -265,13 +265,13 @@ describe('customer BFF authentication', () => {
     }
   });
   it('does not inherit AAL2 from an expired Admin cookie after refresh and persists valid rotated cookies',async()=>{
-    vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://cluera-ai-staging.vercel.app');
+    vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN','https://www.clueraai.in');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://yhnqlfcgrmckhyjdxegg.supabase.co');
     const expired=`header.${Buffer.from(JSON.stringify({sub:uid,session_id:sid,iss:'https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1',aud:'authenticated',role:'authenticated',exp:1,aal:'aal2'})).toString('base64url')}.synthetic`;
     auth.getUser.mockResolvedValueOnce({data:{user:null},error:{status:401}} as never);
     const original=rpc.getMockImplementation()!;
     rpc.mockImplementation(async(name,args)=>name==='account_admin_check'?{data:true,error:null,status:200}:original(name,args));
-    const result=await accountAdminRequest(new Request('https://cluera-ai-staging.vercel.app/api/account/admin',{headers:{cookie:`${cookiePair('access',expired)}; ${cookiePair('refresh',session.refresh_token)}`}}));
+    const result=await accountAdminRequest(new Request('https://www.clueraai.in/api/account/admin',{headers:{cookie:`${cookiePair('access',expired)}; ${cookiePair('refresh',session.refresh_token)}`}}));
     expect(await result.json()).toEqual({needsMfa:true,factors:[]});
     expect(result.headers.get('set-cookie')).toContain('HttpOnly');
     expect(rpc.mock.calls.some(call=>call[0]==='account_admin_read_v2'||(call[0]==='account_admin_check'&&call[1]?.p_require_mfa===true))).toBe(false);
@@ -299,19 +299,19 @@ describe('customer BFF authentication', () => {
       const response = await handleAccount(request(action, { email: user.email, ...(action === 'signup' ? { password: 'synthetic-password' } : {}) }), action);
       expect(response.status).toBe(200); expect(await response.text()).not.toContain(user.email);
     }
-    expect(auth.resetPasswordForEmail).toHaveBeenCalledWith(user.email, { redirectTo: 'https://cluera-ai-staging.vercel.app/api/account/callback' });
+    expect(auth.resetPasswordForEmail).toHaveBeenCalledWith(user.email, { redirectTo: 'https://www.clueraai.in/api/account/callback' });
   });
   it('starts only Google via PKCE and requires bound verifier on callback', async () => {
     vi.stubGlobal('fetch',vi.fn(async()=>Response.json({external:{google:true}})));
     const start = await handleAccount(request('google'), 'google'); expect(start.status).toBe(200);
-    expect(auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: 'https://cluera-ai-staging.vercel.app/api/account/callback', skipBrowserRedirect: true } });
-    const callback = new Request('https://cluera-ai-staging.vercel.app/api/account/callback?code=synthetic');
+    expect(auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: 'https://www.clueraai.in/api/account/callback', skipBrowserRedirect: true } });
+    const callback = new Request('https://www.clueraai.in/api/account/callback?code=synthetic');
     const rejected=await handleAccount(callback,'callback');expect(rejected.status).toBe(303);
-    expect(rejected.headers.get('location')).toBe('https://cluera-ai-staging.vercel.app/account?authError=link_invalid#login');
+    expect(rejected.headers.get('location')).toBe('https://www.clueraai.in/account?authError=link_invalid#login');
     expect(auth.exchangeCodeForSession).not.toHaveBeenCalled();
     const bound = new Request(callback.url, { headers: { cookie: cookiePair('flow', { 'cluera-auth-yhnqlfcgrmckhyjdxegg-v1-code-verifier': 'test' }) } });
     const complete = await handleAccount(bound, 'callback'); expect(complete.status).toBe(303);
-    expect(complete.headers.get('location')).toBe('https://cluera-ai-staging.vercel.app/account');
+    expect(complete.headers.get('location')).toBe('https://www.clueraai.in/account');
     expect(complete.headers.get('set-cookie')).toContain('sr-account-recovery=');
   });
   it('requires the password-recovery session, updates then revokes sessions', async () => {
@@ -373,8 +373,8 @@ describe('account cookie boundary', () => {
   });
   it('needs account secrets but not legacy license pepper/signing credentials', () => {
     vi.stubEnv('LICENSE_HASH_PEPPER_BASE64', ''); vi.stubEnv('LICENSE_SIGNING_PRIVATE_KEY_BASE64', '');
-    expect(accountConfig().origin).toBe('https://cluera-ai-staging.vercel.app');
-    vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN', 'https://cluera-ai-staging.vercel.app/evil');
+    expect(accountConfig().origin).toBe('https://www.clueraai.in');
+    vi.stubEnv('SIGMAROUND_ACCOUNT_ORIGIN', 'https://www.clueraai.in/evil');
     expect(() => accountConfig()).toThrow();
   });
   it('never returns raw cookie values from its reader', () => {

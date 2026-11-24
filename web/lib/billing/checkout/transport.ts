@@ -14,7 +14,7 @@ const draft=z.object({id:z.string().regex(/^txn_[a-z0-9]{26}$/),status:z.enum(['
 export async function createSandboxCheckout(offer:SandboxOffer,intentId:string,env=process.env,request:typeof fetch=fetch):Promise<CheckoutBinding> {
   const canonical=sandboxOffer(offer.code,env.PADDLE_ENVIRONMENT);
   if(canonical.priceId!==offer.priceId || !z.uuid().safeParse(intentId).success || !env.PADDLE_API_KEY
-    || env.SIGMAROUND_ACCOUNT_ORIGIN!=='https://cluera-ai-staging.vercel.app'
+    || env.SIGMAROUND_ACCOUNT_ORIGIN!=='https://www.clueraai.in'
     || env.NEXT_PUBLIC_SUPABASE_URL!=='https://yhnqlfcgrmckhyjdxegg.supabase.co'
     || env.SIGMAROUND_PADDLE_SANDBOX_PROJECT_REF!=='yhnqlfcgrmckhyjdxegg') throw new CheckoutTransportError('configuration');
   let stage:'request'|'http'|'body'|'schema'|'binding'='request';

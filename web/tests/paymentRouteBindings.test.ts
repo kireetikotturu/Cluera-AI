@@ -12,13 +12,13 @@ import {AccountPricing} from '../app/AccountPricing';
 beforeEach(()=>{vi.stubEnv('SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED','false');vi.stubEnv('SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED','false');});
 afterEach(()=>vi.unstubAllEnvs());
 it('unconfigured checkout/intake/reconciliation are precise404/no-store without secrets or new operations',async()=>{
- const request=new Request('https://cluera-ai-staging.vercel.app/api/payments/reconcile',{method:'POST',body:'{}'});
+ const request=new Request('https://www.clueraai.in/api/payments/reconcile',{method:'POST',body:'{}'});
  for(const handler of [handlePaymentCheckout,handleRazorpayWebhook,handlePaymentTick]){
   const response=await handler(request.clone());expect(response.status).toBe(404);expect(response.headers.get('cache-control')).toBe('no-store');
  }
 });
 it('Next route context is never accidentally passed as gateway env/dependencies',async()=>{
- const request=new Request('https://cluera-ai-staging.vercel.app/api/payments/reconcile',{method:'POST',body:'{}'});
+ const request=new Request('https://www.clueraai.in/api/payments/reconcile',{method:'POST',body:'{}'});
  for(const handler of [webhookPost,tickPost]){
   const call=handler as (request:Request,context:unknown)=>Promise<Response>;
   const response=await call(request.clone(),{params:Promise.resolve({})});expect(response.status).toBe(404);
@@ -46,7 +46,7 @@ it('the direct plans page gets the exact Razorpay policy only under the approved
  expect((await config.headers!()).some(rule=>rule.source==='/pricing')).toBe(false);
 });
 const schedulerSecret='synthetic-worker-secret-not-a-real-key-0000';
-const schedulerRequest=()=>new Request('https://cluera-ai-staging.vercel.app/api/internal/billing/tick',
+const schedulerRequest=()=>new Request('https://www.clueraai.in/api/internal/billing/tick',
  {method:'POST',headers:{authorization:`Bearer ${schedulerSecret}`},body:'{}'});
 it('Razorpay scheduler work is independent of absent/disabled Paddle configuration',async()=>{
  const payment=vi.fn(async()=> 'EMPTY'),reconcile=vi.fn(),action=vi.fn(),rpc=vi.fn();

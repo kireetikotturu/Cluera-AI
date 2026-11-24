@@ -8,7 +8,7 @@ function fixture(active=true){
  const window={webContents:{mainFrame:{}}};const event={sender:window.webContents,senderFrame:window.webContents.mainFrame};
  const view={mode:'cluera-staging',state:active?'active':'signed-out',userId:active?userId:undefined};
  const account={status:()=>view,login:vi.fn(async()=>view),restore:vi.fn(async()=>view),logout:vi.fn(async()=>({mode:'cluera-staging',state:'signed-out'})),authorizeWork:vi.fn(async()=>({accessToken:'synthetic-sensitive-token'}))};
- const options={workspaceUserId:userId,stop:vi.fn(async()=>undefined),restart:vi.fn(),updates:{assertSupported:vi.fn(),install:vi.fn(async()=>({state:'current'})),officialDownloadPage:()=> 'https://cluera-ai-staging.vercel.app/download'}};
+ const options={workspaceUserId:userId,stop:vi.fn(async()=>undefined),restart:vi.fn(),updates:{assertSupported:vi.fn(),install:vi.fn(async()=>({state:'current'})),officialDownloadPage:()=> 'https://www.clueraai.in/download'}};
  registerAccountIpc(window as never,account as never,options as never);return {window,event,account,options};
 }
 it('rejects another renderer or subframe on every account action',async()=>{
@@ -32,9 +32,9 @@ it('defers a different account to workspace restart, not access to another local
 });
 it('blocks arbitrary external destinations and gates updates with live account authorization',async()=>{
  const f=fixture();await expect(mocks.handlers.get('account:open-web')!(f.event,'https://evil.invalid')).rejects.toThrow();
- await mocks.handlers.get('account:open-web')!(f.event,'signup');expect(mocks.openExternal).toHaveBeenCalledWith('https://cluera-ai-staging.vercel.app/account#signup');
- await mocks.handlers.get('account:open-web')!(f.event,'reset-password');expect(mocks.openExternal).toHaveBeenCalledWith('https://cluera-ai-staging.vercel.app/account#forgot-password');
- await mocks.handlers.get('account:open-web')!(f.event,'dashboard');expect(mocks.openExternal).toHaveBeenCalledWith('https://cluera-ai-staging.vercel.app/account');
+ await mocks.handlers.get('account:open-web')!(f.event,'signup');expect(mocks.openExternal).toHaveBeenCalledWith('https://www.clueraai.in/account#signup');
+ await mocks.handlers.get('account:open-web')!(f.event,'reset-password');expect(mocks.openExternal).toHaveBeenCalledWith('https://www.clueraai.in/account#forgot-password');
+ await mocks.handlers.get('account:open-web')!(f.event,'dashboard');expect(mocks.openExternal).toHaveBeenCalledWith('https://www.clueraai.in/account');
  await mocks.handlers.get('updates:install')!(f.event);expect(f.account.authorizeWork).toHaveBeenCalledOnce();expect(f.options.updates.install).toHaveBeenCalledOnce();
 });
 it('allows an authenticated required-update install without bypassing account authorization',async()=>{

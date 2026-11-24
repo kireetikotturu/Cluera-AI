@@ -7,7 +7,7 @@ import { paymentTestEnvironment } from './helpers/paymentTestMode';
 const mocks = vi.hoisted(() => ({ clients: vi.fn(), session: vi.fn(), limit: vi.fn() }));
 vi.mock('../lib/accounts/clients', () => ({ accountClients: mocks.clients }));
 vi.mock('../lib/accounts/handler', async original => ({ ...await original<typeof import('../lib/accounts/handler')>(), activeSession: mocks.session, rateLimit: mocks.limit }));
-const origin = 'https://cluera-ai-staging.vercel.app', actor = paymentTestEnvironment.SIGMAROUND_PAYMENT_TESTER_IDS;
+const origin = 'https://www.clueraai.in', actor = paymentTestEnvironment.SIGMAROUND_PAYMENT_TESTER_IDS;
 const sid = '00000000-0000-4000-8000-000000000002', planId = '00000000-0000-4000-8000-000000000005', revisionId = '00000000-0000-4000-8000-000000000004';
 const plan = { planId, revisionId, offerCode: 'cluera_pack_3h_v2', name: 'Cluera 3 Hours', amountPaise: 54900, currency: 'INR', allowanceSeconds: 10800,
   kind: 'PACK', version: 1, enabled: false, archived: false, createdAt: '2026-10-24T00:00:00Z', openCheckouts: 0 };

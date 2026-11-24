@@ -72,7 +72,7 @@ it('a browser callback completes desktop login through the real API parser with 
    expect(createHash('sha256').update(body.verifier).digest('base64url')).toBe(challenge);
    return new Response(JSON.stringify({userId,accessToken:'synthetic-access-token-only',refreshToken:'abcdefghijkl',validForMilliseconds:3600000}));
   }
-  expect(String(url)).toBe('https://cluera-ai-staging.vercel.app/api/account/native/session');
+  expect(String(url)).toBe('https://www.clueraai.in/api/account/native/session');
   return new Response(JSON.stringify({account:{userId,email:'google@example.invalid'},usage:{code:'ACTIVE',availableMilliseconds:900000,reservedMilliseconds:0,spentMilliseconds:0}}));
  });
  const api=new AccountApi(request as typeof fetch);

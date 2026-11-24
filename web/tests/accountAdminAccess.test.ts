@@ -5,7 +5,7 @@ import {accountAdminAccessRequest} from '../lib/accounts/adminAccess';
 const mocks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),authorize:vi.fn(),rpc:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:mocks.session,authorizeCustomer:mocks.authorize}));
-const origin='https://cluera-ai-staging.vercel.app',uid='00000000-0000-4000-8000-000000000801',sid='00000000-0000-4000-8000-000000000802';
+const origin='https://www.clueraai.in',uid='00000000-0000-4000-8000-000000000801',sid='00000000-0000-4000-8000-000000000802';
 let token:string,role:boolean,mfa:boolean;
 const account={userId:uid,sessionId:sid,email:'clueraaisupport@gmail.com',trialSecondsGranted:900,remoteDesktop:false};
 function request(kind='access',headers:Record<string,string>={}){

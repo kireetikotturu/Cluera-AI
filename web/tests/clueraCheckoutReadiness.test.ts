@@ -8,7 +8,7 @@ const sha='a'.repeat(40),owner='00000000-0000-4000-8000-000000000801',hookId='we
 const options={expectedSourceSha:sha,expectedWebhookId:hookId,expectedOwnerUuid:owner};
 const base={VERCEL_ENV:'production',VERCEL_TARGET_ENV:'production',VERCEL_PROJECT_ID:'prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',
  VERCEL_ORG_ID:'team_AksnPXhi2VBXI5UsY2xBIakc',VERCEL_GIT_COMMIT_SHA:sha,SIGMAROUND_ACCOUNTS_ENABLED:'true',
- SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',
+ SIGMAROUND_ACCOUNT_ORIGIN:'https://www.clueraai.in',NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co',
  SIGMAROUND_RAZORPAY_TEST_PROJECT_REF:'yhnqlfcgrmckhyjdxegg',RAZORPAY_ENVIRONMENT:'test',SIGMAROUND_PAYMENT_PROVIDER:'razorpay',
  CLUERA_BILLING_V2_ENABLED:'true',CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED:'true',
  SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED:'false',CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED:'true',
@@ -16,7 +16,7 @@ const base={VERCEL_ENV:'production',VERCEL_TARGET_ENV:'production',VERCEL_PROJEC
  RAZORPAY_TEST_KEY_ID:'rzp_test_synthetic123456',RAZORPAY_TEST_KEY_SECRET:'synthetic-api-secret-not-a-real-key',
  RAZORPAY_TEST_WEBHOOK_SECRET:'synthetic-webhook-secret-not-a-real-key',RAZORPAY_TEST_ACCOUNT_ID:'acc_synthetic123456'};
 const env=(enabled:boolean)=>({...base,SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:enabled?'true':'false',SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:enabled?'false':'true'});
-const hook={id:hookId,url:'https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook',service:'api-test',
+const hook={id:hookId,url:'https://www.clueraai.in/api/account/payments/cluera/webhook',service:'api-test',
  owner_type:'merchant',owner_id:'synthetic123456',active:true,disabled_at:1234567890,secret_exists:true,
  events:['payment.captured','order.paid','refund.processed']};
 const collection=(items:any[])=>({entity:'collection',count:items.length,items});

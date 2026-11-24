@@ -5,8 +5,8 @@ const path=require('node:path'),{createRequire,Module}=require('node:module');
 const {createHash}=require('node:crypto');
 const PROJECT='prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B',TEAM='team_AksnPXhi2VBXI5UsY2xBIakc';
 const TARGETS=Object.freeze({oldAccount:'https://sigmaround-account-staging.vercel.app/api/payments/razorpay/test/webhook',
- clueraLegacy:'https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook',
- clueraV2:'https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook'});
+ clueraLegacy:'https://www.clueraai.in/api/payments/razorpay/test/webhook',
+ clueraV2:'https://www.clueraai.in/api/account/payments/cluera/webhook'});
 const BASE_EVENTS=Object.freeze(['payment.captured','order.paid','refund.processed']);
 const FLAGS=Object.freeze(['CLUERA_BILLING_V2_ENABLED','CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED','SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED',
  'SIGMAROUND_RAZORPAY_TEST_INTAKE_ENABLED','SIGMAROUND_PADDLE_SANDBOX_CHECKOUT_ENABLED']);

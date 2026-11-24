@@ -11,7 +11,7 @@ it('pins new app, profile, database, channel, origins and public key independent
  const config=require('../electron-builder.cluera.cjs');
  expect(config.appId).toBe('ai.cluera.desktop');expect(config.publish).toBeNull();
  expect(ACCOUNT_DISTRIBUTION).toMatchObject({profile:'cluera-ai-desktop-staging',database:'cluera-ai.sqlite',
-  channel:'cluera-beta',audience:'cluera-ai-desktop-test-update',apiOrigin:'https://cluera-ai-staging.vercel.app'});
+  channel:'cluera-beta',audience:'cluera-ai-desktop-test-update',apiOrigin:'https://www.clueraai.in'});
  const publicKey=createPublicKey(fs.readFileSync('resources/cluera-public-key.pem'));
  expect(publicKey.asymmetricKeyType).toBe('ed25519');
  expect(createHash('sha256').update(publicKey.export({type:'spki',format:'der'})).digest('hex')).toBe(CLUERA_UPDATE_KEY_SHA256);

@@ -9,7 +9,7 @@ describe.skipIf(process.env.SIGMAROUND_RUN_RECURRING_ACCEPTANCE!=='true')('stagi
     const env=process.env;
     function check(v:unknown,message:string):asserts v{if(!v)throw new Error(`Recurring acceptance: ${message}`);}
     check(env.NEXT_PUBLIC_SUPABASE_URL==='https://yhnqlfcgrmckhyjdxegg.supabase.co'
-      &&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://cluera-ai-staging.vercel.app'&&env.SUPABASE_SERVICE_ROLE_KEY,'wrong target');
+      &&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://www.clueraai.in'&&env.SUPABASE_SERVICE_ROLE_KEY,'wrong target');
     const user=env.SIGMAROUND_RECURRING_FIXTURE_USER,session=env.SIGMAROUND_RECURRING_FIXTURE_SESSION;
     check(user&&session&&/^[a-f0-9-]{36}$/.test(user)&&/^[a-f0-9-]{36}$/.test(session),'fixture missing');
     const client=createClient(env.NEXT_PUBLIC_SUPABASE_URL!,env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});

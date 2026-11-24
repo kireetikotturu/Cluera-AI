@@ -10,7 +10,7 @@ import {wakeClueraBillingRelay} from '../lib/payments/cluera/wakeRelay';
 import {WEB_DISPATCH_URL} from '../../shared/billingDispatch';
 import {paymentTestEnvironment} from './helpers/paymentTestMode';
 
-const site='https://cluera-ai-staging.vercel.app';
+const site='https://www.clueraai.in';
 const env={...paymentTestEnvironment,CLUERA_BILLING_V2_ENABLED:'true',CLUERA_BILLING_EXTERNAL_SCHEDULER_ENABLED:'false',
  SIGMAROUND_RAZORPAY_TEST_CHECKOUT_ENABLED:'false',SIGMAROUND_ACCOUNT_PAYMENTS_PAUSED:'true',
  SIGMAROUND_PADDLE_SANDBOX_INTAKE_ENABLED:'false',SIGMAROUND_PADDLE_SANDBOX_RECONCILIATION_ENABLED:'false',

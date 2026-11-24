@@ -1,6 +1,6 @@
 import { describe,it,expect,vi } from 'vitest';
 import { usageService } from '../lib/usage/service';
-const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:'https://cluera-ai-staging.vercel.app',
+const env={SIGMAROUND_ACCOUNTS_ENABLED:'true',SIGMAROUND_ACCOUNT_ORIGIN:'https://www.clueraai.in',
   NEXT_PUBLIC_SUPABASE_URL:'https://yhnqlfcgrmckhyjdxegg.supabase.co'};
 const who={userId:'00000000-0000-4000-8000-000000000701',sessionId:'00000000-0000-4000-8000-000000000702'};
 const input={runId:'00000000-0000-4000-8000-000000000703',sequence:0,action:'START' as const};

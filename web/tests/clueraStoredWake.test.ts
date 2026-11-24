@@ -8,7 +8,7 @@ function request(patch: Record<string, unknown> = {}, signature?: string) {
   const raw = JSON.stringify({ entity: 'event', account_id: env.RAZORPAY_TEST_ACCOUNT_ID,
     event: 'payment.captured', created_at: Math.floor(Date.now() / 1000),
     payload: { payment: { entity: { id: 'pay_syntheticwake001', order_id: 'order_syntheticwake001' } } }, ...patch });
-  return new Request('https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook', {
+  return new Request('https://www.clueraai.in/api/account/payments/cluera/webhook', {
     method: 'POST', body: raw, headers: { 'content-type': 'application/json', 'x-razorpay-event-id': 'event_syntheticwake001',
       'x-razorpay-signature': signature ?? createHmac('sha256', env.RAZORPAY_TEST_WEBHOOK_SECRET).update(raw).digest('hex') },
   });

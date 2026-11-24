@@ -1,7 +1,7 @@
 'use strict';
 async function compare(audit,request=fetch,env=process.env,expected,options={}){
  if(typeof expected!=='string'||! /^[A-Za-z0-9]{8,64}$/.test(expected))return{stopped:'INVALID_DESTINATION_ID',requests:0,mutations:0};
- const endpoint='https://cluera-ai-staging.vercel.app/api/payments/razorpay/test/webhook';
+ const endpoint='https://www.clueraai.in/api/payments/razorpay/test/webhook';
  let target,headers;
  async function read(url,init){
   if(init.method!=='GET'||new URL(url).origin!=='https://api.razorpay.com')throw Error('BOUND');

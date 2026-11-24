@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { runPaddleSimulation } from './helpers/paddleSimulation';
 
-const origin = 'https://cluera-ai-staging.vercel.app';
+const origin = 'https://www.clueraai.in';
 const secret = 'synthetic-webhook-secret-for-unit-tests';
 const env = { SIGMAROUND_RUN_PADDLE_SIMULATION: 'true', PADDLE_ENVIRONMENT: 'sandbox',
   SIGMAROUND_ACCOUNT_ORIGIN: origin, NEXT_PUBLIC_SUPABASE_URL: 'https://yhnqlfcgrmckhyjdxegg.supabase.co',

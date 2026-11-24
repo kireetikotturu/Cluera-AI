@@ -106,7 +106,7 @@ function gateway(revision:Revision) {
 async function deliver(eventId:string,eventType:string,payload:Record<string,unknown>,testEnv=env) {
   const raw=Buffer.from(JSON.stringify({entity:'event',account_id:env.RAZORPAY_TEST_ACCOUNT_ID,event:eventType,created_at:Math.floor(Date.now()/1000),payload}));
   const signature=createHmac('sha256',env.RAZORPAY_TEST_WEBHOOK_SECRET).update(raw).digest('hex');
-  const make=()=>new Request('https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook',{method:'POST',headers:{'content-type':'application/json','x-razorpay-signature':signature,'x-razorpay-event-id':eventId},body:raw});
+  const make=()=>new Request('https://www.clueraai.in/api/account/payments/cluera/webhook',{method:'POST',headers:{'content-type':'application/json','x-razorpay-signature':signature,'x-razorpay-event-id':eventId},body:raw});
   const response=await handleClueraWebhook(make(),testEnv,rpc);expect(response.status).toBe(200);expect(await response.json()).toEqual({received:true});
   return {repeat:()=>handleClueraWebhook(make(),testEnv,rpc)};
 }

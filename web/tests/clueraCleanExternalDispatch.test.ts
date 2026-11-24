@@ -71,7 +71,7 @@ function signedEvent(eventId:string,eventType:'payment.captured'|'order.paid'){
  const payload={payment:{entity:{id:paymentId,order_id:orderId,invoice_id:null}},...(eventType==='order.paid'?{order:{entity:{id:orderId}}}:{})};
  const body=Buffer.from(JSON.stringify({entity:'event',account_id:env.RAZORPAY_TEST_ACCOUNT_ID,event:eventType,created_at:Math.floor(Date.now()/1000),payload}));
  const signature=createHmac('sha256',env.RAZORPAY_TEST_WEBHOOK_SECRET).update(body).digest('hex');
- return ()=>new Request('https://cluera-ai-staging.vercel.app/api/account/payments/cluera/webhook',{method:'POST',body,headers:{'content-type':'application/json','x-razorpay-event-id':eventId,'x-razorpay-signature':signature}});
+ return ()=>new Request('https://www.clueraai.in/api/account/payments/cluera/webhook',{method:'POST',body,headers:{'content-type':'application/json','x-razorpay-event-id':eventId,'x-razorpay-signature':signature}});
 }
 async function fixturePinAndEnable(){
  // PGlite fixture ONLY; not a hosted audited bootstrap or financial activation.

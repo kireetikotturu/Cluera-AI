@@ -9,7 +9,7 @@ it('billing polling has separate durable account/IP limits and cannot consume or
   return {data:hits<=Number(args.p_maximum),error:null};
  })}} as unknown as Parameters<typeof rateLimit>[2];
  const config={rateKey:Buffer.alloc(32,5)} as AccountConfig;
- const request=new Request('https://cluera-ai-staging.vercel.app/api/account/credits',{headers:{'x-forwarded-for':'192.0.2.1'}});
+ const request=new Request('https://www.clueraai.in/api/account/credits',{headers:{'x-forwarded-for':'192.0.2.1'}});
  for(let i=0;i<90;i++)await rateLimit(request,config,clients,'synthetic@example.invalid','billing-read');
  await expect(rateLimit(request,config,clients,'synthetic@example.invalid','billing-read')).rejects.toMatchObject({status:429});
  expect(new Set(calls.map(row=>row.p_maximum))).toEqual(new Set([120,90]));
@@ -23,7 +23,7 @@ it('billing read limiter requires a verified account identifier and fails closed
  const config={rateKey:Buffer.alloc(32,5)} as AccountConfig;
  const rpc=vi.fn().mockResolvedValue({data:null,error:{code:'UNAVAILABLE'},status:503});
  const clients={service:{rpc}} as unknown as Parameters<typeof rateLimit>[2];
- const request=new Request('https://cluera-ai-staging.vercel.app/api/account/credits');
+ const request=new Request('https://www.clueraai.in/api/account/credits');
  await expect(rateLimit(request,config,clients,undefined,'billing-read')).rejects.toMatchObject({status:503});expect(rpc).not.toHaveBeenCalled();
  await expect(rateLimit(request,config,clients,'synthetic@example.invalid','billing-read')).rejects.toThrow();
  expect(rpc).toHaveBeenCalledOnce();

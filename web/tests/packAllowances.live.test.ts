@@ -7,7 +7,7 @@ describe.skipIf(process.env.SIGMAROUND_RUN_PACK_DB_ACCEPTANCE!=='true')('isolate
     const env=process.env;
     function check(value:unknown,message:string):asserts value{if(!value)throw new Error(`Pack DB acceptance: ${message}`);}
     check(env.NEXT_PUBLIC_SUPABASE_URL==='https://yhnqlfcgrmckhyjdxegg.supabase.co'
-      &&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://cluera-ai-staging.vercel.app'&&env.SUPABASE_SERVICE_ROLE_KEY,'wrong target');
+      &&env.SIGMAROUND_ACCOUNT_ORIGIN==='https://www.clueraai.in'&&env.SUPABASE_SERVICE_ROLE_KEY,'wrong target');
     const user=env.SIGMAROUND_PACK_FIXTURE_USER,session=env.SIGMAROUND_PACK_FIXTURE_SESSION;
     check(user&&session&&/^[a-f0-9-]{36}$/.test(user)&&/^[a-f0-9-]{36}$/.test(session),'synthetic fixture missing');
     const client=createClient(env.NEXT_PUBLIC_SUPABASE_URL!,env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});

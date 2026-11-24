@@ -14,7 +14,7 @@ The support Admin role was separately owner-authorized and granted through the s
 
 ## October 14 - earlier review; approval handoffs superseded above
 
-Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://cluera-ai-staging.vercel.app. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
+Premium pricing/checkout, accessible payment/account/history status and practical Admin navigation/help are deployed on **READY dpl_7eSnwzVBAK9nwAvi7nvcqLTJQJED**, exact reviewed **1b07a925f3c4289004172039696a11228dfe04da**, stable https://www.clueraai.in. Full734-entry/605-blob source/treef74f234f22975a8c52f501b74e643dc358189986, original locks and target match. [Hosted CI38612312345](https://github.com/kireetikotturu/Cluera-AI/actions/runs/38612312345) passes full web **1082/22 skipped** and desktop **366/1 skipped**, typechecks/builds/audits. Final focused **123/123**, preparation **23/23**,605-source/104-local-artifact/20-hosted-artifact scans pass. Earlier local1077/2 failures/22 skipped and subsequent original-bound isolated9/9 remain separate dated evidence; no failure or skip is relabelled.
 
 Final protected complete-source diagnostic **dpl_GyMG61REfXLFx8tBxzwHYnwTnFxX**, completed2026-10-14T18:14:12.991Z, authenticates both Cluera web and relay configured Supabase credentials. Signed auth-only/disabled-provider status passes, provider requests0/mutations0, identities discarded; intentionalERROR/exit1/no artifact or promotion. This is configured-credential authentication, not independent key-name equality, legacy retirement or customer usage acceptance. Render **LIVE dep-db7s96bbc2fs73b6vtng**, same1b07a925f3c4289004172039696a11228dfe04da runtime and actual health200/no-store/revision agree.
 
@@ -79,7 +79,7 @@ Provider-vault and Cluera release-registry schema proposals remain **unapplied**
 
 | Component | Exact resource and reviewed deployment | Role / retirement status |
 | --- | --- | --- |
-| Cluera website | Vercel prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B; READY dpl_66ESSjyF48sDeduXGs6jjPAU3XNf; 3d813f8f88cb3adacffe9afb889efa8ce07476bc | Current product; stable https://cluera-ai-staging.vercel.app. |
+| Cluera website | Vercel prj_VnxFJLhlCrIXLZk6JYywWUlC5E2B; READY dpl_66ESSjyF48sDeduXGs6jjPAU3XNf; 3d813f8f88cb3adacffe9afb889efa8ce07476bc | Current product; stable https://www.clueraai.in. |
 | Cluera relay | Render srv-db6r6som7kps73b1r4g0; LIVE dep-db7dhf8473hc73d00n9g; same 3d813f8 SHA | Current product; https://cluera-ai-relay-staging.onrender.com; auth-only. |
 | Old Account website | Vercel prj_VuG3xCUQqKmPhT0LIAmLuyUwBXg6; READY dpl_25RyjbEMPbF3ijCq1ZZZCyddNgYx; 0a5ae0153a318988b6f1034d5fc6cf063cdfd41c | **Not obsolete:** active shared DB scheduler destination, existing financial intake and pinned native API/feed. No change authorized/performed. |
 | Old Account relay | Render srv-db1402u0tbcc739dc5m0; LIVE dep-db69g4n40ujc73d6fsug; 6e3a4d45111d0f9916881314d5ea8b08b22eef4b | Transitional installed-client dependency. Active usage/population unknown; cannot disable on empty telemetry. |
@@ -98,7 +98,7 @@ Cluera Vercel has exactly 18 entries, all Production-only, no branch override, h
 | SUPABASE_SERVICE_ROLE_KEY | Sensitive; owner reports distinct new sb_secret_ saved. Entry updated 2026-10-14T01:18:28.166Z. Protected deployed SDK read succeeds. Value/type prefix not decrypted or independently logged. |
 | SIGMAROUND_ACCOUNT_COOKIE_KEY_BASE64, SIGMAROUND_ACCOUNT_RATE_SECRET_BASE64 | Sensitive; existing Cluera-only secrets retained. Signed relay proof confirms the rate-key match. |
 | CLUERA_RELEASE_PRIVATE_KEY_BASE64, CLUERA_RELEASE_PUBLIC_KEY_BASE64 | Sensitive; retained separate Cluera trust. No signing rotation or publication. |
-| SIGMAROUND_ACCOUNTS_ENABLED, SIGMAROUND_ACCOUNT_ORIGIN | true; https://cluera-ai-staging.vercel.app. Keep the canonical existing names, no singular duplicate switch. |
+| SIGMAROUND_ACCOUNTS_ENABLED, SIGMAROUND_ACCOUNT_ORIGIN | true; https://www.clueraai.in. Keep the canonical existing names, no singular duplicate switch. |
 | NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY | Retained dwqltsqumiwsxtkzdoaa URL; public Auth key configured. No service credential in a NEXT_PUBLIC variable; public key value omitted. |
 | RELEASE_DOWNLOAD_ORIGINS | https://github.com; does not approve a release. |
 | CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED; Razorpay checkout/intake; Paddle checkout | All four explicitly false. |

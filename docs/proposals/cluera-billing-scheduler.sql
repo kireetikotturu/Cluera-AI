@@ -17,7 +17,7 @@ create function billing_private.wake_worker() returns void language plpgsql
 security invoker set search_path='' set lock_timeout='2s' set statement_timeout='5s' as $$
 declare owner_row cluera_billing_private.processing_owner;cfg billing_private.worker_config;
  credential text;issued bigint;nonce uuid;proof text;request_id bigint;
- destination constant text:='https://cluera-ai-staging.vercel.app/api/internal/billing/cluera/tick';
+ destination constant text:='https://www.clueraai.in/api/internal/billing/cluera/tick';
 begin
  select * into strict owner_row from cluera_billing_private.processing_owner where singleton for share;
  if owner_row.owner='account' then perform billing_private.wake_worker_account_base();return;end if;

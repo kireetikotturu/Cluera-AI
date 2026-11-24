@@ -4,7 +4,7 @@ Do these six steps in order. Tick each box as you go. Nothing here needs coding.
 
 **Before you start, have these open:** the Supabase SQL editor for project `yhnqlfcgrmckhyjdxegg`, Vercel (project `cluera-ai-staging`), GitHub, the Razorpay dashboard (you will switch between **Test** and **Live** mode), and your Cluera Admin sign-in with your authenticator app.
 
-**Never change the website address** `https://cluera-ai-staging.vercel.app`: the installed Windows app points to it. Nothing below changes it.
+**Never change the website address** `https://www.clueraai.in`: the installed Windows app points to it. Nothing below changes it.
 
 **Never edit or delete payment records by hand.** Every database change below is a prepared file you review first.
 
@@ -65,8 +65,8 @@ The Buy button only works when `CLUERA_LIVE_CHECKOUT_ENABLED` is `true` **and** 
   ```
   Wait until the GitHub **Cluera verification** checks on `staging` are green (GitHub > Actions). If a check is red, do not continue; send me the failing step.
 - [ ] **2c. Push to main.** On GitHub open a **Pull request** from `staging` into `main`, wait for green checks, then press **Merge**. This is the "push to main" that makes Vercel build a Production deployment.
-- [ ] **2d. Publish.** Vercel > Deployments. Open the newest deployment built from `main` (it will say Production but not "Current"). Press **⋯ > Promote to Production** and confirm. The address stays `cluera-ai-staging.vercel.app`.
-- [ ] **2e. Check.** Open `https://cluera-ai-staging.vercel.app/account/admin`, press **Check if payments are ready**. Every line should have a green tick. A red line says what to do next.
+- [ ] **2d. Publish.** Vercel > Deployments. Open the newest deployment built from `main` (it will say Production but not "Current"). Press **⋯ > Promote to Production** and confirm. The address stays `www.clueraai.in`.
+- [ ] **2e. Check.** Open `https://www.clueraai.in/account/admin`, press **Check if payments are ready**. Every line should have a green tick. A red line says what to do next.
 
 **If a variable is wrong:** change it in Vercel, press **⋯ > Redeploy** on the newest deployment, then **Promote to Production** again (a redeploy is not published automatically).
 

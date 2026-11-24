@@ -78,7 +78,7 @@ it.each(templates)('keeps $file fluid without clipped content or a remote render
   }
 });
 
-for(const origin of ['https://cluera-ai-staging.vercel.app']){
+for(const origin of ['https://www.clueraai.in']){
   it.each(templates.filter(t=>t.placeholder==='ConfirmationURL'))(`preserves the complete provider link for $file (${origin})`,template=>{
     const callback=origin+'/api/account/callback?sb_flow_id=synthetic-flow';
     const url=new URL('https://yhnqlfcgrmckhyjdxegg.supabase.co/auth/v1/verify');

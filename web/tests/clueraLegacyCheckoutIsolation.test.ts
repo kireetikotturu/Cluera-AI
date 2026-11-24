@@ -12,7 +12,7 @@ vi.mock('../lib/accounts/handler',async original=>({...await original<typeof imp
   activeSession:mocks.session,rateLimit:mocks.limit}));
 vi.mock('../lib/payments/checkout/service',()=>({createPaymentOrder:mocks.create,paymentStatus:mocks.status,
   verifyPaymentCallback:mocks.callback}));
-const origin='https://cluera-ai-staging.vercel.app',uid=paymentTestEnvironment.SIGMAROUND_PAYMENT_TESTER_IDS;
+const origin='https://www.clueraai.in',uid=paymentTestEnvironment.SIGMAROUND_PAYMENT_TESTER_IDS;
 const sid='00000000-0000-4000-8000-000000000812',requestId='00000000-0000-4000-8000-000000000813';
 const account={userId:uid,sessionId:sid,email:'synthetic@example.invalid'};
 const create={action:'CREATE',expectedAccountId:uid,requestId,offerCode:'pro_3_hours',provider:'razorpay'};

@@ -6,7 +6,7 @@ import {AdminAccessGate,AdminProtectedContent} from '../AdminRoleNavigation';
 export const dynamic='force-dynamic';
 export default async function AccountAdminPage(){
  const incoming=await headers();
- const access=await accountAdminAccessRequest(new Request('https://cluera-ai-staging.vercel.app/account/admin',
+ const access=await accountAdminAccessRequest(new Request('https://www.clueraai.in/account/admin',
   {headers:{cookie:incoming.get('cookie')??''}}),false);
  if(access.status===403)notFound();
  if(access.status!==200)return <main className="account-page"><AdminAccessGate/></main>;

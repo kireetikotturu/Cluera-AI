@@ -1,6 +1,6 @@
 'use strict';
 const {detectSecrets,loadKnownSecrets}=require('./security/source-secret-scan.cjs'),path=require('node:path');
-const ORIGIN='https://cluera-ai-staging.vercel.app';
+const ORIGIN='https://www.clueraai.in';
 // Negative bodies only. No identities, credentials, event payload, order, financial RPC or SDK.
 const checks=[
  ['home','GET','/',200],['pricing','GET','/pricing',200],['checkout-page','GET','/account/checkout',200],

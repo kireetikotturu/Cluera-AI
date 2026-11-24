@@ -11,7 +11,7 @@ import {paymentTestEnvironment} from './helpers/paymentTestMode';
 // response is intercepted; no hosted Auth, provider or database request occurs.
 const mocks=vi.hoisted(()=>({clients:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
-const site='https://cluera-ai-staging.vercel.app';
+const site='https://www.clueraai.in';
 const first={userId:randomUUID(),sessionId:randomUUID()},second={userId:randomUUID(),sessionId:randomUUID()};
 const migration=readFileSync('../supabase/migrations/20261019085323_cluera_customer_billing_history.sql','utf8');
 const frozenProposal=readFileSync('../docs/proposals/cluera-billing-history.sql','utf8');

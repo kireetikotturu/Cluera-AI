@@ -71,7 +71,7 @@ create or replace function billing_private.wake_worker() returns void language p
 security invoker set search_path='' set lock_timeout='2s' set statement_timeout='5s' as $wake$
 declare cfg billing_private.worker_config;owner_row cluera_billing_private.processing_owner;
  credential text;issued bigint;nonce uuid;proof text;request_id bigint;
- destination constant text:='https://cluera-ai-staging.vercel.app/api/internal/billing/cluera/tick';
+ destination constant text:='https://www.clueraai.in/api/internal/billing/cluera/tick';
 begin
  -- This branch is unreachable while clean_worker_stays_passive is retained.
  -- Read/lock the disabled gate BEFORE touching Vault or any network resource.

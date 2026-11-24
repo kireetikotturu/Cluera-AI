@@ -6,7 +6,7 @@
 const { createHash, randomBytes, randomUUID } = require('node:crypto');
 const { prepare } = require('./prepare-cluera-live-profile.cjs');
 
-const ORIGIN = 'https://cluera-ai-staging.vercel.app';
+const ORIGIN = 'https://www.clueraai.in';
 const PROJECT = 'yhnqlfcgrmckhyjdxegg';
 const USAGE = `Usage:
   node scripts/payments/razorpay-go-live.cjs secrets

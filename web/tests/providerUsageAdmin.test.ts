@@ -3,7 +3,7 @@ import {providerUsageAdminRequest} from '../lib/aiProviders/usageAdmin';
 const mocks=vi.hoisted(()=>({clients:vi.fn(),session:vi.fn(),limit:vi.fn()}));
 vi.mock('../lib/accounts/clients',()=>({accountClients:mocks.clients}));
 vi.mock('../lib/accounts/handler',async original=>({...await original<typeof import('../lib/accounts/handler')>(),activeSession:mocks.session,rateLimit:mocks.limit}));
-const origin='https://cluera-ai-staging.vercel.app',actor='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002';
+const origin='https://www.clueraai.in',actor='00000000-0000-4000-8000-000000000001',sid='00000000-0000-4000-8000-000000000002';
 const report={code:'ACTIVE',scope:'LATEST_REQUESTS',limit:50,costStatus:'UNAVAILABLE',rows:[]};
 let rpc:ReturnType<typeof vi.fn>;
 const request=(headers:Record<string,string>={})=>new Request(origin+'/api/account/admin/ai-usage',{headers});
