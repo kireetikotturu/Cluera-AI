@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import type { AudioSourceDescriptor, DesktopCaptureSource, ScreenCapturePreview, SessionDetail, ShotKind } from '../../shared/types';
 import { FormattedAnswer } from '../components/FormattedAnswer';
 import { FloatingLogo } from '../components/FloatingLogo';
+import { LiveTimeRing } from '../components/LiveTimeRing';
 import { ThemeControl } from '../components/ThemeControl';
 import { PrivateModeControl } from '../components/PrivateModeControl';
 import {
@@ -1247,6 +1248,7 @@ export function CopilotPage(): JSX.Element {
         <span className="live-drag-handle" title="Drag Cluera AI"><Move size={15}/></span>
         <button className="rail-collapse" aria-label="Collapse to floating logo" title="Collapse to floating logo" onClick={() => void setLiveCollapsed(true)}><Minimize2 size={15}/></button>
         <span className="live-session-timer" aria-label={`Session time ${sessionTimer}`} title="Live session time">{sessionTimer}</span>
+        <LiveTimeRing/>
         <button
           className={running ? 'stop-listening' : `start-listening${deviceCheckReady ? ' ready-to-start' : ''}`}
           aria-label={running ? 'Stop interview' : 'Start interview'}

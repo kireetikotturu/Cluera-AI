@@ -2797,3 +2797,20 @@ button, input, select, textarea, .setting-rows label { font-weight: 500; }
 .transcript-brand .brand-logo, .dashboard-mark { overflow: hidden; background: transparent; box-shadow: none; padding: 0; }
 .transcript-brand .brand-logo img, .dashboard-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .dashboard-content > .settings-note { margin: 0 0 18px; }
+
+/* Time-left ring in the live side rail */
+.live-time-ring { position: relative; flex: 0 0 auto; width: 36px; height: 36px; margin: 2px auto; display: grid; place-items: center; color: var(--text); -webkit-app-region: no-drag; }
+.live-time-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.live-time-ring .ring-track { fill: none; stroke: rgba(var(--neutral-rgb), 0.16); stroke-width: 3; }
+.live-time-ring .ring-value { fill: none; stroke: #8f7dff; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset .8s ease, stroke .3s ease; }
+.live-time-ring.low .ring-value { stroke: var(--warning); }
+.live-time-ring.critical .ring-value { stroke: var(--danger); }
+.live-time-ring b { position: relative; z-index: 1; font-size: 11px; font-weight: 700; line-height: 1; letter-spacing: -.3px; }
+.live-time-ring b small { font-size: 7px; font-weight: 600; margin-left: 1px; color: var(--muted); }
+.live-time-ring em { position: absolute; z-index: 1; bottom: 6px; font-size: 6px; font-style: normal; color: var(--faint); line-height: 1; }
+.live-time-ring:has(em) b { transform: translateY(-3px); }
+.live-time-ring.pending i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(var(--neutral-rgb), 0.2); border-top-color: #8f7dff; animation: live-ring-spin 1s linear infinite; }
+@keyframes live-ring-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .live-time-ring .ring-value { transition: none; } .live-time-ring.pending i { animation: none; } }
+/* Safety: nothing but the logo may ever show in the collapsed launcher. */
+:root[data-live-collapsed='true'] .account-usage-strip, :root[data-live-collapsed='true'] .live-time-ring { display: none !important; }

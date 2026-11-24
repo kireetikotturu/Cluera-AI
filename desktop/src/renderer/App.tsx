@@ -6,7 +6,6 @@ import { WindowBar } from './components/WindowBar';
 import { CopilotPage } from './pages/CopilotPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { HomePage } from './pages/HomePage';
-import {AccountCreditsSection} from './components/AccountCreditsSection';
 import { FileLibraryPage } from './pages/FileLibraryPage';
 import { SessionEditorPage } from './pages/SessionEditorPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -357,7 +356,6 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
           )}
 
           <div className={`content${account && page === 'copilot' ? ' account-live-content' : ''}`}>
-            {account&&page==='copilot'&&<AccountCreditsSection key={account.userId} userId={account.userId} compact/>}
             {content}
           </div>
         </div>
