@@ -9,14 +9,16 @@ export class IntentDetector {
     const text = raw.replace(/\s+/g, ' ').trim();
     if (!text || SMALL_TALK.test(text)) return this.result(false, 'SMALL_TALK', 0.96, text, true, false);
     const incompleteProbe = text.replace(/[.…,;:!]+$/g, '').trim();
-    if (INCOMPLETE.test(incompleteProbe) || text.split(' ').length < 3) return this.result(false, 'CONTEXT_ONLY', 0.78, text, false, true);
+    // "Introduce yourself" is only two words but it is a whole question.
+    const selfIntroduction = /\b(introduce yourself|about yourself|who are you|your name)\b/i.test(text);
+    if (!selfIntroduction && (INCOMPLETE.test(incompleteProbe) || text.split(' ').length < 3)) return this.result(false, 'CONTEXT_ONLY', 0.78, text, false, true);
 
-    const likelyQuestion = text.includes('?') || QUESTION_START.test(text) || /\b(tell me|walk me through|I'd like to know|talk about)\b/i.test(text);
+    const likelyQuestion = text.includes('?') || QUESTION_START.test(text) || /\b(tell me|walk me through|I'd like to know|talk about|introduce yourself|about yourself|who are you|your name)\b/i.test(text);
     if (!likelyQuestion) return this.result(false, 'NO_ANSWER_NEEDED', 0.84, text, true, false);
 
     let intent: QuestionIntentName = 'GENERAL_QUESTION';
     if (/\b(star|conflict|challenge|failure|mistake|leadership|difficult|situation|time when)\b/i.test(text)) intent = 'BEHAVIORAL_QUESTION';
-    else if (/\b(experience|worked with|background|project|resume)\b/i.test(text)) intent = 'EXPERIENCE_QUESTION';
+    else if (/\b(experiences?|worked with|background|projects?|resume|introduce yourself|about yourself)\b/i.test(text)) intent = 'EXPERIENCE_QUESTION';
     else if (/\b(code|algorithm|complexity|function|implement|debug|leetcode|data structure)\b/i.test(text)) intent = 'CODING_QUESTION';
     else if (/\b(system design|scale|architecture|high availability|distributed|load balancer|database design)\b/i.test(text)) intent = 'SYSTEM_DESIGN';
     else if (/\b(react|node|typescript|javascript|python|java|database|sql|api|cloud|aws|docker|kubernetes|mongodb|authentication|authorization)\b/i.test(text)) intent = 'TECHNICAL_QUESTION';

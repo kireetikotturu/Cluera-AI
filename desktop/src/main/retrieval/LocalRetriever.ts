@@ -19,6 +19,30 @@ export function vectorize(text: string): Vector {
   return vector;
 }
 
+// Question words say nothing about which part of a resume is relevant ("tell me about ...").
+const QUESTION_FILLER = new Set(['about','tell','me','what','which','who','whom','how','why','when','where','do','does','did','have','has','had','can','could','would','will','please','describe','explain','walk','through','give','share','yourself','myself','am','there','any','some','also','than','then','they','their','not','but','if','so','such','into','over','out','up','all','tell','talk','know','like']);
+
+/** Plural/singular forms of one word, so "projects" in a question finds "Project" in a resume. */
+function wordForms(word: string): string[] {
+  const forms = new Set([word]);
+  if (word.length > 3 && word.endsWith('ies')) forms.add(`${word.slice(0, -3)}y`);
+  if (word.length > 3 && word.endsWith('es')) forms.add(word.slice(0, -2));
+  if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) forms.add(word.slice(0, -1));
+  else if (word.length > 2 && !word.endsWith('s')) forms.add(`${word}s`);
+  return [...forms];
+}
+
+/** A question as search terms: filler words dropped, singular and plural wording both searched. */
+export function queryVector(text: string): Vector {
+  const words = tokenize(text).filter((word) => !QUESTION_FILLER.has(word));
+  const vector: Vector = {};
+  for (const word of words) vector[word] = (vector[word] ?? 0) + 1;
+  for (const word of words) for (const form of wordForms(word)) if (!(form in vector)) vector[form] = 0.5;
+  const length = Math.sqrt(Object.values(vector).reduce((sum, value) => sum + value * value, 0)) || 1;
+  for (const token of Object.keys(vector)) vector[token] /= length;
+  return vector;
+}
+
 export function cosine(a: Vector, b: Vector): number {
   let score = 0;
   const [small, large] = Object.keys(a).length < Object.keys(b).length ? [a, b] : [b, a];
@@ -29,6 +53,8 @@ export function cosine(a: Vector, b: Vector): number {
 export class LocalRetriever {
   constructor(private readonly repositories: Repositories, private readonly config: AppConfig['retrieval']) {}
 
+  get settings(): AppConfig['retrieval'] { return this.config; }
+
   index(document: DocumentRecord): void {
     const chunks = this.chunk(document.text).map((text, index) => ({
       id: randomUUID(), sessionId: document.sessionId, documentId: document.id, documentType: document.type,
@@ -38,12 +64,32 @@ export class LocalRetriever {
   }
 
   retrieve(sessionId: string, query: string, topK = this.config.topK): ContextChunk[] {
-    const queryVector = vectorize(query);
-    return this.repositories.listChunks(sessionId, Object.keys(queryVector))
-      .map(({ tokenVector, ...chunk }) => ({ ...chunk, score: cosine(queryVector, JSON.parse(tokenVector) as Vector) }))
+    const vector = queryVector(query);
+    return this.repositories.listChunks(sessionId, Object.keys(vector))
+      .map(({ tokenVector, ...chunk }) => ({ ...chunk, score: cosine(vector, JSON.parse(tokenVector) as Vector) }))
       .filter((chunk) => (chunk.score ?? 0) > 0)
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, topK);
+  }
+
+  /** Relevant chunks of one kind of document, so a long resume cannot crowd out the job description
+   * or the candidate's own notes (and the other way round). */
+  retrieveType(sessionId: string, query: string, type: ContextChunk['documentType'], topK: number): ContextChunk[] {
+    const vector = queryVector(query);
+    return this.repositories.listChunks(sessionId, Object.keys(vector))
+      .filter((chunk) => chunk.documentType === type)
+      .map(({ tokenVector, ...chunk }) => ({ ...chunk, score: cosine(vector, JSON.parse(tokenVector) as Vector) }))
+      .filter((chunk) => (chunk.score ?? 0) > 0)
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, topK);
+  }
+
+  /** The first chunks of a document type in reading order (a resume starts with the candidate's name). */
+  leading(sessionId: string, type: ContextChunk['documentType'], count: number): ContextChunk[] {
+    return this.repositories.listChunks(sessionId)
+      .filter((chunk) => chunk.documentType === type)
+      .slice(0, count)
+      .map(({ tokenVector: _tokenVector, ...chunk }) => ({ ...chunk, score: 0 }));
   }
 
   private chunk(text: string): string[] {

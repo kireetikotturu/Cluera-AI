@@ -3,20 +3,45 @@ import { Repositories } from '../database/Repositories';
 import { LocalRetriever } from '../retrieval/LocalRetriever';
 import type { CompactScreenRequestContext } from '../screen/ScreenAnalyzer';
 
+/** Questions about the candidate themself: they need the whole resume, not a few matching lines. */
+const PERSONAL_QUESTION = /\b(?:introduce|yourself|myself|about you|about me|who are you|your name|my name|your (?:background|experiences?|projects?|skills?|strengths?|weakness(?:es)?|education|college|degree|achievements?|career|journey|role|responsibilit\w+|favou?rite\w*|best|strongest|certifications?|internships?|work|company|companies|resume|cv|profile|tech stack|technologies)|projects? (?:you|have you|did you|you've)|what (?:have|did) you (?:do|done|built|build|work|worked)|walk (?:me )?through your)\b/i;
+
 export class ContextBuilder {
   constructor(private readonly repositories: Repositories, private readonly retriever: LocalRetriever) {}
 
   build(session: Session, intent: QuestionIntent, screenContext?: ScreenContext): AnswerContext {
-    const chunks = this.retriever.retrieve(session.id, intent.question);
+    const { topK } = this.retriever.settings;
+    // Each kind of material is searched on its own, so a long resume cannot push the job description
+    // or the candidate's typed notes out of the answer (and the other way round).
+    const found = (type: ContextChunk['documentType']): ContextChunk[] => this.retriever.retrieveType(session.id, intent.question, type, topK);
+    const chunks = [...found('resume'), ...found('job-description'), ...found('supporting'), ...found('round-context')];
     const byType = (type: ContextChunk['documentType']): ContextChunk[] => chunks.filter((c) => c.documentType === type);
     const fallback = (type: ContextChunk['documentType'], text: string, section: string, limit: number): ContextChunk[] => text.trim() ? [{
       id: `session-${type}`, sessionId: session.id, documentId: `session-${type}`, documentType: type,
       section, page: null, chunkIndex: 0, text: text.trim().slice(0, limit), score: 0,
     }] : [];
-    const resumeContext = byType('resume');
-    const jobContext = byType('job-description');
-    const needsBroadPersonalContext = ['BEHAVIORAL_QUESTION', 'EXPERIENCE_QUESTION'].includes(intent.intent)
-      || /introduce yourself|tell me about yourself|your background|your experience|your (?:recent |own )?project/i.test(intent.question);
+    const needsBroadPersonalContext = ['BEHAVIORAL_QUESTION', 'EXPERIENCE_QUESTION'].includes(intent.intent) || PERSONAL_QUESTION.test(intent.question);
+    // The candidate's own details (name, headline, summary) are always available to the answer.
+    const profile = this.retriever.leading(session.id, 'resume', 1);
+    const matchedResume = byType('resume');
+    const withProfile = (list: ContextChunk[]): ContextChunk[] =>
+      profile.length && !list.some((chunk) => chunk.id === profile[0].id) ? [...profile, ...list.slice(0, topK - 1)] : list;
+    let resumeContext: ContextChunk[];
+    if (needsBroadPersonalContext && session.resumeText.trim()) {
+      // "Introduce yourself", "your projects", "your background": the whole resume is the evidence.
+      const whole = fallback('resume', session.resumeText, 'Resume', 8_000);
+      resumeContext = [...whole, ...matchedResume.filter((chunk) => !whole[0].text.includes(chunk.text.slice(0, 120))).slice(0, 2)];
+    } else {
+      resumeContext = matchedResume.length ? withProfile(matchedResume) : profile;
+    }
+    const matchedJob = byType('job-description');
+    const jobContext = matchedJob.length ? matchedJob : needsBroadPersonalContext ? fallback('job-description', session.jobDescription, 'Job description fallback', 6_000) : [];
+    // Typed context and supporting files describe the candidate too; a personal question must see them
+    // even when no word of the question appears in them.
+    const matchedSupporting = [...byType('supporting'), ...byType('round-context')];
+    const supportingContext = matchedSupporting.length || !needsBroadPersonalContext
+      ? matchedSupporting
+      : this.retriever.leading(session.id, 'supporting', 3);
     const recentConversation = this.repositories.contextTurns(session.id, 30).map((turn) => ({
       ...turn,
       // Candidate/interviewer speech is more useful than repeating a whole old AI answer.
@@ -24,9 +49,9 @@ export class ContextBuilder {
     }));
     return {
       question: intent.question, intent: intent.intent, recentConversation,
-      resumeContext: resumeContext.length ? resumeContext : needsBroadPersonalContext ? fallback('resume', session.resumeText, 'Resume fallback', 8_000) : [],
-      jobContext: jobContext.length ? jobContext : needsBroadPersonalContext ? fallback('job-description', session.jobDescription, 'Job description fallback', 6_000) : [],
-      documentContext: [...byType('supporting'), ...byType('round-context')],
+      resumeContext,
+      jobContext,
+      documentContext: supportingContext,
       instructions: `${session.instructions}\nCurrent round brief: ${this.repositories.currentRound(session.id)?.note ?? ''}`.trim(), session,
       screenContext,
     };

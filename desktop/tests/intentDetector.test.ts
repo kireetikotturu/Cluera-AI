@@ -10,6 +10,11 @@ describe('IntentDetector', () => {
   it('detects multiple questions', () => expect(detector.detect('What did you build? And also how did you test it?').intent).toBe('MULTI_PART_QUESTION'));
   it('waits for an ellipsis-ended incomplete question', () => expect(detector.detect('Tell me about your experience with…').isComplete).toBe(false));
   it('extracts the real question after context', () => expect(detector.detect('MongoDB is important for us. Have you used MongoDB?').question).toBe('Have you used MongoDB?'));
+  it('answers a spoken self-introduction and questions about the candidate\'s projects', () => {
+    expect(detector.detect('Introduce yourself').isAnswerNeeded).toBe(true);
+    expect(detector.detect('Can you introduce yourself please').isAnswerNeeded).toBe(true);
+    expect(detector.detect('What are your favorite projects?').intent).toBe('EXPERIENCE_QUESTION');
+  });
   it('classifies coding and system-design questions', () => {
     expect(detector.detect('Implement a function and explain its complexity?').intent).toBe('CODING_QUESTION');
     expect(detector.detect('How would you design a highly available distributed system?').intent).toBe('SYSTEM_DESIGN');
