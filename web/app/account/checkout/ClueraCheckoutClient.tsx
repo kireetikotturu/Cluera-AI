@@ -234,6 +234,11 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
 
   useEffect(() => {
     if (!enabled) return;
+    // Download the payment window code into the browser cache now (nothing runs until the customer
+    // presses Buy), so the payment window opens the moment checkout is ready.
+    if (!document.head.querySelector(`link[rel="preload"][href="${SDK_URL}"]`)) {
+      const preload = document.createElement('link'); preload.rel = 'preload'; preload.setAttribute('as', 'script'); preload.href = SDK_URL; document.head.append(preload);
+    }
     // Only warm the network connection (no script runs before the customer presses Buy).
     for (const origin of ['https://checkout.razorpay.com', 'https://api.razorpay.com']) {
       if (!document.head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {
@@ -424,7 +429,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         :'Razorpay checkout is open. Your balance updates after payment verification.');
     } catch { if (current()) {
       const notice=stage==='sdk'
-        ? 'The payment window is taking longer than usual to open. Please tap Continue payment to try again.'
+        ? 'We could not open the payment window. Check your internet connection, turn off any ad blocker for this site, then tap Continue payment. You have not been charged.'
         : resume ? 'We could not reopen this order. Tap Refresh billing status, or cancel it and start a new one.'
           : 'We could not start checkout. Tap Refresh billing status, or cancel the unfinished order and try again.';
       preparationFailure.current=notice;needsReconcile.current=false;setResumeRevisionId(null);setMessage(notice);

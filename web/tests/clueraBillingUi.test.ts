@@ -464,7 +464,7 @@ it('an SDK load failure stays visible until an explicit read rechecks the same o
   await act(async()=>script.dispatchEvent(new Event('error')));
   await act(async()=>{await new Promise(resolve=>setTimeout(resolve,5));});
  }
- expect(host.textContent).toContain('payment window is taking longer than usual');expect(button('Continue payment')).toBeUndefined();expect(buy().disabled).toBe(true);
+ expect(host.textContent).toContain('We could not open the payment window');expect(button('Continue payment')).toBeUndefined();expect(buy().disabled).toBe(true);
  await act(async()=>button('Refresh billing status').click());
  expect(button('Continue payment').disabled).toBe(false);expect(buy().disabled).toBe(false);expect(buy().dataset.checkoutAction).toBe('resume');
  const open=vi.fn();window.Razorpay=class{open=open;close=vi.fn();on=vi.fn();};
@@ -924,3 +924,9 @@ it('a late saved-plan read cannot restore the Admin card after the owner boundar
  expect(host.querySelector('article')).toBeNull();expect(host.textContent).not.toContain('plan_syntheticSync0001');
 });
 
+it('downloads the payment window code in advance without running it', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL) => checkoutGet(url)));
+  await renderCheckout();
+  expect(document.querySelector('link[rel="preload"][as="script"][href*="checkout.razorpay.com"]')).not.toBeNull();
+  expect(document.querySelector('script[src*="razorpay"]')).toBeNull();
+});
