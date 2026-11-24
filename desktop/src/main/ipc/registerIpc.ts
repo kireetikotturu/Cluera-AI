@@ -141,6 +141,8 @@ export function registerIpc(
     if (assignmentModeActive) return true;
     const live = (): boolean => sessionModeActive && authorization.isEntitled() && !applicationQuitting && !window.isDestroyed() && !window.webContents.isDestroyed();
     const register = (key: string, action: () => void): boolean => {
+      // Only this app's own registrations are reported here, so releasing one that was left behind is always safe.
+      if (globalShortcut.isRegistered?.(key)) globalShortcut.unregister(key);
       if (!globalShortcut.register(key, () => { if (live()) action(); })) return false;
       assignmentKeys.push(key);
       return true;
@@ -154,6 +156,12 @@ export function registerIpc(
     setTouchThrough(true);
     return true;
   };
+  // Showing, restoring or re-pinning the window must never quietly give the mouse back while clicks should pass through.
+  const reassertTouchThrough = (): void => {
+    if (assignmentModeActive && touchThrough && !window.isDestroyed()) window.setIgnoreMouseEvents(true, { forward: true });
+  };
+  const touchGuardEvents = ['show', 'restore', 'focus', 'always-on-top-changed'] as const;
+  for (const eventName of touchGuardEvents) window.on(eventName as 'show', reassertTouchThrough);
   // If the page crashes while clicks pass through, give the mouse back at once.
   window.webContents.on?.('render-process-gone', releaseAssignmentMode);
   const keepWindowOffTaskbar = (): void => {
@@ -168,6 +176,7 @@ export function registerIpc(
     releaseQuickShotShortcut();
     releaseSendShortcut();
     releaseAssignmentMode();
+    for (const eventName of touchGuardEvents) window.removeListener(eventName as 'show', reassertTouchThrough);
     app.removeListener('before-quit', allowApplicationQuit);
   });
   window.on('close', (event) => {
@@ -238,6 +247,8 @@ export function registerIpc(
   });
   ipcMain.handle(IPC.app.focusLiveTranscript, async (event, forceQuestionFocus: unknown) => {
     if (event.sender !== window.webContents || !sessionModeActive || liveCollapsed || !window.isVisible()) return false;
+    // An assignment is worked on in another window: hearing a question must never pull the keyboard away from it.
+    if (assignmentModeActive) return false;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       if (!window.isFocused()) {
         ensureFocusableOffTaskbar(window);
@@ -601,7 +612,10 @@ export function registerIpc(
     if (event.sender !== window.webContents) throw new Error('Unauthorized window request.');
     requireAccess();
     if (typeof enabled !== 'boolean') throw new Error('Assignment mode must be enabled or disabled explicitly.');
-    if (!enabled || !sessionModeActive) { releaseAssignmentMode(); return { active: false, touchThrough: false }; }
+    if (!enabled) { releaseAssignmentMode(); return { active: false, touchThrough: false }; }
+    // Only the live page asks this, and only while a session runs. If the live window mode was lost on the way (a
+    // shutdown that raced with this page), bring it back instead of silently refusing.
+    if (!sessionModeActive) setSessionMode(true);
     const active = enableAssignmentMode();
     return { active, touchThrough: active && touchThrough };
   });

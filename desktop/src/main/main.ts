@@ -131,8 +131,6 @@ async function createWindow(): Promise<void> {
     state => {
       emit('copilot:status', state === 'reconnecting' ? { status: 'recovering', message: 'Reconnecting audio…' }
         : state === 'restored' ? { status: 'listening', message: 'Audio reconnected' } : { status: 'recovering', message: 'Audio connection lost' });
-      // Reconnecting gave up: the session is about to end, so tell the live page to match (a logout is not this).
-      if (state === 'failed') emit('session:interrupted', null);
     }) : undefined;
   const applyMode = (): void => {
     if (!accountProviders) throw new Error('Cluera account provider runtime is unavailable.');
@@ -361,7 +359,9 @@ if (process.platform === 'win32') {
     updates,
     undefined,
   );
-  stopAccountWork = async () => { accountProviders?.stop(); await stopProtectedSession(); };
+  // Whatever ends the live work (sleep, a lost sign-in, a connection that could not be restored) also turns off the live
+  // window mode and its shortcuts, so the live page must be told to match.
+  stopAccountWork = async () => { emit('session:interrupted', null); accountProviders?.stop(); await stopProtectedSession(); };
   let restartPending = false;
   registerAccountIpc(window, account, account ? { workspaceUserId, updates, context: accountContext, credits:accountCredits, stop: stopAccountWork,
     restart: () => {

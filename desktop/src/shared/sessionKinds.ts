@@ -7,8 +7,9 @@ export const ASSIGNMENT_STYLE_DIRECT = 'Direct answer only';
 export const ASSIGNMENT_STYLE_EXPLAINED = 'Answer with explanation';
 export type AssignmentAnswerMode = 'direct' | 'explained';
 
+/** Only a session that was saved with the direct style answers directly; a new assignment starts with explanations. */
 export const assignmentModeOf = (answerStyle: string | undefined): AssignmentAnswerMode =>
-  answerStyle === ASSIGNMENT_STYLE_EXPLAINED ? 'explained' : 'direct';
+  answerStyle === ASSIGNMENT_STYLE_DIRECT ? 'direct' : 'explained';
 
 export const DEFAULT_ASSIGNMENT_CONTEXT = 'I am going to write an assignment. It has rounds such as MCQ and coding in Java, SQL and Python, plus aptitude, reasoning and math. For multiple choice questions give the correct option. For coding questions give correct, complete code in the language the question asks for. Keep every answer accurate and short.';
 

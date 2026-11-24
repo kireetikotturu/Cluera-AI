@@ -16,7 +16,7 @@ describe('Alt+S send shortcut wiring', () => {
     expect(ipc).toContain("ipcMain.handle(IPC.app.sendShortcut");
     expect(ipc).toContain('if (!enabled || !sessionModeActive) { releaseSendShortcut(); return false; }');
     expect(ipc).toContain('else { releaseQuickShotShortcut(); releaseSendShortcut(); releaseAssignmentMode(); }');
-    expect(ipc).toContain('releaseSendShortcut();\n    releaseAssignmentMode();\n    app.removeListener');
+    expect(ipc).toContain('releaseSendShortcut();\n    releaseAssignmentMode();\n    for (const eventName of touchGuardEvents) window.removeListener(eventName as \'show\', reassertTouchThrough);\n    app.removeListener');
     expect(ipc).toContain("window.webContents.send(IPC.events, 'answer:send-shortcut', null)");
     expect(ipc).toContain("if (event.sender !== window.webContents) throw new Error('Unauthorized shortcut request.')");
   });

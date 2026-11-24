@@ -186,8 +186,8 @@ const source = (file: string): string => fs.readFileSync(file, 'utf8').replace(/
 
 it('tells the live page when reconnecting gave up, and lets it reset so Start works again', () => {
   const main = source('src/main/main.ts'), page = source('src/renderer/pages/CopilotPage.tsx');
-  expect(main).toContain("if (state === 'failed') emit('session:interrupted', null);");
-  expect(main).toContain("() => { void stopAccountWork(); },");           // a logout still ends the session without that message
+  // Whatever ends the live work (giving up, sleep, a lost sign-in) tells the page, so it never shows a dead session as running.
+  expect(main).toContain("stopAccountWork = async () => { emit('session:interrupted', null); accountProviders?.stop(); await stopProtectedSession(); };");
   expect(page).toContain("window.electronAPI.onEvent('session:interrupted', () => interruptedRef.current())");
   expect(page).toContain('window.electronAPI.setSessionWindowMode(true)');
   expect(page).toContain('preparedSessionId.current = null; deviceCheckPromise.current = null;');

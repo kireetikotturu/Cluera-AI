@@ -95,7 +95,9 @@ describe('assignment sessions', () => {
   it('turns the answer style into one of two modes', () => {
     expect(assignmentModeOf(ASSIGNMENT_STYLE_DIRECT)).toBe('direct');
     expect(assignmentModeOf(ASSIGNMENT_STYLE_EXPLAINED)).toBe('explained');
-    expect(assignmentModeOf('Natural and confident')).toBe('direct');
+    // A new assignment starts with explanations; only a session saved with the direct style answers directly.
+    expect(assignmentModeOf('Natural and confident')).toBe('explained');
+    expect(assignmentModeOf(undefined)).toBe('explained');
   });
 
   it('asks the AI for a direct answer or an explained one, as chosen, without any interview wording', () => {
@@ -213,4 +215,26 @@ describe('assignment wiring', () => {
     expect(editor).toContain('{!isAssignment && <label><input type="checkbox" checked={form.autoAnswer ?? false}');
     expect(editor).toContain('autoAnswer: false, saveTranscript: true');
   });
+
+  it('keeps the click-through window dependable: never takes the keyboard, restores itself and says when it cannot work', () => {
+    // Hearing a question must not pull the keyboard away from the page being worked on.
+    expect(ipc).toContain('if (assignmentModeActive) return false;');
+    // A lost live window mode is restored instead of silently refusing, and the ignore-mouse state is put back.
+    expect(ipc).toContain('if (!sessionModeActive) setSessionMode(true);');
+    expect(ipc).toContain('const reassertTouchThrough = (): void => {');
+    expect(ipc).toContain("globalShortcut.isRegistered?.(key)");
+    // Anything that ends the live work tells the page, so it never shows "Touch off" for a window that is already normal.
+    expect(read('src/main/main.ts')).toContain("emit('session:interrupted', null); accountProviders?.stop();");
+    // The page tries again a few times and then shows the truth.
+    expect(page).toContain('const retryAfter = [500, 1_500, 3_500];');
+    expect(page).toContain("touchUnavailable ? 'Alt+M unavailable'");
+    expect(page).toContain('Hands-free after Start · Alt+M');
+  });
+
+  it('starts a new assignment with "Answer with explanation" selected', () => {
+    expect(editor).toContain("checked={assignmentMode === 'explained'}");
+    expect(editor).toContain('const assignmentMode = assignmentModeOf(form.answerStyle);');
+    expect(assignmentModeOf('Natural and confident')).toBe('explained');
+  });
 });
+

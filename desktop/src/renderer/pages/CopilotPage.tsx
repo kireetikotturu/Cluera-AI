@@ -77,6 +77,7 @@ export function CopilotPage(): JSX.Element {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const isAssignment = (detail?.session ?? store.sessions.find((session) => session.id === activeId))?.kind === 'assignment';
   const [touchThrough, setTouchThrough] = useState(false);
+  const [touchUnavailable, setTouchUnavailable] = useState(false);
   const [manual, setManual] = useState('');
   const [transcriptDraftActive, setTranscriptDraftActive] = useState(false);
   const [running, setRunning] = useState(false);
@@ -1019,11 +1020,21 @@ export function CopilotPage(): JSX.Element {
   const assignmentActive = isAssignment && running && !collapsed;
   useEffect(() => {
     let disposed = false;
-    if (!assignmentActive) setTouchThrough(false);
-    void Promise.resolve(window.electronAPI.setAssignmentMode?.(assignmentActive))
-      .then((state) => { if (!disposed && state) setTouchThrough(Boolean(state.touchThrough)); })
-      .catch(() => undefined);
-    return () => { disposed = true; };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const retryAfter = [500, 1_500, 3_500];
+    const apply = async (attempt: number): Promise<void> => {
+      let state: { active: boolean; touchThrough: boolean } | undefined;
+      try { state = await window.electronAPI.setAssignmentMode?.(assignmentActive); } catch { state = undefined; }
+      if (disposed) return;
+      if (!assignmentActive) { setTouchThrough(false); setTouchUnavailable(false); return; }
+      if (state?.active) { setTouchThrough(Boolean(state.touchThrough)); setTouchUnavailable(false); return; }
+      // Not switched on (a shortcut still being released, a mode change in progress): try again a few times, then
+      // say plainly that Alt+M is unavailable instead of showing a state that is not real.
+      if (attempt < retryAfter.length) timer = setTimeout(() => { void apply(attempt + 1); }, retryAfter[attempt]);
+      else { setTouchThrough(false); setTouchUnavailable(true); }
+    };
+    void apply(0);
+    return () => { disposed = true; clearTimeout(timer); };
   }, [assignmentActive]);
   useEffect(() => () => { void Promise.resolve(window.electronAPI.setAssignmentMode?.(false)).catch(() => undefined); }, []);
   useEffect(() => window.electronAPI.onEvent('window:touch-through', (payload) => setTouchThrough(payload.enabled)), []);
@@ -1053,7 +1064,7 @@ export function CopilotPage(): JSX.Element {
       setSystemAudioStatus('error'); setMicrophoneStatus(microphoneMode === 'off' ? 'disabled' : 'error');
       void audio.current.stop(); void candidateAudio.current.stop();
       void Promise.resolve(window.electronAPI.setSessionWindowMode(true)).catch(() => undefined);
-      store.setError('The connection to Cluera was lost and could not be restored. Press Start to continue.');
+      store.setError('The live session was stopped (the connection was lost or the computer went to sleep). Press Start to continue.');
     };
   });
   useEffect(() => window.electronAPI.onEvent('session:interrupted', () => interruptedRef.current()), []);
@@ -1416,11 +1427,12 @@ export function CopilotPage(): JSX.Element {
     </aside>
 
       <section className="live-qa-panel" ref={qaPanelRef} style={{ '--qa-font-size': `${qaFontSize}px` } as CSSProperties}>
-        {(running || store.liveQaItems.length > 0 || store.screenContext) && <div className="qa-panel-tools">
+        {(running || isAssignment || store.liveQaItems.length > 0 || store.screenContext) && <div className="qa-panel-tools">
           <span>{store.liveQaItems.length ? `${store.activeQaIndex + 1}/${store.liveQaItems.length}` : ''}</span>
           <div>
             {store.screenContext && <span className="screen-context-ready"><Sparkles size={10}/>Screen context</span>}
-            {isAssignment && running && <span className={`touch-chip${touchThrough ? ' off' : ''}`} title={touchThrough ? 'Clicks pass through this window to the page behind it. Press Alt+M to use the window.' : 'Press Alt+M to let clicks pass through this window.'}>{touchThrough ? 'Touch off · Alt+M' : 'Touch on · Alt+M'}</span>}
+            {isAssignment && !running && <span className="touch-chip" title="After you press Start, this window ignores clicks so the page behind it keeps working. Alt+M turns that on or off.">Hands-free after Start · Alt+M</span>}
+            {isAssignment && running && <span className={`touch-chip${touchThrough ? ' off' : touchUnavailable ? ' unavailable' : ''}`} title={touchUnavailable ? 'Alt+M could not be reserved (another program may be using it), so this window keeps accepting clicks.' : touchThrough ? 'Clicks pass through this window to the page behind it. Press Alt+M to use the window.' : 'Press Alt+M to let clicks pass through this window.'}>{touchUnavailable ? 'Alt+M unavailable' : touchThrough ? 'Touch off · Alt+M' : 'Touch on · Alt+M'}</span>}
             {running && <span className={`live-status-dot ${store.copilotStatus}`}>{statusLabels[store.copilotStatus]}</span>}
           </div>
         </div>}

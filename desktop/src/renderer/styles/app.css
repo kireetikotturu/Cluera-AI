@@ -902,6 +902,7 @@ button.chat-message-text:hover { background: rgba(var(--neutral-rgb), 0.1); }
 .qa-scroll { overflow-anchor: none; }
 .touch-chip { padding: 2px 7px; border-radius: 999px; color: var(--muted); font-size: 8px; font-weight: 600; background: rgba(var(--neutral-rgb), 0.06); }
 .touch-chip.off { color: var(--accent-text); background: rgba(var(--accent-rgb), 0.12); }
+.touch-chip.unavailable { color: var(--danger); background: rgba(var(--danger-rgb), 0.12); }
 /* The reading area takes focus for keyboard scrolling; the browser's focus line around it is not wanted. */
 .qa-scroll:focus, .qa-scroll:focus-visible { outline: 0; box-shadow: none; }
 .qa-content { display: flow-root; }
