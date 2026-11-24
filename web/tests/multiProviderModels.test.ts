@@ -74,19 +74,21 @@ it('lists every answer model as an answer model for installed desktop apps, with
  expect(body.models.filter((m:{provider:string;isDefault:boolean})=>m.provider==='deepgram'&&m.isDefault)).toHaveLength(1);
  vi.doUnmock('../lib/accounts/clients');vi.doUnmock('../lib/accounts/workspace');
 });
-it('uses fast thinking per Gemini family and retries a new model that rejects it',async()=>{
- const {geminiFastThinking}=await import('../lib/accountRelay/providers');
- expect(geminiFastThinking('gemini-2.5-flash')).toEqual({thinkingBudget:0});
- expect(geminiFastThinking('gemini-3.5-flash')).toEqual({thinkingLevel:'minimal'});
- expect(geminiFastThinking('gemini-4-argon')).toEqual({thinkingLevel:'minimal'});
- expect(geminiFastThinking('gemini-pro-latest')).toBeUndefined();
- const bodies:unknown[]=[];
- const request=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>{bodies.push(JSON.parse(String(init!.body)));
-  return bodies.length===1?new Response('{}',{status:400}):sse([{candidates:[{content:{parts:[{text:'ok answer'}]},finishReason:'STOP'}]}]);});
- const chunks:string[]=[];
- await providerAdapters({...secrets,geminiKey:'AIza-test-key-0000000000000000'},{fetch:request as typeof fetch,resolveModel:async()=>'gemini-4-argon'})
-  .generate({type:'generate',id:'g1',prompt:'Hi'},guard(),text=>chunks.push(text));
- expect(chunks.join('')).toBe('ok answer');expect(request).toHaveBeenCalledTimes(2);
- expect((bodies[0] as {generationConfig:{thinkingConfig?:unknown}}).generationConfig.thinkingConfig).toEqual({thinkingLevel:'minimal'});
- expect((bodies[1] as {generationConfig:{thinkingConfig?:unknown}}).generationConfig.thinkingConfig).toBeUndefined();
+it('picks the fastest thinking setting each Gemini family accepts and remembers it',async()=>{
+ const {geminiThinkingLadder}=await import('../lib/accountRelay/providers');
+ expect(geminiThinkingLadder('gemini-2.0-flash')).toEqual([undefined]);
+ expect(geminiThinkingLadder('gemini-2.5-flash')[0]).toEqual({thinkingBudget:0});
+ expect(geminiThinkingLadder('gemini-2.5-pro')[0]).toEqual({thinkingBudget:128});
+ expect(geminiThinkingLadder('gemini-3.5-flash')[0]).toEqual({thinkingLevel:'minimal'});
+ expect(geminiThinkingLadder('gemini-4-argon')[0]).toEqual({thinkingLevel:'minimal'});
+ expect(geminiThinkingLadder('gemini-flash-latest')[0]).toEqual({thinkingLevel:'minimal'});
+ expect(geminiThinkingLadder('gemini-3.1-pro-preview')[0]).toEqual({thinkingLevel:'low'});
+ // A new model that rejects "minimal" and "low" but accepts a budget: ladder walks down, then is remembered.
+ const bodies:Array<Record<string,unknown>|undefined>=[];
+ const request=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>{const cfg=(JSON.parse(String(init!.body)) as {generationConfig:{thinkingConfig?:Record<string,unknown>}}).generationConfig.thinkingConfig;bodies.push(cfg);
+  return cfg&&'thinkingBudget' in cfg?sse([{candidates:[{content:{parts:[{text:'ok'}]},finishReason:'STOP'}]}]):new Response('{}',{status:400});});
+ const run=()=>providerAdapters({...secrets,geminiKey:'AIza-test-key-0000000000000000'},{fetch:request as typeof fetch,resolveModel:async()=>'gemini-9-future-flash'})
+  .generate({type:'generate',id:'g1',prompt:'Hi'},guard(),()=>undefined);
+ await run();expect(bodies).toEqual([{thinkingLevel:'minimal'},{thinkingLevel:'low'},{thinkingBudget:0}]);
+ bodies.length=0;await run();expect(bodies).toEqual([{thinkingBudget:0}]);
 });
