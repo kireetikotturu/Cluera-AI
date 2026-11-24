@@ -1,4 +1,4 @@
-; Account TEST only. Fixed per-user path; no arbitrary /D or machine install.
+; Cluera AI: fixed per-user install path; no arbitrary /D or machine-wide install.
 ; Legacy registry/uninstaller/product paths are never used.
 !macro accountValidateInstall
   SetShellVarContext current
@@ -7,7 +7,7 @@
   ClearErrors
   ${GetOptions} $R0 "/allusers" $R1
   ${IfNot} ${Errors}
-    MessageBox MB_OK|MB_ICONSTOP "Cluera AI TEST supports a separate per-user installation only."
+    MessageBox MB_OK|MB_ICONSTOP "Cluera AI installs for the current user only."
     Quit
   ${EndIf}
   ${If} ${UAC_IsInnerInstance}
@@ -15,40 +15,37 @@
   ${EndIf}
   ReadRegStr $R1 HKLM "${INSTALL_REGISTRY_KEY}" InstallLocation
   ${If} $R1 != ""
-    MessageBox MB_OK|MB_ICONSTOP "A machine-wide Account installation needs a separately reviewed migration."
+    MessageBox MB_OK|MB_ICONSTOP "A machine-wide Cluera installation was found. Please uninstall it first."
     Quit
   ${EndIf}
   ReadRegStr $R1 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
   ${If} $R1 != ""
   ${AndIf} $R1 != $R2
-    MessageBox MB_OK|MB_ICONSTOP "The registered Account location is not the isolated TEST location."
+    MessageBox MB_OK|MB_ICONSTOP "Cluera AI is registered in a different folder. Please uninstall it first."
     Quit
   ${EndIf}
   !insertmacro GetDParameter $R0
   ${If} $R0 != ""
   ${AndIf} $R0 != $R2
-    MessageBox MB_OK|MB_ICONSTOP "The Account installer cannot target another application folder."
+    MessageBox MB_OK|MB_ICONSTOP "Cluera AI can only be installed in its default folder."
     Quit
   ${EndIf}
   ${If} ${isUpdated}
     ${If} $R1 != $R2
     ${OrIf} $R0 != $R2
-      MessageBox MB_OK|MB_ICONSTOP "An Account upgrade requires its existing isolated installation."
+      MessageBox MB_OK|MB_ICONSTOP "This update needs an existing Cluera AI installation."
       Quit
     ${EndIf}
   ${EndIf}
   ; Refuse an existing non-account directory, including a copied legacy app.
   IfFileExists "$R2\SigmaRound AI.exe" 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "A legacy application was found in the Account directory. Nothing was installed."
+    MessageBox MB_OK|MB_ICONSTOP "An old application was found in the Cluera AI folder. Nothing was installed."
     Quit
   IfFileExists "$R2\SigmaRound Account.exe" 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "An existing Account application was found. Its files were preserved."
+    MessageBox MB_OK|MB_ICONSTOP "An older Cluera application was found in this folder. Nothing was installed."
     Quit
-  ${If} $R1 == ""
-    IfFileExists "$R2\*.*" 0 +3
-      MessageBox MB_OK|MB_ICONSTOP "The new Account directory must be empty. Existing files were preserved."
-      Quit
-  ${EndIf}
+  ; A leftover Cluera AI folder (for example from an earlier or interrupted install) is fine:
+  ; it is this app's own folder, so the installer simply installs over it.
   StrCpy $hasPerMachineInstallation "0"
   StrCpy $isForceCurrentInstall "1"
   StrCpy $installMode "CurrentUser"
