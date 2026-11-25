@@ -1,0 +1,115 @@
+/* Create Session: compact cards, small controls, one centred column. Follows the theme (dark, light, system).
+   Only colors, borders and short fades are animated, so the page stays light to paint. */
+
+/* The page uses the same colors as the rest of the app (the old account skin forced its own blue palette). */
+.session-wizard.session-create.account-session { --text: unset; --muted: unset; --faint: unset; --panel: unset; --panel-2: unset; --line: unset; background: var(--bg); color: var(--text); }
+.session-wizard.session-create { --sc-side: clamp(14px, 4vw, 32px); }
+
+/* Header */
+.session-wizard.session-create .wizard-header { height: 50px; min-height: 50px; background: var(--bg); box-shadow: inset 0 -1px var(--line); }
+.session-wizard.session-create .wizard-back { width: auto; height: 30px; min-width: 0; padding: 0 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; white-space: nowrap; }
+.session-wizard.session-create .session-create-title { font-size: 12.5px; }
+
+/* Scrolling area and column */
+.session-wizard.session-create .wizard-content { width: 100%; margin: 0; padding: 16px var(--sc-side) 22px; }
+.sc-column { width: min(660px, 100%); margin: 0 auto; display: grid; gap: 12px; align-content: start; }
+.sc-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.session-create .session-kind-toggle { margin: 0; padding: 3px; border-radius: 11px; }
+.session-create .session-kind-toggle button { min-width: 92px; height: 28px; padding: 0 12px; border-radius: 8px; font-size: 10.5px; }
+.session-create .session-tutorial { height: 28px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; color: var(--muted); font-size: 10.5px; }
+.session-create .session-tutorial:hover { color: var(--text); background: rgba(var(--neutral-rgb), .06); }
+
+/* Groups of fields */
+.session-wizard.session-create .sc-step { min-width: 0; max-width: none; margin: 0 !important; padding: 0; border: 0; display: grid; gap: 8px; align-content: start; }
+.session-create .sc-heading { margin: 6px 2px 0; font-size: 9.5px; font-weight: 650; letter-spacing: .9px; text-transform: uppercase; color: var(--faint); }
+.session-create .sc-step > .sc-heading:first-child { margin-top: 0; }
+.session-create .sc-card { min-width: 0; margin: 0; padding: 14px; display: grid; gap: 10px; align-content: start; border: 0; border-radius: 14px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+.session-create .sc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.session-create .sc-wide { grid-column: 1 / -1; }
+.session-create .sc-field { min-width: 0; margin: 0; display: grid; gap: 5px; align-content: start; }
+.session-create .sc-field .field-label, .session-create .sc-title { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 600; color: var(--muted); }
+.session-create .sc-title { color: var(--text); font-size: 11px; }
+.session-create .sc-title strong { font-size: 11px; font-weight: 600; }
+.session-create .sc-title svg { flex: none; color: var(--accent-text); }
+.session-create .field-required { padding: 2px 7px; border-radius: 99px; color: var(--accent-text); background: rgba(var(--accent-rgb), .13); font-size: 8.5px; font-weight: 600; }
+.session-create .sc-hint { color: var(--faint); font-size: 9.5px; line-height: 1.45; }
+
+/* Inputs, selects and text areas: 34px, one quiet style */
+.session-create .sc-card :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  width: 100%; min-width: 0; padding: 0 11px; border: 0; border-radius: 9px; outline: 0;
+  color: var(--text); background: rgba(var(--neutral-rgb), .05); box-shadow: inset 0 0 0 1px var(--line-strong);
+  font: inherit; font-size: 11px; transition: background .12s ease, box-shadow .12s ease;
+}
+.session-create .sc-card :is(input:not([type='checkbox']):not([type='radio']), select) { height: 34px; min-height: 0; }
+.session-create .sc-card textarea { height: auto; min-height: 84px; padding: 9px 11px; line-height: 1.55; resize: vertical; }
+.session-create .sc-text textarea { min-height: 92px; }
+.session-create .sc-card :is(input, select, textarea)::placeholder { color: var(--faint); opacity: .85; }
+.session-create .sc-card :is(input:not([type='checkbox']):not([type='radio']), select, textarea):hover { background: rgba(var(--neutral-rgb), .065); }
+.session-create .sc-card :is(input:not([type='checkbox']):not([type='radio']), select, textarea):focus { background: rgba(var(--neutral-rgb), .065); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .75), 0 0 0 3px rgba(var(--accent-rgb), .16); }
+.session-create .sc-card :is(input, select, textarea):disabled { opacity: .55; cursor: not-allowed; }
+.session-create .sc-card select option { color: var(--text); background: var(--panel); }
+.session-create .sc-card .model-picker-button { height: 34px; padding: 0 11px; border-radius: 9px; font-size: 11px; background: rgba(var(--neutral-rgb), .05); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.session-create .sc-card .model-picker-button:hover:not(:disabled), .session-create .sc-card .model-picker.open .model-picker-button { background: rgba(var(--neutral-rgb), .065); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .55); }
+
+/* Résumé and supporting context */
+.session-create .sc-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.session-create .sc-row-text { min-width: 0; display: grid; gap: 3px; }
+.session-create .sc-actions { min-width: 0; display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; }
+.session-create .sc-card .sc-actions select { width: auto; min-width: 128px; max-width: 190px; height: 30px; font-size: 10.5px; }
+.session-create .sc-btn { height: 30px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 9px; color: var(--accent-text); background: rgba(var(--accent-rgb), .14); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .3); font: inherit; font-size: 10.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .12s ease; }
+.session-create .sc-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), .24); }
+.session-create .sc-btn:disabled { opacity: .5; cursor: not-allowed; }
+.session-create .sc-file, .session-create .sc-files > div { min-height: 32px; padding: 0 6px 0 10px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; border-radius: 9px; background: rgba(var(--neutral-rgb), .04); box-shadow: none; color: var(--accent-text); }
+.session-create .sc-file span, .session-create .sc-files span { overflow: hidden; color: var(--text); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.session-create .sc-file small, .session-create .sc-files small { color: var(--faint); font-size: 9px; }
+.session-create .sc-file button, .session-create .sc-files button { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 7px; color: var(--faint); background: transparent; cursor: pointer; }
+.session-create .sc-file button:hover, .session-create .sc-files button:hover { color: var(--danger); background: rgba(var(--danger-rgb), .1); }
+.session-create .sc-files { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; display: grid; gap: 4px; }
+.session-create .sc-files > div.pending { color: var(--accent-text); background: rgba(var(--accent-rgb), .07); }
+.session-create .answer-pref-button { width: 100%; min-height: 40px; padding: 0 12px; display: flex; align-items: center; gap: 10px; border: 0; border-radius: 10px; color: var(--muted); background: rgba(var(--neutral-rgb), .04); box-shadow: inset 0 0 0 1px var(--line); text-align: left; cursor: pointer; transition: background .12s ease; }
+.session-create .answer-pref-button:hover { background: rgba(var(--neutral-rgb), .07); color: var(--text); }
+.session-create .answer-pref-button strong { font-size: 10.5px; }
+.session-create .answer-pref-button small { font-size: 9.5px; }
+
+/* Behavior: each option is a row with a small switch */
+.session-create .session-behavior { padding: 2px 14px; gap: 0; }
+.session-create .session-behavior label { display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; cursor: pointer; }
+.session-create .session-behavior label + label { box-shadow: inset 0 1px var(--line); }
+.session-create .session-behavior label > span { display: grid; gap: 3px; min-width: 0; color: var(--text); font-size: 11px; font-weight: 600; }
+.session-create .session-behavior small { color: var(--faint); font-size: 9.5px; font-weight: 400; line-height: 1.5; }
+.session-wizard.session-create .session-behavior input[type='checkbox'] { -webkit-appearance: none; appearance: none; position: relative; flex: 0 0 auto; width: 30px; height: 18px; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 99px; background: rgba(var(--neutral-rgb), .2); box-shadow: none; cursor: pointer; transition: background .15s ease; }
+.session-wizard.session-create .session-behavior input[type='checkbox']::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); transition: transform .15s ease; }
+.session-wizard.session-create .session-behavior input[type='checkbox']:checked { background: var(--accent); }
+.session-wizard.session-create .session-behavior input[type='checkbox']:checked::after { transform: translateX(12px); }
+.session-wizard.session-create .session-behavior input[type='checkbox']:focus-visible { outline: 2px solid rgba(var(--accent-rgb), .6); outline-offset: 2px; }
+
+/* Assignment answer style */
+.session-create .assignment-style { gap: 6px; }
+.session-create .assignment-style label { padding: 10px 12px; border-radius: 10px; background: rgba(var(--neutral-rgb), .03); box-shadow: inset 0 0 0 1px var(--line); }
+.session-create .assignment-style label:has(input:checked) { background: rgba(var(--accent-rgb), .08); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .55); }
+.session-create .assignment-style label > span { font-size: 11px; }
+.session-create .assignment-style small { font-size: 9.5px; }
+
+/* Bottom bar, lined up with the column */
+.session-wizard.session-create .wizard-actions { min-height: 0; margin: 0; padding: 10px max(var(--sc-side), calc((100% - 660px) / 2)); gap: 12px; border-top: 0; background: var(--bg); box-shadow: inset 0 1px var(--line); }
+.session-wizard.session-create .wizard-actions > div { min-width: 0; display: grid; gap: 2px; font-size: 10.5px; color: var(--muted); }
+.session-wizard.session-create .wizard-actions > span { color: var(--muted); font-size: 10.5px; }
+.session-wizard.session-create .wizard-actions small { color: var(--faint); font-size: 9px; line-height: 1.4; }
+.session-wizard.session-create .wizard-actions .dashboard-create { height: 34px; min-height: 34px; padding: 0 16px; gap: 7px; border-radius: 10px; font-size: 11px; box-shadow: var(--action-shadow); }
+.session-wizard.session-create .account-session-error, .session-wizard.session-create .wizard-error { width: min(660px, calc(100% - 2 * var(--sc-side))); margin: 8px auto 0; padding: 8px 12px; border-radius: 10px; font-size: 10.5px; }
+
+/* Narrow windows: one column and a tidier bar */
+@media (max-width: 560px) {
+  .session-create .sc-grid { grid-template-columns: minmax(0, 1fr); }
+  .session-create .sc-actions { width: 100%; flex-wrap: wrap; }
+  .session-create .sc-card .sc-actions select { flex: 1 1 130px; max-width: none; }
+  .session-create .sc-top { align-items: flex-start; }
+  .session-wizard.session-create .wizard-actions small { display: none; }
+}
+/* Short windows: a little less air */
+@media (max-height: 560px) {
+  .session-wizard.session-create .wizard-content { padding-top: 10px; padding-bottom: 14px; }
+  .sc-column, .session-create .sc-step { gap: 8px; }
+  .session-create .sc-card { padding: 11px; }
+}
+@media (prefers-reduced-motion: reduce) { .session-create * { transition: none !important; } }

@@ -9,5 +9,6 @@ import './styles/theme.css';
 import './styles/app.css';
 import './styles/account.css';
 import './styles/settings.css';
+import './styles/session-create.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><AccountRoot/></React.StrictMode>);

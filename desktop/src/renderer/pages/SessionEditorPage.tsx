@@ -276,7 +276,7 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
   const actions = <footer className="wizard-actions">
     {account ? <div><span>{locked ? 'Please wait for the current operation…' : 'Your setup is saved with this session'}</span>
       <small>Saving opens the workspace. Its audio device check uses your account time.</small></div> : <span>Your setup is saved with this session</span>}
-    <button className="dashboard-create" disabled={locked} onClick={() => void save()}>{saving ? 'Saving...' : editing ? 'Save Session' : 'Create Session'}<ArrowRight size={16}/></button>
+    <button className="dashboard-create" disabled={locked} onClick={() => void save()}>{saving ? 'Saving...' : editing ? 'Save Session' : 'Create Session'}<ArrowRight size={15}/></button>
   </footer>;
   return <main className={`session-wizard session-create${account ? ' account-session' : ''}`} aria-busy={locked}>
     <header className="wizard-header">
@@ -293,64 +293,72 @@ export function SessionEditorPage({ onCollapse, account = false }: SessionEditor
     </header>
 
     <section className="wizard-content">
-      {account && <div className="account-session-intro"><p>PREPARE YOUR WORKSPACE</p><h2>{editing ? 'Refine your session.' : 'A better interview starts here.'}</h2><span>Add your context, choose an approved model and make it yours.</span></div>}
-      <div className="session-tutorial-top">
-        <button type="button" className="session-tutorial" onClick={() => void tutorial()}><Video size={14}/>Video Tutorial</button>
-      </div>
-      <div className="session-kind-toggle" role="group" aria-label="Session type">
-        <button type="button" aria-pressed={!isAssignment} disabled={locked || (editing && isAssignment)} onClick={() => chooseKind('interview')}>Interview</button>
-        <button type="button" aria-pressed={isAssignment} disabled={locked || (editing && !isAssignment)} onClick={() => chooseKind('assignment')}>Assignment</button>
-      </div>
-      {isAssignment ? <fieldset className="wizard-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
-        <div className="session-type-line"><span>Session type</span><strong>Assignment</strong></div>
-        <div className="wizard-fields details-fields">
-          <label className="wide"><span className="field-label">Session name</span><input autoFocus value={form.title} onChange={(event) => update('title', event.target.value)} placeholder="Java, SQL and aptitude assignment"/></label>
-          <label className="context-field wide"><span><FileText size={15}/>Assignment context</span><textarea aria-label="Assignment context" maxLength={4000} value={assignmentContext} onChange={(event) => { assignmentContextTouched.current = true; setAssignmentContext(event.target.value); }} placeholder="Tell the AI about your assignment: the rounds, the languages, and how you want the answers."/></label>
-          <div className="assignment-style wide" role="radiogroup" aria-label="Answer style">
+      <div className="sc-column">
+        <div className="sc-top">
+          <div className="session-kind-toggle" role="group" aria-label="Session type">
+            <button type="button" aria-pressed={!isAssignment} disabled={locked || (editing && isAssignment)} onClick={() => chooseKind('interview')}>Interview</button>
+            <button type="button" aria-pressed={isAssignment} disabled={locked || (editing && !isAssignment)} onClick={() => chooseKind('assignment')}>Assignment</button>
+          </div>
+          <button type="button" className="session-tutorial" onClick={() => void tutorial()}><Video size={14}/>Video Tutorial</button>
+        </div>
+        {isAssignment ? <fieldset className="wizard-step sc-step" disabled={locked}>
+          <h2 className="sc-heading">Assignment details</h2>
+          <div className="sc-card sc-grid">
+            <label className="sc-field sc-wide"><span className="field-label">Session name</span><input autoFocus value={form.title} onChange={(event) => update('title', event.target.value)} placeholder="Java, SQL and aptitude assignment"/></label>
+            <label className="sc-field sc-wide"><span className="field-label"><FileText size={14}/>Assignment context</span><textarea aria-label="Assignment context" maxLength={4000} value={assignmentContext} onChange={(event) => { assignmentContextTouched.current = true; setAssignmentContext(event.target.value); }} placeholder="Tell the AI about your assignment: the rounds, the languages, and how you want the answers."/></label>
+          </div>
+          <h2 className="sc-heading">How to answer</h2>
+          <div className="assignment-style" role="radiogroup" aria-label="Answer style">
             <label><input type="radio" name="assignment-style" checked={assignmentMode === 'direct'} onChange={() => update('answerStyle', ASSIGNMENT_STYLE_DIRECT)}/><span><strong>Simple, direct answer only</strong><small>Just the option, the value, the query or the code.</small></span></label>
             <label><input type="radio" name="assignment-style" checked={assignmentMode === 'explained'} onChange={() => update('answerStyle', ASSIGNMENT_STYLE_EXPLAINED)}/><span><strong>Answer with explanation</strong><small>The answer first, then a short explanation.</small></span></label>
           </div>
-        </div>
-      </fieldset> : <fieldset className="wizard-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
-        <div className="session-type-line"><span>Session type</span><strong>Interview</strong></div>
-        <div className="wizard-fields details-fields">
-          <label className="wide"><span className="field-label">Session name</span><input autoFocus value={form.title} onChange={(event) => update('title', event.target.value)} placeholder="Frontend interview at Acme"/></label>
-          <label><span className="field-label">Company name</span><input value={form.company} onChange={(event) => update('company', event.target.value)} placeholder="Acme Inc."/></label>
-          <label><span className="field-label">Job role / title</span><input value={form.role} onChange={(event) => update('role', event.target.value)} placeholder="Software Engineer"/></label>
-          <section className="context-upload upload-wide" aria-label="Resume upload">
-            <div><span><FileText size={15}/><strong>Resume / CV</strong><small className="field-required">Required</small></span><small>PDF, DOCX, TXT, MD · saved to Files</small></div>
-            <div className="context-upload-actions"><button disabled={uploading !== null} onClick={() => void chooseFile('resume')}><Upload size={14}/>{uploading === 'resume' ? 'Reading...' : resumeFileName ? 'Replace file' : 'Upload resume'}</button><select aria-label="Choose saved resume" value="" disabled={uploading !== null || libraryLoading || savedResumes.length === 0} onChange={(event) => void chooseSavedFile('resume', event.target.value)}><option value="">{libraryLoading ? 'Loading saved resumes...' : savedResumes.length ? 'Choose saved resume...' : 'No saved files'}</option>{savedResumes.map((file) => <option value={file.id} key={file.id}>{file.name}</option>)}</select></div>
-            {resumeFileName && <div className="selected-context-file"><FileText size={13}/><span>{resumeFileName}</span><small>Ready for AI context</small><button aria-label="Remove resume" title="Remove resume" onClick={() => { update('resumeText', ''); setResumeFileName(''); }}><Trash2 size={13}/></button></div>}
+        </fieldset> : <fieldset className="wizard-step sc-step" disabled={locked}>
+          <h2 className="sc-heading">Session details</h2>
+          <div className="sc-card sc-grid">
+            <label className="sc-field sc-wide"><span className="field-label">Session name</span><input autoFocus value={form.title} onChange={(event) => update('title', event.target.value)} placeholder="Frontend interview at Acme"/></label>
+            <label className="sc-field"><span className="field-label">Company name</span><input value={form.company} onChange={(event) => update('company', event.target.value)} placeholder="Acme Inc."/></label>
+            <label className="sc-field"><span className="field-label">Job role / title</span><input value={form.role} onChange={(event) => update('role', event.target.value)} placeholder="Software Engineer"/></label>
+          </div>
+          <h2 className="sc-heading">Your context</h2>
+          <section className="sc-card sc-upload" aria-label="Resume upload">
+            <div className="sc-row">
+              <div className="sc-row-text"><span className="sc-title"><FileText size={14}/><strong>Resume / CV</strong><small className="field-required">Required</small></span><small className="sc-hint">PDF, DOCX, TXT, MD · saved to Files</small></div>
+              <div className="sc-actions"><button type="button" className="sc-btn" disabled={uploading !== null} onClick={() => void chooseFile('resume')}><Upload size={13}/>{uploading === 'resume' ? 'Reading...' : resumeFileName ? 'Replace file' : 'Upload resume'}</button><select aria-label="Choose saved resume" value="" disabled={uploading !== null || libraryLoading || savedResumes.length === 0} onChange={(event) => void chooseSavedFile('resume', event.target.value)}><option value="">{libraryLoading ? 'Loading saved resumes...' : savedResumes.length ? 'Choose saved resume...' : 'No saved files'}</option>{savedResumes.map((file) => <option value={file.id} key={file.id}>{file.name}</option>)}</select></div>
+            </div>
+            {resumeFileName && <div className="sc-file"><FileText size={13}/><span>{resumeFileName}</span><small>Ready for AI context</small><button type="button" aria-label="Remove resume" title="Remove resume" onClick={() => { update('resumeText', ''); setResumeFileName(''); }}><Trash2 size={13}/></button></div>}
           </section>
-          <label className="context-field wide"><span><FileText size={15}/>Interview description / JD <small className="field-required">Required</small></span><textarea value={form.jobDescription} onChange={(event) => update('jobDescription', event.target.value)} placeholder="Paste or type the job description..."/></label>
-          <section className="context-field context-composer wide" aria-label="Supporting context">
-            <div className="context-composer-heading"><span><FileText size={15}/>Supporting context <small className="field-required">Required</small></span><div className="context-composer-actions"><button type="button" disabled={uploading !== null} onClick={() => void chooseFile('supporting')} aria-label="Upload supporting file" title="Upload supporting file"><Plus size={14}/><span>{uploading === 'supporting' ? 'Reading...' : 'Upload file'}</span></button><select aria-label="Choose saved supporting file" value="" disabled={uploading !== null || libraryLoading || savedSupportingFiles.length === 0} onChange={(event) => void chooseSavedFile('supporting', event.target.value)}><option value="">{libraryLoading ? 'Loading saved files...' : savedSupportingFiles.length ? 'Choose saved file...' : 'No saved files'}</option>{savedSupportingFiles.map((file) => <option value={file.id} key={file.id}>{file.name}</option>)}</select></div></div>
+          <label className="sc-card sc-text"><span className="sc-title"><FileText size={14}/>Interview description / JD <small className="field-required">Required</small></span><textarea value={form.jobDescription} onChange={(event) => update('jobDescription', event.target.value)} placeholder="Paste or type the job description..."/></label>
+          <section className="sc-card sc-text" aria-label="Supporting context">
+            <div className="sc-row">
+              <span className="sc-title"><FileText size={14}/>Supporting context <small className="field-required">Required</small></span>
+              <div className="sc-actions"><button type="button" className="sc-btn" disabled={uploading !== null} onClick={() => void chooseFile('supporting')} aria-label="Upload supporting file" title="Upload supporting file"><Plus size={13}/><span>{uploading === 'supporting' ? 'Reading...' : 'Upload file'}</span></button><select aria-label="Choose saved supporting file" value="" disabled={uploading !== null || libraryLoading || savedSupportingFiles.length === 0} onChange={(event) => void chooseSavedFile('supporting', event.target.value)}><option value="">{libraryLoading ? 'Loading saved files...' : savedSupportingFiles.length ? 'Choose saved file...' : 'No saved files'}</option>{savedSupportingFiles.map((file) => <option value={file.id} key={file.id}>{file.name}</option>)}</select></div>
+            </div>
             <textarea aria-label="Supporting context text" value={supportingText} onChange={(event) => { interviewContextTouched.current = true; setSupportingText(event.target.value); }} placeholder="Type context or attach a PDF, DOCX, TXT, or Markdown file..."/>
-            <small className="context-requirement">Type context or attach at least one supporting file.</small>
-            <button type="button" className="answer-pref-button" onClick={() => setShowPreferences(true)}><MessageSquareText size={15}/><span><strong>Answer preferences</strong><small>{answerPreferenceSummary(form.answerPreferences)}</small></span><ArrowRight size={14}/></button>
+            <small className="sc-hint">Type context or attach at least one supporting file.</small>
+            {(documents.length > 0 || pendingSupportingFiles.length > 0) && <div className="supporting-files sc-files">
+              {documents.map((document) => <div key={document.id}><FileText size={13}/><span>{document.name}</span><small>{Math.max(1, Math.ceil(document.sizeBytes / 1024))} KB</small><button type="button" aria-label={`Remove ${document.name}`} onClick={() => void removeDocument(document.id)}><Trash2 size={13}/></button></div>)}
+              {pendingSupportingFiles.map((document, index) => <div className="pending" key={`${document.name}-${index}`}><FileText size={13}/><span>{document.name}</span><small>Ready to save</small><button type="button" aria-label={`Remove ${document.name}`} onClick={() => setPendingSupportingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={13}/></button></div>)}
+            </div>}
+            <button type="button" className="answer-pref-button" onClick={() => setShowPreferences(true)}><MessageSquareText size={14}/><span><strong>Answer preferences</strong><small>{answerPreferenceSummary(form.answerPreferences)}</small></span><ArrowRight size={13}/></button>
           </section>
-        </div>
-        {(documents.length > 0 || pendingSupportingFiles.length > 0) && <div className="supporting-files">
-          {documents.map((document) => <div key={document.id}><FileText size={13}/><span>{document.name}</span><small>{Math.max(1, Math.ceil(document.sizeBytes / 1024))} KB</small><button aria-label={`Remove ${document.name}`} onClick={() => void removeDocument(document.id)}><Trash2 size={13}/></button></div>)}
-          {pendingSupportingFiles.map((document, index) => <div className="pending" key={`${document.name}-${index}`}><FileText size={13}/><span>{document.name}</span><small>Ready to save</small><button aria-label={`Remove ${document.name}`} onClick={() => setPendingSupportingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={13}/></button></div>)}
-        </div>}
-      </fieldset>}
+        </fieldset>}
 
-      <fieldset className="wizard-step preferences-step" disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
-        <h2 className="session-section-label">Output settings</h2>
-        <div className="wizard-fields">
-          <div className="model-field compact-select-field"><span className="field-label" id="session-model-label">AI model</span><div className="model-select-row"><ModelPicker models={models} value={form.selectedModel} recommendedId={recommendedModel} ariaLabel="AI model" placeholder="Choose an AI model" unavailableLabel={form.selectedModel && !selectedModelEnabled ? `${form.selectedModel} · unavailable` : undefined} onChange={(modelId) => { modelTouched.current = true; update('selectedModel', modelId); }}/></div></div>
-          {!isAssignment && <label className="compact-select-field"><span className="field-label">Answer language</span><input list="answer-languages" value={form.language} onChange={(event) => update('language', event.target.value)} aria-label="Answer language"/><datalist id="answer-languages">{['English', 'Hindi', 'Spanish', 'French', 'German', 'Telugu'].map((language) => <option value={language} key={language}/>)}</datalist></label>}
-        </div>
-        <h2 className="session-section-label">Behavior</h2>
-        <div className="session-behavior">
-          {!isAssignment && <label><input type="checkbox" checked={form.autoAnswer ?? false} onChange={(event) => update('autoAnswer', event.target.checked)}/><span><span>Auto Answer <span className="beta-badge">Beta</span></span><small>Automatically answer completed interviewer questions after Start.</small></span></label>}
-          <label><input type="checkbox" checked={form.saveTranscript ?? true} onChange={(event) => update('saveTranscript', event.target.checked)}/><span>Save Transcript<small>Save spoken turns in History. When off, speech is live context only; AI questions and answers are still saved.</small></span></label>
-        </div>
-      </fieldset>
+        <fieldset className="wizard-step preferences-step sc-step" disabled={locked}>
+          <h2 className="sc-heading session-section-label">Output settings</h2>
+          <div className="sc-card sc-grid">
+            <div className="sc-field model-field"><span className="field-label" id="session-model-label">AI model</span><ModelPicker models={models} value={form.selectedModel} recommendedId={recommendedModel} ariaLabel="AI model" placeholder="Choose an AI model" unavailableLabel={form.selectedModel && !selectedModelEnabled ? `${form.selectedModel} · unavailable` : undefined} onChange={(modelId) => { modelTouched.current = true; update('selectedModel', modelId); }}/></div>
+            {!isAssignment && <label className="sc-field"><span className="field-label">Answer language</span><input list="answer-languages" value={form.language} onChange={(event) => update('language', event.target.value)} aria-label="Answer language"/><datalist id="answer-languages">{['English', 'Hindi', 'Spanish', 'French', 'German', 'Telugu'].map((language) => <option value={language} key={language}/>)}</datalist></label>}
+          </div>
+          <h2 className="sc-heading session-section-label">Behavior</h2>
+          <div className="sc-card session-behavior">
+            {!isAssignment && <label><input type="checkbox" checked={form.autoAnswer ?? false} onChange={(event) => update('autoAnswer', event.target.checked)}/><span><span>Auto Answer <span className="beta-badge">Beta</span></span><small>Automatically answer completed interviewer questions after Start.</small></span></label>}
+            <label><input type="checkbox" checked={form.saveTranscript ?? true} onChange={(event) => update('saveTranscript', event.target.checked)}/><span>Save Transcript<small>Save spoken turns in History. When off, speech is live context only; AI questions and answers are still saved.</small></span></label>
+          </div>
+        </fieldset>
 
-      {!account && error && <div role="alert" className="form-error wizard-error">{error}</div>}
-      {!account && actions}
+        {!account && error && <div role="alert" className="form-error wizard-error">{error}</div>}
+        {!account && actions}
+      </div>
     </section>
     {account && error && <div role="alert" className="form-error account-session-error">{error}</div>}
     {account && actions}
