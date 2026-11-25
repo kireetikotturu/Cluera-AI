@@ -24,13 +24,13 @@ describe('create-session intent', () => {
     expect(liveIntentFromSearch('')).toBe(false);
     expect(liveIntentFromSearch(`?next=live&x=${'a'.repeat(5000)}`)).toBe(false);
   });
-  it('remembers it for twenty minutes, then forgets it', () => {
+  it('remembers it for ten minutes, then forgets it', () => {
     const store = new Map<string, string>();
     const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => void store.set(key, value), removeItem: (key: string) => void store.delete(key) };
     expect(resolveLiveIntent('', storage, 1_000)).toBe(false);
     expect(resolveLiveIntent('?next=live', storage, 1_000)).toBe(true);
-    expect(resolveLiveIntent('', storage, 1_000 + 19 * 60_000)).toBe(true);
-    expect(resolveLiveIntent('', storage, 1_000 + 21 * 60_000)).toBe(false);
+    expect(resolveLiveIntent('', storage, 1_000 + 9 * 60_000)).toBe(true);
+    expect(resolveLiveIntent('', storage, 1_000 + 11 * 60_000)).toBe(false);
     expect(store.has(KEY)).toBe(false);
     resolveLiveIntent('?next=live', storage, 5_000);
     clearLiveIntent(storage);

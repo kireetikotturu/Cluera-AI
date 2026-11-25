@@ -1,6 +1,6 @@
 /**
  * "Create session" on the website works only after sign-in. A visitor who taps it while signed out is sent to the sign-in page
- * with `?next=live`; this remembers that for a short while (so it also survives a Google sign-in in the same tab), and the
+ * with `?next=live`; this remembers that for ten minutes (so it also survives a Google sign-in in the same tab), and the
  * sign-in then sends them straight to the live page. It is a navigation hint only: the live page checks the account itself.
  */
 export const LIVE_PATH = '/account/live';
@@ -8,7 +8,7 @@ export const LIVE_PATH = '/account/live';
 export const LIVE_SIGN_IN_PATH = '/account?next=live';
 
 const KEY = 'cluera.live-intent.v1';
-const MAX_AGE_MS = 20 * 60 * 1000;
+const MAX_AGE_MS = 10 * 60 * 1000;
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 /** True only for exactly `?next=live` (a single `next` value) — nothing else is ever followed. */
