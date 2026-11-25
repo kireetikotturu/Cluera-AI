@@ -5,6 +5,7 @@ import { authorizeCustomer, authFailure, rateLimit } from './handler';
 import { json, apiError, readJsonBody } from '../http';
 import { usageService } from '../usage/service';
 import { accountContextCommand } from './context';
+import { phoneSessionAction } from './phoneSessions';
 import { readCredits } from './credits';
 import {CLUERA_AUTH_STORAGE_KEY,CLUERA_SUPABASE_URL} from '../supabase/target';
 
@@ -20,7 +21,7 @@ export async function handleNativeAccount(request: Request, action: string): Pro
     if (request.headers.has('origin') || request.headers.has('cookie') || request.headers.has('sec-fetch-site')
       || new URL(request.url).search) throw new AccountError('FORBIDDEN', 403);
     let clients = accountClients(config);
-    if (!['login', 'refresh', 'session', 'logout', 'oauth-exchange', 'context', 'credits'].includes(action)
+    if (!['login', 'refresh', 'session', 'logout', 'oauth-exchange', 'context', 'credits', 'phone-sessions'].includes(action)
       || request.method !== (action === 'session' || action === 'credits' ? 'GET' : 'POST')) return json({ error: 'Not found.' }, 404);
     // Shared HMAC rate-limit policy with web login; no plaintext identity bucket.
     if (action !== 'login') await rateLimit(request, config, clients);
@@ -64,6 +65,12 @@ export async function handleNativeAccount(request: Request, action: string): Pro
     }
     const account = await authorizeCustomer(clients, token);
     if(action==='credits')return json(await readCredits((name,args)=>clients.service.rpc(name,args),account));
+    if(action==='phone-sessions'){
+      // The Windows app only shows the history of sessions run on a phone; saving and deleting stay on the website.
+      const input=await readJsonBody(request,2048);
+      if(!input||typeof input!=='object'||!['LIST','READ'].includes((input as {action?:unknown}).action as string))throw new AccountError('INVALID_INPUT',400);
+      return json(await phoneSessionAction((name,args)=>clients.service.rpc(name,args),account,input));
+    }
     if(action==='context')return json(await accountContextCommand((name,args)=>clients.service.rpc(name,args),account,await readJsonBody(request,768000)));
     const usage = await usageService((name, args) => clients.service.rpc(name, args)).balance(account);
     // Safe DTO only: do not return auth.sessions IDs, user_metadata or credentials.

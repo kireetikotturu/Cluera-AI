@@ -2912,3 +2912,19 @@ button, input, select, textarea, .setting-rows label { font-weight: 500; }
 .session-wizard .assignment-style input[type='radio'] { min-height: 0; height: 15px; width: 15px; }
 /* The switch above the form already says which session type this is. */
 .session-kind-toggle + .wizard-step .session-type-line { display: none; }
+
+/* Sessions run on a phone (read only, shown only when there are some). */
+.phone-sessions { margin-top: 26px; }
+.phone-sessions > h2 { display: flex; align-items: center; gap: 6px; }
+.phone-session { border-radius: 11px; background: var(--panel); overflow: hidden; }
+.phone-session-head { width: 100%; min-height: 58px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; border: 0; color: var(--text); background: transparent; text-align: left; cursor: pointer; }
+.phone-session-head:hover { background: var(--panel-2); }
+.phone-session-title { min-width: 0; flex: 1; display: grid; gap: 4px; }
+.phone-session-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.phone-session-title small { color: var(--faint); font-size: 10px; }
+.phone-session-head svg { flex: none; color: var(--faint); transition: transform .15s ease; }
+.phone-session-head svg.open { transform: rotate(180deg); }
+.phone-session-body { padding: 4px 14px 14px; display: grid; gap: 14px; border-top: 1px solid rgba(var(--neutral-rgb), 0.08); }
+.phone-turn { display: grid; gap: 6px; justify-items: start; }
+.phone-question { margin: 8px 0 0; font-size: 12px; font-weight: 600; line-height: 1.5; color: var(--text); }
+.phone-answer { margin: 0; white-space: pre-wrap; font-size: 12px; line-height: 1.6; color: var(--muted, var(--text)); user-select: text; }

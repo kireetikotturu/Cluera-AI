@@ -83,7 +83,10 @@
 }
 @media (prefers-reduced-motion: reduce) { .acct-skeleton span { animation: none; } .acct-actions a, .acct-ghost, .acct-btn { transition: none; } }
 
-.acct-boot { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 220px; color: var(--muted); font-size: 14px; }
-.acct-spinner { width: 18px; height: 18px; border: 2px solid var(--line-strong); border-top-color: var(--brand); border-radius: 50%; animation: acct-spin .8s linear infinite; }
-@keyframes acct-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .acct-spinner { animation-duration: 2s; } }
+
+/* Start a live session on a phone (shown only on phone-sized screens). */
+.acct-live { width: 100%; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 20px; border: 1px solid rgba(139,124,255,.5); border-radius: 20px; color: var(--ink); background: radial-gradient(120% 160% at 0% 0%,rgba(124,108,255,.35),transparent 60%),var(--surface); text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.acct-live span { display: grid; gap: 4px; min-width: 0; }
+.acct-live strong { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.acct-live small { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.acct-live em { font-style: normal; font-size: 28px; color: #c4b5fd; }

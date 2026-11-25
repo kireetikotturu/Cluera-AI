@@ -382,6 +382,25 @@ describe('real local relay transport (no external provider or database)', () => 
       expect(generate).not.toHaveBeenCalled(); expect(audio).not.toHaveBeenCalled();
     } finally { await relay.stop(); }
   });
+  it('lets only the Cluera website open a socket from a browser, and still authenticates on the first message', async () => {
+    const command = vi.fn(async () => ({ code: 'EXHAUSTED' as const }));
+    const relay = createRelayServer({ authorize: async () => ({ remainingTokenMs: 60000, createRun: () => createUsageCoordinator(command) }),
+      providers: { generate: async () => {}, audio: () => { throw Error('must not open'); } } }, 'a'.repeat(40), { site: STAGING_SITE } as never);
+    relay.server.listen(0, '127.0.0.1'); await once(relay.server, 'listening');
+    const port = (relay.server.address() as { port: number }).port;
+    try {
+      for (const origin of ['https://evil.example', STAGING_SITE.replace('www.', ''), 'http://www.clueraai.in']) {
+        const rejected = new WebSocket(`ws://127.0.0.1:${port}/v1/session`, { origin });
+        expect((await new Promise<Error>(resolve => rejected.once('error', resolve))).message).toContain('403');
+      }
+      const withCookie = new WebSocket(`ws://127.0.0.1:${port}/v1/session`, { origin: STAGING_SITE, headers: { cookie: 'a=b' } });
+      expect((await new Promise<Error>(resolve => withCookie.once('error', resolve))).message).toContain('403');
+      const peer = new WebSocket(`ws://127.0.0.1:${port}/v1/session`, { origin: STAGING_SITE }); await once(peer, 'open');
+      const ready = once(peer, 'message'); peer.send(JSON.stringify({ type: 'authenticate', accessToken: 'synthetic-account-access-token' }));
+      expect(JSON.parse((await ready)[0].toString())).toEqual({ type: 'ready', protocol: 1 });
+      peer.close();
+    } finally { await relay.stop(); }
+  });
   it('health is bounded; authenticates on the socket; rejects browser/query-token upgrades', async () => {
     const command = vi.fn(async () => ({ code: 'EXHAUSTED' as const }));
     const relay = createRelayServer({ authorize: async () => ({ remainingTokenMs: 60000, createRun: () => createUsageCoordinator(command) }),

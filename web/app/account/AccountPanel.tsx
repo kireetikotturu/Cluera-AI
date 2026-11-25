@@ -1,6 +1,7 @@
 'use client';
 import { useCallback,useEffect, useRef, useState } from 'react';
 import { AccountWorkspace } from './AccountWorkspace';
+import { AccountBoot } from './AccountBoot';
 import {AccountAuthHelp} from './AccountAuthHelp';
 import {AccountPasswordSecurity,type PasswordSecurityState} from './AccountPasswordSecurity';
 import {notifyAccountSessionChanged,ACCOUNT_SESSION_STORAGE_KEY} from './AdminRoleNavigation';
@@ -301,7 +302,7 @@ export function AccountPanel() {
       if(current()){inFlight.current=false;setPendingAction(null);setVisible(false);}
     }
   }
-  if (loading) return <div className="acct-boot" role="status"><span className="acct-spinner" aria-hidden="true"/>Checking your account…</div>;
+  if (loading) return <AccountBoot/>;
   const feedbackRegion=<div id="account-auth-feedback" ref={feedbackElement} tabIndex={-1} role="status" aria-live="polite" aria-atomic="true"
     className={`account-auth-feedback${feedback?` account-auth-feedback-${feedback.tone}`:''}`}>
     {feedback?<><p>{feedback.message}</p>{feedback.maskedEmail?<p className="account-auth-feedback-address">Submitted email: <strong>{feedback.maskedEmail}</strong></p>:null}

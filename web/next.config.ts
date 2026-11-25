@@ -6,6 +6,7 @@ if(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!==undefined)assertPublishableKey(pr
 import { sandboxCheckoutEnabled } from './lib/billing/checkout/gate';
 import { razorpayCheckoutEnabled } from './lib/payments/core/config';
 import { billingUiCapabilities } from './lib/payments/cluera/billingUi';
+import { ACCOUNT_DISTRIBUTION } from '../desktop/src/shared/accountDistribution';
 
 const csp = [
   "default-src 'self'",
@@ -20,6 +21,11 @@ const csp = [
   "object-src 'none'",
   "upgrade-insecure-requests",
 ].join('; ');
+
+// The live session on a phone talks to the relay directly from the page and listens through the microphone.
+const relayOrigin = new URL(ACCOUNT_DISTRIBUTION.relayEndpoint).origin;
+const liveCsp = csp.replace("connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co ${relayOrigin}`);
 
 const nextConfig: NextConfig = {
   turbopack: { root: path.resolve(process.cwd(),'..') },
@@ -38,6 +44,12 @@ const nextConfig: NextConfig = {
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
         { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      ],
+    },{
+      source: '/account/live/:path*',
+      headers: [
+        { key: 'Content-Security-Policy', value: liveCsp },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=()' },
       ],
     },...(sandboxCheckoutEnabled()?[{
       source:'/account/checkout',headers:[{key:'Content-Security-Policy',value:csp

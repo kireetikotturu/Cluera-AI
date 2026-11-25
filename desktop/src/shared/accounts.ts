@@ -25,6 +25,11 @@ export interface AccountDesktopAPI {
     retry():Promise<import('./accountContext').ContextSnapshot>;
     importFile(kind:import('./accountContext').ContextDocument['kind']):Promise<import('./accountContext').ContextSnapshot|null>;
   };
+  /** Sessions run from the website on a phone (read only). */
+  phoneSessions: {
+    list():Promise<import('./phoneSessions').PhoneSessionSummary[]>;
+    read(id:string):Promise<import('./phoneSessions').PhoneSessionDetail>;
+  };
   status(): Promise<AccountView>;
   authOptions(): Promise<AccountAuthOptions>;
   login(input: AccountLogin): Promise<AccountView>;

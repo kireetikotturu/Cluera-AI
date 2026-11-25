@@ -8,6 +8,7 @@ import { useAppStore } from '../stores/appStore';
 import { ThemeControl } from '../components/ThemeControl';
 import { PrivateModeControl } from '../components/PrivateModeControl';
 import { SupportDialog } from '../components/SupportDialog';
+import { PhoneSessionsSection } from '../components/PhoneSessionsSection';
 import { filterSessions } from '../services/sessionSearch';
 import { requireSessionProviderSetup } from '../services/providerSetup';
 import clueraLogo from '../assets/cluera-ai.svg';
@@ -241,6 +242,7 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
           })}</div>
         </section>)}
       </div>}
+      {account.state === 'active' && <PhoneSessionsSection/>}
     </section>
     {showSupport && <SupportDialog account onClose={() => setShowSupport(false)}/>}
     {continuing && <dialog ref={roundDialogRef} className="round-dialog" aria-labelledby="continue-interview-title" onCancel={event => { event.preventDefault(); if (!startingRound) setContinuing(null); }}><form onSubmit={event => {

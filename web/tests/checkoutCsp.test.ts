@@ -13,8 +13,22 @@ const settings={CLUERA_TEST_PAYMENT_ROLLOUT_APPROVED:'true',SIGMAROUND_ACCOUNTS_
   SIGMAROUND_PADDLE_SANDBOX_TESTER_IDS:'00000000-0000-4000-8000-000000000001'};
 beforeEach(()=>{for(const [key,value]of Object.entries(settings))vi.stubEnv(key,value);});
 afterEach(()=>vi.unstubAllEnvs());
-const headers=()=>nextConfig.headers!();
+// The live-session page has its own rule (checked below); these tests are about the global and the checkout rules.
+const allHeaders=()=>nextConfig.headers!();
+const headers=async()=>(await allHeaders()).filter(rule=>!rule.source.startsWith('/account/live'));
 function directives(value:string){return new Map(value.split(';').map(part=>{const [name,...sources]=part.trim().split(/\s+/);return [name,sources];}));}
+
+describe('live session page headers',()=>{
+  it('lets only that page reach the live relay and use the microphone, and changes nothing else',async()=>{
+    const rule=(await allHeaders()).find(item=>item.source==='/account/live/:path*')!;
+    expect(rule.headers.map(header=>header.key)).toEqual(['Content-Security-Policy','Permissions-Policy']);
+    const sources=directives(rule.headers[0].value);
+    expect(sources.get('connect-src')).toEqual(["'self'",'https://*.supabase.co','wss://*.supabase.co','wss://cluera-ai-relay-staging.onrender.com']);
+    for(const name of ['default-src','script-src','style-src','img-src','font-src','frame-ancestors','base-uri','form-action','object-src'])expect(sources.get(name)).toEqual(directives(baseline).get(name));
+    expect(rule.headers[1].value).toBe('camera=(), microphone=(self), geolocation=(), payment=()');
+    expect((await allHeaders())[0].headers.find(header=>header.key==='Permissions-Policy')!.value).toBe('camera=(), microphone=(), geolocation=(), payment=()');
+  });
+});
 
 describe('narrow Sandbox checkout CSP',()=>{
   it('permits the actual Paddle.js Sandbox iframe host and API only on the exact checkout page',async()=>{

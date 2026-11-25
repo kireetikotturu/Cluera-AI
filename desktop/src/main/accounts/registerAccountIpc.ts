@@ -10,10 +10,11 @@ import type {AccountContextManager} from './AccountContextManager';
 import {contextKind} from '../../shared/accountContext';
 import {DOCUMENT_EXTENSIONS} from '../documents/DocumentProcessor';
 import type {AccountCreditsManager} from './AccountCreditsManager';
+import type {AccountPhoneSessions} from './AccountPhoneSessions';
 
 /** Separate account boundary: no generic relay, token, URL or filesystem IPC. */
 export function registerAccountIpc(window: BrowserWindow, account?: AccountSessionManager,
-  options?: { workspaceUserId?: string; stop(): Promise<void>; restart(): void; updates: UpdateManager; context?:AccountContextManager; credits?:AccountCreditsManager }): void {
+  options?: { workspaceUserId?: string; stop(): Promise<void>; restart(): void; updates: UpdateManager; context?:AccountContextManager; credits?:AccountCreditsManager; phoneSessions?:AccountPhoneSessions }): void {
   const trusted = (event: Electron.IpcMainInvokeEvent) => {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) throw new Error('Unauthorized desktop request.');
   };
@@ -64,6 +65,9 @@ export function registerAccountIpc(window: BrowserWindow, account?: AccountSessi
   };
   const context=()=>{requireAccess();if(!options.context)throw new Error('Account context is unavailable.');return options.context;};
   ipcMain.handle('account:credits',event=>{trusted(event);requireAccess(false);if(!options.credits)throw new Error('Account reporting is unavailable.');return options.credits.refresh();});
+  const phoneSessions=()=>{requireAccess(false);if(!options.phoneSessions)throw new Error('Phone sessions are unavailable.');return options.phoneSessions;};
+  ipcMain.handle('account:phone-sessions-list',event=>{trusted(event);return phoneSessions().list();});
+  ipcMain.handle('account:phone-sessions-read',(event,id:unknown)=>{trusted(event);return phoneSessions().read(id);});
   ipcMain.handle('account:context-list',event=>{trusted(event);return context().list();});
   ipcMain.handle('account:context-select',(event,input:unknown)=>{trusted(event);return context().select(input);});
   ipcMain.handle('account:context-read',(event,id:unknown)=>{trusted(event);return context().read(z.string().uuid().parse(id));});

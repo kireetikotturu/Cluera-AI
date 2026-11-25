@@ -4,6 +4,7 @@ import { AccountSessionManager } from './accounts/AccountSessionManager';
 import { AccountProviderRuntime } from './accounts/AccountProviderRuntime';
 import { AccountContextManager } from './accounts/AccountContextManager';
 import { AccountCreditsManager } from './accounts/AccountCreditsManager';
+import { AccountPhoneSessions } from './accounts/AccountPhoneSessions';
 import { accountFocusCheck } from './accounts/AccountFocusCheck';
 import { registerAccountIpc } from './accounts/registerAccountIpc';
 import { SecureJsonStore } from './security/SecureJsonStore';
@@ -118,6 +119,7 @@ async function createWindow(): Promise<void> {
     },
   });
   const accountContext = account && workspaceUserId ? new AccountContextManager(account, workspaceUserId) : undefined;
+  const accountPhoneSessions = account && workspaceUserId ? new AccountPhoneSessions(account, workspaceUserId) : undefined;
   if(account) {
     accountCredits=new AccountCreditsManager(account,undefined,view=>{
       if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send('account:credits-state',view);
@@ -363,7 +365,7 @@ if (process.platform === 'win32') {
   // window mode and its shortcuts, so the live page must be told to match.
   stopAccountWork = async () => { emit('session:interrupted', null); accountProviders?.stop(); await stopProtectedSession(); };
   let restartPending = false;
-  registerAccountIpc(window, account, account ? { workspaceUserId, updates, context: accountContext, credits:accountCredits, stop: stopAccountWork,
+  registerAccountIpc(window, account, account ? { workspaceUserId, updates, context: accountContext, credits:accountCredits, phoneSessions: accountPhoneSessions, stop: stopAccountWork,
     restart: () => {
       if (restartPending) return; restartPending = true;
       setImmediate(() => { accountProviders?.stop(); app.relaunch(); app.quit(); });

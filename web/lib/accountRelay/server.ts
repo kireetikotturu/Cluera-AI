@@ -59,13 +59,15 @@ export function createRelayServer(dependencies: Parameters<typeof attachRelaySes
   const sockets = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME_BYTES, perMessageDeflate: false });
   let stopping = false, attempts = 0, windowStart = performance.now();
   const sessions = new Map<WebSocket, ReturnType<typeof attachRelaySession>>();
+  const websiteOrigin = metadata?.site;
   server.on('upgrade', (request, socket, head) => {
-    // This phase is native-main-process only. Browser BFF relay authorization is
-    // not exposed; reject ambient cookies and all browser-origin handshakes.
+    // Native apps send no Origin. The only browser allowed is Cluera's own website (the live session on a phone): its
+    // Origin cannot be forged by a web page, and the socket still authorizes with the account's access token as its
+    // first message. Every other origin, ambient cookies and query or header credentials are rejected.
     const now = performance.now();
     if (now - windowStart >= 60000) { attempts = 0; windowStart = now; }
     if (stopping || ++attempts > 120 || sockets.clients.size >= 16 || request.method !== 'GET'
-      || request.url !== '/v1/session' || request.headers.origin || request.headers.cookie
+      || request.url !== '/v1/session' || (request.headers.origin && request.headers.origin !== websiteOrigin) || request.headers.cookie
       || request.headers.authorization || request.headers['sec-websocket-protocol']) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return;
     }

@@ -89,6 +89,10 @@ const accountApi: AccountDesktopAPI = {
     retry:()=>ipcRenderer.invoke('account:context-retry'),
     importFile:kind=>ipcRenderer.invoke('account:context-import',kind),
   },
+  phoneSessions: {
+    list:()=>ipcRenderer.invoke('account:phone-sessions-list'),
+    read:id=>ipcRenderer.invoke('account:phone-sessions-read',id),
+  },
   login: input => ipcRenderer.invoke('account:login', input),
   google: () => ipcRenderer.invoke('account:google'),
   retry: () => ipcRenderer.invoke('account:retry'),
