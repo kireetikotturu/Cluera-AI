@@ -3,7 +3,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {expect,it} from 'vitest';
 import {UsageOverviewPanel,UsageDetailPanel,money,usageLine} from '../app/account/admin/CustomerUsage';
 const group=(usd:number)=>({rows:[{provider:'gemini',model:'gemini-3.5-flash',calls:4,inputTokens:12000,outputTokens:3000,thinkingTokens:500,audioMs:0,costUsd:usd,costInr:usd*88}],totalUsd:usd,totalInr:usd*88});
-const assumptions={usdToInr:88,deepgramUsdPerMinute:0.0077,gemini:{flash:{inputPerMillion:0.3,outputPerMillion:2.5},flashLite:{inputPerMillion:0.1,outputPerMillion:0.4},pro:{inputPerMillion:1.25,outputPerMillion:10}},openai:{inputPerMillion:1.25,outputPerMillion:10},anthropic:{inputPerMillion:3,outputPerMillion:15}};
+const assumptions={usdToInr:88};
 it('shows who is live, blocked, how long they used it and the estimated cost, with the assumptions visible',()=>{
  const html=renderToStaticMarkup(createElement(UsageOverviewPanel,{report:{overall:{customerCount:2,activeNow:1,usedMs:5_400_000,usage:group(0.5)},assumptions,customers:[
   {userId:'a',email:'live@example.invalid',state:'ACTIVE',usedMs:3_600_000,activeNow:true,lastActiveAt:null,usage:group(0.25)},

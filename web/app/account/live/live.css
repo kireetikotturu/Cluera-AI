@@ -23,6 +23,7 @@
 .lv-field select{background-image:linear-gradient(45deg,transparent 50%,#a3a7b8 50%),linear-gradient(135deg,#a3a7b8 50%,transparent 50%);background-position:calc(100% - 20px) 52%,calc(100% - 14px) 52%;background-size:6px 6px;background-repeat:no-repeat;padding-right:38px}
 .lv-field textarea{min-height:110px;resize:vertical;line-height:1.5}
 .lv-hint{margin:0;font-size:13px;line-height:1.55;color:var(--faint)}
+.lv-privacy a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .lv-error{margin:0;padding:12px 14px;border:1px solid #b9505a;border-radius:12px;background:#361d29;color:#ffd9dd;font-size:14px;line-height:1.5}
 .lv-note{margin:0;padding:12px 14px;border:1px solid #7d72a0;border-radius:12px;background:#211e35;color:#e2dcff;font-size:14px;line-height:1.5}
 .lv-seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;border:1px solid var(--line-strong);border-radius:13px;background:#0b0d14}

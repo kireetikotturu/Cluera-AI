@@ -423,3 +423,28 @@ describe('real local relay transport (no external provider or database)', () => 
     } finally { await relay.stop(); }
   });
 });
+
+it('gives every provider request its device and app session, and refuses a malformed session reference', async () => {
+  const sessionRef = '4b0c6f2e-9a51-4c3a-9d8e-2f6a1b7c9d10';
+  vi.useFakeTimers();
+  const guards: Array<{ client?: unknown; runId?: string }> = [];
+  const peer = new Peer();
+  const command = vi.fn(async (input: Command) => input.action === 'STOP' ? { code: 'CLOSED' as const } :
+    { code: 'ACTIVE' as const, ...input, serverTime: '2026-10-04T00:00:00Z', expiresAt: '2026-10-04T00:00:30Z',
+      reservedMilliseconds: 30000, allocation: 'TRIAL' as const, validForMilliseconds: 30000 });
+  const providers: Providers = { generate: vi.fn(async (_input, guard) => { guards.push(guard); }),
+    audio: vi.fn(guard => { guards.push(guard); return { write: vi.fn(), forceEndTurn: vi.fn(), close: vi.fn() }; }) };
+  const session = attachRelaySession(peer as unknown as WebSocket, { device: 'web', providers,
+    authorize: async () => ({ remainingTokenMs: 3600000, createRun: () => createUsageCoordinator(command) }) });
+  peer.input({ type: 'authenticate', accessToken: 'synthetic-account-access-token', sessionRef }); await tick();
+  peer.input({ type: 'openAudio', channel: 'interviewer' }); await tick();
+  peer.input({ type: 'generate', id: 'tagged', prompt: 'synthetic' }); await tick();
+  expect(guards).toHaveLength(2);
+  expect(guards.map(guard => guard.client)).toEqual([{ device: 'web', sessionRef }, { device: 'web', sessionRef }]);
+  expect(guards[0].runId).toBe(guards[1].runId);
+  session.stop();
+  const refused = new Peer(), authorize = vi.fn();
+  attachRelaySession(refused as unknown as WebSocket, { authorize, providers });
+  refused.input({ type: 'authenticate', accessToken: 'synthetic-account-access-token', sessionRef: 'not-a-session' }); await tick();
+  expect(authorize).not.toHaveBeenCalled(); expect(refused.readyState).toBe(WebSocket.CLOSED);
+});

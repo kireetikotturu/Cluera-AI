@@ -1,9 +1,25 @@
 import {z} from 'zod';
 const count=z.number().int().min(0).max(1_000_000_000);
+const modelName=z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{1,99}$/);
+const label=z.string().regex(/^[A-Za-z0-9_-]{1,40}$/);
 export const receiptMetadataSchema=z.object({requestHash:z.string().regex(/^[a-f0-9]{64}$/).optional(),
  inputTokens:count.optional(),outputTokens:count.optional(),cachedTokens:count.optional(),thinkingTokens:count.optional(),
- totalTokens:count.optional(),audioWindowMilliseconds:count.optional()}).strict();
+ totalTokens:count.optional(),audioWindowMilliseconds:count.optional(),
+ /** Audio actually sent to live transcription: what Deepgram bills. */
+ audioSentMilliseconds:count.optional(),
+ /** Input written to the provider's cache (priced higher), and the part kept for longer. */
+ cacheWriteTokens:count.optional(),cacheWrite1hTokens:count.optional(),
+ /** The model that actually answered, which can differ from the one asked for. */
+ servedModel:modelName.optional(),serviceTier:label.optional(),region:label.optional(),
+ /** The reply was stopped before the provider reported final counts, so these are approximate. */
+ estimated:z.boolean().optional()}).strict();
 export type ReceiptMetadata=z.infer<typeof receiptMetadataSchema>;
+/** A provider's text is kept only when it is a plain model name or label; anything else is dropped, never stored. */
+export function safeModelName(value:unknown):string|undefined{
+ const text=typeof value==='string'?value.replace(/^models\//,''):'';
+ return modelName.safeParse(text).success?text:undefined;
+}
+export const safeLabel=(value:unknown):string|undefined=>label.safeParse(value).success?value as string:undefined;
 export const providerOutcome=z.enum(['SUCCEEDED','FAILED','CANCELLED','STOPPED']);
 export type ProviderOutcome=z.infer<typeof providerOutcome>;
 export const providerUsageReportSchema=z.object({code:z.literal('ACTIVE'),scope:z.literal('LATEST_REQUESTS'),limit:z.literal(50),

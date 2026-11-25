@@ -69,7 +69,7 @@ export function FileLibraryPage({ onCollapse }: FileLibraryPageProps): JSX.Eleme
       </div>
     </header>
     <div className="file-library-scroll">
-      <div className="library-intro"><p>LOCAL FILE LIBRARY</p><h1>Reusable interview context</h1><span>Files stay on this device and can be attached to future sessions.</span></div>
+      <div className="library-intro"><p>LOCAL FILE LIBRARY</p><h1>Reusable interview context</h1><span>Files are kept on this device for future sessions. A résumé you use in a session is also saved to your Cluera account (see Privacy on clueraai.in).</span></div>
       {error && <div className="form-error library-error">{error}</div>}
       <div className="library-sections">
         {section('resume', 'Resumes', 'PDF, DOCX, TXT, and Markdown resumes available to new sessions.')}

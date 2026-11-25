@@ -71,8 +71,10 @@ export function createRelayServer(dependencies: Parameters<typeof attachRelaySes
       || request.headers.authorization || request.headers['sec-websocket-protocol']) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return;
     }
+    // Only the website sends an Origin (checked above), so it tells a phone session from a Windows one.
+    const device = request.headers.origin ? 'web' as const : 'windows' as const;
     sockets.handleUpgrade(request, socket, head, peer => {
-      const session = attachRelaySession(peer, dependencies); sessions.set(peer, session);
+      const session = attachRelaySession(peer, { ...dependencies, device }); sessions.set(peer, session);
       peer.once('close', () => sessions.delete(peer));
     });
   });

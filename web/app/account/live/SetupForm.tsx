@@ -14,6 +14,8 @@ export interface SetupDraft {
   kind: SessionKind; title: string; role: string; company: string; interviewType: InterviewType; language: string;
   answerLength: AnswerLength; answerStyle: string; answerPreferences: AnswerPreferences; instructions: string;
   resumeText: string; jobDescription: string;
+  /** The résumé's file name, and the original file when one was uploaded just now. Used to save a copy on the account. */
+  resumeName: string; resumeFile: File | null;
   /** Set when the résumé was uploaded or pasted and the customer wants it kept on the account for next time. */
   saveResume: { name: string; text: string } | null;
   /** Extra saved notes (supporting material or instructions) chosen under More options. */
@@ -65,6 +67,7 @@ export function SetupForm({ models, defaults, documents, busy, error, onStart, o
   const extraNotes = useMemo(() => documents.filter(document => document.kind === 'SUPPORTING' || document.kind === 'INSTRUCTIONS'), [documents]);
   const [resumeText, setResumeText] = useState('');
   const [resumeName, setResumeName] = useState('');
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeFrom, setResumeFrom] = useState<'none' | 'upload' | 'saved' | 'typed'>('none');
   const [resumeBusy, setResumeBusy] = useState(false);
   const [resumeError, setResumeError] = useState('');
@@ -86,7 +89,7 @@ export function SetupForm({ models, defaults, documents, busy, error, onStart, o
   useEffect(() => {
     if (preloaded.current || !savedResumes.length) return;
     preloaded.current = true;
-    void loadSaved(savedResumes[0].id, document => { setResumeText(document.body ?? ''); setResumeName(document.name); setResumeFrom('saved'); }, setResumeBusy);
+    void loadSaved(savedResumes[0].id, document => { setResumeText(document.body ?? ''); setResumeName(document.name); setResumeFile(null); setResumeFrom('saved'); }, setResumeBusy);
   }, [savedResumes]);
 
   const upload = async (file: File | undefined): Promise<void> => {
@@ -94,13 +97,13 @@ export function SetupForm({ models, defaults, documents, busy, error, onStart, o
     setResumeError(''); setResumeNote(''); setResumeBusy(true);
     try {
       const result = await readDocumentText(file);
-      setResumeText(result.text); setResumeName(file.name.replace(/\.[^.]+$/, '').slice(0, 120) || 'My résumé'); setResumeFrom('upload'); setSaveResume(true);
+      setResumeText(result.text); setResumeName(file.name.replace(/\.[^.]+$/, '').slice(0, 120) || 'My résumé'); setResumeFile(file); setResumeFrom('upload'); setSaveResume(true);
       if (result.truncated) setResumeNote('Your résumé is very long, so only the first part is used.');
     } catch (failure) {
       setResumeError(failure instanceof DocumentError ? failure.message : 'That file could not be read. Paste the text instead.');
     } finally { setResumeBusy(false); }
   };
-  const clearResume = (): void => { setResumeText(''); setResumeName(''); setResumeFrom('none'); setResumeNote(''); setResumeError(''); };
+  const clearResume = (): void => { setResumeText(''); setResumeName(''); setResumeFile(null); setResumeFrom('none'); setResumeNote(''); setResumeError(''); };
 
   const changeKind = (next: SessionKind): void => {
     setKind(next);
@@ -122,6 +125,7 @@ export function SetupForm({ models, defaults, documents, busy, error, onStart, o
       answerStyle: kind === 'assignment' ? (explained ? ASSIGNMENT_STYLE_EXPLAINED : ASSIGNMENT_STYLE_DIRECT) : 'Natural and confident',
       answerPreferences: preferences, instructions: (kind === 'assignment' ? assignmentNotes : interviewNotes).trim(),
       resumeText: resume, jobDescription: kind === 'assignment' ? '' : jd.trim(),
+      resumeName: resumeFrom === 'typed' ? 'Typed résumé' : resumeName.trim() || 'Résumé', resumeFile: kind === 'interview' && resumeFrom === 'upload' ? resumeFile : null,
       saveResume: kind === 'interview' && saveResume && resumeFrom !== 'saved' && resume.length >= 40 ? { name: resumeName.trim() || 'My résumé', text: resume } : null,
       docIds: kind === 'assignment' ? [] : extraPicked, modelId, autoAnswer, saveHistory,
     });
@@ -151,13 +155,14 @@ export function SetupForm({ models, defaults, documents, busy, error, onStart, o
         {resumeError ? <p className="lv-error" role="alert">{resumeError}</p> : null}
         {resumeNote ? <p className="lv-note">{resumeNote}</p> : null}
         {savedResumes.length > 1 ? <label className="lv-field"><span>Or use another saved résumé</span>
-          <select value="" onChange={event => { const id = event.target.value; if (id) void loadSaved(id, document => { setResumeText(document.body ?? ''); setResumeName(document.name); setResumeFrom('saved'); }, setResumeBusy); }}>
+          <select value="" onChange={event => { const id = event.target.value; if (id) void loadSaved(id, document => { setResumeText(document.body ?? ''); setResumeName(document.name); setResumeFile(null); setResumeFrom('saved'); }, setResumeBusy); }}>
             <option value="">Choose…</option>{savedResumes.map(document => <option key={document.id} value={document.id}>{document.name}</option>)}</select></label> : null}
         <label className="lv-field"><span>Résumé text <em>(you can edit it, or paste it here)</em></span>
           <textarea value={resumeText} onChange={event => { setResumeText(event.target.value); setResumeFrom(current => (current === 'saved' || current === 'upload' ? current : event.target.value.trim() ? 'typed' : 'none')); }}
             maxLength={120000} placeholder="Your résumé appears here after you upload it. Or paste it." rows={6} /></label>
         {resumeText.trim().length >= 40 && resumeFrom !== 'saved' ? <label className="lv-switch"><span><b>Save for next time</b><small>Keeps it on your account, also for the Windows app.</small></span>
           <input type="checkbox" checked={saveResume} onChange={event => setSaveResume(event.target.checked)} /><i /></label> : null}
+        <p className="lv-hint lv-privacy">When you start, a copy of this résumé is saved to your Cluera account. <a href="/privacy" target="_blank" rel="noopener">Privacy policy</a></p>
       </section>
 
       <section className="lv-card lv-source" aria-label="Job description">

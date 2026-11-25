@@ -1,0 +1,25 @@
+/* Admin "Data": stored résumés. Admin only. */
+.account-admin-shell .admin-data { display: grid; gap: 14px; }
+.account-admin-shell .admin-data > * { min-width: 0; }
+.account-admin-shell .admin-data h2 + p { margin-bottom: 0; }
+.account-admin-shell .data-meter { height: 6px; margin: 2px 0; border-radius: 0 3px 3px 0; background: rgba(255,255,255,.07); }
+.account-admin-shell .data-meter span { display: block; height: 100%; border-radius: 0 3px 3px 0; background: #8b7cff; }
+.account-admin-shell form.data-search { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; background: none; }
+.account-admin-shell form.data-search input { flex: 1 1 240px; width: auto; }
+.account-admin-shell .admin-data .data-message { margin: 0; color: #d9d5f8; font-size: 13px; }
+.account-admin-shell .data-table td { vertical-align: top; }
+.account-admin-shell .data-table th, .account-admin-shell .data-table td { padding-inline: 12px; }
+.account-admin-shell .data-table td.wrap { min-width: 150px; max-width: 250px; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.account-admin-shell .data-table td.wrap:first-child { min-width: 190px; overflow-wrap: break-word; }
+.account-admin-shell .data-table small { display: block; margin-top: 3px; color: #95a3bd; font-size: 11.5px; white-space: nowrap; }
+.account-admin-shell .data-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.account-admin-shell .data-actions span { color: #f6a5a5; font-size: 12px; }
+.account-admin-shell .data-actions button { min-height: 30px; padding: 0 10px; font-size: 12px; }
+.account-admin-shell .data-actions button.data-danger { color: #ffb4b4; border-color: #ff8a8a44; background: transparent; }
+.account-admin-shell .data-actions button.data-danger:hover:not(:disabled) { background: rgba(242,125,117,.14); }
+.account-admin-shell .data-viewer { border: 1px solid #45516a; border-radius: 14px; background: #101725; }
+.account-admin-shell .data-viewer header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #35415a; }
+.account-admin-shell .data-viewer header strong { display: block; overflow-wrap: anywhere; }
+.account-admin-shell .data-viewer header small { color: #95a3bd; font-size: 12px; }
+.account-admin-shell .data-viewer pre { max-height: 420px; margin: 0; padding: 14px; overflow: auto; color: #dbe2f1; font: 13px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.account-admin-shell .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

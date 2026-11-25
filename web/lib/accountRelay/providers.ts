@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 import WebSocket from 'ws';
 import { DEEPGRAM_MODEL, GEMINI_MODEL, secretFilter, type Generate } from './protocol';
 import {providerReceiptMetadata} from '../aiProviders/telemetry';
-import {receiptMetadataSchema,type ReceiptMetadata} from '../aiProviders/usageMetadata';
+import {receiptMetadataSchema,safeLabel,safeModelName,type ReceiptMetadata} from '../aiProviders/usageMetadata';
 
-export type Guard = { signal: AbortSignal; assertActive(): void; runId?:string };
+/** Where a live connection comes from, kept with its usage records. */
+export type UsageClient = { device: 'windows' | 'web'; sessionRef?: string };
+export type Guard = { signal: AbortSignal; assertActive(): void; runId?:string; client?: UsageClient };
 export type ProviderSecrets = { geminiKey?: string; deepgramKey?: string; openaiKey?: string; anthropicKey?: string; serviceKey: string; rateKey: string };
 export type AudioConnection = { write(bytes: Buffer): void; forceEndTurn(): void; close(): void };
 /** Optional hints for one live-transcription connection. */
@@ -55,6 +57,8 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
       const filter = secretFilter(privateValues);
       const timing: { headersMs?: number; firstTokenMs?: number; thinking?: string } = {}, begun = performance.now();
+      // For a reply that does not finish: whether it began, what it had sent and whether its counts arrived.
+      const progress = { streamed: false, completed: false, reported: false, providerError: false, characters: 0 };
       try {
         const started = performance.now();
         const post = (thinkingConfig: Record<string, unknown> | undefined) => request(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:streamGenerateContent?alt=sse`, {
@@ -83,6 +87,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
         timing.headersMs = Math.round(performance.now() - started);
         if (!response.ok || !response.body) { logAnswerFailure('gemini', selectedModel, `http-${response.status}`, begun); await response.body?.cancel(); throw unavailable(); }
         reader = response.body.getReader();
+        progress.streamed = true;
         let buffer = '', totalBytes = 0, hasAnswer = false;
         const decoder = new TextDecoder('utf-8', { fatal: true });
         const event = (raw: string) => {
@@ -92,7 +97,8 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
           if (!data || data === '[DONE]') return;
           const value = JSON.parse(data);
           const receipt=providerReceiptMetadata('gemini',value);if(receipt)dependencies.receipt?.(receipt);
-          if (value.error) throw unavailable();
+          if (receipt?.inputTokens !== undefined || receipt?.totalTokens !== undefined) progress.reported = true;
+          if (value.error) { progress.providerError = true; throw unavailable(); }
           // Gemini can return HTTP 200 for blocked prompts/candidates. These are
           // bounded failures, never a successful empty or policy-blocked answer.
           if (value.promptFeedback?.blockReason) throw unavailable();
@@ -102,6 +108,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
           if (!Array.isArray(parts)) return;
           for (const part of parts) {
             if (typeof part.text !== 'string' || part.thought) continue;
+            progress.characters += part.text.length;
             if (part.text.trim()) hasAnswer = true;
             const text = filter.push(part.text);
             if (text) { if (timing.firstTokenMs === undefined) timing.firstTokenMs = Math.round(performance.now() - begun); emit(text); }
@@ -127,12 +134,18 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
         }
         buffer += decoder.decode();
         if (buffer.trim()) event(buffer);
+        progress.completed = true;
         guard.assertActive();
         if (!hasAnswer) throw unavailable();
         const final = filter.push('', true); if (final) emit(final);
         logAnswerTiming('gemini', selectedModel, timing, begun);
       } catch {
         if (!guard.signal.aborted) logAnswerFailure('gemini', selectedModel, timing.firstTokenMs === undefined ? (timing.headersMs === undefined ? 'no-reply-from-google' : 'no-words-after-reply') : 'stream-stopped', begun);
+        if (progress.streamed && !progress.completed) {
+          const partial = unfinishedUsage({ reported: progress.reported, stopped: guard.signal.aborted && !progress.providerError,
+            outputCharacters: progress.characters, inputCharacters: input.prompt.length, image: Boolean(input.image) });
+          if (partial) dependencies.receipt?.(partial);
+        }
         throw unavailable();
       }
       finally { clearTimeout(total); clearTimeout(idle); cancel(); await reader?.cancel().catch(() => undefined); }
@@ -291,17 +304,53 @@ const anthropicNoTemperature = new Set<string>();
 const countOf = (value: unknown): number | undefined => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 1_000_000_000 ? value : undefined;
 const requestId = (value: unknown): string | undefined => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,256}$/.test(value)
   ? createHash('sha256').update(value).digest('hex') : undefined;
-/** Only documented numeric usage fields; never prompt, answer, headers or raw provider bodies. */
-function chatReceipt(parts: { id?: string; input?: number; output?: number; thinking?: number; cached?: number; total?: number }): ReceiptMetadata | undefined {
+type ChatUsage = { id?: string; model?: unknown; tier?: unknown; region?: unknown;
+  input?: number; output?: number; thinking?: number; cached?: number; cacheWrite?: number; cacheWrite1h?: number; total?: number };
+/** Only documented numeric usage fields and short model and tier names; never prompt, answer, headers or raw bodies. */
+function chatReceipt(parts: ChatUsage): ReceiptMetadata | undefined {
   const result: Record<string, unknown> = {};
   const hash = requestId(parts.id); if (hash) result.requestHash = hash;
+  const served = safeModelName(parts.model); if (served) result.servedModel = served;
+  const tier = safeLabel(parts.tier); if (tier) result.serviceTier = tier;
+  const region = safeLabel(parts.region); if (region) result.region = region;
   if (parts.input !== undefined) result.inputTokens = parts.input;
   if (parts.output !== undefined) result.outputTokens = parts.output;
   if (parts.thinking !== undefined) result.thinkingTokens = parts.thinking;
   if (parts.cached !== undefined) result.cachedTokens = parts.cached;
+  if (parts.cacheWrite !== undefined) result.cacheWriteTokens = parts.cacheWrite;
+  if (parts.cacheWrite1h !== undefined) result.cacheWrite1hTokens = parts.cacheWrite1h;
   if (parts.total !== undefined) result.totalTokens = parts.total;
   const parsed = receiptMetadataSchema.safeParse(result);
   return parsed.success && Object.keys(parsed.data).length ? parsed.data : undefined;
+}
+/** Claude sends input counts when the reply starts and running totals as it ends; each newer number replaces the older.
+ * Its output total includes thinking, which is kept apart like the other providers'. */
+function claudeUsage(counts: Record<string, unknown>, raw: Record<string, number | undefined>, usage: ChatUsage) {
+  const read = (key: string, value: unknown) => { const n = countOf(value); if (n !== undefined) raw[key] = n; };
+  read('fresh', counts.input_tokens);
+  read('read', counts.cache_read_input_tokens);
+  read('write', counts.cache_creation_input_tokens);
+  read('write1h', (counts.cache_creation as Record<string, unknown> | undefined)?.ephemeral_1h_input_tokens);
+  read('output', counts.output_tokens);
+  read('thinking', (counts.output_tokens_details as Record<string, unknown> | undefined)?.thinking_tokens);
+  if (typeof counts.service_tier === 'string') usage.tier = counts.service_tier;
+  if (typeof counts.inference_geo === 'string') usage.region = counts.inference_geo;
+  if (raw.fresh !== undefined || raw.read !== undefined || raw.write !== undefined) {
+    usage.input = (raw.fresh ?? 0) + (raw.read ?? 0) + (raw.write ?? 0);
+    usage.cached = raw.read ?? 0;
+    usage.cacheWrite = raw.write ?? 0;
+    usage.cacheWrite1h = raw.write1h ?? 0;
+  }
+  if (raw.output !== undefined) usage.output = Math.max(0, raw.output - (raw.thinking ?? 0));
+  if (raw.thinking !== undefined) usage.thinking = raw.thinking;
+}
+/** What a reply that did not finish still costs. The provider's own counts are kept when it sent any. A reply the
+ * customer stopped, or one cut off part way, with no counts is estimated at about four characters a token and about
+ * 1,100 tokens a picture. A request the provider failed or refused before writing anything is not billed. */
+function unfinishedUsage(reply: { reported: boolean; stopped: boolean; outputCharacters: number; inputCharacters: number; image: boolean }): ReceiptMetadata | undefined {
+  if (reply.reported) return { estimated: true };
+  if (!reply.stopped && reply.outputCharacters === 0) return undefined;
+  return { inputTokens: Math.ceil(reply.inputCharacters / 4) + (reply.image ? 1100 : 0), outputTokens: Math.ceil(reply.outputCharacters / 4), estimated: true };
 }
 
 /** Streaming answers from OpenAI (Chat Completions) or Anthropic (Messages). Fixed hosts,
@@ -317,6 +366,8 @@ async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model
   const filter = secretFilter(privateValues);
   const timing: { headersMs?: number; firstTokenMs?: number; thinking?: string } = {}, begun = performance.now();
   const maxTokens = input.maxTokens ?? 3000;
+  const usage: ChatUsage = {};
+  const progress = { streamed: false, completed: false, final: false, providerError: false, characters: 0 };
   try {
     const image = input.image;
     const started = performance.now();
@@ -365,42 +416,47 @@ async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model
     timing.headersMs = Math.round(performance.now() - started);
     if (!response.ok || !response.body) { logAnswerFailure(provider, model, `http-${response.status}`, begun); await response.body?.cancel(); throw unavailable(); }
     reader = response.body.getReader();
+    progress.streamed = true;
     let buffer = '', totalBytes = 0, hasAnswer = false;
-    const usage: { id?: string; input?: number; output?: number; thinking?: number; cached?: number; total?: number } = {};
+    const claudeCounts: Record<string, number | undefined> = {};
     const decoder = new TextDecoder('utf-8', { fatal: true });
     const event = (raw: string) => {
       guard.assertActive();
       const data = raw.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5)).join('\n').trim();
       if (!data || data === '[DONE]') return;
       const value = JSON.parse(data);
-      if (value.error || value.type === 'error') throw unavailable();
+      if (value.error || value.type === 'error') { progress.providerError = true; throw unavailable(); }
       let text: unknown;
       if (provider === 'openai') {
         usage.id ??= value.id;
+        usage.model ??= value.model;
+        if (typeof value.service_tier === 'string') usage.tier = value.service_tier;
         const u = value.usage;
         if (u && typeof u === 'object') {
           const reasoning = countOf(u.completion_tokens_details?.reasoning_tokens) ?? 0, completion = countOf(u.completion_tokens);
           usage.input = countOf(u.prompt_tokens); usage.total = countOf(u.total_tokens);
           if (completion !== undefined) { usage.output = Math.max(0, completion - reasoning); usage.thinking = reasoning; }
           usage.cached = countOf(u.prompt_tokens_details?.cached_tokens);
+          usage.cacheWrite = countOf(u.prompt_tokens_details?.cache_write_tokens);
+          // The usage message arrives once, at the end, with the final counts.
+          progress.final = true;
         }
         const choice = value.choices?.[0];
         if (choice?.delta?.refusal || (choice?.finish_reason && !['stop', 'length'].includes(choice.finish_reason))) throw unavailable();
         text = choice?.delta?.content;
       } else {
         if (value.type === 'message_start') {
-          const u = value.message?.usage ?? {};
           usage.id ??= value.message?.id;
-          const cachedRead = countOf(u.cache_read_input_tokens) ?? 0;
-          usage.input = (countOf(u.input_tokens) ?? 0) + cachedRead + (countOf(u.cache_creation_input_tokens) ?? 0);
-          usage.cached = cachedRead;
+          usage.model ??= value.message?.model;
+          claudeUsage(value.message?.usage ?? {}, claudeCounts, usage);
         } else if (value.type === 'message_delta') {
-          const output = countOf(value.usage?.output_tokens); if (output !== undefined) usage.output = output;
+          claudeUsage(value.usage ?? {}, claudeCounts, usage);
           if (value.delta?.stop_reason && !['end_turn', 'max_tokens', 'stop_sequence'].includes(value.delta.stop_reason)) throw unavailable();
         }
         text = value.type === 'content_block_delta' && value.delta?.type === 'text_delta' ? value.delta.text : undefined;
       }
       if (typeof text !== 'string' || !text) return;
+      progress.characters += text.length;
       if (text.trim()) hasAnswer = true;
       const safe = filter.push(text);
       if (safe) { if (timing.firstTokenMs === undefined) timing.firstTokenMs = Math.round(performance.now() - begun); emit(safe); }
@@ -424,13 +480,27 @@ async function chatGenerate(provider: 'openai' | 'anthropic', key: string, model
     }
     buffer += decoder.decode();
     if (buffer.trim()) event(buffer);
+    progress.completed = true;
+    // The reply is complete, so its counts are final even if it turns out to hold no words.
+    const metadata = chatReceipt(usage); if (metadata) receipt?.(metadata);
     guard.assertActive();
     if (!hasAnswer) throw unavailable();
     const final = filter.push('', true); if (final) emit(final);
-    const metadata = chatReceipt(usage); if (metadata) receipt?.(metadata);
     logAnswerTiming(provider, model, timing, begun);
   } catch {
     if (!guard.signal.aborted) logAnswerFailure(provider, model, timing.firstTokenMs === undefined ? (timing.headersMs === undefined ? 'no-reply-from-provider' : 'no-words-after-reply') : 'stream-stopped', begun);
+    if (progress.streamed && !progress.completed) {
+      if (progress.final) { const exact = chatReceipt(usage); if (exact) receipt?.(exact); }
+      else {
+        const counted = usage.input !== undefined;
+        const partial = unfinishedUsage({ reported: counted, stopped: guard.signal.aborted && !progress.providerError,
+          outputCharacters: progress.characters, inputCharacters: ANSWER_SYSTEM.length + input.prompt.length, image: Boolean(input.image) });
+        // Claude's running output count can lag the words already received, so the larger of the two is kept.
+        const known: ChatUsage = counted ? { ...usage, output: Math.max(usage.output ?? 0, Math.ceil(progress.characters / 4)) }
+          : { id: usage.id, model: usage.model, tier: usage.tier, region: usage.region };
+        if (partial) receipt?.({ ...chatReceipt(known), ...partial });
+      }
+    }
     throw unavailable();
   }
   finally { clearTimeout(total); clearTimeout(idle); cancel(); await reader?.cancel().catch(() => undefined); }

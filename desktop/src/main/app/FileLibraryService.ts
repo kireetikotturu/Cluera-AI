@@ -59,6 +59,19 @@ export class FileLibraryService {
     return this.content(file);
   }
 
+  /** The saved file a session's résumé text came from, with its original bytes, if it is still in Files and unchanged. */
+  async resumeSource(text: string, name: string): Promise<{ name: string; extension: string; hash: string; bytes: Buffer } | null> {
+    const normal = (value: string): string => value.replace(/\r\n/g, '\n').trim();
+    const wanted = normal(text);
+    if (!wanted) return null;
+    const matches = this.repositories.listLibraryFiles('resume').filter((file) => normal(file.text) === wanted);
+    const file = matches.find((item) => item.name === name) ?? matches[0];
+    if (!file) return null;
+    const bytes = await fsp.readFile(this.storagePath(file.storageName)).catch(() => null);
+    if (!bytes || createHash('sha256').update(bytes).digest('hex') !== file.contentHash) return null;
+    return { name: file.name, extension: path.extname(file.storageName).toLowerCase(), hash: file.contentHash, bytes };
+  }
+
   async delete(id: string): Promise<void> {
     const file = this.repositories.getLibraryFile(this.safeId(id));
     if (!file) return;

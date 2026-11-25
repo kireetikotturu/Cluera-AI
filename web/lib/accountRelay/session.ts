@@ -14,7 +14,11 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
   authorize(token: string): Promise<RelayAuthorization>;
   providers: Providers;
   observe?: (event: RelayEvent) => void;
+  /** Where this connection comes from, kept with its usage records: the website (phone) or the Windows app. */
+  device?: 'windows' | 'web';
 }) {
+  let sessionRef: string | undefined;
+  const client = () => ({ device: dependencies.device ?? ('windows' as const), ...(sessionRef ? { sessionRef } : {}) });
   let ended = false, authenticating = false, authorization: RelayAuthorization | undefined;
   let run: ReturnType<typeof createUsageCoordinator> | undefined;
   let starting: Promise<void> | undefined;
@@ -119,6 +123,7 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
       void (async () => {
         try {
           const parsed = authFrame.parse(JSON.parse(bytes.toString()));
+          sessionRef = parsed.sessionRef;
           const result = await dependencies.authorize(parsed.accessToken);
           if (ended) return;
           if (performance.now() >= authenticationDeadline) throw Error();
@@ -160,7 +165,9 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
           try {
             await dependencies.providers.prepare?.('deepgram');
             await ensureStarted();
-            const audio = dependencies.providers.audio(run!, value => send({ type: 'transcript', channel: command.channel, ...value }),
+            const owner = run!;
+            const audio = dependencies.providers.audio({ signal: owner.signal, runId: owner.runId, client: client(), assertActive: () => owner.assertActive() },
+              value => send({ type: 'transcript', channel: command.channel, ...value }),
               () => end('provider_failed'), () => {
                 if (ended) return;
                 try {
@@ -190,7 +197,7 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
           if (abort.signal.aborted) return;
           const signal = AbortSignal.any([run!.signal, abort.signal]);
           providerCall = true;
-          await dependencies.providers.generate(command, { signal, runId:run!.runId, assertActive() { active(); if (signal.aborted) throw Error(); } }, text => {
+          await dependencies.providers.generate(command, { signal, runId:run!.runId, client: client(), assertActive() { active(); if (signal.aborted) throw Error(); } }, text => {
             active(); if (signal.aborted) throw Error(); touch(); send({ type: 'answer', id: command.id, text });
           });
           if (!signal.aborted) send({ type: 'answerDone', id: command.id });

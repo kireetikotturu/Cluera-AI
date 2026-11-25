@@ -12,6 +12,7 @@ import { usageDuration } from '../../../lib/usage/display';
 import { loadPrefs, saveLastSetup } from './prefs';
 import { LIVE_PATH, LIVE_SIGN_IN_PATH, LIVE_WELCOME_QUERY } from '../../../lib/live/intent';
 import { createMeter } from './meter';
+import { sendResume } from '../../../lib/live/resumeUpload';
 import { SetupForm, type SetupDraft } from './SetupForm';
 import { LiveSession } from './LiveSession';
 import { TurnCard } from './TurnCard';
@@ -167,6 +168,8 @@ export function LiveApp() {
         await engine.start(setup);
         setLive({ setup, engine, mic });
         setView({ name: 'live' });
+        // The résumé used in this session is also saved on the account, in the background.
+        if (setup.resumeText.trim()) void sendResume({ text: setup.resumeText, name: draft.resumeName, file: draft.resumeFile, sessionRef: setup.id });
         // A résumé uploaded or pasted for this session is kept for next time, unless the customer turned that off.
         const keep = draft.saveResume;
         if (keep && !loaded.documents.some(document => document.kind === 'RESUME' && document.name === keep.name)) {

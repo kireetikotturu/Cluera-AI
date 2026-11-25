@@ -9,6 +9,8 @@ export const AUDIO_BACKLOG_BYTES = 256_000;
 export const CONNECT_TIMEOUT_MS = 20_000;
 
 const id = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(value);
+/** The relay accepts only a proper UUID as the app session of a connection. */
+const SESSION_REF = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Reads one message from the relay. Anything that is not exactly a known message is rejected. */
 export function parseIncoming(raw: unknown): RelayIncoming | null {
@@ -44,7 +46,7 @@ export class RelayLink {
   private readonly ready = new Set<RelayChannel>();
   private constructor(private readonly socket: SocketLike, private readonly handlers: LinkHandlers) {}
 
-  static connect(open: () => SocketLike, accessToken: string, handlers: LinkHandlers, timeoutMs = CONNECT_TIMEOUT_MS): Promise<RelayLink> {
+  static connect(open: () => SocketLike, accessToken: string, handlers: LinkHandlers, timeoutMs = CONNECT_TIMEOUT_MS, sessionRef?: string): Promise<RelayLink> {
     return new Promise<RelayLink>((resolve, reject) => {
       let settled = false;
       let credential = accessToken;
@@ -59,7 +61,9 @@ export class RelayLink {
       };
       const timer = setTimeout(fail, timeoutMs);
       socket.onopen = () => {
-        try { socket.send(JSON.stringify({ type: 'authenticate', accessToken: credential })); } catch { fail(); }
+        try {
+          socket.send(JSON.stringify({ type: 'authenticate', accessToken: credential, ...(sessionRef && SESSION_REF.test(sessionRef) ? { sessionRef } : {}) }));
+        } catch { fail(); }
         credential = '';
       };
       socket.onmessage = event => {

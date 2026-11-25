@@ -7,7 +7,7 @@ import { AnswerStream } from '../../../desktop/src/renderer/services/answerStrea
 import { buildAnswerContext, indexSetup, type DocumentIndex } from './context';
 import { extractKeyterms } from './keyterms';
 import { photoPrompt, PHOTO_QUESTION, questionPrompt } from './prompt';
-import { RelayLink } from './relayLink';
+import { CONNECT_TIMEOUT_MS, RelayLink } from './relayLink';
 import type {
   AccessGrant, LiveSetup, LiveSnapshot, LiveStatus, LiveTurn, RelayIncoming, SocketLike, TurnSource,
 } from './types';
@@ -201,7 +201,7 @@ export class LiveEngine {
     const link = await RelayLink.connect(() => this.deps.openSocket(grant.relayEndpoint), grant.accessToken, {
       onEvent: event => { if (self && self === this.link) this.onEvent(event); },
       onClose: () => { if (self) this.onLinkClosed(self); },
-    });
+    }, CONNECT_TIMEOUT_MS, this.setup.id);
     self = link;
     if (epoch !== this.epoch) { link.drop(); throw new Error('The live session was closed.'); }
     this.link = link;

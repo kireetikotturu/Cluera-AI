@@ -5,6 +5,7 @@ import { AccountProviderRuntime } from './accounts/AccountProviderRuntime';
 import { AccountContextManager } from './accounts/AccountContextManager';
 import { AccountCreditsManager } from './accounts/AccountCreditsManager';
 import { AccountPhoneSessions } from './accounts/AccountPhoneSessions';
+import { AccountResumes } from './accounts/AccountResumes';
 import { accountFocusCheck } from './accounts/AccountFocusCheck';
 import { registerAccountIpc } from './accounts/registerAccountIpc';
 import { SecureJsonStore } from './security/SecureJsonStore';
@@ -308,12 +309,15 @@ if (process.platform === 'win32') {
       documentProcessor,
 
       retriever,
+      // The résumé of a saved session is also kept on the account, in the background.
+      (session) => accountResumes?.collect(session),
     );
   const fileLibrary = new FileLibraryService(
     repositories,
     documentProcessor,
     path.join(path.dirname(config.databasePath), 'file-library'),
   );
+  const accountResumes = account && workspaceUserId ? new AccountResumes(account, workspaceUserId, fileLibrary) : undefined;
 
   // ============================================================
   // EXISTING SCREEN ANALYZER

@@ -1,0 +1,68 @@
+/* Admin "AI costs": totals, cost by model, daily columns, customers and sessions. Admin only. */
+.account-admin-shell .ai-costs { display: grid; gap: 14px; }
+.account-admin-shell .ai-costs h2 + p { margin-bottom: 0; }
+.account-admin-shell .ai-costs h3 { margin: 12px 0 0; }
+.account-admin-shell .ai-costs-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.account-admin-shell .ai-period { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid #35415a; border-radius: 11px; background: #101725; }
+.account-admin-shell .ai-period button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; color: #b4bfd4; background: transparent; }
+.account-admin-shell .ai-period button:hover:not(:disabled) { background: #202a3c; }
+.account-admin-shell .ai-period button[aria-pressed="true"] { color: #fff; background: #6f60e0; font-weight: 600; }
+.account-admin-shell .ai-costs-updated { margin-left: auto; color: var(--faint); font-size: 12px; }
+.account-admin-shell .ai-costs-body { display: grid; gap: 14px; min-width: 0; transition: opacity .2s; }
+.account-admin-shell .ai-costs-body > * { min-width: 0; }
+.account-admin-shell .ai-costs-body.is-loading { opacity: .55; }
+
+.account-admin-shell .ai-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.account-admin-shell .ai-tile { display: grid; align-content: start; gap: 5px; padding: 16px; border: 1px solid #35415a; border-radius: 14px; background: #141d2b; }
+.account-admin-shell .ai-tile > span { color: #a3a7b8; font-size: 12.5px; }
+.account-admin-shell .ai-tile > strong { color: #f2f4fb; font-size: 24px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+.account-admin-shell .ai-tile-hero { border-color: #8b7cff66; background: linear-gradient(160deg, rgba(139,124,255,.14), #141d2b 70%); }
+.account-admin-shell .ai-tile-hero > strong { font-size: 34px; }
+.account-admin-shell .ai-tile > small { color: #95a3bd; font-size: 12px; line-height: 1.5; }
+.account-admin-shell .ai-live { display: inline-flex; align-items: center; gap: 5px; color: #9ee6c1; font-weight: 600; }
+.account-admin-shell .ai-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #3ee6a0; }
+.account-admin-shell .ai-costs .ai-estimate { margin: 0; padding: 11px 14px; border: 1px solid #8b7cff44; border-radius: 10px; color: #d9d5f8; background: rgba(124,108,255,.08); font-size: 13px; }
+.account-admin-shell .ai-costs .ai-warning { margin: 0; padding: 11px 14px; border: 1px solid #9a5a3a; border-radius: 10px; color: #f6d3a5; background: #2a1d17; font-size: 13px; }
+
+/* A customer name is a link in the table, not another button. */
+.account-admin-shell .ai-costs .usage-link { min-height: 0; padding: 0; border: 0; border-radius: 0; color: #e6e9f5; background: none; font-size: 13px; }
+.account-admin-shell .ai-costs .usage-link:hover:not(:disabled) { color: #c8b9ff; background: none; }
+.account-admin-shell .ai-costs .usage-table td { vertical-align: top; }
+.account-admin-shell .ai-costs .usage-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.account-admin-shell .ai-costs .usage-table td.wrap { min-width: 190px; white-space: normal; line-height: 1.5; }
+.account-admin-shell .ai-costs .usage-table small { display: block; margin-top: 3px; color: #95a3bd; font-size: 11.5px; font-weight: 500; white-space: normal; }
+.account-admin-shell .ai-share { width: 110px; height: 8px; margin: 5px 0 0; border-radius: 0 4px 4px 0; background: rgba(255,255,255,.06); }
+.account-admin-shell .ai-share span { display: block; height: 100%; border-radius: 0 4px 4px 0; background: #8b7cff; }
+.account-admin-shell .ai-noprice, .account-admin-shell .ai-upcoming { color: #f6d3a5; font-weight: 600; }
+
+/* Daily cost: one thin column per day on a single axis; the tallest is labelled, hover or focus shows any day. */
+.account-admin-shell .ai-chart { margin: 0; padding: 26px 14px 10px; border: 1px solid #35415a; border-radius: 14px; background: #141d2b; }
+.account-admin-shell .ai-chart-plot { position: relative; height: 160px; margin-left: 56px; }
+.account-admin-shell .ai-chart-grid span { position: absolute; right: 0; left: 0; border-top: 1px solid #2c3750; }
+.account-admin-shell .ai-chart-grid em { position: absolute; right: 100%; margin-right: 8px; transform: translateY(-50%); color: #95a3bd; font-size: 11px; font-style: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.account-admin-shell .ai-chart ol.ai-chart-columns { position: absolute; inset: 0; display: flex; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.account-admin-shell .ai-chart-columns li { flex: 1; min-width: 0; padding: 0; border: 0; border-radius: 0; background: none; }
+.account-admin-shell .ai-chart-columns button { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; border-radius: 4px 4px 0 0; background: transparent; cursor: default; }
+.account-admin-shell .ai-chart-columns button:hover:not(:disabled) { background: rgba(255,255,255,.05); }
+.account-admin-shell .ai-chart-columns button span { display: block; flex: none; width: min(100%, 22px); border-radius: 4px 4px 0 0; background: #8b7cff; }
+.account-admin-shell .ai-chart-columns button:hover span, .account-admin-shell .ai-chart-columns button:focus-visible span { background: #b0a5ff; }
+.account-admin-shell .ai-chart-columns button em { margin-bottom: 4px; color: #e6e9f5; font-size: 11px; font-style: normal; white-space: nowrap; }
+.account-admin-shell .ai-chart-tip { position: absolute; top: -20px; z-index: 2; display: grid; gap: 2px; padding: 7px 10px; transform: translateX(-50%); border: 1px solid #45516a; border-radius: 8px; background: #0b1120; pointer-events: none; white-space: nowrap; }
+.account-admin-shell .ai-chart-tip strong { font-size: 14px; }
+.account-admin-shell .ai-chart-tip span { color: #b4bfd4; font-size: 11.5px; }
+.account-admin-shell .ai-chart-axis { display: flex; justify-content: space-between; gap: 8px; margin: 6px 0 0 56px; color: #95a3bd; font-size: 11px; }
+
+.account-admin-shell .ai-method { color: #b4bfd4; font-size: 12.5px; line-height: 1.7; }
+.account-admin-shell .ai-method summary { padding: 6px 0; color: #d9d5f8; font-weight: 600; cursor: pointer; }
+.account-admin-shell .ai-method a { color: #c8b9ff; }
+.account-admin-shell .ai-method .usage-table-wrap { margin-top: 8px; }
+
+@media (max-width: 640px) {
+  .account-admin-shell .ai-costs-updated { order: 3; width: 100%; margin-left: 0; }
+  .account-admin-shell .ai-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .account-admin-shell .ai-tile { padding: 12px; }
+  .account-admin-shell .ai-tile > strong { font-size: 20px; }
+  .account-admin-shell .ai-tile-hero > strong { font-size: 26px; }
+  .account-admin-shell .ai-period button { padding: 0 8px; }
+  .account-admin-shell .ai-chart-plot, .account-admin-shell .ai-chart-axis { margin-left: 46px; }
+}

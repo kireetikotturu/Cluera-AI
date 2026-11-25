@@ -1,7 +1,7 @@
 import {ZodError} from 'zod';
 import {AccountError} from './config';
 import {SupabaseOperationError} from '../supabase/diagnostics';
-const stages=new Set(['authorization','admin_check','session_restore','mfa_check','read_query','read_rpc','catalog','providers','releases']);
+const stages=new Set(['authorization','admin_check','session_restore','mfa_check','read_query','read_rpc','catalog','providers','releases','usage','costs','resumes']);
 /** Bounded server-only diagnostic: no IDs, SQL, error messages, cookies or bodies. */
 export function adminReadFailure(error:unknown,stage:string):{error:string;status:number}{
  const status=error instanceof AccountError?error.status:error instanceof ZodError?400:503;

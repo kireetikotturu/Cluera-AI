@@ -84,6 +84,43 @@ it('accepts only a sensible answer-length limit from the app',()=>{
  expect(commandFrame.safeParse({...base,maxTokens:800}).success).toBe(true);
  for(const maxTokens of [99,4001,1.5,'800'])expect(commandFrame.safeParse({...base,maxTokens}).success).toBe(false);
 });
+it('records the model that answered, cache writes, thinking and region',async()=>{
+ await openai(vi.fn(async()=>sse([{id:'chatcmpl-x',model:'gpt-6-luna-2026-09-15',service_tier:'default',choices:[{delta:{content:'ok'},finish_reason:'stop'}],usage:null},
+  {id:'chatcmpl-x',choices:[],usage:{prompt_tokens:300,completion_tokens:20,total_tokens:320,prompt_tokens_details:{cached_tokens:100,cache_write_tokens:150}}},'[DONE]'])),'gpt-6-luna')
+  .generate({type:'generate',id:'m1',prompt:'Hi'},guard(),()=>undefined);
+ expect(receipts).toHaveLength(1);expect(receipts[0]).toMatchObject({servedModel:'gpt-6-luna-2026-09-15',serviceTier:'default',inputTokens:300,cachedTokens:100,cacheWriteTokens:150,outputTokens:20});
+ expect('estimated' in receipts[0]).toBe(false);receipts=[];
+ await claude(vi.fn(async()=>sse([{type:'message_start',message:{id:'msg_9',model:'claude-haiku-5-5-20261001',usage:{input_tokens:10,cache_read_input_tokens:20,cache_creation_input_tokens:30,cache_creation:{ephemeral_1h_input_tokens:10},output_tokens:1,inference_geo:'us',service_tier:'standard'}}},
+  {type:'content_block_delta',delta:{type:'text_delta',text:'hi'}},{type:'message_delta',delta:{stop_reason:'end_turn'},usage:{output_tokens:50,output_tokens_details:{thinking_tokens:15}}}])),'claude-haiku-5-5')
+  .generate({type:'generate',id:'m2',prompt:'Hi'},guard(),()=>undefined);
+ expect(receipts[0]).toMatchObject({servedModel:'claude-haiku-5-5-20261001',inputTokens:60,cachedTokens:20,cacheWriteTokens:30,cacheWrite1hTokens:10,outputTokens:35,thinkingTokens:15,region:'us',serviceTier:'standard'});
+});
+const stoppable=()=>{const owner=new AbortController();return {owner,guard:{signal:owner.signal,assertActive(){if(owner.signal.aborted)throw Error('stopped');}}};};
+it('records a reply the customer stopped as an estimate, using the provider counts when it sent them',async()=>{
+ const gpt=stoppable();
+ await expect(openai(vi.fn(async()=>sse([{id:'chatcmpl-s',model:'gpt-6-luna',choices:[{delta:{content:'hello world'}}]},{choices:[{delta:{content:'more'}}]},'[DONE]'])),'gpt-6-luna')
+  .generate({type:'generate',id:'s1',prompt:'x'.repeat(400)},gpt.guard,()=>gpt.owner.abort())).rejects.toThrow('Provider unavailable.');
+ expect(receipts).toHaveLength(1);expect(receipts[0]).toMatchObject({estimated:true,outputTokens:3,servedModel:'gpt-6-luna'});
+ expect(receipts[0].inputTokens).toBe(Math.ceil((400+'You are Cluera, a concise interview copilot. Answer clearly and directly.'.length)/4));receipts=[];
+ const claudeStop=stoppable();
+ await expect(claude(vi.fn(async()=>sse([{type:'message_start',message:{id:'msg_s',usage:{input_tokens:900,output_tokens:1}}},{type:'content_block_delta',delta:{type:'text_delta',text:'a long first part'}},{type:'content_block_delta',delta:{type:'text_delta',text:'more'}}])),'claude-haiku-5-5')
+  .generate({type:'generate',id:'s2',prompt:'Hi'},claudeStop.guard,()=>claudeStop.owner.abort())).rejects.toThrow('Provider unavailable.');
+ expect(receipts[0]).toMatchObject({estimated:true,inputTokens:900,outputTokens:5});
+});
+it('adds no usage for a request the provider refused before answering',async()=>{
+ await expect(openai(vi.fn(async()=>new Response('{}',{status:429})),'gpt-6-luna').generate({type:'generate',id:'r1',prompt:'Hi'},guard(),()=>undefined)).rejects.toThrow();
+ await expect(claude(vi.fn(async()=>sse([{type:'error',error:{type:'overloaded_error'}}])),'claude-haiku-5-5').generate({type:'generate',id:'r2',prompt:'Hi'},guard(),()=>undefined)).rejects.toThrow();
+ await expect(providerAdapters({...secrets,geminiKey:'AIza-test-key-0000000000000000'},{fetch:vi.fn(async()=>sse([{error:{code:500}}])) as typeof fetch,resolveModel:async()=>'gemini-3.6-flash',receipt:value=>receipts.push(value)})
+  .generate({type:'generate',id:'r3',prompt:'Hi'},guard(),()=>undefined)).rejects.toThrow();
+ expect(receipts).toEqual([]);
+});
+it('marks a Gemini reply cut off part way as an estimate and keeps its counts',async()=>{
+ const owner=stoppable();
+ await expect(providerAdapters({...secrets,geminiKey:'AIza-test-key-0000000000000000'},{resolveModel:async()=>'gemini-3.5-flash',receipt:value=>receipts.push(value),
+  fetch:vi.fn(async()=>sse([{modelVersion:'gemini-3.6-flash',candidates:[{content:{parts:[{text:'part one of it'}]}}],usageMetadata:{promptTokenCount:700,candidatesTokenCount:3,totalTokenCount:703}},{candidates:[{content:{parts:[{text:'two'}]}}]}])) as typeof fetch})
+  .generate({type:'generate',id:'c1',prompt:'Hi'},owner.guard,()=>owner.owner.abort())).rejects.toThrow('Provider unavailable.');
+ expect(receipts[0]).toMatchObject({servedModel:'gemini-3.6-flash',inputTokens:700});expect(receipts.at(-1)).toEqual({estimated:true});
+});
 it('records usage receipts for ChatGPT and Claude as well as Gemini and Deepgram',async()=>{
  const rpc=vi.fn(async(name:string)=>name==='cluera_provider_usage_start'?{code:'RECORDED',operationId:rpc.mock.calls.at(-1)![1].p_operation}:{code:'RECORDED',operationId:rpc.mock.calls.at(-1)![1].p_operation});
  const telemetry=providerTelemetry(rpc as never,{CLUERA_PROVIDER_TELEMETRY_ENABLED:'true'});

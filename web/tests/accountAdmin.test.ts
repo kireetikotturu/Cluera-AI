@@ -278,15 +278,16 @@ it('keeps trusted installer origin, token AAL2 and live database MFA mandatory',
 });
 it('reads live customer usage through the dedicated admin RPC and adds an estimated cost, never raw SQL errors',async()=>{
  rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_admin_usage_report'?{code:'ACTIVE',
-  overall:{customerCount:2,activeNow:1,usedMs:3600000,usage:[{provider:'gemini',model:'gemini-3.5-flash',calls:2,inputTokens:1000000,outputTokens:100000,thinkingTokens:0,audioMs:0}]},
-  customers:[{userId:actor,email:'a@example.invalid',state:'ACTIVE',usedMs:3600000,activeNow:true,lastActiveAt:null,usage:[{provider:'deepgram',model:'flux-general-en',calls:1,inputTokens:0,outputTokens:0,thinkingTokens:0,audioMs:600000}]}]}:null,error:null,status:200}));
+  overall:{customerCount:2,activeNow:1,usedMs:3600000,usage:[{provider:'gemini',model:'gemini-3.5-flash',calls:2,inputTokens:1000000,outputTokens:100000,thinkingTokens:0,audioMs:0,costUsd:1.125,unpriced:0}]},
+  customers:[{userId:actor,email:'a@example.invalid',state:'ACTIVE',usedMs:3600000,activeNow:true,lastActiveAt:null,usage:[{provider:'deepgram',model:'flux-general-en',calls:1,inputTokens:0,outputTokens:0,thinkingTokens:0,audioMs:600000,costUsd:0.065,unpriced:0}]}]}:null,error:null,status:200}));
  const response=await accountAdminRequest(new Request(`${origin}/api/account/admin?usage=1`));
  expect(response.status).toBe(200);
  const body=await response.json();
  expect(rpc).toHaveBeenCalledWith('cluera_admin_usage_report',{p_actor:actor,p_session:sid,p_subject:null});
  expect(body.overall.activeNow).toBe(1);
- expect(body.customers[0].usage.totalUsd).toBeCloseTo(0.077,5);
- expect(body.overall.usage.totalUsd).toBeCloseTo(0.55,5);
+ expect(body.customers[0].usage.totalUsd).toBeCloseTo(0.065,5);
+ expect(body.overall.usage.totalUsd).toBeCloseTo(1.125,5);
+ expect(body.overall.usage.totalInr).toBeCloseTo(1.125*88,3);
  expect(body.assumptions.usdToInr).toBe(88);
  expect(JSON.stringify(body)).not.toMatch(/service|secret|token"/i);
 });
@@ -296,6 +297,16 @@ it('validates the usage subject and refuses non-admin usage reads',async()=>{
  expect((await accountAdminRequest(new Request(`${origin}/api/account/admin?usage=1`))).status).toBe(403);
  rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_admin_usage_report'?{code:'NOT_FOUND'}:null,error:null,status:200}));
  expect((await accountAdminRequest(new Request(`${origin}/api/account/admin?usage=1&subject=${actor}`))).status).toBe(404);
+});
+it('reads the AI costs report for a period in the Admin’s time zone, for admins only',async()=>{
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:name==='cluera_admin_ai_costs'?{code:'ACTIVE',totals:{costUsd:1.5,sessions:2}}:null,error:null,status:200}));
+ const response=await accountAdminRequest(new Request(`${origin}/api/account/admin?costs=1&from=${encodeURIComponent('2026-11-25T18:30:00.000Z')}&tz=Asia%2FKolkata`));
+ expect(response.status).toBe(200);const body=await response.json();
+ expect(rpc).toHaveBeenCalledWith('cluera_admin_ai_costs',{p_actor:actor,p_session:sid,p_from:'2026-11-25T18:30:00.000Z',p_to:null,p_tz:'Asia/Kolkata'});
+ expect(body).toMatchObject({usdToInr:88,totals:{costUsd:1.5,sessions:2},models:[],sessions:[]});
+ expect((await accountAdminRequest(new Request(`${origin}/api/account/admin?costs=1&tz=${encodeURIComponent("x';drop")}`))).status).toBe(400);
+ rpc.mockImplementation(async(name:string)=>({data:name==='account_admin_check'?true:{code:'FORBIDDEN'},error:null,status:200}));
+ expect((await accountAdminRequest(new Request(`${origin}/api/account/admin?costs=1`))).status).toBe(403);
 });
 it('routes "reduce time" to the audited adjustment RPC with only a whole number of minutes',async()=>{
  const body={action:'REDUCE_MINUTES',operationId:crypto.randomUUID(),subjectId:actor,reason:'Reduce time after a refund was agreed',input:{minutes:30}};

@@ -30,6 +30,13 @@ const liveCsp = csp.replace("connect-src 'self' https://*.supabase.co wss://*.su
 const nextConfig: NextConfig = {
   turbopack: { root: path.resolve(process.cwd(),'..') },
   outputFileTracingRoot: path.resolve(process.cwd(),'..'),
+  // Résumé compression draws PDF pages with a native library and the PDF reader's own font files.
+  serverExternalPackages: ['@napi-rs/canvas', 'pdfjs-dist'],
+  outputFileTracingIncludes: {
+    '/api/account/resume': ['./node_modules/pdfjs-dist/legacy/build/pdf.mjs', './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+      './node_modules/pdfjs-dist/standard_fonts/**/*', './node_modules/pdfjs-dist/cmaps/**/*', './node_modules/pdfjs-dist/wasm/**/*',
+      './node_modules/@napi-rs/canvas*/**/*'],
+  },
   poweredByHeader: false,
   reactStrictMode: true,
   async headers() {

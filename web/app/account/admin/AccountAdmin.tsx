@@ -10,6 +10,8 @@ import {PaymentReadiness} from './PaymentReadiness';
 import {AdminPlans} from './AdminPlans';
 import {FinancialReports} from './FinancialReports';
 import {useUsageReport,UsageOverviewPanel,UsageDetailPanel} from './CustomerUsage';
+import {AiCosts} from './AiCosts';
+import {AdminData} from './AdminData';
 import {adminReadError} from '../../../lib/accounts/adminReadErrors';
 import {useAdminAccessRecheck} from '../AdminRoleNavigation';
 import '../account-ui.css';
@@ -24,7 +26,7 @@ interface State {needsMfa?:boolean;factors?:Factor[];testEntitlementsEnabled?:bo
  audit?:Array<{id:string;action:string;reason:string;createdAt:string}>;
  models?:ModelPolicy[];
 }
-type Tab='overview'|'plans'|'ai'|'customers'|'payments'|'updates'|'history';
+type Tab='overview'|'plans'|'ai'|'costs'|'customers'|'data'|'payments'|'updates'|'history';
 export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean}){
  const recheckAccess=useAdminAccessRecheck();
  const [state,setState]=useState<State|null>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[subject,setSubject]=useState('');
@@ -122,7 +124,7 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
   {(enrollment||factors.find(f=>f.id===factorId)?.status==='unverified')?<button disabled={busy} onClick={()=>void action({action:'MFA_CANCEL',factorId:enrollment?.id??factorId})}>Cancel unfinished setup</button>:null}
   <p>Setup keys exist only in this page’s memory. Refresh never creates another factor; cancel unfinished setup explicitly before enrolling again.</p>
  </div>:state?<>
-  <nav className="admin-tabs" role="tablist" aria-label="Admin sections">{([['overview','Overview'],['plans','Plans & pricing'],['ai','AI models & keys'],['customers','Customers'],['payments','Payments'],['updates','App updates'],['history','History']] as [Tab,string][]).map(([id,name])=>
+  <nav className="admin-tabs" role="tablist" aria-label="Admin sections">{([['overview','Overview'],['plans','Plans & pricing'],['ai','AI models & keys'],['costs','AI costs'],['customers','Customers'],['data','Data'],['payments','Payments'],['updates','App updates'],['history','History']] as [Tab,string][]).map(([id,name])=>
    <button key={id} type="button" role="tab" aria-selected={tab===id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{name}</button>)}</nav>
   {releaseLocked&&!pendingMutation?<p role="status" className="account-admin-lock-summary">An app update change is waiting for confirmation. Finish it in App updates first.</p>:null}
 
@@ -131,7 +133,9 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
    <div className="admin-stat-grid">
     <button type="button" className="admin-stat" onClick={()=>setTab('plans')}><strong>Plans &amp; pricing</strong><span>Add, edit, turn on/off or remove the time packs customers buy.</span></button>
     <button type="button" className="admin-stat" onClick={()=>setTab('ai')}><strong>{state.models?.filter(m=>m.enabled).length??0} AI models on</strong><span>Gemini, ChatGPT, Claude and Deepgram models and keys.</span></button>
+    <button type="button" className="admin-stat" onClick={()=>setTab('costs')}><strong>AI costs</strong><span>What the AI costs you: by model, customer and session.</span></button>
     <button type="button" className="admin-stat" onClick={()=>setTab('customers')}><strong>{state.users?.length??0} recent customers</strong><span>Find an account, add or remove time, suspend.</span></button>
+    <button type="button" className="admin-stat" onClick={()=>setTab('data')}><strong>Data</strong><span>Résumés customers used in sessions.</span></button>
     <button type="button" className="admin-stat" onClick={()=>setTab('payments')}><strong>Payments</strong><span>See recent purchases and unfinished checkouts.</span></button>
    </div>
    <div id="account-admin-start-payments"><PaymentReadiness disabled={locked}/></div>
@@ -148,6 +152,8 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
     onSave={(values,reason)=>mutate('SESSION_DEFAULTS',values,reason,null)}/></section>
    <section id="admin-ai-keys" className="account-admin-section" aria-label="AI keys"><AiQuickSetup disabled={locked} models={state.models} active={tab==='ai'} onApplied={()=>void load()}/></section>
   </div>
+
+  <div hidden={tab!=='costs'}><AiCosts active={tab==='costs'} onOpenCustomer={id=>{setTab('customers');select(id);}}/></div>
 
   <div hidden={tab!=='customers'}><section id="account-admin-users" className="account-admin-section" aria-labelledby="account-admin-users-heading"><div className="account-admin-section-heading"><div><p className="account-ui-kicker">CUSTOMERS</p><h2 id="account-admin-users-heading">Customers</h2></div><button disabled={busy||Boolean(pendingMutation)||releaseLocked} onClick={()=>select('')}>Show recent</button></div>
   <UsageOverviewPanel report={usage.overview} error={usage.error} loading={usage.loading} updatedAt={usage.updatedAt} onRefresh={usage.refresh} onSelect={select} selected={subject} disabled={locked}/>
@@ -184,6 +190,8 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
    <form onSubmit={event=>{event.preventDefault();const v=new FormData(event.currentTarget);mutate('REMOVE_MINUTES',{grantId:grant.id,minutes:Number(v.get('minutes'))},String(v.get('reason')));}}><label>Minutes<input name="minutes" type="number" required min={1} max={60000}/></label><label>Reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Remove</button></form>
    {grant.testGrant&&grant.state==='ACTIVE'?<form onSubmit={event=>{event.preventDefault();mutate('REVOKE_TEST',{grantId:grant.id},String(new FormData(event.currentTarget).get('reason')));}}><label>Reason<input name="reason" minLength={10} maxLength={500} required disabled={busy}/></label><button disabled={busy}>Remove test minutes</button></form>:null}</div>:null)}</div>:null}
   </fieldset></section></div>
+
+  <div hidden={tab!=='data'}><AdminData active={tab==='data'} disabled={locked}/></div>
 
   <div hidden={tab!=='payments'}><section className="account-admin-section" aria-label="Payments">
    {liveBillingAdmin?<FinancialReports key="live-report" mode="live" disabled={locked}/>:<p className="account-admin-empty">Payments appear here once real payments are switched on.</p>}

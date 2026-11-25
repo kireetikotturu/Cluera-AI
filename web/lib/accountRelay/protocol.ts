@@ -6,7 +6,9 @@ import { z } from 'zod';
 export const GEMINI_MODEL = 'gemini-3.5-flash';
 export const DEEPGRAM_MODEL = 'flux-general-en';
 export const MAX_FRAME_BYTES = 7_000_000;
-export const authFrame = z.object({ type: z.literal('authenticate'), accessToken: z.string().min(20).max(12000) }).strict();
+export const authFrame = z.object({ type: z.literal('authenticate'), accessToken: z.string().min(20).max(12000),
+  /** The app session this connection belongs to. Only used to group usage records; it grants nothing. */
+  sessionRef: z.uuid().optional() }).strict();
 const channel = z.enum(['interviewer', 'candidate']);
 /** Words the live-transcription service should listen for harder (a job role, a technology, a person's name). Plain
  * words only: letters, digits, spaces and a few symbols found in technical names (C++, C#, Node.js, CI/CD). */

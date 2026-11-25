@@ -87,7 +87,7 @@ export class InterviewOrchestrator {
     private readonly contextBuilder: ContextBuilder,
     private readonly model: AnswerModel,
     private readonly emit: Emitter,
-    private readonly accountProviders?: { recognizer(source: AudioSourceDescriptor): SpeechRecognizer; stop(): void },
+    private readonly accountProviders?: { recognizer(source: AudioSourceDescriptor): SpeechRecognizer; stop(): void; useSession?(sessionId: string | undefined): void },
   ) {}
 
   async start(sessionId: string, source: AudioSourceDescriptor, interactionEnabled = true): Promise<void> {
@@ -95,6 +95,7 @@ export class InterviewOrchestrator {
     if (!session) throw new Error('Session not found.');
     const retainedScreenContext = this.session?.id === sessionId ? this.screenContext : undefined;
     await this.stop();
+    this.accountProviders?.useSession?.(sessionId);
     this.session = session;
     this.interactionEnabled = Boolean(interactionEnabled);
     this.screenContext = retainedScreenContext;
@@ -145,6 +146,7 @@ export class InterviewOrchestrator {
     this.answerAbort?.abort();
     this.answerAbort = null;
     this.accountProviders?.stop();
+    this.accountProviders?.useSession?.(undefined);
     this.activeQuestionText = '';
     this.pendingInterviewerTranscript = '';
     await Promise.all([this.recognizer?.stop(), this.candidateRecognizer?.stop()]);

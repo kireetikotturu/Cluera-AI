@@ -1,6 +1,6 @@
 /**
- * Reads the text of a résumé or notes file on the phone itself. The file is never sent anywhere: only the text that
- * comes out of it is used (and saved to the account when the customer chooses). PDF, Word (.docx), text and Markdown.
+ * Reads the text of a résumé or notes file on the phone itself: nothing is sent while reading. When a session starts,
+ * a copy of its résumé is saved to the account (see resumeUpload.ts). PDF, Word (.docx), text and Markdown.
  */
 export class DocumentError extends Error {}
 

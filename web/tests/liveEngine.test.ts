@@ -39,7 +39,8 @@ async function begin(options: Partial<LiveSetup> = {}) {
   await flush();
   const socket = sockets.at(-1)!;
   socket.accept();
-  expect(socket.frames()[0]).toEqual({ type: 'authenticate', accessToken: 'synthetic-access-token-0000' });
+  // The connection names its session, so Admin shows its usage as one session.
+  expect(socket.frames()[0]).toEqual({ type: 'authenticate', accessToken: 'synthetic-access-token-0000', sessionRef: '00000000-0000-4000-8000-000000000001' });
   socket.push({ type: 'ready', protocol: 1 });
   await flush();
   expect(socket.commands('openAudio')).toEqual([{ type: 'openAudio', channel: 'interviewer', keyterms: expect.arrayContaining(['Java developer', 'Acme', 'Spring Boot']) }]);

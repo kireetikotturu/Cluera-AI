@@ -47,7 +47,9 @@ it('ignores older account responses and binds the mutation only to displayed ver
  const fetcher=vi.fn((url:string,init?:RequestInit)=>init?.method==='POST'?mutation.promise:url.includes(a)?first.promise:url.includes(b)?second.promise:Promise.resolve(Response.json(view())));
  vi.stubGlobal('fetch',fetcher);await render();
  await act(async()=>{button(users[0].email).click();button(users[1].email).click();});
- expect((fetcher.mock.calls[1][1] as RequestInit).signal?.aborted).toBe(true);
+ // The session-defaults box also reads the model list once when the page opens.
+ const reads=fetcher.mock.calls.filter(([url])=>url!=='/api/account/models');
+ expect((reads[1][1] as RequestInit).signal?.aborted).toBe(true);
  await act(async()=>second.resolve(Response.json(view(b))));
  await act(async()=>first.resolve(Response.json(view(a))));
  expect(host.textContent).toContain(users[1].email);expect(host.textContent).not.toContain(users[0].email);
@@ -117,14 +119,16 @@ it('does not treat a malformed success response or timed-out mutation as confirm
 it('provides anchored navigation and local audit filtering without extra requests or writes',async()=>{
  const fetcher=vi.fn(async()=>Response.json({...view(),audit:[{id:'one',action:'CATALOG',reason:'Synthetic catalog update',createdAt:'2026-10-12T00:00:00Z'},{id:'two',action:'SUSPEND',reason:'Synthetic suspension reason',createdAt:'2026-10-12T00:00:01Z'}]}));
  vi.stubGlobal('fetch',fetcher);await render();
- const links=host.querySelectorAll('nav[aria-label="Admin sections"] button');expect(links).toHaveLength(7);
- expect([...links].map(link=>link.textContent)).toEqual(['Overview','Plans & pricing','AI models & keys','Customers','Payments','App updates','History']);
- await act(async()=>(links[6] as HTMLButtonElement).click());expect(links[6].getAttribute('aria-selected')).toBe('true');
- const filter=host.querySelector('input[type="search"]') as HTMLInputElement;
+ const links=host.querySelectorAll('nav[aria-label="Admin sections"] button');
+ expect([...links].map(link=>link.textContent)).toEqual(['Overview','Plans & pricing','AI models & keys','AI costs','Customers','Data','Payments','App updates','History']);
+ const history=links[links.length-1] as HTMLButtonElement;
+ await act(async()=>history.click());expect(history.getAttribute('aria-selected')).toBe('true');
+ const filter=host.querySelector('#account-admin-audit input[type="search"]') as HTMLInputElement;
  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
  await act(async()=>{setter.call(filter,'catalog');filter.dispatchEvent(new Event('input',{bubbles:true}));});
  expect(host.querySelector('.account-admin-audit')?.textContent).toContain('CATALOG');expect(host.querySelector('.account-admin-audit')?.textContent).not.toContain('SUSPEND');
- expect(fetcher).toHaveBeenCalledTimes(1);expect(host.textContent).not.toContain('recurring checkout is unavailable');
+ expect((fetcher.mock.calls as unknown as Array<[string]>).map(([url])=>url).filter(url=>url!=='/api/account/models')).toEqual(['/api/account/admin']);
+ expect(host.textContent).not.toContain('recurring checkout is unavailable');
  expect(host.querySelector('#account-admin-billing-tools')).toBeNull();
 });
 

@@ -42,6 +42,7 @@ export class AccountProviderRuntime {
   private lifetime = new AbortController();
   private authSignal?: AbortSignal;
   private epoch = 0;
+  private sessionRef?: string;
   private preparing = false;
   private recovering = false;
   private recoveries: number[] = [];
@@ -66,6 +67,8 @@ export class AccountProviderRuntime {
     else if (event.type === 'answerFailed' && event.id === this.generation?.id) this.generation.finish(answerFailure());
     else if (event.type === 'audioReady' || event.type === 'transcript') this.listeners.get(event.channel)?.(event);
   };
+  /** The app session that the next connection serves (none between sessions). */
+  useSession(sessionId: string | undefined): void { this.sessionRef = sessionId; }
   private ensure(): Promise<StagingRelayConnection> {
     if (this.connection && !this.connection.signal.aborted) return Promise.resolve(this.connection);
     if (this.connecting) return this.connecting;
@@ -75,7 +78,7 @@ export class AccountProviderRuntime {
       if (epoch !== this.epoch) throw failure();
       this.authSignal = auth.signal;
       const owner = AbortSignal.any([auth.signal, this.lifetime.signal]);
-      const connection = await this.connect(auth.accessToken, owner, this.receive);
+      const connection = await this.connect(auth.accessToken, owner, this.receive, undefined, this.sessionRef);
       if (epoch !== this.epoch || owner.aborted || connection.signal.aborted) { connection.stop(); throw failure(); }
       this.connection = connection;
       this.activity(true);

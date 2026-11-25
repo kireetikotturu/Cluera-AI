@@ -9,6 +9,8 @@ export class SessionService {
     private readonly repositories: Repositories,
     private readonly documents: DocumentProcessor,
     private readonly retriever: LocalRetriever,
+    /** Told about each saved session, for work that runs in the background. */
+    private readonly saved: (session: Session) => void = () => undefined,
   ) {}
 
   startRound(sessionId: string, note = ''): void {
@@ -44,6 +46,7 @@ export class SessionService {
     const session = this.repositories.saveSession(input);
     this.syncBuiltInDocument(session, 'Session resume', 'resume', session.resumeText);
     this.syncBuiltInDocument(session, 'Session job description', 'job-description', session.jobDescription);
+    try { this.saved(session); } catch { /* background work never affects saving */ }
     return session;
   }
 

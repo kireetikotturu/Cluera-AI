@@ -14,10 +14,12 @@ import {assertTrustedInstallerUrl} from '../releases/policy';
 import {ReleaseInputError,releaseValidationCode,logReleaseDiagnostic} from './releaseDiagnostics';
 import {adminReadFailure} from './adminReadDiagnostics';
 import {shapeUsageReport} from './usageCost';
+import {aiCostRange,shapeAiCostReport} from './aiCost';
+import {deleteResume,openResume,resumeDelete,resumeListQuery,resumeOpen,shapeResumeList} from './adminResumes';
 import {sessionDefaultsInput} from './sessionDefaults';
 
 const model=accountModelPolicy;
-const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','SESSION_DEFAULTS','ADD_MINUTES','REMOVE_MINUTES','REDUCE_MINUTES','CATALOG','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
+const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','SESSION_DEFAULTS','ADD_MINUTES','REMOVE_MINUTES','REDUCE_MINUTES','CATALOG','RESUME_DELETE','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
  subjectId:z.uuid().nullable(),reason:z.string().trim().min(10).max(500),input:z.unknown()}).strict();
 /** Staging BFF administration. Live session + explicit allowlist + AAL2 are
  * independently checked by SQL; customer metadata never defines authority. */
@@ -84,6 +86,20 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
     if(report?.code!=='ACTIVE')throw new AccountError('FORBIDDEN',403);
     return cookies.apply(json(shapeUsageReport(report)));
    }
+   if(params.get('costs')==='1'){
+    // Provider cost from each request's own reported usage. Read only; SQL re-checks the admin session and AAL2.
+    stage='costs';const range=aiCostRange.parse({from:params.get('from'),to:params.get('to'),tz:params.get('tz')});
+    const report=await rpc('cluera_admin_ai_costs',{...adminArgs,p_from:range.from,p_to:range.to,p_tz:range.tz??'UTC'});
+    if(report?.code!=='ACTIVE')throw new AccountError('FORBIDDEN',403);
+    return cookies.apply(json(shapeAiCostReport(report)));
+   }
+   if(params.get('data')==='resumes'){
+    // Résumés used in sessions (no text in the list). SQL re-checks the admin session and AAL2.
+    stage='resumes';const search=resumeListQuery.parse({query:params.get('query')??'',before:params.get('before'),beforeId:params.get('beforeId')});
+    const report=await rpc('cluera_admin_resumes',{...adminArgs,p_query:search.query,p_before:search.before,p_before_id:search.beforeId});
+    if(report?.code!=='ACTIVE')throw new AccountError('FORBIDDEN',403);
+    return cookies.apply(json(shapeResumeList(report)));
+   }
    if(params.get('providers')==='1'){
     stage='providers';
     await rateLimit(request,config,clients,account.email);
@@ -104,9 +120,12 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
     testEntitlementsEnabled:process.env.SIGMAROUND_ACCOUNT_TEST_ENTITLEMENTS_ENABLED==='true'}));
   }
   if(request.method!=='POST')return cookies.apply(json({error:'Not found.'},404));
-  await rateLimit(request,config,clients,account.email);
+  // Opening résumés is reading: it uses the read allowance, not the one that guards sign-in and changes.
+  const opening=new URL(request.url).searchParams.get('open')==='resume';
+  await rateLimit(request,config,clients,account.email,...(opening?['billing-read'] as const:[]));
   stage='read_body';const raw=await readJsonBody(request,8192);
   const action=z.object({action:z.string()}).parse(raw).action;
+  if(opening!==(action==='RESUME_OPEN'))throw new AccountError('FORBIDDEN',403);
   if(['RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW'].includes(action))releaseAction=action;
   if(['MFA_ENROLL','MFA_VERIFY','MFA_CANCEL'].includes(action)){
    const factors=await withSessionCapture(()=>clients.auth.auth.mfa.listFactors());if(factors.error)throw new AccountError('UNAVAILABLE',503);
@@ -136,6 +155,10 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
    return cookies.apply(json({ok:true}));
   }
   if(!allowed){if(releaseAction){logReleaseDiagnostic('authorization',releaseAction,'FORBIDDEN');return cookies.apply(json({error:'RELEASE_MFA_REQUIRED'},403));}throw new AccountError('FORBIDDEN',403);}
+  if(action==='RESUME_OPEN'){
+   stage='resume_open';const opened=await openResume(rpc,clients.service.storage as never,adminArgs,resumeOpen.parse(raw));
+   return cookies.apply(json(opened.body,opened.status));
+  }
   stage='validation';
   const input=mutation.parse(raw);let values:object;
   if(input.action.startsWith('RELEASE_')){
@@ -154,6 +177,11 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
    const errors:Record<string,string>={INVALID:'RELEASE_DATABASE_INVALID',CONFLICT:'RELEASE_CONFLICT',NOT_FOUND:'RELEASE_NOT_FOUND',FORBIDDEN:'RELEASE_MFA_REQUIRED'};
    const error=errors[result?.code];
    return cookies.apply(json({error:error??'RELEASE_SERVICE_UNAVAILABLE'},error?(result.code==='FORBIDDEN'?403:409):503));
+  }
+  if(input.action==='RESUME_DELETE'){
+   if(!input.subjectId)throw new AccountError('FORBIDDEN',403);stage='resume_delete';
+   const result=await deleteResume(rpc,clients.service.storage as never,adminArgs,{operationId:input.operationId,reason:input.reason,id:resumeDelete.parse(input.input).id});
+   return cookies.apply(json(result,result?.code==='APPLIED'?200:409));
   }
   if(input.action==='MODEL'){
    if(input.subjectId!==null)throw new AccountError('FORBIDDEN',403);values=model.parse(input.input);

@@ -6,6 +6,8 @@ import { ACCOUNT_DISTRIBUTION } from '../../shared/accountDistribution';
 // legacy provider path until hosted acceptance and account ownership pass.
 const endpoint = ACCOUNT_DISTRIBUTION.relayEndpoint;
 const channel = z.enum(['interviewer', 'candidate']);
+/** The relay accepts only a proper UUID as the app session of a connection. */
+const SESSION_REF = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
 const incoming = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ready'), protocol: z.literal(1) }).strict(),
@@ -53,7 +55,10 @@ const LINK_STALL_MS = 30_000;
 export function openStagingRelay(accessToken: string, owner: AbortSignal,
   receive: (event: RelayOutput) => void,
   connect: (url: string, options: WebSocket.ClientOptions) => WebSocket = (url, options) => new WebSocket(url, options),
+  /** The app session this connection serves, so its usage is shown as one session in Admin. */
+  sessionRef?: string,
 ): Promise<StagingRelayConnection> {
+  const session = sessionRef && SESSION_REF.test(sessionRef) ? { sessionRef: sessionRef.toLowerCase() } : {};
   if (owner.aborted || accessToken.length < 20 || accessToken.length > 12000) return Promise.reject(unavailable());
   return new Promise((resolve, reject) => {
     let peer: WebSocket | undefined, authorized = false, ended = false;
@@ -105,7 +110,7 @@ export function openStagingRelay(accessToken: string, owner: AbortSignal,
         perMessageDeflate: false, maxPayload: 256000 });
       peer.once('open', () => {
         if (ended || owner.aborted) { finish(false); return; }
-        try { peer!.send(JSON.stringify({ type: 'authenticate', accessToken: credential }), error => { if (error) finish(false); }); }
+        try { peer!.send(JSON.stringify({ type: 'authenticate', accessToken: credential, ...session }), error => { if (error) finish(false); }); }
         catch { finish(false); }
         finally { credential = ''; }
       });

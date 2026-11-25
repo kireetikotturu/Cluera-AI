@@ -2,7 +2,7 @@
 // values, request data, and hints, so never retain their raw message or cause.
 const operations = [
   'billing.sandbox.receive', 'billing.checkout', 'billing.reconcile', 'billing.outbox',
-  'account.authorize', 'account.rateLimit', 'account.usage', 'account.workspace', 'account.admin', 'account.models',
+  'account.authorize', 'account.rateLimit', 'account.usage', 'account.workspace', 'account.admin', 'account.models', 'account.resume',
   'admin.profile.read', 'admin.rateLimit',
   'catalog.pricing.read', 'catalog.pricing.update',
   'catalog.models.read', 'catalog.models.upsert',
