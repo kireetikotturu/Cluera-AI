@@ -96,3 +96,7 @@
 .lv-q img{width:54px;height:54px;object-fit:cover;border-radius:10px;border:1px solid var(--line-strong);flex:0 0 auto}
 .lv-q time{font-size:11.5px;color:var(--faint);white-space:nowrap;padding-top:3px}
 @media(prefers-reduced-motion:reduce){.lv-skeleton{animation:none}}
+
+/* "Welcome" card on the live page right after signing in from "Create session". */
+.lv-welcome{display:grid;gap:4px;padding:14px 16px;border:1px solid #3ee6a055;border-radius:14px;background:#3ee6a012;color:#d6f8e8;font-size:14px;line-height:1.5}
+.lv-welcome b{font-size:16px;color:#fff}

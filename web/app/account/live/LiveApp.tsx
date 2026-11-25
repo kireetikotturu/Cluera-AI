@@ -10,6 +10,7 @@ import {
 import type { LiveSetup, LiveTurn, SocketLike } from '../../../lib/live/types';
 import { usageDuration } from '../../../lib/usage/display';
 import { loadPrefs, saveLastSetup } from './prefs';
+import { LIVE_PATH, LIVE_SIGN_IN_PATH, LIVE_WELCOME_QUERY } from '../../../lib/live/intent';
 import { createMeter } from './meter';
 import { SetupForm, type SetupDraft } from './SetupForm';
 import { LiveSession } from './LiveSession';
@@ -90,11 +91,21 @@ export function LiveApp() {
   const [view, setView] = useState<View>({ name: 'home' });
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState('');
+  const [welcome, setWelcome] = useState(false);
   const [micProblem, setMicProblem] = useState('');
   const [live, setLive] = useState<{ setup: LiveSetup; engine: LiveEngine; mic: MicCapture } | null>(null);
   const meter = useMemo(createMeter, []);
   // Leaving the page for any reason also leaves full screen, so the site's header never stays hidden.
   useEffect(() => leaveFullScreen, []);
+  // Arriving from "Create session" after signing in: a short welcome, shown once (the address is cleaned straight away).
+  useEffect(() => {
+    try {
+      const query = new URLSearchParams(window.location.search);
+      if (query.get(LIVE_WELCOME_QUERY) !== '1') return;
+      setWelcome(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    } catch { /* the welcome is a courtesy only */ }
+  }, []);
 
   useEffect(() => {
     // Phones and tablets: a narrow screen, or a touch screen as the main input. A computer with a mouse is sent to the Windows app.
@@ -115,7 +126,7 @@ export function LiveApp() {
       if (Date.now() - last < 15_000) return;
       sessionStorage.setItem('cluera-live-reload', String(Date.now()));
     } catch { /* storage unavailable: reload once anyway */ }
-    window.location.assign('/account/live');
+    window.location.assign(`${LIVE_PATH}${window.location.search}`);
   }, []);
 
   const load = useCallback(async (): Promise<void> => {
@@ -189,8 +200,8 @@ export function LiveApp() {
         : view.name === 'detail' ? <HistoryDetail id={view.id} onBack={() => setView({ name: 'home' })} onDeleted={() => { setSessions(list => list.filter(item => item.id !== view.id)); setView({ name: 'home' }); }} />
         : state === 'loading' ? <div className="lv-stack"><div className="lv-skeleton" /><div className="lv-skeleton" style={{ height: 70 }} /><div className="lv-skeleton" /><div className="lv-skeleton" /></div>
         : state === 'signed-out' ? <div className="lv-card lv-stack"><h1 style={{ margin: 0, fontSize: 24 }}>Sign in to continue</h1>
-            <p className="lv-sub" style={{ margin: 0 }}>Sign in to your Cluera account to start a live session on this phone.</p>
-            <Link className="lv-btn block" href="/account">Sign in</Link></div>
+            <p className="lv-sub" style={{ margin: 0 }}>Sign in to your Cluera account to create a session on this phone. New accounts get 15 free minutes.</p>
+            <a className="lv-btn block" href={LIVE_SIGN_IN_PATH}>Sign in</a></div>
         : state === 'unavailable' || !loaded ? <div className="lv-card lv-stack"><h1 style={{ margin: 0, fontSize: 24 }}>Cluera is not reachable</h1>
             <p className="lv-sub" style={{ margin: 0 }}>Check your internet connection and try again.</p>
             <button type="button" className="lv-btn block" onClick={() => { setLoaded(null); setState('loading'); }}>Try again</button></div>
@@ -198,6 +209,8 @@ export function LiveApp() {
             onStart={begin} onBack={() => { setStartError(''); setView({ name: 'home' }); }} />
         : <div className="lv-stack">
           <div className="lv-head"><h1>Live session</h1></div>
+          {welcome ? <div className="lv-welcome" role="status"><b>Welcome to Cluera</b>
+            <span>{loaded.availableMilliseconds > 0 ? `${usageDuration(loaded.availableMilliseconds)} ready to use. Your first 15 minutes are free.` : 'Your account is ready.'}</span></div> : null}
           <p className="lv-sub" style={{ margin: 0 }}>Answers to your interview or test questions, on this phone. The microphone listens to the room and answers by itself.</p>
           <div className="lv-balance"><div><small>Time left</small><b>{usageDuration(loaded.availableMilliseconds)}</b></div>
             <Link className="lv-btn ghost small" href="/account/checkout?offer=cluera_pack_3h_v2">Buy time</Link></div>

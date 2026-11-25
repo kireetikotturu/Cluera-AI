@@ -8,6 +8,7 @@ import {notifyAccountSessionChanged,ACCOUNT_SESSION_STORAGE_KEY} from './AdminRo
 import {selectedPlanReturn,replaceAccountLocation} from '../../lib/accounts/browserNavigation';
 import {authFailure,emailNotice,signupNotice,resendNotice,publicLoginSchema,publicSessionSchema,safeGoogleRedirect,type PublicAccount} from '../../lib/accounts/publicAuth';
 import {MIN_PASSWORD_LENGTH,MAX_PASSWORD_LENGTH} from '../../lib/accounts/passwordPolicy';
+import {resolveLiveIntent,liveIntentFromSearch,clearLiveIntent,liveWelcomePath} from '../../lib/live/intent';
 import {resolveCheckoutSelection,selectionFromSearch,clearCheckoutSelection,checkoutSelectionHref,checkoutSelectionName,type CheckoutSelection} from '../../lib/cluera/checkoutJourney';
 import './account-ui.css';
 import './account-home.css';
@@ -32,6 +33,7 @@ export function AccountPanel() {
   const [feedback,setFeedback]=useState<Feedback|null>(null);
   const [visible, setVisible] = useState(false);
   const [selection,setSelection]=useState<CheckoutSelection|null>(null);
+  const [liveIntent,setLiveIntent]=useState(false);
   const [resendSeconds,setResendSeconds]=useState(0);
   const [verificationReady,setVerificationReady]=useState(false);
   const [emailDraft,setEmailDraft]=useState('');
@@ -47,6 +49,7 @@ export function AccountPanel() {
   const securityState=useRef<PasswordSecurityState|null>(null),restartRecovery=useRef(false);
   const reauthUntil=useRef(0),lastSessionCheck=useRef(0),returned=useRef(false);
   const callbackFeedback=useRef<Feedback|null>(null);
+  const wantLive=useRef(false);
   const restoreSession=useRef<(expectedAccountId?:string,writeCurrent?:()=>boolean,explicit?:boolean)=>Promise<boolean>>(async()=>false);
   const refreshGoogle=useRef<()=>void>(()=>{});
   const baseBusy=pendingAction!==null||checkingSession;
@@ -68,6 +71,7 @@ export function AccountPanel() {
   function completeSignOut(message:Feedback|null){
     try{clearCheckoutSelection(window.sessionStorage);}catch{/* Storage is optional. */}
     window.history.replaceState(null,'',`${window.location.pathname}#login`);
+    wantLive.current=false;setLiveIntent(false);try{clearLiveIntent(window.sessionStorage);}catch{/* Storage is optional. */}
     selected.current=null;setSelection(null);clearSessionView();verificationEmail.current='';
     setVerificationReady(false);setEmailDraft('');resendUntil.current=0;setResendSeconds(0);setReauthSeconds(0);
     reauthUntil.current=0;setMode('login');setFeedback(message);notifyAccountSessionChanged();
@@ -101,6 +105,9 @@ export function AccountPanel() {
     try{selected.current=resolveCheckoutSelection(window.location.search,window.sessionStorage);}
     catch{selected.current=selectionFromSearch(window.location.search);}
     setSelection(selected.current);
+    try{wantLive.current=resolveLiveIntent(window.location.search,window.sessionStorage);}
+    catch{wantLive.current=liveIntentFromSearch(window.location.search);}
+    setLiveIntent(wantLive.current);
     const selectMode = () => {
       if (inFlight.current) return;
       setVerificationReady(false);verificationEmail.current='';
@@ -163,6 +170,11 @@ export function AccountPanel() {
           selected.current=null;setSelection(null);
           window.history.replaceState(null,'',window.location.pathname);
           replaceAccountLocation(destination);
+        }
+        // "Create session" from the website: once signed in, go straight on to the live page (a chosen plan comes first).
+        if(!destination&&wantLive.current&&!returned.current&&!sensitiveHandoff&&!session.passwordRecovery){
+          returned.current=true;wantLive.current=false;try{clearLiveIntent(window.sessionStorage);}catch{/* Storage is optional. */}
+          replaceAccountLocation(liveWelcomePath());
         }
         return true;
       }catch{
@@ -355,7 +367,7 @@ export function AccountPanel() {
     </> : <>
       <div className="account-auth-heading"><div className="account-auth-brand" aria-hidden="true">C</div><span className="account-ui-kicker">CLUERA AI</span></div>
       <h2>{emailPending?'Check your email':mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create an account' : mode==='resend-verification'?'Verify your email':'Reset your password'}</h2>
-      {!emailPending?<p className="account-auth-description">{mode === 'signup' ? 'One account for Cluera on the web and desktop.' : mode === 'forgot-password' ? 'Enter your email and we’ll help you reset your password.' : mode==='resend-verification'?'Send a new verification link to finish creating your account.':'Welcome back to Cluera.'}</p>:null}
+      {!emailPending?<p className="account-auth-description">{liveIntent&&mode==='signup'?'Create your account to start your session. Your first 15 minutes are free.':liveIntent&&mode==='login'?'Sign in to create your session. New here? Create an account to get 15 free minutes.':mode === 'signup' ? 'One account for Cluera on the web and desktop.' : mode === 'forgot-password' ? 'Enter your email and we’ll help you reset your password.' : mode==='resend-verification'?'Send a new verification link to finish creating your account.':'Welcome back to Cluera.'}</p>:null}
       {!emailPending&&!emailOnly&&google==='enabled'?<><button className="button secondary" type="button" disabled={busy} onClick={() => void submit('google')}>Continue with Google</button><div className="account-auth-divider"><span>or continue with email</span></div></>:null}
       {!emailPending?<form key={mode} aria-describedby="account-auth-feedback" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);

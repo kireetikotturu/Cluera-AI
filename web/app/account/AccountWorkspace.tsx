@@ -70,7 +70,7 @@ export function AccountWorkspace(){
   {loading&&!data?<div className="acct-skeleton" aria-hidden="true"><span/><span/><span/></div>:null}
   {pending?<div className="acct-notice" role="alert"><p>A change is awaiting confirmation. Other edits are paused.</p><button type="button" className="acct-btn" disabled={busy} onClick={()=>void submit(pending)}>Retry the same change</button></div>:null}
   {data?<>
-  <a className="acct-live mobile-only" href="/account/live"><span><strong>Start a live session</strong><small>Answers on this phone. The microphone listens and answers by itself.</small></span><em aria-hidden="true">›</em></a>
+  <a className="acct-live mobile-only" href="/account/live"><span><strong>Create session</strong><small>Answers on this phone. The microphone listens and answers by itself.</small></span><em aria-hidden="true">›</em></a>
   <section className="acct-hero" aria-label="Your time">
    <div className="acct-hero-top"><h3>Your Cluera account</h3>
     <button type="button" className="acct-ghost" disabled={locked} onClick={()=>void refresh()}><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Refresh balance and account</button></div>
@@ -84,7 +84,7 @@ export function AccountWorkspace(){
     {(data.balances.RECURRING??0)>0?<span>Monthly plan · {minutes(data.balances.RECURRING??0)}</span>:null}
     {(data.balances.PACK??0)>0?<span>Time packs · {minutes(data.balances.PACK??0)}</span>:null}
    </div>:null}
-   <nav className="acct-actions" aria-label="Billing shortcuts"><a className="acct-primary" href="/account/checkout?offer=cluera_pack_3h_v2">Buy more time</a><a className="acct-secondary" href="/pricing">Compare plans</a><a className="acct-secondary" href="/account/checkout#billing-history">Billing history</a><a className="acct-secondary" href="/account/download">Download Cluera AI for Windows</a></nav>
+   <nav className="acct-actions" aria-label="Billing shortcuts"><a className="acct-primary" href="/account/checkout?offer=cluera_pack_3h_v2">Buy more time</a><a className="acct-secondary" href="/pricing">Compare plans</a><a className="acct-secondary" href="/account/checkout#billing-history">Billing history</a><a className="acct-secondary on-desktop" href="/account/download">Download Cluera AI for Windows</a></nav>
   </section>
   <div className="acct-grid">
    <section className="acct-card" aria-label="Profile">

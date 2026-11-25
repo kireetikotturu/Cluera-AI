@@ -2,16 +2,20 @@ import Link from 'next/link';
 import {approvedAccountRelease} from '@/lib/accounts/releases';
 import {AccountPricing} from './AccountPricing';
 import {BrandMark} from './BrandMark';
+import {LIVE_PATH,LIVE_SIGN_IN_PATH} from '../lib/live/intent';
 import type {ClueraPublicRevision} from '../lib/payments/cluera/publicCatalog';
 
 /** Account-only server pages. Separate Cluera pages; old product services remain outside this source. */
 export function AccountHome({catalog=null}:{catalog?:ClueraPublicRevision[]|null}={}){
  return <main className="home">
   <section className="hero"><div className="hero-copy reveal">
-   <p className="pill"><span className="pill-dot" aria-hidden="true"/>Your AI interview copilot for Windows</p>
+   <p className="pill"><span className="pill-dot" aria-hidden="true"/>Your AI interview copilot<span className="on-desktop"> for Windows</span></p>
    <h1>Walk into every interview <span className="accent-serif">ready.</span></h1>
    <p className="lede">Cluera listens to the conversation, transcribes it live and gives you clear, tailored answers in seconds, built from your résumé and the job description. One Cluera account, one shared time balance.</p>
-   <div className="hero-actions"><Link className="button" href="/download">Download for Windows</Link><Link className="button secondary when-signed-out" href="/account">Sign in / create account</Link></div>
+   <div className="hero-actions"><Link className="button on-desktop" href="/download">Download for Windows</Link>
+    <a className="button on-mobile when-signed-in" href={LIVE_PATH}>Create session</a><a className="button on-mobile when-signed-out" href={LIVE_SIGN_IN_PATH}>Create session</a>
+    <Link className="button secondary when-signed-out on-desktop" href="/account">Sign in / create account</Link></div>
+   <p className="start-note on-mobile when-signed-out">Sign in first. Your first 15 minutes are free.</p>
    <div className="trust-row"><span>15 free minutes to start</span><span>No API keys needed</span><span>Pay only for the time you use</span></div>
   </div>
   <div className="hero-visual reveal" style={{'--d':'.15s'} as React.CSSProperties} aria-hidden="true">
@@ -41,10 +45,12 @@ export function AccountHome({catalog=null}:{catalog?:ClueraPublicRevision[]|null
    <Feature icon="clock" title="One shared balance" text="Buy time once and use it on any of your devices. Packs never expire."/>
    <Feature icon="bolt" title="Ready in minutes" text="Sign in, add your context and start. No API keys, no setup headaches."/>
   </div></section>
-  <section id="how" className="section split-section"><div className="reveal"><p className="kicker">How it works</p><h2>Up and running in <span className="accent-serif">three steps.</span></h2><p className="section-copy">Create your account, install the app and start your first session. Your first 15 minutes are free.</p><Link className="button secondary" href="/setup">Read the setup guide</Link></div><ol className="steps">
+  <section id="how" className="section split-section"><div className="reveal"><p className="kicker">How it works</p><h2>Up and running in <span className="accent-serif">three steps.</span></h2><p className="section-copy">Create your account<span className="on-desktop">, install the app</span> and start your first session. Your first 15 minutes are free.</p><Link className="button secondary" href="/setup">Read the setup guide</Link></div><ol className="steps">
    <li className="reveal"><span>1</span><div><b>Create your account</b><p>Sign up with email or Google and verify your address. You get 15 free minutes.</p></div></li>
-   <li className="reveal" style={{'--d':'.08s'} as React.CSSProperties}><span>2</span><div><b>Download Cluera for Windows</b><p>Install the app on Windows 10 or 11 and sign in with the same account.</p></div></li>
-   <li className="reveal" style={{'--d':'.16s'} as React.CSSProperties}><span>3</span><div><b>Start a session</b><p>Add your résumé and the job description, check your audio and you're ready.</p></div></li>
+   <li className="reveal on-desktop" style={{'--d':'.08s'} as React.CSSProperties}><span>2</span><div><b>Download Cluera for Windows</b><p>Install the app on Windows 10 or 11 and sign in with the same account.</p></div></li>
+   <li className="reveal on-desktop" style={{'--d':'.16s'} as React.CSSProperties}><span>3</span><div><b>Start a session</b><p>Add your résumé and the job description, check your audio and you're ready.</p></div></li>
+   <li className="reveal on-mobile" style={{'--d':'.08s'} as React.CSSProperties}><span>2</span><div><b>Add your context</b><p>Upload your résumé and paste the job description, so every answer fits you and the role.</p></div></li>
+   <li className="reveal on-mobile" style={{'--d':'.16s'} as React.CSSProperties}><span>3</span><div><b>Create a session</b><p>Allow the microphone and keep your phone close. Answers appear on screen as questions are asked.</p></div></li>
   </ol></section>
   <AccountPricing catalog={catalog}/>
   <section className="section faq"><div className="section-heading reveal"><p className="kicker">FAQ</p><h2>Questions, <span className="accent-serif">answered.</span></h2></div><div className="faq-list">
@@ -52,10 +58,10 @@ export function AccountHome({catalog=null}:{catalog?:ClueraPublicRevision[]|null
    <Faq q="Do my hours expire?" a="One-time packs never expire, and packs stack. Your balance is shared across all your devices."/>
    <Faq q="How do I pay?" a="Securely through Razorpay with UPI, cards, netbanking or wallets. Your hours are added automatically, usually within 2 minutes."/>
    <Faq q="What if I close the payment window?" a="You are not charged. You can continue the same payment or cancel it and start again whenever you like."/>
-   <Faq q="Which computers are supported?" a="Cluera runs on Windows 10 and 11 and needs an internet connection during sessions."/>
+   <Faq q="Which devices are supported?" a="Cluera runs on Windows 10 and 11, and you can also create a live session in your phone's browser. Both need an internet connection during sessions."/>
    <Faq q="Can I get a refund?" a="See our refund policy for details, or contact support and we will help."/>
   </div></section>
-  <section className="final-cta reveal"><p className="kicker">Get started</p><h2>Your next interview starts <span className="accent-serif">here.</span></h2><p>Create your free account and try Cluera with 15 free minutes.</p><div className="hero-actions"><Link className="button when-signed-out" href="/account#signup">Create free account</Link><Link className="button when-signed-in" href="/download">Download for Windows</Link><Link className="button secondary" href="/pricing">See pricing</Link></div></section>
+  <section className="final-cta reveal"><p className="kicker">Get started</p><h2>Your next interview starts <span className="accent-serif">here.</span></h2><p>Create your free account and try Cluera with 15 free minutes.</p><div className="hero-actions"><Link className="button when-signed-out on-desktop" href="/account#signup">Create free account</Link><Link className="button when-signed-in on-desktop" href="/download">Download for Windows</Link><a className="button on-mobile when-signed-out" href={`${LIVE_SIGN_IN_PATH}#signup`}>Create session</a><a className="button on-mobile when-signed-in" href={LIVE_PATH}>Create session</a><Link className="button secondary" href="/pricing">See pricing</Link></div></section>
  </main>;
 }
 const icons:Record<string,React.ReactNode>={
@@ -79,13 +85,17 @@ async function pageRelease():Promise<Release>{
 export async function AccountDownload(){
  let release:Release=null,unavailable=false;
  try{release=await pageRelease();}catch{unavailable=true;}
- return <main className="content-page download-page"><div className="content-hero"><p className="kicker">Download</p><h1>Get Cluera for <span className="accent-serif">Windows.</span></h1><p>Install the app, sign in with your Cluera account and start your first session. Your first 15 minutes are free.</p></div>
+ return <main className="content-page download-page"><div className="content-hero"><p className="kicker"><span className="on-desktop">Download</span><span className="on-mobile">Get started</span></p><h1><span className="on-desktop">Get Cluera for <span className="accent-serif">Windows.</span></span><span className="on-mobile">Cluera on <span className="accent-serif">your phone.</span></span></h1><p className="on-desktop">Install the app, sign in with your Cluera account and start your first session. Your first 15 minutes are free.</p><p className="on-mobile">Nothing to download. Create a live session right in your browser. Your first 15 minutes are free.</p></div>
   <article className="download-card"><div className="download-icon"><BrandMark size={56}/></div>
-   {release?<><p className="kicker">Version {release.version}</p><h2>Latest version {release.version}</h2><p>{release.releaseNotes||'The latest Cluera AI app for Windows.'}</p>
-    <div className="download-meta"><span>Windows 10 &amp; 11 (64-bit)</span><span>{Math.round(release.fileSizeBytes/1_000_000)} MB</span><span>Free to install</span></div>
-    <a className="button" href="/account/download">Download for Windows</a>
-    <p>The first time you open it, Windows may show “Windows protected your PC”. Click <b>More info</b> and then <b>Run anyway</b>.</p></>
-    :<><h2>{unavailable?'Download temporarily unavailable':'Download coming soon'}</h2><p>{unavailable?'We could not load the download right now. Please try again in a few minutes.':'The Windows app will be available here shortly. Create your account now so you are ready.'}</p></>}
+   <h2 className="on-mobile">Nothing to install</h2>
+   <p className="on-mobile">Cluera for Windows is an app for computers. On a phone you create a live session right here in the browser: add your résumé and the job description, then answer your questions with the microphone.</p>
+   <a className="button on-mobile when-signed-in" href={LIVE_PATH}>Create session</a><a className="button on-mobile when-signed-out" href={LIVE_SIGN_IN_PATH}>Create session</a>
+   <p className="start-note on-mobile when-signed-out">Sign in first. Your first 15 minutes are free.</p>
+   {release?<><p className="kicker on-desktop">Version {release.version}</p><h2 className="on-desktop">Latest version {release.version}</h2><p className="on-desktop">{release.releaseNotes||'The latest Cluera AI app for Windows.'}</p>
+    <div className="download-meta on-desktop"><span>Windows 10 &amp; 11 (64-bit)</span><span>{Math.round(release.fileSizeBytes/1_000_000)} MB</span><span>Free to install</span></div>
+    <a className="button on-desktop" href="/account/download">Download for Windows</a>
+    <p className="on-desktop">The first time you open it, Windows may show “Windows protected your PC”. Click <b>More info</b> and then <b>Run anyway</b>.</p></>
+    :<><h2 className="on-desktop">{unavailable?'Download temporarily unavailable':'Download coming soon'}</h2><p className="on-desktop">{unavailable?'We could not load the download right now. Please try again in a few minutes.':'The Windows app will be available here shortly. Create your account now so you are ready.'}</p></>}
    <p><Link className="when-signed-out" href="/account">Sign in / create account</Link><Link className="when-signed-in" href="/account">My account</Link> · <Link href="/setup">Setup guide</Link></p>
   </article>
  </main>;

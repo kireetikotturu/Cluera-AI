@@ -240,3 +240,71 @@ html:not([data-signed-in="1"]) .when-signed-in{display:none!important}
 html[data-signed-in="1"] .account-page:has(.acct-boot){max-width:1040px;margin:36px auto 80px;padding:0 clamp(14px,3vw,28px)}
 html[data-signed-in="1"] .acct-boot-card{height:560px}
 @media(prefers-reduced-motion:reduce){.acct-boot-card{animation:none}}
+
+/* ================= Phone home page: one steady column, nothing moves while the page loads ================= */
+/* Windows-only and phone-only content is chosen by CSS alone (no script), so there is no flash and no shift. A phone is a narrow screen or a touch screen as the main input, the same rule the live page uses. */
+@media(max-width:820px),(pointer:coarse){.on-desktop{display:none!important}}
+@media(min-width:821px){@media(pointer:fine),(pointer:none){.on-mobile{display:none!important}}}
+.start-note{margin:14px 0 0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.cluera-site .download-card .start-note{margin:14px 0 0}
+
+/* The two hero columns are exactly equal and can never be pushed wider by their content. Before, the typing line widened the left column to 534px on a 375px phone for about four seconds, then snapped back. */
+.cluera-site .hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.cluera-site .hero>*{min-width:0}
+@media(max-width:1000px){
+ .cluera-site .hero{grid-template-columns:minmax(0,1fr)}
+ /* On phones and tablets the sample question is simply shown (no typing animation that changes its size), and the hero does not slide in. */
+ .typing{width:auto;white-space:normal;border-right:0;overflow:visible;animation:none}
+ .hero .reveal{animation:none}
+}
+
+@media(max-width:900px){
+ .site-header{gap:10px}
+ .site-header nav a.nav-cta{order:-1;margin-bottom:8px;border-bottom:0;border-radius:12px;color:#fff;font-weight:650;text-align:center;background:linear-gradient(135deg,#8f7dff,#6b5cf6 55%,#4c7dff);box-shadow:0 8px 22px -8px #6b5cf6aa}
+ .site-header nav a.nav-cta:hover{color:#fff;background:linear-gradient(135deg,#8f7dff,#6b5cf6 55%,#4c7dff)}
+}
+
+@media(max-width:640px){
+ /* One side margin (16px) for the header, every section, the call to action and the footer, so everything lines up. */
+ .site-header{width:calc(100% - 32px)}
+ .hero,.section,.content-page,.page-loading{width:calc(100% - 32px)}
+ .cluera-site .final-cta{width:calc(100% - 32px);padding:40px 20px;margin:24px auto 56px}
+ .cluera-site.account-site footer{width:calc(100% - 32px);padding:36px 0 32px}
+
+ /* Lighter background on phones: smaller, still, no third glow. */
+ .ambient i{animation:none;filter:blur(60px)}
+ .ambient i:nth-child(1){width:420px;height:420px;left:-160px;top:-180px}
+ .ambient i:nth-child(2){width:360px;height:360px;right:-160px;top:160px}
+ .ambient i:nth-child(3){display:none}
+ .ambient:after{background-size:48px 48px}
+
+ /* Hero */
+ .cluera-site .hero{padding:24px 0 44px;gap:32px}
+ .pill{margin:0 0 18px;font-size:12.5px}
+ .cluera-site .hero h1{font-size:clamp(34px,10.4vw,44px);line-height:1.06}
+ .cluera-site .lede{margin:18px 0 24px;font-size:16px;line-height:1.6}
+ .cluera-site .hero-actions{gap:10px}
+ .cluera-site .button{min-height:50px;border-radius:14px;font-size:15px}
+ .cluera-site .trust-row{margin-top:20px;gap:8px 16px;font-size:12.5px}
+ .float-card{display:none}
+
+ /* Sections */
+ .cluera-site .section{padding:56px 0}
+ .cluera-site .section-heading{margin:0 0 28px;text-align:left}
+ .cluera-site .section-heading h2,.cluera-site .split-section h2,.cluera-site .final-cta h2{font-size:clamp(26px,7.6vw,32px);line-height:1.12}
+ .cluera-site .section-heading p:not(.kicker),.cluera-site .section-copy,.cluera-site .final-cta p:not(.kicker){font-size:15.5px;line-height:1.6}
+ .cluera-site .kicker{margin-bottom:12px;padding:4px 11px;font-size:11px}
+ .cluera-site .feature-grid{gap:12px}
+ .cluera-site .feature{padding:20px}
+ .feature-icon{width:42px;height:42px;margin-bottom:14px}
+ .cluera-site .feature h3{font-size:17px}
+ .cluera-site .feature p{font-size:14.5px}
+ .cluera-site .split-section{gap:28px}
+ .cluera-site .steps{gap:10px}
+ .cluera-site .steps li{gap:14px;padding:18px}
+ .cluera-site .steps b{font-size:16px}
+ .faq-list{gap:10px}
+ .faq-item summary{padding:16px 18px;font-size:15px}
+ .faq-item p{padding:0 18px 16px;font-size:14.5px}
+ .cluera-site .download-card{padding:24px 20px}
+}
