@@ -8,5 +8,6 @@ import { AccountRoot } from './components/AccountRoot';
 import './styles/theme.css';
 import './styles/app.css';
 import './styles/account.css';
+import './styles/settings.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><AccountRoot/></React.StrictMode>);

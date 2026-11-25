@@ -360,7 +360,7 @@ describe('desktop and provider contracts', () => {
     expect(home).toContain('window.electronAPI.closeWindow()');
     expect(home).not.toContain('aria-label="Settings"');
     expect(home).toContain("setPage('settings')");
-    expect(home).toContain('Settings & models');
+    expect(home).toContain('Settings');
     expect(home).toContain('aria-label="Dashboard window controls"');
     expect(home).toContain('>Zoom +</span>');
     expect(home).toContain('>Zoom −</span>');

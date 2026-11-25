@@ -186,7 +186,7 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
           <button className={`dashboard-action dashboard-account${showAccountMenu ? ' active' : ''}`} aria-label={customerName} title={customerName} aria-expanded={showAccountMenu} onClick={() => { setShowWindowMenu(false); setShowAccountMenu((value) => !value); }}><CircleUserRound size={14}/><span>{customerName}</span></button>
           {showAccountMenu && <div className="dashboard-account-menu">
             <div className="dashboard-account-summary"><CircleUserRound size={18}/><span><strong>{customerName}</strong></span></div>
-            {account&&<><button className="ghost" onClick={()=>{setShowAccountMenu(false);setPage('settings');}}>Settings & Updates</button><button className="ghost" onClick={()=>void window.accountAPI?.logout(false).catch(()=>setError('Sign-out could not be confirmed.'))}>Log out</button></>}
+            {account&&<><button className="ghost" onClick={()=>{setShowAccountMenu(false);setPage('settings');}}>Settings</button><button className="ghost" onClick={()=>void window.accountAPI?.logout(false).catch(()=>setError('Sign-out could not be confirmed.'))}>Log out</button></>}
           </div>}
         </div>}
         <button className="dashboard-create" disabled={checkingSetup} onClick={create}><Plus size={15}/>{checkingSetup ? 'Checking…' : 'Create Session'}</button>
@@ -199,7 +199,7 @@ export function HomePage({ onCollapse, customerName, account }: HomePageProps): 
             <ThemeControl/>
             <PrivateModeControl/>
             <button className="dashboard-files-action" role="menuitem" onClick={() => { setShowWindowMenu(false); setPage('files'); }}><FolderOpen size={14}/><span>Files</span></button>
-            <button role="menuitem" onClick={() => { setShowWindowMenu(false); setPage('settings'); }}><Settings2 size={14}/><span>Settings & models</span></button>
+            <button role="menuitem" onClick={() => { setShowWindowMenu(false); setPage('settings'); }}><Settings2 size={14}/><span>Settings</span></button>
           </div>}
         </div>
         <button className="dashboard-icon" aria-label="Collapse dashboard" title="Collapse to floating logo" onClick={() => { setShowWindowMenu(false); onCollapse(); }}><Shrink size={15}/></button>

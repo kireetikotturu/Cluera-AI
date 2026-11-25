@@ -1,8 +1,8 @@
-import { Download, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Download, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { UpdateStatus } from '../../shared/types';
 
-export function UpdatesSection({ initial, onStatus }: { initial?: UpdateStatus; onStatus?(status: UpdateStatus): void }): JSX.Element {
+export function UpdatesSection({ initial, onStatus, variant }: { initial?: UpdateStatus; onStatus?(status: UpdateStatus): void; variant?: 'panel' }): JSX.Element {
   const [status, setStatus] = useState<UpdateStatus | undefined>(initial);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -32,6 +32,29 @@ export function UpdatesSection({ initial, onStatus }: { initial?: UpdateStatus; 
   };
   const busy = installing || Boolean(status?.installPhase && status.installPhase !== 'idle');
   const available = status && ['optional', 'recommended', 'required'].includes(status.state);
+  if (variant === 'panel') {
+    const note = error || status?.installError;
+    const progress = busy ? (status?.installPhase === 'downloading'
+      ? `Downloading ${Math.round((status.downloadedBytes ?? 0) / 1_000_000)} MB${status.totalBytes ? ` of ${Math.round(status.totalBytes / 1_000_000)} MB` : ''}`
+      : status?.installPhase === 'launching' ? 'Opening the installer…' : 'Checking the download…') : '';
+    return <section className="st-card st-updates" aria-labelledby="updates-title">
+      <div className="st-row">
+        <div className="st-card-head"><h2 id="updates-title">Updates</h2><p>Cluera AI {status?.installedVersion ?? '…'}</p></div>
+        <div className="st-row-actions">
+          {status?.state === 'current' ? <span className="st-pill ok"><CheckCircle2 size={13}/>Up to date</span> : null}
+          {available ? <span className="st-pill">Version {status.version} available</span> : null}
+          <button type="button" className="st-btn" disabled={checking || busy || status?.sessionActive} onClick={() => void check()}><RefreshCw size={14}/>{checking ? 'Checking…' : 'Check for updates'}</button>
+          {available ? <button type="button" className="st-btn primary" disabled={checking || busy || status.sessionActive} onClick={() => void install()}><Download size={14}/>{busy ? 'Updating…' : 'Update now'}</button> : null}
+          {busy && status?.installPhase !== 'launching' ? <button type="button" className="st-btn" onClick={() => void window.electronAPI.cancelUpdate()}>Cancel</button> : null}
+        </div>
+      </div>
+      {status?.state === 'unavailable' ? <p className="st-hint">{status.message}</p> : null}
+      {available && status.releaseNotes ? <details className="st-notes"><summary>What's new</summary><p className="update-release-notes">{status.releaseNotes}</p></details> : null}
+      {status?.sessionActive ? <p className="st-hint">Finish your session first. Updating never interrupts a live session.</p> : null}
+      {progress ? <p className="st-hint" role="status">{progress}</p> : null}
+      {note ? <p className="st-hint" role="status">{note}</p> : null}
+    </section>;
+  }
   return <section className="settings-section" aria-labelledby="updates-title">
     <div className="settings-title"><Download size={19}/><div><h2 id="updates-title">Updates</h2>
       <p>Installed version: {status?.installedVersion ?? 'Loading…'}</p></div></div>

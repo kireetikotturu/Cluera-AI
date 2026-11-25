@@ -1,10 +1,11 @@
 import {useEffect,useState,useRef} from 'react';
 import {ArrowUpRight,Clock3,RefreshCw,Wallet} from 'lucide-react';
 import {allowancePercent,bucketName,creditDuration,emptyCredits,type CreditsView} from '../../shared/accountCredits';
+const sourceName={TRIAL:'Free trial',RECURRING:'Monthly plan',PACK:'Time packs',TEST:'Bonus time',MANUAL:'Added by Cluera'} as const;
 
 /** Isolated one-second paint while active. Estimates never authorize work or
  * replace server balances. Main deduplicates all refresh/foreground requests. */
-export function AccountCreditsSection({userId,compact=false,small=false}:{userId?:string;compact?:boolean;small?:boolean}):JSX.Element {
+export function AccountCreditsSection({userId,compact=false,small=false,settings=false}:{userId?:string;compact?:boolean;small?:boolean;settings?:boolean}):JSX.Element {
  const [view,setView]=useState<CreditsView>(emptyCredits),[elapsed,setElapsed]=useState(0),[error,setError]=useState('');
  const ownerEpoch=useRef(0);
  useEffect(()=>{
@@ -30,6 +31,15 @@ export function AccountCreditsSection({userId,compact=false,small=false}:{userId
   <span>{view.active?`Active AI estimate ${creditDuration(elapsed)}`:'AI usage idle'}</span>
   <span>{snapshot?`${creditDuration(snapshot.availableMilliseconds)} available`:'Balance syncing'}</span>
   {view.state==='unavailable'&&<span>Sync unavailable</span>}</section>;
+ if(settings)return <div className="st-time-wrap" aria-label="Time and usage">
+  <dl className="st-time"><div className="st-time-main"><dt>Time left</dt><dd>{snapshot?creditDuration(snapshot.availableMilliseconds):'—'}</dd></div>
+   <div><dt>Used</dt><dd>{snapshot?creditDuration(snapshot.spentMilliseconds):'—'}</dd></div>
+   {snapshot&&snapshot.reservedMilliseconds>0&&<div><dt>In use now</dt><dd>{creditDuration(snapshot.reservedMilliseconds)}</dd></div>}</dl>
+  {snapshot&&snapshot.buckets.some(bucket=>bucket.availableMilliseconds>0)&&<p className="st-sources" aria-label="Where your time comes from">{snapshot.buckets.filter(bucket=>bucket.availableMilliseconds>0).map(bucket=><span key={bucket.kind}>{sourceName[bucket.kind]} · {creditDuration(bucket.availableMilliseconds)}</span>)}</p>}
+  <div className="st-time-actions"><button type="button" className="st-btn primary" onClick={buy}>Buy time<ArrowUpRight size={14}/></button>
+   <button type="button" className="st-btn" disabled={view.refreshing} onClick={refresh} aria-label="Refresh time"><RefreshCw size={14}/>{view.refreshing?'Syncing…':'Refresh'}</button></div>
+  {(error||view.state==='unavailable')&&<p className="st-hint" role="status">{error||'Could not sync just now. Showing your last known balance.'}</p>}
+ </div>;
  if(small)return <section className="account-credits-small" aria-label="Time and usage">
   <div className="acs-main"><span className="acs-icon"><Wallet size={16}/></span>
    <div><small>Time left</small><strong>{snapshot?creditDuration(snapshot.availableMilliseconds):'—'}</strong></div>

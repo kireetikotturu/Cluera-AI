@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Sidebar } from './components/Sidebar';
 import { FloatingLogo } from './components/FloatingLogo';
 import { DiagonalResizeHandle } from './components/DiagonalResizeHandle';
 import { WindowBar } from './components/WindowBar';
@@ -11,6 +10,7 @@ import { SessionEditorPage } from './pages/SessionEditorPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useAppStore } from './stores/appStore';
 import { AnswerStream } from './services/answerStream';
+import { useSavedDocuments } from './services/contextSelection';
 import { TranscriptOwnership } from './services/transcriptOwnership';
 import { UpdatePage } from './pages/UpdatePage';
 import type { UpdateStatus } from '../shared/types';
@@ -212,6 +212,15 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
     return () => { disposed = true; };
   }, [account.state, account.userId, updateStatus?.state, workspaceInitialized, workspaceAttempt]);
 
+  // The documents saved in the account are the ones answers use: no ticking by hand, and not only after Settings is opened.
+  useEffect(() => {
+    const context = window.accountAPI?.context;
+    if (!workspaceInitialized || account.state !== 'active' || !context) return undefined;
+    let disposed = false;
+    void context.list().then((snapshot) => (disposed ? snapshot : useSavedDocuments(snapshot, context.select))).catch(() => undefined);
+    return () => { disposed = true; };
+  }, [workspaceInitialized, account.state, account.userId]);
+
   useEffect(() => {
     if (account.state !== 'active' || !window.electronAPI) return undefined;
     let disposed = false;
@@ -338,9 +347,9 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
           ? <CopilotPage />
           : page === 'history'
             ? <HistoryPage onCollapse={() => void setDashboardCollapse(true)} />
-            : <SettingsPage account={account} onUpdateStatus={setUpdateStatus} />;
+            : <SettingsPage account={account} onUpdateStatus={setUpdateStatus} onCollapse={() => void setDashboardCollapse(true)} />;
 
-  const standaloneWorkspace = page === 'home' || page === 'create' || page === 'history' || page === 'files';
+  const standaloneWorkspace = page === 'home' || page === 'create' || page === 'history' || page === 'files' || page === 'settings';
 
   return (
     <>
@@ -355,10 +364,6 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
               : ''
           }`}
         >
-          {!standaloneWorkspace && page !== 'copilot' && (
-            <Sidebar />
-          )}
-
           <div className={`content${account && page === 'copilot' ? ' account-live-content' : ''}`}>
             {content}
           </div>

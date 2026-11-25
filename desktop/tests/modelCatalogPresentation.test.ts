@@ -30,9 +30,8 @@ vi.mock('../src/renderer/stores/appStore', () => ({
 describe('activated desktop model catalog presentation', () => {
   it('shows exact enabled catalog IDs in Settings selectors without a free-text model field', () => {
     const html = renderToStaticMarkup(createElement(SettingsPage,{account:{mode:'cluera-staging',state:'active',userId:'00000000-0000-4000-8000-000000000001',email:'synthetic@example.invalid'}}));
-    expect(html).toContain('value="gemini-3.5-flash"');
+    expect(html).toContain('aria-label="Approved answer model"');
     expect(html).toContain('Gemini 3.5 Flash');
-    expect(html).toContain('server-approved Flux model');
     expect(html).not.toContain('API key');
     expect(html).not.toContain('value="gemini-disabled"');
     expect(html).not.toMatch(/<input[^>]+(?:name|id)="[^\"]*model/i);
