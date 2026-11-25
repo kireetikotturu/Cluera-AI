@@ -25,6 +25,12 @@ const requestBody = z.object({ contents: z.array(z.object({ role: z.literal('use
  * session ends exactly as it always did. */
 export const RECONNECT_DELAYS_MS = [300, 1_200, 3_000, 6_000, 10_000] as const;
 export const MAX_RECONNECTS = 6;
+/**
+ * A connection that keeps ending soon after it opens is not helped by connecting again at once: the first wait grows
+ * with every recent loss (a multiple of the first reconnect delay), so a service that is briefly unhappy is given
+ * time instead of being hit again and again, and the session still gives up after MAX_RECONNECTS.
+ */
+const RECOVERY_SPACING = [1, 4, 10, 20, 30, 40] as const;
 export const RECONNECT_WINDOW_MS = 120_000;
 
 /** One account owner, one WSS session, one server usage reservation shared by
@@ -101,7 +107,9 @@ export class AccountProviderRuntime {
     try {
       this.notify('reconnecting');
       for (const interrupt of this.interrupted.values()) interrupt(true);
-      for (const wait of this.reconnectDelays) {
+      const spacing = (this.reconnectDelays[0] ?? 0) * RECOVERY_SPACING[Math.min(this.recoveries.length, RECOVERY_SPACING.length) - 1];
+      for (const [index, base] of this.reconnectDelays.entries()) {
+        const wait = index === 0 ? Math.max(base, spacing) : base;
         try { await delay(wait, undefined, { signal: this.lifetime.signal }); } catch { return; }
         if (epoch !== this.epoch) return;
         try {

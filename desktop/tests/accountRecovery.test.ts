@@ -104,6 +104,37 @@ it('gives up when the connection keeps being lost again and again', async () => 
   expect(f.notify).toHaveBeenCalledWith('failed');
 });
 
+it('waits longer before reconnecting each time a connection is lost again soon after, and a new session starts afresh', async () => {
+  const f = fixture([20]); await liveAudio(f);
+  const gaps: number[] = [];
+  for (let loss = 0; loss < 3; loss++) {
+    const before = f.connections.length;
+    const lostAt = Date.now();
+    f.last().end();
+    await vi.waitFor(() => expect(f.connections.length).toBeGreaterThan(before), { timeout: 3000, interval: 2 });
+    gaps.push(Date.now() - lostAt);
+    await vi.waitFor(() => expect(f.notify).toHaveBeenCalledWith('restored'));
+    f.notify.mockClear();
+  }
+  expect(gaps[1]).toBeGreaterThan(gaps[0]);
+  expect(gaps[2]).toBeGreaterThan(gaps[1]);                // 1x, 4x, 10x the first delay
+  expect(gaps[2]).toBeGreaterThanOrEqual(190);
+  // Stopping the live session (a new one is being started) clears the count of recent losses.
+  f.runtime.stop();
+  const opened = f.connections.length;
+  const speaker = f.runtime.recognizer(speakers), mic = f.runtime.recognizer(microphone);
+  const ready = Promise.all([speaker.start(), mic.start()]);
+  await vi.waitFor(() => expect(f.connections.length).toBeGreaterThan(opened));
+  await vi.waitFor(() => expect(f.last().connection.send).toHaveBeenCalledTimes(2));
+  f.last().receive({ type: 'audioReady', channel: 'interviewer' }); f.last().receive({ type: 'audioReady', channel: 'candidate' });
+  await ready;
+  const before = f.connections.length;
+  const lostAt = Date.now();
+  f.last().end();
+  await vi.waitFor(() => expect(f.connections.length).toBeGreaterThan(before), { timeout: 3000, interval: 2 });
+  expect(Date.now() - lostAt).toBeLessThan(150);           // back to the shortest wait
+});
+
 it('only loses the answer being written when there is no live audio, and does not end the session', async () => {
   const f = fixture();
   const response = await f.runtime.generate(JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'A question' }] }] }), new AbortController().signal);
