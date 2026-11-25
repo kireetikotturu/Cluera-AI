@@ -162,11 +162,15 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
         'answer:completed',
         (data) => {
           if (!answerStream.accepts(data.questionId) || useAppStore.getState().activeAnswerId !== data.questionId) return;
-          answerStream.dispose();
-          store.finishAnswer(
-            data.answer.text,
-            data.telemetry,
-          );
+          // A large piece that is still being shown line by line finishes first (a fraction of a second), then the
+          // final text is set exactly as before.
+          answerStream.complete(data.questionId, () => {
+            if (useAppStore.getState().activeAnswerId !== data.questionId) return;
+            store.finishAnswer(
+              data.answer.text,
+              data.telemetry,
+            );
+          });
         },
       ),
 

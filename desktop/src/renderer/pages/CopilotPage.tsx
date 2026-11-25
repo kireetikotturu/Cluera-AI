@@ -139,6 +139,17 @@ export function CopilotPage(): JSX.Element {
   const answerRequestBaselineId = useRef<string | null>(null);
   const deviceCheckPromise = useRef<Promise<boolean> | null>(null);
   const preparedSessionId = useRef<string | null>(null);
+  // The device check state as the latest code sees it. A callback that was created earlier (a timer, a device-change
+  // listener) must not decide from an old copy of the state and start a second check over a working one.
+  const deviceCheckActiveRef = useRef(false);
+  const deviceCheckRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deviceCheckAttempts = useRef(0);
+  const prepareDeviceCheckRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false));
+  const markDeviceCheckActive = (active: boolean): void => { deviceCheckActiveRef.current = active; setDeviceCheckActive(active); };
+  const clearDeviceCheckRetry = (): void => {
+    if (deviceCheckRetryTimer.current !== null) { clearTimeout(deviceCheckRetryTimer.current); deviceCheckRetryTimer.current = null; }
+    deviceCheckAttempts.current = 0;
+  };
   const unmountCleanupTimer = useRef<number | null>(null);
   const autoFocusingTranscript = useRef(false);
   const activeScreenCaptureId = useRef<string | null>(null);
@@ -192,6 +203,7 @@ export function CopilotPage(): JSX.Element {
       unmountCleanupTimer.current = null;
     }
     return () => {
+      clearDeviceCheckRetry();
       unmountCleanupTimer.current = window.setTimeout(() => {
         delete document.documentElement.dataset.copilotSession;
         delete document.documentElement.dataset.liveSession;
@@ -576,17 +588,46 @@ export function CopilotPage(): JSX.Element {
     retainSystemAudioSource(selected.id, `Windows output · ${selectedName}`);
   };
 
+  // A capture that failed and then worked on a retry leaves its own error banner behind; take that one away.
+  const clearAudioCaptureError = (): void => {
+    if (useAppStore.getState().error?.startsWith('Audio capture:')) store.setError(null);
+  };
+
+  // Windows sometimes cannot hand out the output-audio capture right after a session opens or a device changes, and
+  // works a moment later. Ask a few times before reporting a problem.
+  const startSystemAudio = async (sessionId: string | null, attempts = 3): Promise<void> => {
+    let lastError: unknown = new Error('Windows audio output could not be connected.');
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise<void>((resolve) => { setTimeout(resolve, attempt === 1 ? 600 : 1_500); });
+        if (sessionId !== null && preparedSessionId.current !== sessionId) throw lastError; // the session ended or changed meanwhile
+      }
+      try {
+        await ensureAutomaticSystemAudioSource();
+        await audio.current.start();
+        try { audioOutputSignature.current = await AudioCapture.audioOutputSignature(); } catch { /* Device labels may be permission-gated. */ }
+        if (attempt > 0) clearAudioCaptureError();
+        return;
+      } catch (error) { lastError = error; }
+    }
+    throw lastError;
+  };
+
   const reconnectSystemAudio = async (): Promise<void> => {
     setShowLiveMenu(false);
     setSystemAudioStatus('starting');
     try {
-      if (!deviceCheckActive) {
+      if (!deviceCheckActiveRef.current) {
         const ready = await prepareDeviceCheck();
-        if (!ready) throw new Error('Audio device checking could not be prepared.');
+        if (!ready) {
+          // Preparing has already shown what went wrong. Only when it could not even begin (the page is still
+          // loading) say that, rather than a vague message that hides the real reason.
+          setSystemAudioStatus('error');
+          if (!useAppStore.getState().error) store.setError('The live connection is still getting ready. Try the audio button again in a moment.');
+          return;
+        }
       }
-      await ensureAutomaticSystemAudioSource();
-      await audio.current.start();
-      try { audioOutputSignature.current = await AudioCapture.audioOutputSignature(); } catch { /* Device labels may be permission-gated. */ }
+      await startSystemAudio(null, 2);
       setSystemAudioStatus('active');
       store.setError(null);
     } catch (error) {
@@ -608,36 +649,62 @@ export function CopilotPage(): JSX.Element {
     }
 
     setMicrophoneStatus('starting');
-    try {
-      let chosenDeviceId = requestedDeviceId;
-      if (mode === 'auto') {
-        const available = await AudioCapture.listMicrophones();
+    // Right after a session opens (or a headset reconnects) Windows can list no usable input for a moment. The
+    // automatic choice asks again shortly after, unless the microphone was refused, before it reports a problem.
+    const attempts = mode === 'auto' ? 3 : 1;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise<void>((resolve) => { setTimeout(resolve, attempt === 1 ? 700 : 1_800); });
         if (microphoneEpoch.current !== epoch) return;
-        setMicrophones(available);
-        const automatic = selectAutomaticMicrophone(available);
-        if (!automatic) throw new Error('No usable physical microphone input was found.');
-        // Let Chromium resolve Windows' current default input rather than
-        // pinning the pseudo "default" endpoint as an exact physical device.
-        chosenDeviceId = automatic.deviceId === 'default' ? '' : automatic.deviceId;
       }
-      const selected = await candidateAudio.current.start(chosenDeviceId || undefined);
-      if (microphoneEpoch.current !== epoch) return;
-      const selectedLabel = mode === 'auto' ? `System default · ${selected.label}` : selected.label;
-      setMicrophoneLabel(selectedLabel);
-      setMicrophoneDeviceId(selected.deviceId);
-      localStorage.setItem('sigmaround.microphone.deviceId', selected.deviceId);
-      localStorage.setItem('sigmaround.microphone.label', selectedLabel);
-      setMicrophoneStatus('active');
-    } catch (error) {
-      if (microphoneEpoch.current !== epoch) return;
-      setMicrophoneStatus('error');
-      setMicrophoneError(`${error instanceof Error ? error.message : 'Candidate microphone could not start.'} The meeting is still listening without candidate audio.`);
+      try {
+        let chosenDeviceId = requestedDeviceId;
+        if (mode === 'auto') {
+          const available = await AudioCapture.listMicrophones();
+          if (microphoneEpoch.current !== epoch) return;
+          setMicrophones(available);
+          const automatic = selectAutomaticMicrophone(available);
+          if (!automatic) throw new Error('No usable physical microphone input was found.');
+          // Let Chromium resolve Windows' current default input rather than
+          // pinning the pseudo "default" endpoint as an exact physical device.
+          chosenDeviceId = automatic.deviceId === 'default' ? '' : automatic.deviceId;
+        }
+        const selected = await candidateAudio.current.start(chosenDeviceId || undefined);
+        if (microphoneEpoch.current !== epoch) return;
+        const selectedLabel = mode === 'auto' ? `System default · ${selected.label}` : selected.label;
+        setMicrophoneLabel(selectedLabel);
+        setMicrophoneDeviceId(selected.deviceId);
+        localStorage.setItem('sigmaround.microphone.deviceId', selected.deviceId);
+        localStorage.setItem('sigmaround.microphone.label', selectedLabel);
+        setMicrophoneStatus('active');
+        if (attempt > 0) clearAudioCaptureError();
+        return;
+      } catch (error) {
+        if (microphoneEpoch.current !== epoch) return;
+        const refused = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
+        if (attempt + 1 < attempts && !refused) continue;
+        setMicrophoneStatus('error');
+        setMicrophoneError(`${error instanceof Error ? error.message : 'Candidate microphone could not start.'} The meeting is still listening without candidate audio.`);
+      }
     }
+  };
+
+  // A preparation that failed (a brief network or relay hiccup, Windows not ready yet) is tried again by itself a few
+  // times, so the devices are found without pressing anything. The real reason stays on screen if it keeps failing.
+  const scheduleDeviceCheckRetry = (sessionId: string): void => {
+    if (deviceCheckRetryTimer.current !== null || deviceCheckAttempts.current >= 3) return;
+    const delay = [1_200, 3_000, 6_000][deviceCheckAttempts.current];
+    deviceCheckAttempts.current += 1;
+    deviceCheckRetryTimer.current = setTimeout(() => {
+      deviceCheckRetryTimer.current = null;
+      if (useAppStore.getState().activeSessionId !== sessionId || deviceCheckActiveRef.current) return;
+      void prepareDeviceCheckRef.current();
+    }, delay);
   };
 
   const prepareDeviceCheck = (): Promise<boolean> => {
     if (!activeId || !store.providerStatus?.deepgramConfigured) return Promise.resolve(false);
-    if (deviceCheckActive && preparedSessionId.current === activeId) return Promise.resolve(true);
+    if (deviceCheckActiveRef.current && preparedSessionId.current === activeId) return Promise.resolve(true);
     if (deviceCheckPromise.current) return deviceCheckPromise.current;
 
     const sessionId = activeId;
@@ -647,7 +714,7 @@ export function CopilotPage(): JSX.Element {
         if (preparedSessionId.current && preparedSessionId.current !== sessionId) {
           microphoneEpoch.current += 1;
           await Promise.all([audio.current.stop(), candidateAudio.current.stop(), window.electronAPI.stopInterview()]);
-          setDeviceCheckActive(false);
+          markDeviceCheckActive(false);
         }
         transcriptDraftReleaseArmed.current = false;
         transcriptDraftEditedRef.current = false;
@@ -658,13 +725,12 @@ export function CopilotPage(): JSX.Element {
         await window.electronAPI.setAutoAnswer(autoAnswerEnabled);
         await window.electronAPI.startInterview(sessionId, SYSTEM_SOURCE, false);
         preparedSessionId.current = sessionId;
-        setDeviceCheckActive(true);
+        markDeviceCheckActive(true);
+        deviceCheckAttempts.current = 0;
 
         let outputError: unknown;
         try {
-          await ensureAutomaticSystemAudioSource();
-          await audio.current.start();
-          try { audioOutputSignature.current = await AudioCapture.audioOutputSignature(); } catch { /* Device labels may be permission-gated. */ }
+          await startSystemAudio(sessionId);
           setSystemAudioStatus('active');
         } catch (error) {
           outputError = error;
@@ -678,8 +744,9 @@ export function CopilotPage(): JSX.Element {
         return true;
       } catch (error) {
         preparedSessionId.current = null;
-        setDeviceCheckActive(false);
+        markDeviceCheckActive(false);
         setSystemAudioStatus('error');
+        scheduleDeviceCheckRetry(sessionId);
         await window.electronAPI.stopInterview();
         store.setError(error instanceof Error ? error.message : 'Could not prepare audio device checking.');
         return false;
@@ -691,6 +758,7 @@ export function CopilotPage(): JSX.Element {
     });
     return task;
   };
+  prepareDeviceCheckRef.current = prepareDeviceCheck;
 
   const start = async (): Promise<void> => {
     if (!store.providerStatus?.deepgramConfigured) {
@@ -699,7 +767,10 @@ export function CopilotPage(): JSX.Element {
     }
     try {
       const ready = await prepareDeviceCheck();
-      if (!ready) return;
+      if (!ready) {
+        if (!useAppStore.getState().error) store.setError('The live connection is still getting ready. Press Start again in a moment.');
+        return;
+      }
       // Device-check speech is intentionally transient. Start begins a clean
       // interview context without reconnecting either live audio stream.
       transcriptDraftReleaseArmed.current = false;
@@ -744,7 +815,8 @@ export function CopilotPage(): JSX.Element {
     if (pendingPreparation) await pendingPreparation.catch(() => false);
     microphoneEpoch.current += 1;
     preparedSessionId.current = null;
-    setDeviceCheckActive(false);
+    clearDeviceCheckRetry();
+    markDeviceCheckActive(false);
     await Promise.allSettled([audio.current.stop(), candidateAudio.current.stop()]);
     await Promise.allSettled([window.electronAPI.stopInterview(), window.electronAPI.setLiveCollapsed(false)]);
     setSystemAudioStatus('idle');
@@ -1062,7 +1134,7 @@ export function CopilotPage(): JSX.Element {
   useLayoutEffect(() => {
     interruptedRef.current = (): void => {
       pauseSessionTimer();
-      setRunning(false); setDeviceCheckActive(false); setCollapsed(false);
+      setRunning(false); clearDeviceCheckRetry(); markDeviceCheckActive(false); setCollapsed(false);
       preparedSessionId.current = null; deviceCheckPromise.current = null; microphoneEpoch.current += 1;
       setSystemAudioStatus('error'); setMicrophoneStatus(microphoneMode === 'off' ? 'disabled' : 'error');
       void audio.current.stop(); void candidateAudio.current.stop();

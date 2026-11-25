@@ -9,6 +9,7 @@ export class ModelCatalog {
   private pendingRefresh: Promise<void> | null = null;
   private approvedDefaults: Partial<Record<ProviderName, string>> = {};
   private sessionDefaultsValue: SessionDefaults = BUILT_IN_SESSION_DEFAULTS;
+  private keepFreshTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(private readonly serverUrl: string, private readonly defaults: {
     gemini: string; deepgram: string;
@@ -21,6 +22,18 @@ export class ModelCatalog {
 
   setLocalDefault(provider: ProviderName, modelId: string): void { this.defaults[provider] = modelId; }
   defaultModel(provider: ProviderName): string { return this.hasCurrentRemoteModels() ? this.approvedDefaults[provider] ?? this.defaults[provider] : this.defaults[provider]; }
+
+  /**
+   * While a live session runs, reload the list now and then. Every answer checks that its model is still enabled, and
+   * a list older than five minutes makes that check wait for the network; this way an answer never waits for it.
+   */
+  keepFresh(on: boolean, everyMs = 120_000): void {
+    if (this.keepFreshTimer) clearInterval(this.keepFreshTimer);
+    this.keepFreshTimer = undefined;
+    if (!on || this.managedMode()) return;
+    this.keepFreshTimer = setInterval(() => { void this.refresh(true).catch(() => undefined); }, everyMs);
+    this.keepFreshTimer.unref?.();
+  }
 
   async refresh(force = false): Promise<void> {
     if (this.managedMode()) return;

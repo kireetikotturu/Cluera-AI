@@ -538,6 +538,7 @@ export function registerIpc(
       throw new Error('Sign in to your verified Cluera account to continue.');
     }
     finishStart(true);
+    models.keepFresh(true);
     usageInteraction = interactionEnabled ?? true;
     usagePaused = false;
     usage?.setActive(usageInteraction);
@@ -548,6 +549,7 @@ export function registerIpc(
   let usageInteraction = false;
   let usagePaused = false;
   const stopProtectedSession = (): Promise<void> => {
+    models.keepFresh(false);
     usageInteraction = false;
     usage?.setActive(false);
     if (stoppingProtectedSession) return stoppingProtectedSession;
