@@ -126,6 +126,7 @@ export class AccountProviderRuntime {
   }
   stop(): void {
     ++this.epoch;
+    this.recoveries = [];
     this.lastGeneration = -Infinity;
     const old = this.connection; this.connection = undefined; this.connecting = undefined;
     this.lifetime.abort(); this.lifetime = new AbortController();

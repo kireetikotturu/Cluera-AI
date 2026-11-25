@@ -140,15 +140,23 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
       if(!secrets.deepgramKey)throw unavailable();
       let ended = false, upstream: WebSocket | undefined;
       let queue: Buffer[] = [], queued = 0, allowance = 96000, previous = performance.now();
+      const startedAt = previous;
+      let written = 0;
       let idle: ReturnType<typeof setTimeout>;
       function close() {
         if (ended) return; ended = true; clearTimeout(idle);
         guard.signal.removeEventListener('abort', close);
         queue = []; queued = 0; upstream?.terminate();
       }
-      function fail() { if (ended) return; close(); failed(); }
+      // The reason is logged as a fixed code and number only (never audio, text, headers or keys), so a dropped
+      // live-transcription connection can be explained afterwards.
+      function fail(cause = 'unspecified', detail?: string | number) {
+        if (ended) return;
+        logAudioFailure(cause, detail, Math.round(performance.now() - startedAt), written);
+        close(); failed();
+      }
       function active() { if (ended || guard.signal.aborted) throw unavailable(); guard.assertActive(); }
-      function touch() { clearTimeout(idle); idle = setTimeout(fail, 15000); }
+      function touch() { clearTimeout(idle); idle = setTimeout(() => fail('idle_15s'), 15000); }
       guard.signal.addEventListener('abort', close, { once: true });
       try {
         active();
@@ -166,35 +174,39 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
             // local socket is not readiness, and late opens after stop cannot emit.
             active(); ready();
           }
-          catch { fail(); }
+          catch (error) { fail('open_handler', errorName(error)); }
         });
         upstream.on('message', raw => {
           try {
             active();
             const value = JSON.parse(raw.toString());
             const receipt=providerReceiptMetadata('deepgram',value);if(receipt)dependencies.receipt?.(receipt);
-            if (value.type === 'Error') throw unavailable();
+            if (value.type === 'Error') { fail('provider_error', typeof value.code === 'string' ? value.code : undefined); return; }
             if (!fluxEvents.has(value.event) || typeof value.transcript !== 'string' || value.transcript.length > 16000) return;
             const transcript = secretFilter(privateValues).push(value.transcript, true);
             emit({ event: value.event, transcript });
-          } catch { fail(); }
+          } catch (error) { fail('message_handler', errorName(error)); }
         });
-        upstream.on('unexpected-response', (_request, response) => { response.destroy(); fail(); });
-        upstream.on('error', fail); upstream.on('close', fail);
+        upstream.on('unexpected-response', (_request, response) => { const status = response.statusCode; response.destroy(); fail('handshake_rejected', status); });
+        upstream.on('error', (error: NodeJS.ErrnoException) => fail('socket_error', error?.code ?? errorName(error)));
+        upstream.on('close', (code: number, reason: Buffer) => fail('socket_closed', `${code}:${reason?.toString?.() ?? ''}`));
       } catch { close(); throw unavailable(); }
       return {
         write(bytes) {
+          let cause = 'write_inactive';
           try {
             active();
             const now = performance.now(); allowance = Math.min(96000, allowance + Math.max(0, now - previous) * 32); previous = now;
+            cause = !bytes.length || bytes.length > 8192 || bytes.length % 2 ? 'write_shape' : 'write_rate';
             if (!bytes.length || bytes.length > 8192 || bytes.length % 2 || bytes.length > allowance) throw unavailable();
-            allowance -= bytes.length; touch();
+            allowance -= bytes.length; touch(); written += bytes.length;
+            cause = 'write_backpressure';
             if (upstream?.readyState === WebSocket.OPEN) {
               if (upstream.bufferedAmount > 128000) throw unavailable();
               upstream.send(bytes);
             } else if (queued + bytes.length <= 96000) { queue.push(bytes); queued += bytes.length; }
-            else throw unavailable();
-          } catch { fail(); throw unavailable(); }
+            else { cause = 'write_queue'; throw unavailable(); }
+          } catch { fail(cause, cause === 'write_rate' ? Math.round(allowance) : undefined); throw unavailable(); }
         },
         forceEndTurn() { active(); if (upstream?.readyState === WebSocket.OPEN) upstream.send('{"type":"ForceEndTurn"}'); },
         close,
@@ -215,6 +227,15 @@ export function geminiThinkingLadder(model: string): Array<Record<string, unknow
   // Flash / Lite / newer families (3.x, 4.x, aliases such as gemini-flash-latest).
   return [{ thinkingLevel: 'minimal' }, { thinkingLevel: 'low' }, { thinkingBudget: 0 }, undefined];
 }
+/** Secret-free failure log for the live-transcription connection: a fixed cause, a short code or number, how long it
+ * had been running and how many audio bytes it had taken. Never audio, text, headers or keys. */
+function logAudioFailure(cause: string, detail: string | number | undefined, afterMs: number, bytes: number) {
+  try {
+    const safe = detail === undefined ? undefined : String(detail).replace(/[^A-Za-z0-9_.: -]/g, '').slice(0, 60);
+    console.warn(JSON.stringify({ component: 'cluera-audio-failure', cause, detail: safe, afterMs, bytes }));
+  } catch { /* Logging never affects a session. */ }
+}
+const errorName = (error: unknown): string => error instanceof Error ? error.name : 'unknown';
 /** Secret-free speed log: how long the provider took to answer and to send the first words. */
 function logAnswerFailure(provider: string, model: string, stage: string, begun: number) {
   try { console.warn(JSON.stringify({ component: 'cluera-answer-failure', provider, model, stage, afterMs: Math.round(performance.now() - begun) })); }
