@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type TouchEvent } from 'react';
 import type { LiveEngine } from '../../../lib/live/engine';
 import type { MicCapture } from '../../../lib/live/mic';
 import { PhotoError, preparePhoto, type PreparedPhoto } from '../../../lib/live/photo';
@@ -7,10 +7,16 @@ import { historyPayload, saveSession, type ModelOption } from '../../../lib/live
 import type { LiveSetup } from '../../../lib/live/types';
 import { loadPrefs, savePrefs, type LivePrefs } from './prefs';
 import { modelChoiceLabel } from './modelChoices';
+import type { Meter } from './meter';
 import { Icon } from './icons';
-import { TurnCard } from './TurnCard';
+import { copyText } from './TurnCard';
+import { Action, AnswerPane, QuestionHeader } from './LiveParts';
 
 const LABEL = { idle: 'Ready', connecting: 'Connecting', listening: 'Listening', reconnecting: 'Reconnecting', ended: 'Ended', error: 'Stopped' } as const;
+/** The microphone counts as quiet below this level (0 to 1) ... */
+const QUIET_LEVEL = 0.12;
+/** ... and the customer is told after this long without anything louder. */
+const QUIET_AFTER_MS = 9_000;
 
 function Elapsed({ since }: { since: number }) {
   const [now, setNow] = useState(() => Date.now());
@@ -23,28 +29,31 @@ function Elapsed({ since }: { since: number }) {
 const supportsNativeFullscreen = (): boolean => typeof document !== 'undefined'
   && Boolean(document.documentElement.requestFullscreen || (document.documentElement as unknown as { webkitRequestFullscreen?: unknown }).webkitRequestFullscreen);
 
-export function LiveSession({ setup, engine, mic, models, micProblem, onClose }: {
-  setup: LiveSetup; engine: LiveEngine; mic: MicCapture; models: ModelOption[]; micProblem: string;
+export function LiveSession({ setup, engine, mic, meter, models, micProblem, onClose }: {
+  setup: LiveSetup; engine: LiveEngine; mic: MicCapture; meter: Meter; models: ModelOption[]; micProblem: string;
   onClose(savedId: string | null): void;
 }) {
   const snap = useSyncExternalStore(engine.subscribe, engine.snapshot, engine.snapshot);
   const [prefs, setPrefsState] = useState<LivePrefs>(loadPrefs);
   const [sheet, setSheet] = useState<'none' | 'settings' | 'photo'>('none');
-  const [full, setFull] = useState(false);
+  // The live screen opens full screen: the tap on Start already asked for it.
+  const [full, setFull] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('lv-full'));
   const [confirmStop, setConfirmStop] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [text, setText] = useState('');
-  const [away, setAway] = useState(false);
+  const [pinned, setPinned] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [quiet, setQuiet] = useState(false);
   const [saved, setSaved] = useState<'off' | 'idle' | 'saving' | 'saved' | 'failed'>(setup.saveHistory ? 'idle' : 'off');
   const [height, setHeight] = useState(() => (typeof window === 'undefined' ? 0 : window.innerHeight));
   const [top, setTop] = useState(64);
   const scroller = useRef<HTMLDivElement>(null);
-  const follow = useRef(true);
-  const dock = useRef<HTMLDivElement>(null);
-  const fullRef = useRef(false);
+  const meterBar = useRef<HTMLElement>(null);
+  const fullRef = useRef(full);
+  const swipe = useRef<{ x: number; y: number; ok: boolean } | null>(null);
   const setPrefs = (patch: Partial<LivePrefs>): void => setPrefsState(current => { const next = { ...current, ...patch }; savePrefs(next); return next; });
 
-  // ── The page around the live screen: no footer, no double scrolling, the header only when not full screen ─────────
+  // ── The page around the live screen ───────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const root = document.documentElement;
     root.classList.add('lv-session');
@@ -56,7 +65,8 @@ export function LiveSession({ setup, engine, mic, models, micProblem, onClose }:
     window.visualViewport?.addEventListener('resize', measure);
     window.addEventListener('resize', measure);
     return () => {
-      root.classList.remove('lv-session', 'lv-full');
+      // Full screen belongs to the page that started the session (it also ends it); only this screen's own mark goes here.
+      root.classList.remove('lv-session');
       window.visualViewport?.removeEventListener('resize', measure);
       window.removeEventListener('resize', measure);
     };
@@ -74,7 +84,7 @@ export function LiveSession({ setup, engine, mic, models, micProblem, onClose }:
   };
   useEffect(() => {
     const onChange = (): void => {
-      if (!document.fullscreenElement && fullRef.current) { fullRef.current = false; setFull(false); document.documentElement.classList.remove('lv-full'); }
+      if (!document.fullscreenElement && fullRef.current && supportsNativeFullscreen()) { fullRef.current = false; setFull(false); document.documentElement.classList.remove('lv-full'); }
     };
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
@@ -111,6 +121,20 @@ export function LiveSession({ setup, engine, mic, models, micProblem, onClose }:
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [active]);
+
+  // The microphone's level: drawn straight onto the bar, and used to say so when the phone cannot hear the customer.
+  useEffect(() => {
+    let quietSince = Date.now();
+    const unsubscribe = meter.subscribe(level => {
+      meterBar.current?.style.setProperty('--level', String(Math.min(1, level)));
+      if (level >= QUIET_LEVEL) quietSince = Date.now();
+    });
+    const timer = setInterval(() => {
+      const listening = engine.snapshot().status === 'listening' && !engine.snapshot().paused;
+      setQuiet(listening && Date.now() - quietSince > QUIET_AFTER_MS);
+    }, 1_000);
+    return () => { unsubscribe(); clearInterval(timer); };
+  }, [meter, engine]);
 
   // ── History: saved a moment after each finished answer, and once more when the session ends ───────────────────────
   const chain = useRef<Promise<void>>(Promise.resolve());
@@ -158,24 +182,31 @@ export function LiveSession({ setup, engine, mic, models, micProblem, onClose }:
     void end();
   };
 
-  // ── Scrolling ─────────────────────────────────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!snap.questionSequence) return;
-    follow.current = true; setAway(false);
-    const card = scroller.current?.querySelector(`[data-turn="${snap.activeTurnId ?? ''}"]`);
-    requestAnimationFrame(() => (card as HTMLElement | null)?.scrollIntoView({ block: 'start' }));
-  }, [snap.questionSequence, snap.activeTurnId]);
-  const writtenLength = snap.turns.find(turn => turn.id === snap.activeTurnId)?.answer.length ?? 0;
-  useEffect(() => {
-    const element = scroller.current;
-    if (!prefs.autoScroll || !follow.current || !element) return;
-    element.scrollTop = element.scrollHeight;
-  }, [writtenLength, prefs.autoScroll]);
-  const touched = (): void => { follow.current = false; if (prefs.autoScroll && snap.activeTurnId) setAway(true); };
-  const onScroll = (): void => {
-    const element = scroller.current;
-    if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 48) { follow.current = true; setAway(false); }
+  // ── One question at a time ────────────────────────────────────────────────────────────────────────────────────────
+  const turns = snap.turns;
+  const index = pinned ? Math.max(0, turns.findIndex(turn => turn.id === pinned)) : turns.length - 1;
+  const current = turns[index];
+  // A new question always takes over the screen.
+  useEffect(() => { setPinned(null); }, [snap.questionSequence]);
+  const go = useCallback((target: number): void => {
+    const next = Math.max(0, Math.min(turns.length - 1, target));
+    setPinned(next >= turns.length - 1 ? null : turns[next].id);
+  }, [turns]);
+  const swipeStart = (event: TouchEvent): void => {
+    const touch = event.touches[0];
+    swipe.current = { x: touch.clientX, y: touch.clientY, ok: !(event.target as Element).closest('pre') };
   };
+  const swipeEnd = (event: TouchEvent): void => {
+    const start = swipe.current; swipe.current = null;
+    if (!start?.ok || turns.length < 2) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
+    if (Math.abs(dx) > 70 && Math.abs(dy) < 50 && Math.abs(dx) > Math.abs(dy) * 1.8) go(index + (dx < 0 ? 1 : -1));
+  };
+  const retry = useCallback((id: string): void => { void engine.retry(id); }, [engine]);
+  const copy = useCallback((value: string): void => {
+    void copyText(value).then(ok => { if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1_500); } });
+  }, []);
 
   // ── Typing and photos ─────────────────────────────────────────────────────────────────────────────────────────────
   const submit = (event: FormEvent): void => {
@@ -207,48 +238,60 @@ export function LiveSession({ setup, engine, mic, models, micProblem, onClose }:
   };
   const closePhoto = (): void => { setSheet('none'); setPhoto(null); setPhotoNote(''); setPhotoError(''); };
 
-  const retry = useCallback((id: string): void => { void engine.retry(id); }, [engine]);
   const label = snap.paused && snap.status === 'listening' ? 'Paused' : LABEL[snap.status];
-  const typing = snap.heard || snap.collected;
+  const hearing = snap.heard || snap.collected;
   const offset = full ? 0 : top;
-  return <div className="lv-live" style={{ height: Math.max(0, height - offset), top: offset, ['--lv-font' as string]: `${prefs.font}px`, ['--lv-dock' as string]: `${(dock.current?.offsetHeight ?? 150)}px` }}>
+  const lastIndex = turns.length - 1;
+  return <div className="lv-live" style={{ height: Math.max(0, height - offset), top: offset, ['--lv-font' as string]: `${prefs.font}px` }}>
     <header className="lv-bar">
       <div className="lv-status" role="status" aria-live="polite">
         <span className={`lv-dot ${snap.paused ? '' : snap.status}`} aria-hidden="true" />
-        <b>{label}</b>
-        {snap.startedAt ? <Elapsed since={snap.startedAt} /> : null}
+        <div><b>{label}</b>{snap.startedAt ? <Elapsed since={snap.startedAt} /> : null}</div>
       </div>
-      <button type="button" className="lv-icon" aria-label={snap.paused ? 'Resume listening' : 'Pause listening'} aria-pressed={snap.paused} disabled={!active} onClick={() => engine.pause(!snap.paused)}>
-        <Icon name={snap.paused ? 'play' : 'pause'} /></button>
-      <button type="button" className="lv-icon" aria-label="Settings" onClick={() => setSheet('settings')}><Icon name="settings" /></button>
-      <button type="button" className="lv-icon" aria-label={full ? 'Exit full screen' : 'Full screen'} aria-pressed={full} onClick={() => void toggleFull()}><Icon name={full ? 'shrink' : 'expand'} /></button>
-      <button type="button" className="lv-icon" aria-label={confirmStop ? 'Tap again to end the session' : 'End session'} onClick={stopPressed} disabled={stopping}
-        style={confirmStop || !active ? { background: '#7f1d1d', borderColor: '#b91c1c', color: '#fff' } : undefined}>
-        {confirmStop ? 'End?' : !active ? 'Close' : <Icon name="stop" />}
-      </button>
+      <nav className="lv-actions" aria-label="Session controls">
+        <Action icon={snap.paused ? 'play' : 'pause'} label={snap.paused ? 'Resume' : 'Pause'} pressed={snap.paused} disabled={!active}
+          title={snap.paused ? 'Resume listening' : 'Stop listening for a while'} onClick={() => engine.pause(!snap.paused)} />
+        <Action icon="settings" label="Settings" onClick={() => setSheet('settings')} />
+        <Action icon={full ? 'shrink' : 'expand'} label={full ? 'Exit full' : 'Full screen'} pressed={full} onClick={() => void toggleFull()} />
+        <Action icon={confirmStop || !active ? null : 'stop'} label={confirmStop ? 'Tap to end' : !active ? 'Close' : 'End'} danger disabled={stopping}
+          title={confirmStop ? 'Tap again to end the session' : 'End the session'} onClick={stopPressed} />
+      </nav>
+      <i className="lv-meter" aria-hidden="true" ref={meterBar as React.RefObject<HTMLElement>} />
     </header>
     {snap.status === 'reconnecting' ? <p className="lv-banner" role="status">Reconnecting… your answers are safe. Keep this screen open.</p> : null}
     {snap.status === 'error' ? <p className="lv-banner bad" role="alert">{snap.message}</p> : null}
     {micProblem && active ? <p className="lv-banner bad" role="alert">{micProblem}</p> : null}
-    <div className="lv-scroll" ref={scroller} onTouchStart={touched} onWheel={touched} onPointerDown={touched} onScroll={onScroll}>
-      {snap.turns.length ? snap.turns.map(turn => <TurnCard key={turn.id} turn={turn} onRetry={retry} />)
-        : <div className="lv-empty"><b>{snap.status === 'connecting' ? 'Connecting…' : 'Listening'}</b>
-          {snap.autoAnswer ? 'Ask a question out loud and the answer appears here by itself. You can also type a question or send a photo below.'
-            : 'Questions you hear are collected below. Tap Send to get the answer. You can also type a question or send a photo.'}</div>}
-    </div>
-    {away ? <button type="button" className="lv-latest" onClick={() => { follow.current = true; setAway(false); const element = scroller.current; if (element) element.scrollTop = element.scrollHeight; }}>
-      <Icon name="down" /> Latest</button> : null}
-    <div className="lv-dock" ref={dock}>
-      {typing && !snap.paused ? <div className="lv-heard" aria-live="polite">
-        <span className="lv-wave" aria-hidden="true"><i /><i /><i /><i /></span><p>{snap.heard || snap.collected}</p>
+    {quiet && active && !snap.paused ? <p className="lv-banner" role="status">The phone can hardly hear anything. Hold it closer to the speaker or to you, and check that Voice boost is on in Settings.</p> : null}
+
+    <main className="lv-stage" onTouchStart={swipeStart} onTouchEnd={swipeEnd}>
+      {current ? <>
+        <QuestionHeader turn={current} number={index + 1} total={turns.length} />
+        <div className="lv-answer" ref={scroller}>
+          <AnswerPane turn={current} onRetry={retry} onCopy={copy} copied={copied} follow={prefs.autoScroll} scroller={scroller} />
+        </div>
+      </> : <div className="lv-empty"><Icon name="mic" /><b>{snap.status === 'connecting' ? 'Connecting…' : 'Listening'}</b>
+        <span>{snap.autoAnswer ? 'Ask a question out loud and its answer appears here by itself. You can also type a question or send a photo below.'
+          : 'Questions you hear are collected below. Tap Send to get the answer. You can also type a question or send a photo.'}</span></div>}
+    </main>
+
+    {turns.length > 1 ? <nav className="lv-nav" aria-label="Questions">
+      <button type="button" onClick={() => go(index - 1)} disabled={index <= 0}><Icon name="back" /><span>Previous</span></button>
+      <span className="lv-count" aria-live="polite">{index + 1}<i> / {turns.length}</i></span>
+      <button type="button" onClick={() => go(index + 1)} disabled={index >= lastIndex}><span>Next</span><Icon name="forward" /></button>
+    </nav> : null}
+
+    <div className="lv-dock">
+      {hearing && !snap.paused ? <div className="lv-heard" aria-live="polite">
+        <span className="lv-wave" aria-hidden="true"><i /><i /><i /><i /></span>
+        <div><small>Hearing</small><p>{snap.heard || snap.collected}</p></div>
         {!snap.autoAnswer && snap.collected ? <button type="button" className="lv-btn small" onClick={() => void engine.sendCollected()}>Send</button> : null}
-        <button type="button" className="lv-icon" style={{ height: 40, minWidth: 40 }} aria-label="Clear what was heard" onClick={() => engine.clearInput()}><Icon name="close" /></button>
-      </div> : snap.message || micProblem ? <p className="lv-hint" role="status">{snap.message}</p> : null}
+        <button type="button" className="lv-clear" aria-label="Clear what was heard" title="Clear what was heard" onClick={() => engine.clearInput()}><Icon name="close" /></button>
+      </div> : snap.message ? <p className="lv-hint" role="status">{snap.message}</p> : null}
       <form className="lv-compose" onSubmit={submit}>
-        <button type="button" className="lv-icon" aria-label="Send a photo of a question" disabled={snap.status !== 'listening'} onClick={() => setSheet('photo')}><Icon name="camera" /></button>
+        <button type="button" className="lv-side" title="Send a photo of a question" disabled={snap.status !== 'listening'} onClick={() => setSheet('photo')}><Icon name="camera" /><span>Photo</span></button>
         <input value={text} onChange={event => setText(event.target.value)} placeholder="Type a question…" enterKeyHint="send" autoComplete="off" autoCorrect="on"
           aria-label="Type a question" disabled={snap.status === 'error' || snap.status === 'ended'} maxLength={4000} />
-        <button type="submit" className="lv-icon send" aria-label="Ask" disabled={!text.trim() || snap.status !== 'listening'}><Icon name="send" /></button>
+        <button type="submit" className="lv-side go" title="Ask this question" disabled={!text.trim() || snap.status !== 'listening'}><Icon name="send" /><span>Ask</span></button>
       </form>
     </div>
 
@@ -262,6 +305,11 @@ export function LiveSession({ setup, engine, mic, models, micProblem, onClose }:
             <input type="checkbox" checked={prefs.autoScroll} onChange={event => setPrefs({ autoScroll: event.target.checked })} /><i /></label>
           <label className="lv-switch"><span><b>Keep screen on</b><small>Stops the phone from locking during the session.</small></span>
             <input type="checkbox" checked={prefs.keepAwake} onChange={event => setPrefs({ keepAwake: event.target.checked })} /><i /></label>
+          <hr />
+          <label className="lv-switch"><span><b>Voice boost</b><small>Lifts a quiet or distant voice to a steady level so it is heard better.</small></span>
+            <input type="checkbox" checked={prefs.boost} onChange={event => { setPrefs({ boost: event.target.checked }); mic.setOptions({ boost: event.target.checked }); }} /><i /></label>
+          <label className="lv-switch"><span><b>Reduce background noise</b><small>Helps in a loud room. Turn it off if your voice sounds cut or is missed.</small></span>
+            <input type="checkbox" checked={prefs.noiseReduction} onChange={event => { setPrefs({ noiseReduction: event.target.checked }); mic.setOptions({ noiseReduction: event.target.checked }); }} /><i /></label>
           <hr />
           <div className="lv-field"><span>Text size</span>
             <div className="lv-size">

@@ -1,4 +1,4 @@
-import { downsample, PcmChunker } from './pcm';
+import { MicPipeline } from './dsp';
 
 export class MicError extends Error {}
 
@@ -15,19 +15,40 @@ const explain = (error: unknown): string => {
 /**
  * The phone's microphone as 16 kHz sound in 80 ms pieces. It hears the room: the interviewer coming out of a speaker and
  * the customer's own voice alike, so echo cancellation is off (it would remove the interviewer's voice when the phone
- * itself plays the call) while the volume is levelled and steady noise is reduced.
+ * itself plays the call). The browser's own volume and noise processing is off too, because it distorts speech for the
+ * transcriber; instead the sound is resampled properly, cleaned of rumble and lifted to a steady level here.
  * Starting must happen in the tap that starts the session; phones only allow sound inside a tap.
  */
+export interface MicOptions {
+  /** Lift a quiet voice to a steady level. */
+  boost: boolean;
+  /** Ask the browser to reduce background noise (helps in a loud room, can blur a distant voice). */
+  noiseReduction: boolean;
+}
+export const DEFAULT_MIC: MicOptions = { boost: true, noiseReduction: false };
+
 export class MicCapture {
   private context: AudioContext | null = null;
   private stream: MediaStream | null = null;
   private node: AudioWorkletNode | null = null;
   private sink: GainNode | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
-  private readonly chunker = new PcmChunker();
+  private pipeline: MicPipeline | null = null;
   private epoch = 0;
+  private lastReport = 0;
 
-  async start(onChunk: (samples: Int16Array) => void, onProblem: (message: string) => void): Promise<void> {
+  constructor(private options: MicOptions = DEFAULT_MIC) {}
+
+  /** Changes the processing while the session runs. */
+  setOptions(next: Partial<MicOptions>): void {
+    this.options = { ...this.options, ...next };
+    if (this.pipeline) this.pipeline.boost = this.options.boost;
+    if (next.noiseReduction !== undefined) {
+      void this.stream?.getAudioTracks()[0]?.applyConstraints({ noiseSuppression: next.noiseReduction }).catch(() => undefined);
+    }
+  }
+
+  async start(onChunk: (samples: Int16Array) => void, onProblem: (message: string) => void, onLevel: (level: number) => void = () => undefined): Promise<void> {
     await this.stop();
     const epoch = ++this.epoch;
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -43,7 +64,7 @@ export class MicCapture {
     void context.resume().catch(() => undefined);
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true, channelCount: 1 }, video: false,
+        audio: { echoCancellation: false, noiseSuppression: this.options.noiseReduction, autoGainControl: false, channelCount: 1 }, video: false,
       });
       if (epoch !== this.epoch) throw new MicError('The microphone was closed.');
       if (!this.stream.getAudioTracks().length) throw new MicError('No microphone audio track is available.');
@@ -53,12 +74,17 @@ export class MicCapture {
       this.node = new AudioWorkletNode(context, 'pcm-processor');
       this.sink = context.createGain();
       this.sink.gain.value = 0;
+      const pipeline = new MicPipeline(context.sampleRate);
+      pipeline.boost = this.options.boost;
+      this.pipeline = pipeline;
       this.node.port.onmessage = (event: MessageEvent<Float32Array>) => {
         if (epoch !== this.epoch) return;
         const track = this.stream?.getAudioTracks()[0];
         // A stopped, disabled or muted microphone sends nothing.
-        if (!track || track.readyState !== 'live' || !track.enabled || track.muted) { this.chunker.reset(); return; }
-        for (const chunk of this.chunker.push(downsample(event.data, context.sampleRate))) onChunk(chunk);
+        if (!track || track.readyState !== 'live' || !track.enabled || track.muted) { pipeline.reset(); onLevel(0); return; }
+        for (const chunk of pipeline.push(event.data)) onChunk(chunk);
+        const now = performance.now();
+        if (now - this.lastReport >= 80) { this.lastReport = now; onLevel(pipeline.lastLevel); }
       };
       this.source.connect(this.node).connect(this.sink).connect(context.destination);
       await context.resume();
@@ -94,7 +120,7 @@ export class MicCapture {
     this.stream = null;
     const context = this.context;
     this.context = null;
-    this.chunker.reset();
+    this.pipeline?.reset(); this.pipeline = null;
     if (context) { context.onstatechange = null; await context.close().catch(() => undefined); }
   }
 }

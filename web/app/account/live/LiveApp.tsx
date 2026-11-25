@@ -1,23 +1,39 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LiveEngine } from '../../../lib/live/engine';
 import { MicCapture } from '../../../lib/live/mic';
 import {
-  deleteSession, getAccess, getDocuments, getHome, getModels, listSessions, LiveApiError, readSession,
+  deleteSession, getAccess, getDocuments, getHome, getModels, listSessions, LiveApiError, readSession, saveDocument,
   type AccountDocument, type ModelOption, type PhoneSession, type PhoneSessionSummary, type SessionDefaults,
 } from '../../../lib/live/liveApi';
 import type { LiveSetup, LiveTurn, SocketLike } from '../../../lib/live/types';
 import { usageDuration } from '../../../lib/usage/display';
-import { saveLastSetup } from './prefs';
+import { loadPrefs, saveLastSetup } from './prefs';
+import { createMeter } from './meter';
 import { SetupForm, type SetupDraft } from './SetupForm';
 import { LiveSession } from './LiveSession';
 import { TurnCard } from './TurnCard';
 import { Icon } from './icons';
 import './live.css';
+import './live-screen.css';
 
 type View = { name: 'home' } | { name: 'setup' } | { name: 'live' } | { name: 'detail'; id: string };
 type Loaded = { documents: AccountDocument[]; availableMilliseconds: number; models: ModelOption[]; defaults: SessionDefaults };
+
+/** The live screen fills the phone: the site's header goes away and the browser's own bars too, where the phone allows it. */
+function enterFullScreen(): void {
+  const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+  root.classList.add('lv-full');
+  try {
+    const request = root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen?.();
+    void Promise.resolve(request).catch(() => undefined);
+  } catch { /* the page is still full screen without the browser's help */ }
+}
+function leaveFullScreen(): void {
+  document.documentElement.classList.remove('lv-full');
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+}
 
 function composeSetup(draft: SetupDraft, documents: AccountDocument[], models: ModelOption[]): LiveSetup {
   const bodies = (kind: AccountDocument['kind']): AccountDocument[] => documents.filter(document => document.kind === kind && document.body);
@@ -27,10 +43,11 @@ function composeSetup(draft: SetupDraft, documents: AccountDocument[], models: M
     id: crypto.randomUUID(), kind: draft.kind, title, role: draft.role, company: draft.company, interviewType: draft.interviewType,
     language: draft.language, answerLength: draft.answerLength, answerStyle: draft.answerStyle, answerPreferences: draft.answerPreferences,
     instructions: [draft.instructions, ...bodies('INSTRUCTIONS').map(document => document.body as string)].filter(Boolean).join('\n\n').slice(0, 8_000),
-    resumeText: bodies('RESUME').map(document => document.body).join('\n\n').slice(0, 60_000),
-    jobDescription: bodies('JOB_DESCRIPTION').map(document => document.body).join('\n\n').slice(0, 30_000),
+    resumeText: draft.resumeText.slice(0, 100_000),
+    jobDescription: draft.jobDescription.slice(0, 60_000),
     supporting: bodies('SUPPORTING').map(document => ({ name: document.name, text: document.body as string })),
-    documentNames: documents.map(document => document.name), modelId: draft.modelId, modelReadsImages: Boolean(model?.image),
+    documentNames: [...(draft.resumeText ? ['Résumé'] : []), ...(draft.jobDescription ? ['Job description'] : []), ...documents.map(document => document.name)],
+    modelId: draft.modelId, modelReadsImages: Boolean(model?.image),
     autoAnswer: draft.autoAnswer, saveHistory: draft.saveHistory,
   };
 }
@@ -75,6 +92,9 @@ export function LiveApp() {
   const [startError, setStartError] = useState('');
   const [micProblem, setMicProblem] = useState('');
   const [live, setLive] = useState<{ setup: LiveSetup; engine: LiveEngine; mic: MicCapture } | null>(null);
+  const meter = useMemo(createMeter, []);
+  // Leaving the page for any reason also leaves full screen, so the site's header never stays hidden.
+  useEffect(() => leaveFullScreen, []);
 
   useEffect(() => {
     // Phones and tablets: a narrow screen, or a touch screen as the main input. A computer with a mouse is sent to the Windows app.
@@ -120,9 +140,13 @@ export function LiveApp() {
   const begin = (draft: SetupDraft): void => {
     if (starting || !loaded) return;
     setStarting(true); setStartError(''); setMicProblem('');
+    // Everything below that needs the tap (full screen, the microphone) is asked for first, before anything is awaited.
+    enterFullScreen();
     const engine = new LiveEngine({ access: getAccess, openSocket: url => new WebSocket(url) as unknown as SocketLike });
-    const mic = new MicCapture();
-    const microphone = mic.start(chunk => engine.pushAudio(chunk), message => setMicProblem(message));
+    const prefs = loadPrefs();
+    const mic = new MicCapture({ boost: prefs.boost, noiseReduction: prefs.noiseReduction });
+    meter.set(0);
+    const microphone = mic.start(chunk => engine.pushAudio(chunk), message => setMicProblem(message), level => meter.set(level));
     void (async () => {
       try {
         const [documents] = await Promise.all([getDocuments(draft.docIds), microphone]);
@@ -132,15 +156,22 @@ export function LiveApp() {
         await engine.start(setup);
         setLive({ setup, engine, mic });
         setView({ name: 'live' });
+        // A résumé uploaded or pasted for this session is kept for next time, unless the customer turned that off.
+        const keep = draft.saveResume;
+        if (keep && !loaded.documents.some(document => document.kind === 'RESUME' && document.name === keep.name)) {
+          void saveDocument({ kind: 'RESUME', name: keep.name, body: keep.text }).then(() => reloadDocuments(), () => undefined);
+        }
       } catch (error) {
         engine.stop();
         await mic.stop();
+        leaveFullScreen();
         setStartError(error instanceof Error && error.message ? error.message : 'The session could not start. Try again.');
       } finally { setStarting(false); }
     })();
   };
 
   const finished = (savedId: string | null): void => {
+    leaveFullScreen();
     setLive(null);
     void listSessions().then(setSessions, () => undefined);
     void reloadDocuments().catch(() => undefined);
@@ -154,7 +185,7 @@ export function LiveApp() {
       <Link className="button" href="/download">Download for Windows</Link>
     </div>
     {phone ? <div className="lv-app">
-      {view.name === 'live' && live ? <LiveSession setup={live.setup} engine={live.engine} mic={live.mic} models={loaded?.models ?? []} micProblem={micProblem} onClose={finished} />
+      {view.name === 'live' && live ? <LiveSession setup={live.setup} engine={live.engine} mic={live.mic} meter={meter} models={loaded?.models ?? []} micProblem={micProblem} onClose={finished} />
         : view.name === 'detail' ? <HistoryDetail id={view.id} onBack={() => setView({ name: 'home' })} onDeleted={() => { setSessions(list => list.filter(item => item.id !== view.id)); setView({ name: 'home' }); }} />
         : state === 'loading' ? <div className="lv-stack"><div className="lv-skeleton" /><div className="lv-skeleton" style={{ height: 70 }} /><div className="lv-skeleton" /><div className="lv-skeleton" /></div>
         : state === 'signed-out' ? <div className="lv-card lv-stack"><h1 style={{ margin: 0, fontSize: 24 }}>Sign in to continue</h1>
@@ -164,7 +195,7 @@ export function LiveApp() {
             <p className="lv-sub" style={{ margin: 0 }}>Check your internet connection and try again.</p>
             <button type="button" className="lv-btn block" onClick={() => { setLoaded(null); setState('loading'); }}>Try again</button></div>
         : view.name === 'setup' ? <SetupForm models={loaded.models} defaults={loaded.defaults} documents={loaded.documents} busy={starting} error={startError}
-            onStart={begin} onBack={() => { setStartError(''); setView({ name: 'home' }); }} onDocumentsChanged={reloadDocuments} />
+            onStart={begin} onBack={() => { setStartError(''); setView({ name: 'home' }); }} />
         : <div className="lv-stack">
           <div className="lv-head"><h1>Live session</h1></div>
           <p className="lv-sub" style={{ margin: 0 }}>Answers to your interview or test questions, on this phone. The microphone listens to the room and answers by itself.</p>

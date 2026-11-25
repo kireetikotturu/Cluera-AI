@@ -5,6 +5,7 @@ import { mergeFinalTranscriptText } from '../../../desktop/src/main/interview/me
 import { TurnPrefixFilter } from '../../../desktop/src/main/interview/turnPrefixFilter';
 import { AnswerStream } from '../../../desktop/src/renderer/services/answerStream';
 import { buildAnswerContext, indexSetup, type DocumentIndex } from './context';
+import { extractKeyterms } from './keyterms';
 import { photoPrompt, PHOTO_QUESTION, questionPrompt } from './prompt';
 import { RelayLink } from './relayLink';
 import type {
@@ -42,6 +43,34 @@ interface Generation {
 }
 
 const MAX_TOKENS = { short: 800, medium: 1_500, detailed: 3_000 } as const;
+/** A question heard while a typed question or a photo is still being answered waits this long for its turn. */
+const DEFERRED_QUESTION_MS = 25_000;
+
+const wordsOf = (text: string): string[] => text.toLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+const gramsOf = (words: string[], size: number): Set<string> => {
+  const grams = new Set<string>();
+  for (let index = 0; index + size <= words.length; index += 1) grams.add(words.slice(index, index + size).join(' '));
+  return grams;
+};
+/**
+ * The microphone hears the customer too. Reading an answer aloud must not be taken for a new question, even when the
+ * answer itself contains a question ("Why does this matter? Because..."). True when most of what was heard is
+ * (almost word for word) in one of the recent answers.
+ */
+export function isReadingAnAnswer(heard: string, answers: readonly string[]): boolean {
+  const words = wordsOf(heard);
+  if (words.length < 4) return false;
+  const size = words.length >= 7 ? 3 : 2;
+  const wanted = gramsOf(words, size);
+  if (!wanted.size) return false;
+  const threshold = size === 3 ? 0.75 : 0.8;
+  return answers.some(answer => {
+    const known = gramsOf(wordsOf(answer), size);
+    let hits = 0;
+    for (const gram of wanted) if (known.has(gram)) hits += 1;
+    return hits / wanted.size >= threshold;
+  });
+}
 const initial = (): LiveSnapshot => ({
   status: 'idle', message: '', paused: false, autoAnswer: true, heard: '', collected: '', turns: [], activeTurnId: null,
   startedAt: 0, modelId: '', answerLength: 'medium', questionSequence: 0,
@@ -57,6 +86,8 @@ export class LiveEngine {
   private readonly listeners = new Set<() => void>();
   private setup!: LiveSetup;
   private index!: DocumentIndex;
+  /** Words the transcriber should listen for harder (role, company, name, technologies). */
+  private keyterms: string[] = [];
   private link: RelayLink | undefined;
   private audioReady = false;
   private epoch = 0;
@@ -67,6 +98,7 @@ export class LiveEngine {
   private requestSequence = 0;
   private lastGenerateAt = -Infinity;
   private lastQuestion = '';
+  private deferred: { text: string; at: number } | undefined;
   private lastTranscript = '';
   private forceEndTimer: ReturnType<typeof setTimeout> | undefined;
   private renewTimer: ReturnType<typeof setTimeout> | undefined;
@@ -98,6 +130,7 @@ export class LiveEngine {
     this.shutdown();
     this.setup = { ...setup };
     this.index = indexSetup(setup);
+    try { this.keyterms = extractKeyterms(setup); } catch { this.keyterms = []; }
     this.running = true;
     const epoch = ++this.epoch;
     this.snap = { ...initial(), status: 'connecting', message: 'Connecting…', autoAnswer: setup.autoAnswer, startedAt: this.now(),
@@ -173,7 +206,7 @@ export class LiveEngine {
     if (epoch !== this.epoch) { link.drop(); throw new Error('The live session was closed.'); }
     this.link = link;
     this.audioReady = false;
-    link.send({ type: 'openAudio', channel: 'interviewer' });
+    link.send({ type: 'openAudio', channel: 'interviewer', ...(this.keyterms.length ? { keyterms: this.keyterms } : {}) });
     clearTimeout(this.readyTimer);
     this.readyTimer = setTimeout(() => { if (epoch === this.epoch && this.link === link && !this.audioReady) link.drop(); }, AUDIO_READY_MS);
     this.scheduleRenewal(grant.expiresInMs, epoch, link);
@@ -194,6 +227,9 @@ export class LiveEngine {
   private onLinkClosed(link: RelayLink): void {
     if (this.link !== link) return;
     this.link = undefined;
+    // A connection that ended before the audio was ever ready may have been refused because of the extra words sent
+    // with it (an older relay does not know them): the next one is opened without them.
+    if (!this.audioReady && this.keyterms.length) this.keyterms = [];
     this.audioReady = false;
     clearTimeout(this.forceEndTimer); clearTimeout(this.readyTimer);
     this.lastTranscript = '';
@@ -358,8 +394,17 @@ export class LiveEngine {
     const display = raw.trim();
     if (!display || !this.running) return false;
     if (!options.force && (this.snap.paused || display === this.lastQuestion)) return false;
-    // An automatic question never replaces a typed question or a photo that is still being answered.
-    if (!options.force && this.generation && !this.generation.interruptible && !this.generation.cancelled) return false;
+    // The customer reading an answer out loud is not a new question.
+    if (!options.force && options.source === 'voice' && isReadingAnAnswer(display,
+      this.snap.turns.slice(-3).map(turn => turn.answer).filter(Boolean))) {
+      this.update({ heard: '', message: 'Heard you reading the answer' });
+      return false;
+    }
+    // An automatic question never replaces a typed question or a photo that is still being answered; it waits its turn.
+    if (!options.force && this.generation && !this.generation.interruptible && !this.generation.cancelled) {
+      this.deferred = { text: display, at: this.now() };
+      return false;
+    }
     this.lastQuestion = display;
     const intent = this.intentFor(display, options.force);
     if (!intent.isComplete) { this.update({ message: 'Waiting for the rest of the question' }); return false; }
@@ -447,16 +492,27 @@ export class LiveEngine {
     else this.finishTurn(generation.turnId, 'failed', note);
   }
 
+  /** A question heard while another was being answered gets its turn now, if it is still fresh. */
+  private afterAnswer(): void {
+    const waiting = this.deferred;
+    if (!waiting || this.generation || !this.running) return;
+    this.deferred = undefined;
+    if (this.now() - waiting.at > DEFERRED_QUESTION_MS || this.snap.paused || !this.snap.autoAnswer) return;
+    void this.processQuestion(waiting.text, { source: 'voice', force: false, interruptible: true });
+  }
+
   private finishTurn(id: string, state: 'done' | 'failed' | 'cancelled', note?: string): void {
     this.update({
       turns: this.snap.turns.map(turn => (turn.id === id ? { ...turn, state, ...(note ? { note } : {}) } : turn)),
       activeTurnId: this.snap.activeTurnId === id ? null : this.snap.activeTurnId,
       message: this.snap.message === 'Writing answer…' ? '' : this.snap.message,
     });
+    queueMicrotask(() => this.afterAnswer());
   }
 
   /** Removes a question whose answer never started (it was replaced by a newer one). */
   private discardTurn(id: string): void {
+    queueMicrotask(() => this.afterAnswer());
     this.photos.delete(id);
     this.update({ turns: this.snap.turns.filter(turn => turn.id !== id), activeTurnId: this.snap.activeTurnId === id ? null : this.snap.activeTurnId });
   }

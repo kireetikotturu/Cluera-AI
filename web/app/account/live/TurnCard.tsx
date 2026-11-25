@@ -29,7 +29,7 @@ const clock = (value: string): string => {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
 
-async function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(text); return true; } catch { /* older browsers: fall back below */ }
   try {
     const area = document.createElement('textarea');

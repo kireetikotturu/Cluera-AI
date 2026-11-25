@@ -167,7 +167,7 @@ export function attachRelaySession(peer: WebSocket, dependencies: {
                   active(); opening.delete(command.channel); touch();
                   send({ type: 'audioReady', channel: command.channel });
                 } catch { end('provider_failed'); }
-              });
+              }, command.keyterms?.length ? { keyterms: command.keyterms } : undefined);
             if (ended) { audio.close(); return; }
             channels.set(command.channel, audio); touch();
           } catch { end('provider_failed'); }

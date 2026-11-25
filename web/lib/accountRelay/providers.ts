@@ -7,11 +7,13 @@ import {receiptMetadataSchema,type ReceiptMetadata} from '../aiProviders/usageMe
 export type Guard = { signal: AbortSignal; assertActive(): void; runId?:string };
 export type ProviderSecrets = { geminiKey?: string; deepgramKey?: string; openaiKey?: string; anthropicKey?: string; serviceKey: string; rateKey: string };
 export type AudioConnection = { write(bytes: Buffer): void; forceEndTurn(): void; close(): void };
+/** Optional hints for one live-transcription connection. */
+export type AudioOptions = { keyterms?: readonly string[] };
 export type Providers = {
   prepare?(kind:'gemini'|'deepgram',input?:Generate):Promise<void>;
   generate(input: Generate, guard: Guard, emit: (text: string) => void): Promise<void>;
   audio(guard: Guard, emit: (value: { event: string; transcript: string }) => void, failed: () => void,
-    ready?: () => void): AudioConnection;
+    ready?: () => void, options?: AudioOptions): AudioConnection;
 };
 const fluxEvents = new Set(['StartOfTurn', 'EagerEndOfTurn', 'TurnResumed', 'EndOfTurn', 'Update']);
 const unavailable = () => new Error('Provider unavailable.');
@@ -135,7 +137,7 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
       }
       finally { clearTimeout(total); clearTimeout(idle); cancel(); await reader?.cancel().catch(() => undefined); }
     },
-    audio(guard, emit, failed, ready = () => {}) {
+    audio(guard, emit, failed, ready = () => {}, options) {
       guard.assertActive();
       if(!secrets.deepgramKey)throw unavailable();
       let ended = false, upstream: WebSocket | undefined;
@@ -158,25 +160,31 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
       function active() { if (ended || guard.signal.aborted) throw unavailable(); guard.assertActive(); }
       function touch() { clearTimeout(idle); idle = setTimeout(() => fail('idle_15s'), 15000); }
       guard.signal.addEventListener('abort', close, { once: true });
-      try {
-        active();
-        const audioModel = dependencies.audioModel ?? DEEPGRAM_MODEL;
-        if (!/^flux-[a-z0-9-]{1,60}$/.test(audioModel)) throw unavailable();
-        upstream = connect(`wss://api.deepgram.com/v2/listen?model=${encodeURIComponent(audioModel)}&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eot_timeout_ms=4500`, {
+      // Words to listen for harder (a role, a technology, a name). The service is asked once with them; if it refuses
+      // the request because of them, the connection is opened again without them so the session still works.
+      let keyterms = [...new Set((options?.keyterms ?? []).filter(term => /^[\p{L}\p{N}][\p{L}\p{N} .+#&'\/-]{1,39}$/u.test(term)))].slice(0, 25);
+      let retried = false, announced = false;
+      function openUpstream(audioModel: string) {
+        const terms = keyterms.map(term => `&keyterm=${encodeURIComponent(term)}`).join('');
+        const socket = connect(`wss://api.deepgram.com/v2/listen?model=${encodeURIComponent(audioModel)}&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eot_timeout_ms=4500${terms}`, {
           headers: { Authorization: `Token ${secrets.deepgramKey}` }, handshakeTimeout: 8000,
           followRedirects: false, maxPayload: 128000, perMessageDeflate: false,
         });
-        touch();
-        upstream.once('open', () => {
+        upstream = socket;
+        // Events of a connection that was replaced are ignored.
+        const current = () => upstream === socket;
+        socket.once('open', () => {
+          if (!current()) return;
           try {
-            active(); for (const bytes of queue) { active(); upstream!.send(bytes); } queue = []; queued = 0;
+            active(); for (const bytes of queue) { active(); socket.send(bytes); } queue = []; queued = 0;
             // Upstream has completed its authenticated handshake. A constructed
             // local socket is not readiness, and late opens after stop cannot emit.
-            active(); ready();
+            announced = true; active(); ready();
           }
           catch (error) { fail('open_handler', errorName(error)); }
         });
-        upstream.on('message', raw => {
+        socket.on('message', raw => {
+          if (!current()) return;
           try {
             active();
             const value = JSON.parse(raw.toString());
@@ -187,9 +195,27 @@ export function providerAdapters(secrets: ProviderSecrets, dependencies: {
             emit({ event: value.event, transcript });
           } catch (error) { fail('message_handler', errorName(error)); }
         });
-        upstream.on('unexpected-response', (_request, response) => { const status = response.statusCode; response.destroy(); fail('handshake_rejected', status); });
-        upstream.on('error', (error: NodeJS.ErrnoException) => fail('socket_error', error?.code ?? errorName(error)));
-        upstream.on('close', (code: number, reason: Buffer) => fail('socket_closed', `${code}:${reason?.toString?.() ?? ''}`));
+        socket.on('unexpected-response', (_request, response) => {
+          if (!current()) return;
+          const status = response.statusCode; response.destroy();
+          if (keyterms.length && !retried && !announced && typeof status === 'number' && status >= 400 && status < 500 && ![401, 403, 429].includes(status)) {
+            retried = true; keyterms = [];
+            logAudioFailure('keyterms_refused', status, Math.round(performance.now() - startedAt), written);
+            socket.terminate();
+            try { active(); openUpstream(audioModel); } catch { fail('keyterms_retry'); }
+            return;
+          }
+          fail('handshake_rejected', status);
+        });
+        socket.on('error', (error: NodeJS.ErrnoException) => { if (current()) fail('socket_error', error?.code ?? errorName(error)); });
+        socket.on('close', (code: number, reason: Buffer) => { if (current()) fail('socket_closed', `${code}:${reason?.toString?.() ?? ''}`); });
+      }
+      try {
+        active();
+        const audioModel = dependencies.audioModel ?? DEEPGRAM_MODEL;
+        if (!/^flux-[a-z0-9-]{1,60}$/.test(audioModel)) throw unavailable();
+        openUpstream(audioModel);
+        touch();
       } catch { close(); throw unavailable(); }
       return {
         write(bytes) {

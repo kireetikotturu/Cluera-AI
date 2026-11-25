@@ -38,3 +38,6 @@ supabase/.branches/
 # Only this manifest-pinned private dependency runtime is reviewed source, not generated application output.
 !desktop/vendor/global-agent/dist/
 !desktop/vendor/global-agent/dist/**
+
+# Copied from node_modules before every build (see web/scripts/copy-pdf-worker.mjs)
+web/public/live/pdf.worker.min.mjs

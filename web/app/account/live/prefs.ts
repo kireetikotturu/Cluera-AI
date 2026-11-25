@@ -1,7 +1,7 @@
 /** Small per-phone choices. They only make the screen nicer, so every read and write is allowed to fail. */
-export interface LivePrefs { autoScroll: boolean; keepAwake: boolean; font: number }
+export interface LivePrefs { autoScroll: boolean; keepAwake: boolean; font: number; boost: boolean; noiseReduction: boolean }
 const KEY = 'cluera-live-prefs-v1';
-const DEFAULTS: LivePrefs = { autoScroll: false, keepAwake: true, font: 17 };
+const DEFAULTS: LivePrefs = { autoScroll: false, keepAwake: true, font: 18, boost: true, noiseReduction: false };
 
 export function loadPrefs(): LivePrefs {
   try {
@@ -10,6 +10,8 @@ export function loadPrefs(): LivePrefs {
       autoScroll: typeof raw?.autoScroll === 'boolean' ? raw.autoScroll : DEFAULTS.autoScroll,
       keepAwake: typeof raw?.keepAwake === 'boolean' ? raw.keepAwake : DEFAULTS.keepAwake,
       font: typeof raw?.font === 'number' && raw.font >= 14 && raw.font <= 28 ? Math.round(raw.font) : DEFAULTS.font,
+      boost: typeof raw?.boost === 'boolean' ? raw.boost : DEFAULTS.boost,
+      noiseReduction: typeof raw?.noiseReduction === 'boolean' ? raw.noiseReduction : DEFAULTS.noiseReduction,
     };
   } catch { return { ...DEFAULTS }; }
 }

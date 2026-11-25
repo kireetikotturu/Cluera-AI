@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveEngine, MAX_RECONNECTS } from '../lib/live/engine';
+import { isReadingAnAnswer, LiveEngine, MAX_RECONNECTS } from '../lib/live/engine';
 import type { LiveSetup, SocketLike } from '../lib/live/types';
 import { DEFAULT_ANSWER_PREFERENCES } from '../../desktop/src/shared/answerPreferences';
 
@@ -42,7 +42,7 @@ async function begin(options: Partial<LiveSetup> = {}) {
   expect(socket.frames()[0]).toEqual({ type: 'authenticate', accessToken: 'synthetic-access-token-0000' });
   socket.push({ type: 'ready', protocol: 1 });
   await flush();
-  expect(socket.commands('openAudio')).toEqual([{ type: 'openAudio', channel: 'interviewer' }]);
+  expect(socket.commands('openAudio')).toEqual([{ type: 'openAudio', channel: 'interviewer', keyterms: expect.arrayContaining(['Java developer', 'Acme', 'Spring Boot']) }]);
   socket.push({ type: 'audioReady', channel: 'interviewer' });
   await flush(30);
   await started;
@@ -293,6 +293,83 @@ describe('the phone live session', () => {
     expect(engine.snapshot().turns[0].state).toBe('cancelled');
     await flush(60_000);
     expect(sockets).toHaveLength(1);
+  });
+
+  it('does not take the customer reading an answer aloud for a new question', async () => {
+    const socket = await begin();
+    say(socket, 'What is polymorphism in Java?');
+    await flush(600);
+    const first = socket.commands('generate')[0];
+    const answer = 'Polymorphism lets one interface take many forms. Why does that matter? Because you can write code against a parent type.';
+    socket.push({ type: 'answer', id: first.id, text: answer });
+    socket.push({ type: 'answerDone', id: first.id });
+    await flush(500);
+    say(socket, 'Why does that matter? Because you can write code against a parent type.');
+    await flush(3_000);
+    expect(socket.commands('generate')).toHaveLength(1);
+    expect(engine.snapshot().turns).toHaveLength(1);
+    // A real new question still gets its answer.
+    say(socket, 'What is encapsulation in Java?');
+    await flush(2_000);
+    expect(socket.commands('generate')).toHaveLength(2);
+  });
+
+  it('recognises reading aloud but not a short or different question', () => {
+    const answer = 'A thread is the smallest unit of execution. Threads share memory inside one process.';
+    expect(isReadingAnAnswer('A thread is the smallest unit of execution', [answer])).toBe(true);
+    expect(isReadingAnAnswer('what is the smallest unit of execution called', [answer])).toBe(false);
+    expect(isReadingAnAnswer('What is a process', [answer])).toBe(false);
+    expect(isReadingAnAnswer('a thread is', [answer])).toBe(false);
+    expect(isReadingAnAnswer('anything at all here today', [])).toBe(false);
+  });
+
+  it('keeps a question heard while a typed question is answered, and answers it right after', async () => {
+    const socket = await begin();
+    void engine.ask('Explain the difference between a list and a set.');
+    await flush(10);
+    const typed = socket.commands('generate')[0];
+    say(socket, 'What is a hash map in Java?');
+    await flush(2_000);
+    expect(socket.commands('generate')).toHaveLength(1);
+    socket.push({ type: 'answer', id: typed.id, text: 'A list keeps order.' });
+    socket.push({ type: 'answerDone', id: typed.id });
+    await flush(2_500);
+    const generates = socket.commands('generate');
+    expect(generates).toHaveLength(2);
+    expect(generates[1].prompt).toContain('hash map');
+  });
+
+  it('forgets a waiting question that is no longer fresh', async () => {
+    const socket = await begin();
+    void engine.ask('Explain the difference between a list and a set.');
+    await flush(10);
+    const typed = socket.commands('generate')[0];
+    say(socket, 'What is a hash map in Java?');
+    await flush(40_000);
+    socket.push({ type: 'answer', id: typed.id, text: 'A list keeps order.' });
+    socket.push({ type: 'answerDone', id: typed.id });
+    await flush(3_000);
+    expect(socket.commands('generate')).toHaveLength(1);
+  });
+
+  it('opens the audio again without the extra words if the relay ended the connection before audio was ready', async () => {
+    const started = engine.start(setup());
+    await flush();
+    const first = sockets.at(-1)!;
+    first.accept(); first.push({ type: 'ready', protocol: 1 });
+    await flush();
+    expect(first.commands('openAudio')[0].keyterms).toBeDefined();
+    first.die();
+    await flush(400);
+    const second = sockets.at(-1)!;
+    expect(second).not.toBe(first);
+    second.accept(); second.push({ type: 'ready', protocol: 1 });
+    await flush();
+    expect(second.commands('openAudio')).toEqual([{ type: 'openAudio', channel: 'interviewer' }]);
+    second.push({ type: 'audioReady', channel: 'interviewer' });
+    await flush(30);
+    await started;
+    expect(engine.snapshot().status).toBe('listening');
   });
 
   it('reports a start that fails and does not keep trying by itself', async () => {

@@ -8,6 +8,10 @@ export const DEEPGRAM_MODEL = 'flux-general-en';
 export const MAX_FRAME_BYTES = 7_000_000;
 export const authFrame = z.object({ type: z.literal('authenticate'), accessToken: z.string().min(20).max(12000) }).strict();
 const channel = z.enum(['interviewer', 'candidate']);
+/** Words the live-transcription service should listen for harder (a job role, a technology, a person's name). Plain
+ * words only: letters, digits, spaces and a few symbols found in technical names (C++, C#, Node.js, CI/CD). */
+export const MAX_KEYTERMS = 25;
+export const keyterm = z.string().trim().min(2).max(40).regex(/^[\p{L}\p{N}][\p{L}\p{N} .+#&'\/-]*$/u);
 const image = z.object({ mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
   data: z.string().min(4).max(6_666_668).regex(/^[A-Za-z0-9+/]+={0,2}$/),
 }).strict().refine(value => {
@@ -23,7 +27,7 @@ export const commandFrame = z.discriminatedUnion('type', [
     /** Upper bound for the answer length (the app sends it from the Short/Medium/Detailed setting). */
     maxTokens: z.number().int().min(100).max(4000).optional() }).strict(),
   z.object({ type: z.literal('cancelGeneration') }).strict(),
-  z.object({ type: z.literal('openAudio'), channel }).strict(),
+  z.object({ type: z.literal('openAudio'), channel, keyterms: z.array(keyterm).max(MAX_KEYTERMS).optional() }).strict(),
   z.object({ type: z.literal('closeAudio'), channel }).strict(),
   z.object({ type: z.literal('forceEndTurn'), channel }).strict(),
   z.object({ type: z.literal('stop') }).strict(),

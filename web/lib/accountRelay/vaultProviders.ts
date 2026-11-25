@@ -40,7 +40,7 @@ export function vaultProviders(config:RelayConfig,rpc:Rpc,env:NodeJS.ProcessEnv=
      receipt:value=>receipt?.observe(value)}).generate(input,held.guard,emit);succeeded=true;
    }finally{held.close();await receipt?.finish(succeeded?'SUCCEEDED':guard.signal.aborted?'CANCELLED':'FAILED');}
   },
-  audio(guard,emit,failed,ready){
+  audio(guard,emit,failed,ready,options){
    let peer:AudioConnection|undefined,closed=false,cleanup:()=>void=()=>{},receipt:Awaited<ReturnType<typeof telemetry.start>>|undefined;
    const settle=(outcome:'STOPPED'|'FAILED')=>{if(closed)return;closed=true;guard.signal.removeEventListener('abort',close);cleanup();peer?.close();void receipt?.finish(outcome);};
    const close=()=>settle('STOPPED');
@@ -50,7 +50,7 @@ export function vaultProviders(config:RelayConfig,rpc:Rpc,env:NodeJS.ProcessEnv=
     if(closed||guard.signal.aborted)return;guard.assertActive();const held=lease(snapshot,guard,fail);cleanup=()=>{held.close();guard.signal.removeEventListener('abort',close);};
     receipt=await telemetry.start({runId:guard.runId,provider:'deepgram',credentialId:snapshot.credentialId,revision:snapshot.revision,model:snapshot.model});
     if(closed||guard.signal.aborted){await receipt.finish('STOPPED');return;}
-    held.guard.assertActive();peer=providerAdapters({...config,deepgramKey:snapshot.key},{audioModel:snapshot.model,receipt:value=>receipt!.observe(value)}).audio(held.guard,emit,fail,ready);
+    held.guard.assertActive();peer=providerAdapters({...config,deepgramKey:snapshot.key},{audioModel:snapshot.model,receipt:value=>receipt!.observe(value)}).audio(held.guard,emit,fail,ready,options);
    }).catch(fail);
    return {write(bytes){if(peer&&!closed)peer.write(bytes);},forceEndTurn(){if(peer&&!closed)peer.forceEndTurn();},close};
   },

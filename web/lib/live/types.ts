@@ -80,7 +80,7 @@ export type RelayIncoming =
 export type RelayCommand =
   | { type: 'generate'; id: string; prompt: string; modelId?: string; maxTokens?: number; image?: { mimeType: 'image/jpeg' | 'image/png' | 'image/webp'; data: string } }
   | { type: 'cancelGeneration' }
-  | { type: 'openAudio'; channel: RelayChannel }
+  | { type: 'openAudio'; channel: RelayChannel; keyterms?: string[] }
   | { type: 'closeAudio'; channel: RelayChannel }
   | { type: 'forceEndTurn'; channel: RelayChannel }
   | { type: 'stop' };

@@ -15,10 +15,10 @@ export function approvedProviders(config:RelayConfig):Providers{
  const base=providerAdapters(config,{resolveModel:(input)=>registry.resolve('gemini',input.modelId,Boolean(input.image))});
  return {
   generate:base.generate,
-  audio(guard,emit,failed,ready){
+  audio(guard,emit,failed,ready,options){
    let peer:AudioConnection|undefined,closed=false;
    void registry.resolve('deepgram').then(()=>{
-    if(closed||guard.signal.aborted)return;guard.assertActive();peer=base.audio(guard,emit,failed,ready);
+    if(closed||guard.signal.aborted)return;guard.assertActive();peer=base.audio(guard,emit,failed,ready,options);
    }).catch(()=>{if(!closed&&!guard.signal.aborted)failed();});
    return {write(bytes){if(peer&&!closed)peer.write(bytes);},forceEndTurn(){if(peer&&!closed)peer.forceEndTurn();},close(){closed=true;peer?.close();}};
   },
