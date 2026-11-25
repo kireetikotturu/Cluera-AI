@@ -60,4 +60,5 @@ it('the phone layout rules that keep the home page from shifting are in place',(
  // one 16px side margin everywhere on phones
  expect(css).toMatch(/\.site-header\{width:calc\(100% - 32px\)\}/);
  expect(css).toMatch(/\.cluera-site\.account-site footer\{width:calc\(100% - 32px\)/);
+ expect(css).toContain('html body .account-page,html[data-signed-in="1"] body .account-page:has(.acct-boot),html body .account-page:has(.acct-dash){padding-inline:16px}');
 });

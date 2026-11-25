@@ -307,4 +307,6 @@ html[data-signed-in="1"] .acct-boot-card{height:560px}
  .faq-item summary{padding:16px 18px;font-size:15px}
  .faq-item p{padding:0 18px 16px;font-size:14.5px}
  .cluera-site .download-card{padding:24px 20px}
+ /* The sign-in card and the signed-in account page use the same 16px side margin as the header. */
+ html body .account-page,html[data-signed-in="1"] body .account-page:has(.acct-boot),html body .account-page:has(.acct-dash){padding-inline:16px}
 }
