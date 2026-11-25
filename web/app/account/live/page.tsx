@@ -8,6 +8,6 @@ export const dynamic = 'force-dynamic';
 
 export default function LivePage() {
   return process.env.SIGMAROUND_ACCOUNTS_ENABLED === 'true'
-    ? <main><h1 className="account-page-title">Live session</h1><LiveApp /></main>
+    ? <main><h1 className="sr-only">Live session</h1><LiveApp /></main>
     : <main className="account-page"><p>Customer accounts are not available on this deployment yet.</p></main>;
 }

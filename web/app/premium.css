@@ -232,7 +232,7 @@ html:not([data-signed-in="1"]) .when-signed-in{display:none!important}
 @media(prefers-reduced-motion:reduce){.razorpay-container .razorpay-checkout-frame{animation:none}}
 /* Shown only on phone-sized screens (the live session on a phone). */
 .mobile-only{display:none!important}
-@media(max-width:820px){.mobile-only{display:inline-flex!important}.site-header nav a.mobile-only{display:block!important}}
+@media(max-width:820px),(pointer:coarse){.mobile-only{display:inline-flex!important}.site-header nav a.mobile-only{display:block!important}}
 /* The account page shows the same card-shaped placeholder while the page loads and while the sign-in is checked, so nothing moves when the real card appears. */
 .acct-boot{display:block;min-height:0}
 .acct-boot-card{height:604px;max-width:100%;border:1px solid var(--line);border-radius:22px;background:linear-gradient(100deg,var(--surface),var(--surface2),var(--surface));background-size:200% 100%;animation:page-shimmer 1.4s ease-in-out infinite}

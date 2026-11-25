@@ -77,11 +77,25 @@ export function LiveApp() {
   const [live, setLive] = useState<{ setup: LiveSetup; engine: LiveEngine; mic: MicCapture } | null>(null);
 
   useEffect(() => {
-    const query = window.matchMedia('(max-width: 820px)');
+    // Phones and tablets: a narrow screen, or a touch screen as the main input. A computer with a mouse is sent to the Windows app.
+    const query = window.matchMedia('(max-width: 820px), (pointer: coarse)');
     const update = (): void => setPhone(query.matches);
     update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
+  }, []);
+
+  // This page needs its own security settings (the relay and the microphone). A page opened from inside the site keeps
+  // the settings of the page it came from, so in that case the page is loaded again once, as a whole.
+  useEffect(() => {
+    const policy = (document as unknown as { permissionsPolicy?: { allowsFeature(name: string): boolean } }).permissionsPolicy;
+    if (!policy || policy.allowsFeature('microphone')) return;
+    try {
+      const last = Number(sessionStorage.getItem('cluera-live-reload') ?? 0);
+      if (Date.now() - last < 15_000) return;
+      sessionStorage.setItem('cluera-live-reload', String(Date.now()));
+    } catch { /* storage unavailable: reload once anyway */ }
+    window.location.assign('/account/live');
   }, []);
 
   const load = useCallback(async (): Promise<void> => {
