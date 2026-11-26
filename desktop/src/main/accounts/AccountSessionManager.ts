@@ -12,8 +12,18 @@ export interface AccountSessionStore {
   clear(): Promise<void>;
 }
 
+/** A check of the account this recent, with the same token, is used again: the relay and every server call check the
+ * account themselves, and asking again before each of them slowed answers and could reach the service's rate limit. */
+export const VERIFIED_FOR_MS = 60_000;
+/** After a network or service problem the saved sign-in is tried again after these waits, then once a minute. */
+export const RETRY_DELAYS_MS = [3_000, 10_000, 30_000, 60_000] as const;
+const RECONNECTING = 'Reconnecting to your account…';
+
 /** Main-process session owner. Epoch fencing prevents late login/refresh/storage
- * completions restoring access after logout. Disk operations are serialized. */
+ * completions restoring access after logout. Disk operations are serialized.
+ * Only the sign-in service ends a sign-in (401, or 403 for a suspended account). A slow or missing network, a rate
+ * limit or a service problem never shows the sign-in page: the account stays signed in, the saved sign-in is kept and
+ * it is tried again until it works. An expired token is never used meanwhile. */
 export class AccountSessionManager {
   private view: AccountView = { mode: 'cluera-staging', state: 'signed-out' };
   private tokens?: AccountTokens;
@@ -22,6 +32,9 @@ export class AccountSessionManager {
   private owner = new AbortController();
   private refreshTimer?: ReturnType<typeof setTimeout>;
   private expiryTimer?: ReturnType<typeof setTimeout>;
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private retries = 0;
+  private verified?: { token: string; at: number };
   private pending?: Promise<AccountView>;
   private disk: Promise<void> = Promise.resolve();
   private closed = false;
@@ -38,31 +51,53 @@ export class AccountSessionManager {
     const next = this.disk.then(action); this.disk = next.catch(() => undefined); return next;
   }
   private invalidate(): void {
-    clearTimeout(this.refreshTimer); clearTimeout(this.expiryTimer);
-    this.owner.abort(); this.tokens = undefined; this.expires = 0;
+    clearTimeout(this.refreshTimer); clearTimeout(this.expiryTimer); clearTimeout(this.retryTimer);
+    this.owner.abort(); this.tokens = undefined; this.expires = 0; this.verified = undefined;
   }
   private current(epoch: number): void {
     if (this.closed || epoch !== this.epoch) throw new AccountApiError(401);
   }
+  private usable(): boolean { return Boolean(this.tokens) && this.clock() < this.expires; }
+  /** The signed-in view without the "reconnecting" note. */
+  private settled(): AccountView {
+    const { reconnecting: _reconnecting, message: _message, ...rest } = this.view;
+    return rest;
+  }
+  /** The access token ran out before it could be renewed: it is not used again, but the sign-in stays. */
+  private expired(): void {
+    this.tokens = undefined; this.expires = 0; this.verified = undefined;
+    if (this.view.state !== 'active') return;
+    this.publish({ ...this.view, reconnecting: true, message: RECONNECTING });
+    if (!this.pending) void this.restore().catch(() => undefined);
+  }
+  private scheduleRetry(status: number): void {
+    const wait = status === 429 ? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]
+      : RETRY_DELAYS_MS[Math.min(this.retries, RETRY_DELAYS_MS.length - 1)];
+    this.retries += 1;
+    clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(() => { void this.restore().catch(() => undefined); }, wait);
+    this.retryTimer.unref?.();
+  }
   private async accept(tokens: AccountTokens, epoch: number, started: number, expectedUser?: string): Promise<AccountView> {
     this.current(epoch);
     if (expectedUser && tokens.userId !== expectedUser) throw new AccountApiError(401);
-    // Subtract the entire round-trip, never extend token lifetime by network delay.
-    const remaining = tokens.validForMilliseconds - (this.clock() - started);
-    if (remaining <= 0) throw new AccountApiError(401);
+    // The renewed sign-in is saved first: the old saved one stops working once a new one has been issued.
     await this.enqueue(async () => { this.current(epoch); await this.store.write({ version: 1,
       userId: tokens.userId, refreshToken: tokens.refreshToken }); });
     this.current(epoch);
-    this.tokens = tokens; this.expires = started + tokens.validForMilliseconds;
+    // Subtract the entire round-trip, never extend token lifetime by network delay. A token that is already too old
+    // (the computer slept during the request) is asked for again; it does not end the sign-in.
+    if (tokens.validForMilliseconds - (this.clock() - started) <= 0) throw new AccountApiError(503);
+    this.tokens = tokens; this.expires = started + tokens.validForMilliseconds; this.verified = undefined;
     clearTimeout(this.expiryTimer);
-    this.expiryTimer = setTimeout(() => {
-      if (epoch !== this.epoch) return;
-      this.invalidate(); this.publish({ mode: 'cluera-staging', state: 'unavailable', message: 'Sign in or retry to renew your session.' });
-    }, Math.max(1, this.expires - this.clock()));
+    this.expiryTimer = setTimeout(() => { if (epoch === this.epoch) this.expired(); }, Math.max(1, this.expires - this.clock()));
     this.expiryTimer.unref?.();
     const snapshot = await this.api.snapshot(tokens.accessToken);
     this.current(epoch);
-    if (snapshot.account.userId !== tokens.userId || this.clock() >= this.expires) throw new AccountApiError(401);
+    if (snapshot.account.userId !== tokens.userId) throw new AccountApiError(401);
+    if (this.clock() >= this.expires) throw new AccountApiError(503);
+    this.verified = { token: tokens.accessToken, at: this.clock() };
+    this.retries = 0; clearTimeout(this.retryTimer);
     if (this.owner.signal.aborted) this.owner = new AbortController();
     const state = this.publish({ mode: 'cluera-staging', state: 'active', userId: tokens.userId,
       email: snapshot.account.email, availableMilliseconds: snapshot.usage.availableMilliseconds,
@@ -70,18 +105,32 @@ export class AccountSessionManager {
     clearTimeout(this.refreshTimer);
     // One expiration-based refresh, not account/usage polling. Short leases refresh halfway.
     const lifetime = this.expires - this.clock();
-    this.refreshTimer = setTimeout(() => { void this.restore(); }, Math.max(1, lifetime - Math.min(60000, lifetime / 2)));
+    this.refreshTimer = setTimeout(() => { void this.restore().catch(() => undefined); }, Math.max(1, lifetime - Math.min(60000, lifetime / 2)));
     this.refreshTimer.unref?.();
     return state;
   }
-  private run(operation: (epoch: number) => Promise<AccountView>): Promise<AccountView> {
+  /** `resumable`: renewing a saved sign-in, so a network or service problem is tried again by itself. */
+  private run(operation: (epoch: number) => Promise<AccountView>, resumable = false): Promise<AccountView> {
     if (this.closed) return Promise.reject(new AccountApiError(401));
     if (this.pending) return this.pending;
+    clearTimeout(this.retryTimer);
     const epoch = this.epoch;
     const pending = operation(epoch).catch(async (error: unknown) => {
       if (epoch !== this.epoch || this.closed) return this.status();
-      this.invalidate();
       const status = error instanceof AccountApiError ? error.status : 503;
+      if (status !== 401 && status !== 403) {
+        if (this.view.state === 'active') {
+          this.scheduleRetry(status);
+          if (!this.usable()) return this.publish({ ...this.view, reconnecting: true, message: RECONNECTING });
+          return this.view.reconnecting ? this.publish(this.settled()) : this.status();
+        }
+        if (resumable) {
+          this.invalidate();
+          this.scheduleRetry(status);
+          return this.publish({ mode: 'cluera-staging', state: 'unavailable', reconnecting: true, message: new AccountApiError(status).message });
+        }
+      }
+      this.invalidate();
       if (status === 401) await this.enqueue(() => this.store.clear()).catch(() => undefined);
       if (epoch !== this.epoch || this.closed) return this.status();
       return this.publish({ mode: 'cluera-staging', state: status === 401 ? 'signed-out' : status === 403 ? 'suspended' : 'unavailable',
@@ -109,7 +158,7 @@ export class AccountSessionManager {
       const started = this.clock();
       const result = await this.api.refresh(saved.data.refreshToken);
       return this.accept(result, epoch, started, saved.data.userId);
-    });
+    }, true);
   }
   /** Main-only browser handoff. The callback is never supplied over IPC. */
   loginExternal(acquire:(signal:AbortSignal)=>Promise<AccountTokens>):Promise<AccountView>{
@@ -122,37 +171,73 @@ export class AccountSessionManager {
   /** Main-only capability. Never register this return value on IPC. */
   async reportingCapability():Promise<{accessToken:string;signal:AbortSignal}> {
     if(this.pending)await this.pending;
-    if(!this.tokens||this.clock()>=this.expires||this.view.state!=='active')throw new AccountApiError(401);
+    if(this.view.state!=='active')throw new AccountApiError(401);
+    // While the sign-in is being renewed this means "try again later" (503), never a sign-out.
+    if(!this.usable())throw new AccountApiError(503);
     // Reporting endpoint independently validates Auth + live session. Avoid a
     // second balance read on every UI sync; provider authorization is unchanged.
-    return {accessToken:this.tokens.accessToken,signal:this.owner.signal};
+    return {accessToken:this.tokens!.accessToken,signal:this.owner.signal};
   }
   rejectReportingAccess(status:401|403):void {
+    if(status===401){
+      // A rejected access token may only have run out: renewing it decides whether the saved sign-in still works.
+      this.verified=undefined;
+      if(this.view.state==='active')void this.restore().catch(()=>undefined);
+      return;
+    }
     ++this.epoch;this.invalidate();this.pending=undefined;
-    if(status===401)void this.enqueue(()=>this.store.clear()).catch(()=>undefined);
-    this.publish({mode:'cluera-staging',state:status===401?'signed-out':'suspended',message:new AccountApiError(status).message});
+    this.publish({mode:'cluera-staging',state:'suspended',message:new AccountApiError(403).message});
+  }
+  /** Time left on the account, including time held for running work; undefined when it cannot be read now. */
+  async remainingMilliseconds(): Promise<number | undefined> {
+    try {
+      if (this.pending) await this.pending;
+      if (this.view.state !== 'active' || !this.usable()) return undefined;
+      const snapshot = await this.api.snapshot(this.tokens!.accessToken);
+      return snapshot.usage.availableMilliseconds + snapshot.usage.reservedMilliseconds;
+    } catch { return undefined; }
   }
   /** Main-only capability. Never register this return value on IPC. */
   async authorizeWork(): Promise<{ accessToken: string; signal: AbortSignal }> {
     if (this.pending) await this.pending;
-    if (!this.tokens || this.clock() >= this.expires || this.view.state !== 'active') throw new AccountApiError(401);
-    const epoch = this.epoch, tokens = this.tokens;
+    if (this.view.state === 'active' && !this.usable()) await this.restore();
+    if (this.view.state !== 'active') throw new AccountApiError(401);
+    if (!this.usable()) throw new AccountApiError(503);
+    const epoch = this.epoch, tokens = this.tokens!;
+    const granted = { accessToken: tokens.accessToken, signal: this.owner.signal };
+    if (this.verified?.token === tokens.accessToken && this.clock() - this.verified.at < VERIFIED_FOR_MS) return granted;
     try {
       const snapshot = await this.api.snapshot(tokens.accessToken); this.current(epoch);
-      if (snapshot.account.userId !== tokens.userId || !this.tokens || this.clock() >= this.expires) throw new AccountApiError(401);
-      this.publish({ ...this.view, availableMilliseconds: snapshot.usage.availableMilliseconds,
+      if (snapshot.account.userId !== tokens.userId) throw new AccountApiError(401);
+      if (this.tokens === tokens) this.verified = { token: tokens.accessToken, at: this.clock() };
+      this.publish({ ...this.settled(), availableMilliseconds: snapshot.usage.availableMilliseconds,
         reservedMilliseconds: snapshot.usage.reservedMilliseconds, spentMilliseconds: snapshot.usage.spentMilliseconds });
-      return { accessToken: this.tokens.accessToken, signal: this.owner.signal };
+      return granted;
     } catch (error) {
-      if (epoch === this.epoch) { this.invalidate(); this.publish({ mode: 'cluera-staging',
-        state: error instanceof AccountApiError && error.status === 403 ? 'suspended' : 'unavailable',
-        message: 'Account verification is required before continuing.' }); }
-      throw new AccountApiError(error instanceof AccountApiError ? error.status : 503);
+      const status = error instanceof AccountApiError ? error.status : 503;
+      if (epoch !== this.epoch) throw new AccountApiError(status);
+      if (status === 403) {
+        this.invalidate(); this.publish({ mode: 'cluera-staging', state: 'suspended', message: new AccountApiError(403).message });
+        throw new AccountApiError(403);
+      }
+      if (status === 401) {
+        // The token was rejected: renewing it signs out only when the saved sign-in is rejected too.
+        this.verified = undefined;
+        await this.restore();
+        if (this.view.state === 'active' && this.usable() && this.tokens!.accessToken !== tokens.accessToken) {
+          return { accessToken: this.tokens!.accessToken, signal: this.owner.signal };
+        }
+        throw new AccountApiError(401);
+      }
+      // A network problem, time-out or rate limit is no verdict on this sign-in. The current token is still used:
+      // the server checks the account again on every call.
+      if (this.tokens === tokens && this.usable()) return granted;
+      throw new AccountApiError(status);
     }
   }
   async logout(allDevices = false): Promise<AccountView> {
     const access = this.tokens?.accessToken;
-    const epoch = ++this.epoch; this.invalidate(); this.pending = undefined;
+    const epoch = ++this.epoch; this.invalidate(); this.pending = undefined; this.retries = 0;
     this.publish({ mode: 'cluera-staging', state: 'signed-out' });
     let failed = allDevices && !access;
     await this.enqueue(() => this.store.clear()).catch(() => { failed = true; });

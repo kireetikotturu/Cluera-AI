@@ -22,6 +22,12 @@ it('opens separate fixed Account creation and recovery actions without credentia
  await render();await act(async()=>button('Create account').click());await act(async()=>button('Forgot password?').click());
  expect(dom.window.accountAPI.openWeb.mock.calls).toEqual([['signup'],['reset-password']]);
 });
+it('shows Google\'s logo on its button and no Google warning before the server has answered',async()=>{
+ dom.window.accountAPI.authOptions.mockImplementationOnce(()=>new Promise(()=>undefined));
+ await render();
+ expect(button('Continue with Google').querySelector('svg path[fill="#4285F4"]')).not.toBeNull();
+ expect(document.getElementById('account-google-status')).toBeNull();
+});
 it('serializes same-tick login and clears password and visibility after completion',async()=>{
  await render();await act(async()=>{fill('email','synthetic@example.invalid');fill('password','synthetic-password');});
  await act(async()=>(document.querySelector('[aria-label="Show password"]') as HTMLButtonElement).click());

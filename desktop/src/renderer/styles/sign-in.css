@@ -1,0 +1,78 @@
+/* Sign-in and loading screens (always in Cluera's night palette), and the account notices on the dashboard. */
+.account-login, .loading-screen {
+  height: 100%; display: flex; flex-direction: column; min-height: 0;
+  color: #eef0f8; background: radial-gradient(90% 55% at 50% -5%, rgba(124, 92, 255, .2), transparent 70%), #0c0e15;
+  --text: #eef0f8; --muted: #b3bad0; --faint: #8b93ab; --line: #262b3b;
+}
+.account-login-bar { flex: 0 0 46px; padding: 0 10px 0 16px; display: flex; align-items: center; justify-content: space-between; -webkit-app-region: drag; }
+.account-login-bar > span { display: flex; align-items: center; gap: 9px; font-size: 12.5px; font-weight: 600; color: #dfe3f0; }
+.account-login-bar .account-login-logo { width: 22px; height: 22px; border-radius: 7px; }
+.account-login-bar button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 8px; color: #aab2c8; background: transparent; cursor: pointer; -webkit-app-region: no-drag; }
+.account-login-bar button:hover { background: #46282f; color: #fff; }
+
+/* Sign-in: a narrow centred column that fits the window the app opens with, without scrolling. */
+.account-login-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; padding: 4px 20px 16px; scrollbar-width: thin; scrollbar-color: #2e3447 transparent; }
+.account-login-card { width: min(100%, 332px); margin: auto; display: flex; flex-direction: column; -webkit-app-region: no-drag; }
+.signin-logo { width: 42px; height: 42px; margin: 0 auto 12px; border-radius: 12px; box-shadow: 0 8px 28px rgba(124, 92, 255, .35); }
+.account-login-card h1 { margin: 0; text-align: center; font-size: 21px; line-height: 1.25; letter-spacing: -.4px; }
+.signin-sub { margin: 5px 0 16px; text-align: center; font-size: 12.5px; color: var(--muted); }
+.account-login .account-google { width: 100%; height: 38px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #d9dbe3; border-radius: 9px; background: #fff; color: #1f1f1f; font: 600 13px/1 'DM Sans', system-ui, sans-serif; cursor: pointer; }
+.account-login .account-google:hover:not(:disabled) { background: #f1f2f6; }
+.google-g { width: 17px; height: 17px; flex: none; }
+.account-auth-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; color: var(--faint); font-size: 11px; }
+.account-auth-divider::before, .account-auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.account-login-card form { display: grid; gap: 11px; }
+.signin-field { display: grid; gap: 5px; font-size: 11.5px; font-weight: 500; color: #c9cfe0; text-align: left; }
+.account-login .signin-field input { width: 100%; height: 36px; padding: 0 11px; border: 1px solid #2c3245; border-radius: 9px; background: #12151f; color: #eef0f8; font: 13px 'DM Sans', system-ui, sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
+.account-login .signin-field input::placeholder { color: #66708c; }
+.account-login .signin-field input:focus-visible { border-color: #8b6cf6; box-shadow: 0 0 0 3px rgba(139, 108, 246, .28); outline: none; }
+.account-password { position: relative; display: block; }
+.account-login .account-password input { padding-right: 40px; }
+.account-password button { position: absolute; right: 2px; top: 2px; width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #98a0b8; cursor: pointer; }
+.account-login .signin-submit { height: 38px; margin-top: 3px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 9px; background: linear-gradient(135deg, #8b6cf6, #6a57e0); color: #fff; font: 600 13px/1 'DM Sans', system-ui, sans-serif; cursor: pointer; box-shadow: 0 8px 22px rgba(106, 87, 224, .3); }
+.account-login .signin-submit:hover:not(:disabled) { filter: brightness(1.08); }
+.signin-message { margin: 9px 0 0; text-align: center; font-size: 11.5px; line-height: 1.5; color: #d5c9a8; overflow-wrap: anywhere; }
+.signin-message:empty { display: none; }
+.account-auth-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.account-auth-links button { border: 0; padding: 2px 0; background: transparent; color: #b9a8ff; font-size: 12px; cursor: pointer; }
+.account-auth-links button:hover:not(:disabled) { text-decoration: underline; }
+.signin-footer { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; padding-top: 11px; border-top: 1px solid var(--line); color: #4d556c; }
+.signin-footer .account-retry { border: 0; padding: 2px 0; background: transparent; color: var(--faint); font-size: 11.5px; cursor: pointer; }
+.signin-footer .account-retry:hover:not(:disabled) { color: #d8dcec; }
+.account-auth-note { margin: 7px 0 0; text-align: center; color: var(--faint); font-size: 10.5px; line-height: 1.5; }
+.account-login button:disabled { opacity: .55; cursor: default; }
+.account-login button:focus-visible { outline: 2px solid #b9a8ff; outline-offset: 2px; }
+@media (max-height: 540px) { .signin-logo { display: none; } .signin-sub { margin-bottom: 11px; } .signin-footer { margin-top: 11px; } }
+
+/* Loading: one progress bar from starting or signing in until the dashboard. */
+.loading-card { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 0 24px 46px; text-align: center; -webkit-app-region: no-drag; }
+.loading-logo { width: 54px; height: 54px; border-radius: 15px; box-shadow: 0 10px 36px rgba(124, 92, 255, .38); animation: loading-breathe 2.4s ease-in-out infinite; }
+.loading-card h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.2px; }
+.loading-card p { margin: 7px auto 0; max-width: 300px; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.loading-bar { width: min(230px, 70vw); height: 4px; border-radius: 99px; background: #222738; overflow: hidden; }
+.loading-bar span { position: relative; display: block; height: 100%; width: var(--to); border-radius: inherit; background: linear-gradient(90deg, #8b6cf6, #5eead4); overflow: hidden; animation: loading-grow .7s cubic-bezier(.2, .7, .2, 1) both; }
+.loading-bar span::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent); animation: loading-shine 1.3s linear infinite; }
+@keyframes loading-grow { from { width: var(--from); } to { width: var(--to); } }
+@keyframes loading-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes loading-breathe { 50% { transform: scale(1.05); } }
+.loading-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; }
+.loading-primary { height: 34px; padding: 0 18px; border: 0; border-radius: 9px; background: linear-gradient(135deg, #8b6cf6, #6a57e0); color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.loading-link { border: 0; padding: 3px 6px; background: transparent; color: var(--faint); font-size: 12px; cursor: pointer; }
+.loading-link:hover:not(:disabled) { color: #d8dcec; }
+.loading-actions button:disabled { opacity: .55; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .loading-logo, .loading-bar span, .loading-bar span::after { animation: none; } }
+
+/* Time used up during a live session. */
+.time-up-dialog { width: min(370px, calc(100% - 32px)); padding: 24px 22px 20px; border: 1px solid var(--line-strong); border-radius: 18px; background: var(--panel); color: var(--text); text-align: center; box-shadow: 0 24px 80px rgba(0, 0, 0, .4); -webkit-app-region: no-drag; }
+.time-up-dialog::backdrop { background: rgba(4, 9, 14, .66); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.time-up-icon { width: 46px; height: 46px; margin: 0 auto 13px; display: grid; place-items: center; border-radius: 14px; color: var(--warning); background: rgba(237, 197, 126, .15); }
+.time-up-dialog h2 { margin: 0 0 8px; font-size: 18px; letter-spacing: -.3px; }
+.time-up-dialog p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.time-up-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.time-up-actions button { flex: 1 1 130px; height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.time-up-primary { border: 0; background: var(--action-fill); color: var(--accent-ink); }
+.time-up-secondary { border: 1px solid var(--line-strong); background: transparent; color: var(--text); }
+.time-up-dialog .time-up-error { margin-top: 12px; color: var(--danger); }
+
+/* The saved sign-in is being renewed after a connection problem; nothing was signed out. */
+.reconnect-banner { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 60; margin: 0; padding: 7px 14px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--panel); color: var(--text); font-size: 11.5px; white-space: nowrap; box-shadow: var(--soft-shadow); pointer-events: none; }

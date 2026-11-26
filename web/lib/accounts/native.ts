@@ -23,8 +23,10 @@ export async function handleNativeAccount(request: Request, action: string): Pro
     let clients = accountClients(config);
     if (!['login', 'refresh', 'session', 'logout', 'oauth-exchange', 'context', 'credits', 'phone-sessions'].includes(action)
       || request.method !== (action === 'session' || action === 'credits' ? 'GET' : 'POST')) return json({ error: 'Not found.' }, 404);
-    // Shared HMAC rate-limit policy with web login; no plaintext identity bucket.
-    if (action !== 'login') await rateLimit(request, config, clients);
+    // Shared HMAC rate-limit policy with web login; no plaintext identity bucket. Sign-in and token renewal use the
+    // sign-in limit; the signed-in app's other requests are counted per kind, apart from it.
+    if (action === 'refresh' || action === 'oauth-exchange') await rateLimit(request, config, clients);
+    else if (action !== 'login') await rateLimit(request, config, clients, undefined, `native:${action}`);
     if (action === 'login' || action === 'refresh' || action === 'oauth-exchange') {
       if (request.headers.has('authorization')) throw new AccountError('FORBIDDEN', 403);
       const raw = await readJsonBody(request, 16000);

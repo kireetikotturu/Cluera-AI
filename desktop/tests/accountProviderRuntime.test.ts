@@ -127,6 +127,74 @@ it.each([[800, true], [100, true], [4000, true], [50, false], [5000, false], [1.
     if (passed) expect(command.maxTokens).toBe(limit); else expect('maxTokens' in command).toBe(false);
     f.receive({ type: 'answerDone', id: command.id }); await response.text();
   });
+/** An account that can say how much time it has left. */
+function timedFixture(left: () => number | undefined) {
+  const owner = new AbortController();
+  const connections: Array<{ connection: StagingRelayConnection; lifetime: AbortController; receive(event: RelayOutput): void }> = [];
+  const connect = vi.fn(async (_token: string, signal: AbortSignal, callback: (event: RelayOutput) => void) => {
+    const lifetime = new AbortController();
+    const connection: StagingRelayConnection = { signal: lifetime.signal, send: vi.fn(), writeAudio: vi.fn(), stop: vi.fn(() => lifetime.abort()) };
+    signal.addEventListener('abort', () => lifetime.abort(), { once: true });
+    connections.push({ connection, lifetime, receive: callback });
+    return connection;
+  });
+  const account = { authorizeWork: vi.fn(async () => ({ accessToken: 'synthetic-account-token', signal: owner.signal })), remainingMilliseconds: vi.fn(async () => left()) };
+  const stopped = vi.fn(), notify = vi.fn();
+  const runtime = new AccountProviderRuntime(account, connect, stopped, undefined, () => undefined, notify, [5, 5, 5]); runtimes.push(runtime);
+  return { runtime, connections, connect, account, stopped, notify };
+}
+it('ends with "time used up", not a reconnect, when the account has no time left', async () => {
+  const f = timedFixture(() => 0), speech = f.runtime.recognizer(interviewer), errors: Error[] = [];
+  speech.onError(error => errors.push(error));
+  const ready = speech.start(); await vi.waitFor(() => expect(f.connections).toHaveLength(1));
+  await vi.waitFor(() => expect(f.connections[0].connection.send).toHaveBeenCalled());
+  f.connections[0].receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
+  f.connections[0].lifetime.abort();                       // the service ends the connection: no time left
+  await vi.waitFor(() => expect(f.notify).toHaveBeenCalledWith('exhausted'));
+  await new Promise(resolve => setTimeout(resolve, 40));
+  expect(f.connect).toHaveBeenCalledOnce(); expect(f.stopped).not.toHaveBeenCalled();
+  expect(f.notify).not.toHaveBeenCalledWith('failed'); expect(errors).toHaveLength(1);
+});
+it('also says the time is used up when a session cannot even start, without waiting for a time-out', async () => {
+  const f = timedFixture(() => 200), speech = f.runtime.recognizer(interviewer);
+  const starting = expect(speech.start()).rejects.toThrow('Account provider session ended.');
+  await vi.waitFor(() => expect(f.connections[0]?.connection.send).toHaveBeenCalled());
+  f.connections[0].lifetime.abort();
+  await starting;
+  await vi.waitFor(() => expect(f.notify).toHaveBeenCalledWith('exhausted'));
+});
+it.each([[600_000], [undefined]])('reconnects as before while time is left (%s) or cannot be read', async left => {
+  const f = timedFixture(() => left), speech = f.runtime.recognizer(interviewer);
+  const ready = speech.start(); await vi.waitFor(() => expect(f.connections[0]?.connection.send).toHaveBeenCalled());
+  f.connections[0].receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
+  f.connections[0].lifetime.abort();
+  expect(f.notify).toHaveBeenCalledWith('reconnecting');
+  await vi.waitFor(() => expect(f.notify).toHaveBeenCalledWith('restored'));
+  expect(f.notify).not.toHaveBeenCalledWith('exhausted');
+});
+it('says the time is used up when a typed question finds no time left', async () => {
+  const f = timedFixture(() => 0);
+  const response = await f.runtime.generate(body, new AbortController().signal);
+  const reading = expect(response.text()).rejects.toThrow('Account provider session ended.');
+  f.connections[0].lifetime.abort(); await reading;
+  await vi.waitFor(() => expect(f.notify).toHaveBeenCalledWith('exhausted'));
+});
+it('keeps an open channel alive with silence while no sound arrives, and stays quiet while sound flows', async () => {
+  vi.useFakeTimers();
+  const f = fixture(), speech = f.runtime.recognizer(interviewer), ready = speech.start();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(f.connection.send).toHaveBeenCalled(); f.receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
+  const written = () => vi.mocked(f.connection.writeAudio).mock.calls;
+  await vi.advanceTimersByTimeAsync(1_000); expect(written()).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(2_000); expect(written().length).toBeGreaterThanOrEqual(1);
+  const [channel, silence] = written()[0];
+  expect(channel).toBe('interviewer'); expect(silence).toHaveLength(2_560); expect(silence.every(byte => byte === 0)).toBe(true);
+  const before = written().length;
+  for (let second = 0; second < 6; second++) { speech.sendAudio(Buffer.alloc(2560, 1)); await vi.advanceTimersByTimeAsync(1_000); }
+  expect(written().length).toBe(before + 6);                // only the real sound
+  await speech.stop(); const after = written().length;
+  await vi.advanceTimersByTimeAsync(10_000); expect(written().length).toBe(after);
+});
 it('fails only the one answer, in plain words, and leaves the live audio session running', async () => {
   const f = fixture(), speech = f.runtime.recognizer(interviewer), ready = speech.start();
   await vi.waitFor(() => expect(f.connection.send).toHaveBeenCalled()); f.receive({ type: 'audioReady', channel: 'interviewer' }); await ready;

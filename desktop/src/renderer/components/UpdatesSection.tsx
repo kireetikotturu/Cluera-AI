@@ -36,7 +36,7 @@ export function UpdatesSection({ initial, onStatus, variant }: { initial?: Updat
     const note = error || status?.installError;
     const progress = busy ? (status?.installPhase === 'downloading'
       ? `Downloading ${Math.round((status.downloadedBytes ?? 0) / 1_000_000)} MB${status.totalBytes ? ` of ${Math.round(status.totalBytes / 1_000_000)} MB` : ''}`
-      : status?.installPhase === 'launching' ? 'Opening the installer…' : 'Checking the download…') : '';
+      : status?.installPhase === 'launching' ? 'Installing the update…' : 'Checking the download…') : '';
     return <section className="st-card st-updates" aria-labelledby="updates-title">
       <div className="st-row">
         <div className="st-card-head"><h2 id="updates-title">Updates</h2><p>Cluera AI {status?.installedVersion ?? '…'}</p></div>
@@ -52,6 +52,7 @@ export function UpdatesSection({ initial, onStatus, variant }: { initial?: Updat
       {available && status.releaseNotes ? <details className="st-notes"><summary>What's new</summary><p className="update-release-notes">{status.releaseNotes}</p></details> : null}
       {status?.sessionActive ? <p className="st-hint">Finish your session first. Updating never interrupts a live session.</p> : null}
       {progress ? <p className="st-hint" role="status">{progress}</p> : null}
+      {busy ? <p className="st-hint">Cluera AI closes while Windows installs the update, then reopens by itself. This can take a minute.</p> : null}
       {note ? <p className="st-hint" role="status">{note}</p> : null}
     </section>;
   }
@@ -68,10 +69,11 @@ export function UpdatesSection({ initial, onStatus, variant }: { initial?: Updat
       {available && <button className="primary" disabled={checking || busy || status.sessionActive} onClick={() => void install()}><Download size={15}/>{busy ? 'Updating…' : 'Update now'}</button>}
       {busy && status?.installPhase !== 'launching' && <button className="ghost" onClick={() => void window.electronAPI.cancelUpdate()}>Cancel download</button>}
     </div>
-    {available && !busy && <p className="muted">Update now downloads and verifies the approved installer, then closes Cluera and opens the Windows upgrade wizard. Your local data is preserved.</p>}
+    {available && !busy && <p className="muted">Update now downloads and verifies the approved installer, then closes Cluera, installs the update and reopens it by itself. Your local data is preserved.</p>}
     {busy && <p role="status">{status?.installPhase === 'downloading'
       ? `Downloading: ${Math.round((status.downloadedBytes ?? 0) / 1_000_000)} MB${status.totalBytes ? ` / ${Math.round(status.totalBytes / 1_000_000)} MB` : ''}`
-      : status?.installPhase === 'launching' ? 'Opening the installer…' : 'Verifying the approved update…'}</p>}
+      : status?.installPhase === 'launching' ? 'Installing the update…' : 'Verifying the approved update…'}</p>}
+    {busy && <p className="muted">Cluera AI closes while Windows installs the update, then reopens by itself. This can take a minute.</p>}
     {(error || status?.installError) && <p role="status">{error || status?.installError}</p>}
   </section>;
 }

@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountSessionManager } from '../src/main/accounts/AccountSessionManager';
 import { AccountApi, AccountApiError } from '../src/main/accounts/AccountApi';
 
@@ -56,11 +56,16 @@ it('logout waits for an in-flight encrypted write and then removes it', async ()
   const ending = f.manager.logout(); finish(); await Promise.all([login, ending]);
   expect(f.saved()).toBeNull(); expect(f.manager.status().state).toBe('signed-out');
 });
-it('network failure stops owned work without labeling it revocation or discarding refresh', async () => {
+it('a network problem while renewing never signs out: work continues, the saved sign-in stays and it is tried again', async () => {
+  vi.useFakeTimers();
   const f = fixture(); await f.manager.login(input); const work = await f.manager.authorizeWork();
   f.api.refresh.mockRejectedValueOnce(new AccountApiError(503));
-  expect((await f.manager.restore()).state).toBe('unavailable'); expect(work.signal.aborted).toBe(true);
-  expect(f.saved()).not.toBeNull(); expect((await f.manager.restore()).state).toBe('active');
+  expect(await f.manager.restore()).toMatchObject({ state: 'active' }); expect(work.signal.aborted).toBe(false);
+  expect(f.manager.status().reconnecting).toBeUndefined();   // the current token still works
+  expect(f.saved()).not.toBeNull();
+  await vi.advanceTimersByTimeAsync(3_000);                  // tried again by itself
+  expect(f.api.refresh).toHaveBeenCalledTimes(2); expect(f.manager.status().state).toBe('active');
+  expect(f.changed.mock.calls.every(([view]) => view.state !== 'unavailable' && view.state !== 'signed-out')).toBe(true);
 });
 it('revoked refresh clears storage; suspension stops access without a false active state', async () => {
   for (const status of [401, 403]) {
@@ -80,11 +85,86 @@ it('storage encryption failure fails closed and only exposes bounded errors', as
   const view = await f.manager.login(input); expect(view.state).toBe('unavailable');
   expect(JSON.stringify(view)).not.toContain('sensitive'); await expect(f.manager.authorizeWork()).rejects.toThrow();
 });
-it('token deadline terminates work even while refresh is stuck', async () => {
+it('never uses an expired token while it cannot be renewed, keeps the account signed in and recovers', async () => {
   vi.useFakeTimers(); const f = fixture(); f.api.login.mockResolvedValueOnce({ ...tokens, validForMilliseconds: 2000 });
   await f.manager.login(input); const work = await f.manager.authorizeWork();
-  f.api.refresh.mockImplementation(() => new Promise(() => undefined));
-  await vi.advanceTimersByTimeAsync(2001); expect(work.signal.aborted).toBe(true); expect(f.manager.status().state).toBe('unavailable');
+  f.api.refresh.mockRejectedValue(new AccountApiError(503));
+  await vi.advanceTimersByTimeAsync(2001);
+  expect(f.manager.status()).toMatchObject({ state: 'active', reconnecting: true }); expect(work.signal.aborted).toBe(false);
+  await expect(f.manager.authorizeWork()).rejects.toMatchObject({ status: 503 });
+  await expect(f.manager.reportingCapability()).rejects.toMatchObject({ status: 503 });
+  expect(await f.manager.remainingMilliseconds()).toBeUndefined();
+  expect(f.saved()).not.toBeNull();
+  f.api.refresh.mockImplementation(async () => ({ ...tokens, refreshToken: 'rotated-synthetic-refresh' }));
+  await vi.advanceTimersByTimeAsync(60_000);                 // the next try works
+  expect(f.manager.status()).toMatchObject({ state: 'active' }); expect(f.manager.status().reconnecting).toBeUndefined();
+  await expect(f.manager.authorizeWork()).resolves.toMatchObject({ accessToken: tokens.accessToken });
+});
+describe('account checks that must not sign anyone out', () => {
+  /** A manager whose clock the test moves, so the recent-check window can be passed. */
+  async function signedIn() {
+    const f = fixture(); const time = { now: 1_000 };
+    const manager = new AccountSessionManager(f.store, f.api as unknown as AccountApi, f.changed, () => time.now);
+    managers.push(manager); await manager.login(input); f.api.snapshot.mockClear();
+    return { ...f, manager, time };
+  }
+  it('reuses a check made within the last minute instead of asking before every connection and answer', async () => {
+    const f = await signedIn();
+    await f.manager.authorizeWork(); await f.manager.authorizeWork(); expect(f.api.snapshot).not.toHaveBeenCalled();
+    f.time.now += 61_000; await f.manager.authorizeWork(); await f.manager.authorizeWork();
+    expect(f.api.snapshot).toHaveBeenCalledOnce();
+  });
+  it.each([429, 503])('keeps working with the current token when the check fails with %s', async status => {
+    const f = await signedIn(); f.time.now += 61_000;
+    f.api.snapshot.mockRejectedValueOnce(new AccountApiError(status));
+    await expect(f.manager.authorizeWork()).resolves.toMatchObject({ accessToken: tokens.accessToken });
+    expect(f.manager.status().state).toBe('active'); expect(f.saved()).not.toBeNull();
+  });
+  it('renews a rejected token and carries on; only a rejected saved sign-in signs out', async () => {
+    const f = await signedIn(); f.time.now += 61_000;
+    f.api.snapshot.mockRejectedValueOnce(new AccountApiError(401));
+    f.api.refresh.mockResolvedValueOnce({ ...tokens, accessToken: 'synthetic-second-access-token', refreshToken: 'rotated-synthetic-refresh' });
+    await expect(f.manager.authorizeWork()).resolves.toMatchObject({ accessToken: 'synthetic-second-access-token' });
+    f.time.now += 61_000;
+    f.api.snapshot.mockRejectedValueOnce(new AccountApiError(401)); f.api.refresh.mockRejectedValueOnce(new AccountApiError(401));
+    await expect(f.manager.authorizeWork()).rejects.toMatchObject({ status: 401 });
+    expect(f.manager.status().state).toBe('signed-out'); expect(f.saved()).toBeNull();
+  });
+  it('shows a suspended account as suspended', async () => {
+    const f = await signedIn(); f.time.now += 61_000; f.api.snapshot.mockRejectedValueOnce(new AccountApiError(403));
+    await expect(f.manager.authorizeWork()).rejects.toMatchObject({ status: 403 });
+    expect(f.manager.status().state).toBe('suspended');
+  });
+  it('renews instead of signing out when a balance read says the token was rejected', async () => {
+    const f = await signedIn(); const work = await f.manager.authorizeWork();
+    f.manager.rejectReportingAccess(401);
+    await vi.waitFor(() => expect(f.api.refresh).toHaveBeenCalledOnce());
+    expect(f.manager.status().state).toBe('active'); expect(work.signal.aborted).toBe(false); expect(f.saved()).not.toBeNull();
+  });
+  it('reads the time left, including time held for running work', async () => {
+    const f = await signedIn();
+    f.api.snapshot.mockResolvedValueOnce({ ...snapshot, usage: { ...snapshot.usage, availableMilliseconds: 0, reservedMilliseconds: 800 } });
+    expect(await f.manager.remainingMilliseconds()).toBe(800);
+    f.api.snapshot.mockRejectedValueOnce(new AccountApiError(503));
+    expect(await f.manager.remainingMilliseconds()).toBeUndefined(); expect(f.manager.status().state).toBe('active');
+  });
+  it('asks again, without signing out, when a renewed token arrives too late (the computer slept)', async () => {
+    const f = await signedIn();
+    f.api.refresh.mockImplementationOnce(async () => { f.time.now += 2 * 3_600_000; return { ...tokens, refreshToken: 'rotated-after-sleep' }; });
+    expect((await f.manager.restore()).state).toBe('active');
+    expect(f.saved()).toMatchObject({ refreshToken: 'rotated-after-sleep' });
+  });
+});
+it('opens a saved sign-in that cannot be checked yet as reconnecting, not signed out, and finishes by itself', async () => {
+  vi.useFakeTimers(); const f = fixture();
+  await f.store.write({ version: 1, userId, refreshToken: tokens.refreshToken });
+  f.api.refresh.mockRejectedValueOnce(new AccountApiError(503));
+  expect(await f.manager.restore()).toMatchObject({ state: 'unavailable', reconnecting: true });
+  expect(f.saved()).not.toBeNull();
+  await vi.advanceTimersByTimeAsync(3_000);
+  expect(f.manager.status()).toMatchObject({ state: 'active', userId });
+  const resting = fixture(); await resting.manager.restore(); await vi.advanceTimersByTimeAsync(120_000);
+  expect(resting.api.refresh).not.toHaveBeenCalled();        // nothing saved, nothing retried
 });
 it('does not claim all-device revocation when offline, but still ends local access', async () => {
   const f = fixture(); await f.manager.login(input); f.api.logout.mockRejectedValueOnce(new Error('private failure'));

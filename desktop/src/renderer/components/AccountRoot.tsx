@@ -3,6 +3,7 @@ import type { AccountView } from '../../shared/accounts';
 import App from '../App';
 import { useAppStore } from '../stores/appStore';
 import { AccountLogin } from './AccountLogin';
+import { LoadingScreen } from './LoadingScreen';
 
 /** Safe state subscription only; no token storage, polling or direct Auth calls. */
 export function AccountRoot(): JSX.Element {
@@ -22,8 +23,27 @@ export function AccountRoot(): JSX.Element {
     });
     return () => { alive = false; remove(); };
   }, []);
-  if (!account) return <main className="startup-error"><h1>Opening Cluera AI…</h1></main>;
+  if (!account) return <LoadingScreen title="Opening Cluera AI…" progress={12}/>;
   if (account.mode !== 'cluera-staging') return <main className="startup-error"><h1>Cluera identity unavailable</h1><p>Please restart Cluera AI. If this keeps happening, contact support.</p></main>;
   if (account.state === 'active') return <App key={account.userId} account={account}/>;
+  if (account.loading) {
+    const openingWorkspace = account.message?.includes('workspace') ?? false;
+    return <LoadingScreen title={account.message ?? 'Opening your workspace…'} progress={openingWorkspace ? 55 : 30}/>;
+  }
+  // A saved sign-in that cannot be checked yet (no network, a service problem) is not signed out: it is tried again.
+  if (account.reconnecting) return <ReconnectingAccount onState={setAccount}/>;
   return <AccountLogin state={account} onState={setAccount}/>;
+}
+
+function ReconnectingAccount({ onState }: { onState(state: AccountView): void }): JSX.Element {
+  const [busy, setBusy] = useState(false);
+  const run = (action: () => Promise<AccountView>): void => {
+    setBusy(true);
+    void action().then(onState).catch(() => undefined).finally(() => setBusy(false));
+  };
+  return <LoadingScreen title="Connecting to your account…" progress={30}
+    detail="You are still signed in. Check your internet connection; Cluera AI keeps trying.">
+    <button type="button" className="loading-primary" disabled={busy} onClick={() => run(() => window.accountAPI!.retry())}>Try again now</button>
+    <button type="button" className="loading-link" disabled={busy} onClick={() => run(() => window.accountAPI!.logout(false))}>Use another account</button>
+  </LoadingScreen>;
 }

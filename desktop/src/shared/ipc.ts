@@ -38,7 +38,7 @@ export const IPC = {
   interview: {
     start: 'interview:start', stop: 'interview:stop', pause: 'interview:pause', interaction: 'interview:interaction', autoAnswer: 'interview:auto-answer', answer: 'interview:answer', clear: 'interview:clear', discardInput: 'interview:discard-input',
   },
-  audio: { chunk: 'audio:chunk', error: 'audio:error', selectSystemSource: 'audio:select-system-source' },
+  audio: { chunk: 'audio:chunk', error: 'audio:error', selectSystemSource: 'audio:select-system-source', defaultSystemSource: 'audio:default-system-source' },
   screen: { sources: 'screen:sources', captureDesktop: 'screen:capture-desktop', captureCurrent: 'screen:capture-current', selectedSource: 'screen:selected-source', approve: 'screen:approve', discard: 'screen:discard', firstVisible: 'screen:first-visible', shot: 'screen:shot', clearContext: 'screen:clear-context' },
   settings: { get: 'settings:get', save: 'settings:save' },
   providers: { status: 'providers:status' },
@@ -95,6 +95,8 @@ export interface ElectronAPI {
   sendAudioChunk(sourceId: string, chunk: ArrayBuffer): void;
   reportAudioError(message: string): void;
   selectSystemAudioSource(sourceId: string): Promise<string>;
+  /** Picks the screen that carries Windows' output audio, without listing every window. */
+  selectDefaultSystemAudioSource(): Promise<{ id: string; name: string }>;
   listDesktopCaptureSources(): Promise<DesktopCaptureSource[]>;
   captureDesktopSource(sourceId: string): Promise<ScreenCapturePreview | null>;
   captureCurrentScreen(): Promise<ScreenCapturePreview | null>;

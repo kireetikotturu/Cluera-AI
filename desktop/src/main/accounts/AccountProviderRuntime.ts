@@ -7,9 +7,17 @@ import type { SpeechRecognizer } from '../stt/SpeechRecognizer';
 import { openStagingRelay, type RelayCommand, type RelayOutput, type StagingRelayConnection } from './StagingRelayClient';
 
 type Channel = 'interviewer' | 'candidate';
-type Authority = { authorizeWork(): Promise<{ accessToken: string; signal: AbortSignal }> };
-/** What the live page is told while the audio connection is being restored. */
-export type ConnectionState = 'reconnecting' | 'restored' | 'failed';
+type Authority = { authorizeWork(): Promise<{ accessToken: string; signal: AbortSignal }>;
+  /** Time left on the account, including time held for running work; undefined when it cannot be read. */
+  remainingMilliseconds?(): Promise<number | undefined> };
+/** What the live page is told while the audio connection is being restored, or when the account's time ran out. */
+export type ConnectionState = 'reconnecting' | 'restored' | 'failed' | 'exhausted';
+/** At or below this the account has no usable time left (the last part of a server reservation can be this short). */
+export const NO_TIME_MS = 1_500;
+/** The service ends an audio channel that receives nothing for 15 seconds. While a device is being found, switched
+ * or muted, a short piece of silence keeps the channel open once nothing has been sent for this long. */
+export const SILENCE_AFTER_MS = 2_000;
+const SILENCE = Buffer.alloc(2_560); // 80 ms of 16 kHz mono silence
 const failure = () => new Error('Account provider session ended. Check your connection and account balance.');
 /** One answer failed on the provider's side; audio and the session are still running. */
 const answerFailure = () => new Error('The AI model could not answer this time. Please ask again, or choose another model in Settings.');
@@ -49,6 +57,9 @@ export class AccountProviderRuntime {
   private lastGeneration = -Infinity;
   private readonly listeners = new Map<Channel, (event: RelayOutput) => void>();
   private readonly interrupted = new Map<Channel, (reconnecting: boolean) => void>();
+  /** Channels the current connection is ready for, with when sound was last sent on each. */
+  private readonly lastSound = new Map<Channel, number>();
+  private keepOpen?: ReturnType<typeof setInterval>;
   private generation?: { id: string; chunk(text: string): void; finish(error?: Error): void };
   private cancellation?: { id:string; settled:Promise<boolean>; resolve(value:boolean):void; timer:ReturnType<typeof setTimeout> };
   constructor(private readonly account: Authority, private readonly connect = openStagingRelay,
@@ -65,8 +76,31 @@ export class AccountProviderRuntime {
     if (event.type === 'answer' && event.id === this.generation?.id) this.generation.chunk(event.text);
     else if (event.type === 'answerDone' && event.id === this.generation?.id) this.generation.finish();
     else if (event.type === 'answerFailed' && event.id === this.generation?.id) this.generation.finish(answerFailure());
-    else if (event.type === 'audioReady' || event.type === 'transcript') this.listeners.get(event.channel)?.(event);
+    else if (event.type === 'audioReady' || event.type === 'transcript') {
+      if (event.type === 'audioReady') this.keepChannelOpen(event.channel);
+      this.listeners.get(event.channel)?.(event);
+    }
   };
+  private keepChannelOpen(channel: Channel): void {
+    if (!this.listeners.has(channel)) return;
+    this.lastSound.set(channel, performance.now());
+    if (this.keepOpen) return;
+    this.keepOpen = setInterval(() => {
+      const connection = this.connection;
+      if (!connection || connection.signal.aborted) return;
+      const now = performance.now();
+      for (const [open, sentAt] of this.lastSound) {
+        if (now - sentAt < SILENCE_AFTER_MS) continue;
+        this.lastSound.set(open, now);
+        try { connection.writeAudio(open, SILENCE); } catch { /* a lost connection is handled by the runtime */ }
+      }
+    }, 1_000);
+    this.keepOpen.unref?.();
+  }
+  private releaseChannels(channel?: Channel): void {
+    if (channel) this.lastSound.delete(channel); else this.lastSound.clear();
+    if (!this.lastSound.size) { clearInterval(this.keepOpen); this.keepOpen = undefined; }
+  }
   /** The app session that the next connection serves (none between sessions). */
   useSession(sessionId: string | undefined): void { this.sessionRef = sessionId; }
   private ensure(): Promise<StagingRelayConnection> {
@@ -95,13 +129,26 @@ export class AccountProviderRuntime {
     if (this.connection !== failed) return;
     const epoch = this.epoch;
     const channels = [...this.listeners.keys()];
+    const answering = Boolean(this.generation);
     this.connection = undefined; this.connecting = undefined;
+    this.releaseChannels();
     this.activity(false);
     if (this.cancellation) { clearTimeout(this.cancellation.timer); this.cancellation.resolve(false); this.cancellation = undefined; }
     this.generation?.finish(failure()); // only the answer being written is lost
     if (this.authSignal?.aborted) { this.stop(); this.stopped(); return; }
-    if (!channels.length) { this.stop(); return; } // nothing live to keep: the next question connects again by itself
-    if (this.recovering) return; // the running recovery tries again with this connection gone
+    // The service also ends a connection when the account's time is used up. That is not a connection problem.
+    const outOfTime = this.account.remainingMilliseconds && (channels.length || answering) ? this.outOfTime() : undefined;
+    if (!channels.length) { // nothing live to keep: the next question connects again by itself
+      this.stop();
+      const after = this.epoch;
+      void outOfTime?.then(out => { if (out && after === this.epoch && !this.connection) this.notify('exhausted'); });
+      return;
+    }
+    if (this.recovering) {
+      // The running recovery tries again with this connection gone, unless the time ran out.
+      void outOfTime?.then(out => { if (out) this.timeOver(epoch); });
+      return;
+    }
     const now = Date.now();
     this.recoveries = this.recoveries.filter(at => now - at < RECONNECT_WINDOW_MS);
     if (this.recoveries.length >= MAX_RECONNECTS) { this.giveUp(epoch); return; }
@@ -115,6 +162,7 @@ export class AccountProviderRuntime {
         const wait = index === 0 ? Math.max(base, spacing) : base;
         try { await delay(wait, undefined, { signal: this.lifetime.signal }); } catch { return; }
         if (epoch !== this.epoch) return;
+        if (outOfTime && await outOfTime) { this.timeOver(epoch); return; }
         try {
           const connection = await this.ensure();
           if (epoch !== this.epoch) return;
@@ -135,8 +183,21 @@ export class AccountProviderRuntime {
     this.notify('failed');
     this.stop(); this.stopped();
   }
+  private async outOfTime(): Promise<boolean> {
+    const left = await this.account.remainingMilliseconds?.().catch(() => undefined);
+    return left !== undefined && left <= NO_TIME_MS;
+  }
+  /** The account's time ran out: the live work ends with that reason instead of trying to reconnect. The app that
+   * is told ('exhausted') closes the session itself, so the lost-connection message is not shown. */
+  private timeOver(epoch: number): void {
+    if (epoch !== this.epoch) return;
+    for (const interrupt of [...this.interrupted.values()]) interrupt(false);
+    this.notify('exhausted');
+    this.stop();
+  }
   stop(): void {
     ++this.epoch;
+    this.releaseChannels();
     this.recoveries = [];
     this.lastGeneration = -Infinity;
     const old = this.connection; this.connection = undefined; this.connecting = undefined;
@@ -150,6 +211,7 @@ export class AccountProviderRuntime {
     const connection = this.connection;
     if (!connection || connection.signal.aborted) throw failure();
     connection.writeAudio(channel, pcm);
+    if (this.lastSound.has(channel)) this.lastSound.set(channel, performance.now());
   }
   sendControl(command: RelayCommand): void {
     const connection = this.connection;
@@ -252,6 +314,7 @@ export class AccountProviderRuntime {
   }
   closeAudio(channel: Channel): void {
     this.interrupted.delete(channel);
+    this.releaseChannels(channel);
     if (!this.listeners.delete(channel)) return;
     if (this.connection && !this.connection.signal.aborted) {
       try { this.connection.send({ type: 'closeAudio', channel }); } catch { this.connection.stop(); }

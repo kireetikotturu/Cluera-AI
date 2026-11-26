@@ -8,6 +8,10 @@ export interface AccountView {
   reservedMilliseconds?: number;
   spentMilliseconds?: number;
   message?: string;
+  /** The saved sign-in is being renewed after a network or service problem; it has not ended. */
+  reconnecting?: boolean;
+  /** The app is opening the account: show the loading screen, not the sign-in form. */
+  loading?: boolean;
 }
 export interface AccountLogin { email: string; password: string }
 export interface AccountAuthOptions { google: 'enabled' | 'disabled' | 'unavailable' }

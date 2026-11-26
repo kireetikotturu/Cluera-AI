@@ -1,4 +1,5 @@
-import { app, BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, screen, session, shell, type Rectangle } from 'electron';
+import { app, BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain as electronIpc, screen, session, shell, type Rectangle } from 'electron';
+import { trackedIpc } from './trackedIpc';
 import { randomUUID } from 'node:crypto';
 import { assertProviderSetup, assertSessionProviderSetup } from '../providers/providerSetup';
 import { MANAGED_GEMINI_MODEL, MANAGED_DEEPGRAM_MODEL } from '../../shared/managedProviders';
@@ -32,7 +33,9 @@ export function registerIpc(
   models: ModelCatalog,
   updates: UpdateManager,
   usage?: { setActive(active: boolean): void },
-): { stopProtectedSession(): Promise<void> } {
+): { stopProtectedSession(): Promise<void>; dispose(): void } {
+  // Everything registered here can be removed again (dispose), so another account's workspace can open in this window.
+  const ipcMain = trackedIpc(electronIpc);
   const requireAccess = (): void => { authorization.assertEntitled(); updates.assertSupported(); };
   type CaptureTimingMark = 'capture-complete' | 'optimization-start' | 'optimization-complete' | 'approval-start' | 'rag-start' | 'rag-complete' | 'gemini-request-start' | 'first-token' | 'first-visible' | 'full-response-complete';
   interface CaptureTiming { startedAt: number; marks: Partial<Record<CaptureTimingMark, number>> }
@@ -62,7 +65,7 @@ export function registerIpc(
   };
   let approvedAbort: AbortController | null = null;
   let analysisInProgress = false;
-  let systemAudioSourceId: string | null = null;
+  let systemAudioSource: { id: string; name: string } | null = null;
   let overlayMode = false;
   let sessionModeActive = false;
   let roundSessionId: string | null = null;
@@ -172,14 +175,15 @@ export function registerIpc(
   };
   const allowApplicationQuit = (): void => { applicationQuitting = true; releaseQuickShotShortcut(); releaseSendShortcut(); releaseAssignmentMode(); };
   app.on('before-quit', allowApplicationQuit);
-  window.once('closed', () => {
+  const releaseOnClosed = (): void => {
     releaseQuickShotShortcut();
     releaseSendShortcut();
     releaseAssignmentMode();
     for (const eventName of touchGuardEvents) window.removeListener(eventName as 'show', reassertTouchThrough);
     app.removeListener('before-quit', allowApplicationQuit);
-  });
-  window.on('close', (event) => {
+  };
+  window.once('closed', releaseOnClosed);
+  const preventClose = (event: Electron.Event): void => {
     if (explicitCloseRequested || applicationQuitting) return;
     event.preventDefault();
     keepWindowOffTaskbar();
@@ -187,8 +191,9 @@ export function registerIpc(
     if (!window.isVisible()) window.showInactive();
     keepWindowOffTaskbar();
     keepWindowPinned();
-  });
-  window.on('minimize', () => {
+  };
+  window.on('close', preventClose);
+  const keepRestored = (): void => {
     setImmediate(() => {
       if (window.isDestroyed()) return;
       keepWindowOffTaskbar();
@@ -197,13 +202,12 @@ export function registerIpc(
       keepWindowOffTaskbar();
       keepWindowPinned();
     });
-  });
-  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
-    if (!systemAudioSourceId) { callback({}); return; }
-    const sources = await desktopCapturer.getSources({ types: ['window', 'screen'], thumbnailSize: { width: 0, height: 0 } });
-    const selected = sources.find((source) => source.id === systemAudioSourceId);
-    if (!selected) { callback({}); return; }
-    callback({ video: selected, audio: 'loopback' });
+  };
+  window.on('minimize', keepRestored);
+  // The source chosen for this capture is reused as it is: listing every window again here delayed the sound.
+  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
+    if (!systemAudioSource) { callback({}); return; }
+    callback({ video: systemAudioSource, audio: 'loopback' });
   });
   ipcMain.handle(IPC.app.status, async (_event, fresh?: unknown) => {
     requireAccess();
@@ -561,7 +565,7 @@ export function registerIpc(
     approvedAbort = null;
     pendingCapture = null;
     selectedScreenSource = null;
-    systemAudioSourceId = null;
+    systemAudioSource = null;
     captureTimings.clear();
     if (sessionModeActive || liveCollapsed) {
       try { setSessionMode(false); } catch { /* Continue shutting down the interview. */ }
@@ -636,12 +640,25 @@ export function registerIpc(
     }
   });
   ipcMain.on(IPC.audio.error, (_event, message: string) => window.webContents.send(IPC.events, 'app:error', { title: 'Audio capture', message, recoverable: true }));
+  const useSystemAudioSource = (source: { id: string; name: string }): { id: string; name: string } => {
+    systemAudioSource = { id: source.id, name: source.name };
+    return systemAudioSource;
+  };
   ipcMain.handle(IPC.audio.selectSystemSource, async (_event, sourceId: string) => {
     requireAccess();
     const sources = await desktopCapturer.getSources({ types: ['window', 'screen'], thumbnailSize: { width: 0, height: 0 } });
     const selected = sources.find((source) => source.id === sourceId);
     if (!selected) throw new Error('The selected system-audio source is no longer available.');
-    systemAudioSourceId = selected.id; return selected.name;
+    return useSystemAudioSource(selected).name;
+  });
+  // The loopback audio is the same whichever screen carries it, so only screens are listed, without thumbnails: that
+  // takes a fraction of a second, while listing every window with a picture of each could take many seconds.
+  ipcMain.handle(IPC.audio.defaultSystemSource, async () => {
+    requireAccess();
+    const screens = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
+    const primary = screens.find((source) => source.display_id === String(screen.getPrimaryDisplay().id)) ?? screens[0];
+    if (!primary) throw new Error('Windows did not list a screen for output audio.');
+    return useSystemAudioSource(primary);
   });
   ipcMain.handle(IPC.screen.sources, async () => {
     requireAccess();
@@ -786,5 +803,15 @@ export function registerIpc(
     window.setContentProtection(safe.privateMode);
     return repositories.saveSettings(safe);
   });
-  return { stopProtectedSession };
+  /** Removes everything registered above. The live work must already be stopped. */
+  const dispose = (): void => {
+    releaseOnClosed();
+    window.removeListener('closed', releaseOnClosed);
+    window.removeListener('close', preventClose);
+    window.removeListener('minimize', keepRestored);
+    window.webContents.removeListener?.('render-process-gone', releaseAssignmentMode);
+    session.defaultSession.setDisplayMediaRequestHandler(null);
+    ipcMain.dispose();
+  };
+  return { stopProtectedSession, dispose };
 }

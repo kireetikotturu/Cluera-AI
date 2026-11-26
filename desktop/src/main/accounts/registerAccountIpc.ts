@@ -1,6 +1,7 @@
-import { ipcMain, shell, dialog, type BrowserWindow } from 'electron';
+import { ipcMain as electronIpc, shell, dialog, type BrowserWindow } from 'electron';
 import { z } from 'zod';
 import { IPC } from '../../shared/ipc';
+import { trackedIpc } from '../ipc/trackedIpc';
 import type { AccountView } from '../../shared/accounts';
 import type { AccountSessionManager } from './AccountSessionManager';
 import { AccountApi, ACCOUNT_ORIGIN } from './AccountApi';
@@ -12,15 +13,18 @@ import {DOCUMENT_EXTENSIONS} from '../documents/DocumentProcessor';
 import type {AccountCreditsManager} from './AccountCreditsManager';
 import type {AccountPhoneSessions} from './AccountPhoneSessions';
 
-/** Separate account boundary: no generic relay, token, URL or filesystem IPC. */
+/** Separate account boundary: no generic relay, token, URL or filesystem IPC. Returns how to remove its handlers.
+ * `restart` opens the workspace of the account that is now signed in (in the same running app). */
 export function registerAccountIpc(window: BrowserWindow, account?: AccountSessionManager,
-  options?: { workspaceUserId?: string; stop(): Promise<void>; restart(): void; updates: UpdateManager; context?:AccountContextManager; credits?:AccountCreditsManager; phoneSessions?:AccountPhoneSessions }): void {
+  options?: { workspaceUserId?: string; stop(): Promise<void>; restart(): void; updates: UpdateManager; context?:AccountContextManager; credits?:AccountCreditsManager; phoneSessions?:AccountPhoneSessions }): () => void {
+  const ipcMain = trackedIpc(electronIpc);
+  const dispose = (): void => ipcMain.dispose();
   const trusted = (event: Electron.IpcMainInvokeEvent) => {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) throw new Error('Unauthorized desktop request.');
   };
   const requireAccount = (): AccountSessionManager => { if (!account || !options) throw new Error('Account mode is unavailable in this build.'); return account; };
   const safeView = (view: AccountView): AccountView => view.state === 'active' && view.userId !== options?.workspaceUserId
-    ? { mode: 'cluera-staging', state: 'checking', message: 'Opening your isolated account workspace…' } : view;
+    ? { mode: 'cluera-staging', state: 'checking', loading: true, message: 'Opening your workspace…' } : view;
   const complete = (view: AccountView): AccountView => {
     if (view.state === 'active' && view.userId !== options?.workspaceUserId) options?.restart();
     return safeView(view);
@@ -57,7 +61,7 @@ export function registerAccountIpc(window: BrowserWindow, account?: AccountSessi
       if(requireAccount().status().userId===state.userId&&requireAccount().status().state==='active')options?.credits?.checkoutOpened();
     }else await shell.openExternal(`${ACCOUNT_ORIGIN}/account${action==='signup'?'#signup':action==='reset-password'?'#forgot-password':''}`);
   });
-  if (!account || !options) return;
+  if (!account || !options) return dispose;
   const requireAccess = (checkUpdatePolicy=true) => {
     const state = account.status();
     if (state.state !== 'active' || state.userId !== options.workspaceUserId) throw new Error('Sign in to your account to continue.');
@@ -85,4 +89,5 @@ export function registerAccountIpc(window: BrowserWindow, account?: AccountSessi
   ipcMain.handle(IPC.updates.install, async event => { trusted(event); requireAccess(false); await account.authorizeWork(); return options.updates.install(); });
   ipcMain.handle(IPC.updates.cancel, event => { trusted(event); options.updates.cancelInstall(); });
   ipcMain.handle(IPC.updates.openDownload, async event => { trusted(event); await shell.openExternal(options.updates.officialDownloadPage()); });
+  return dispose;
 }

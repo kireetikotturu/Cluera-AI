@@ -25,6 +25,33 @@ it('keeps an authoritative active event when an earlier initialization request l
  expect(document.querySelector('[data-active-workspace]')).not.toBeNull();
  expect(document.body.textContent).not.toContain('private-ipc-failure');
 });
+const button=(text:string)=>Array.from(document.querySelectorAll('button')).find(item=>item.textContent?.trim()===text)!;
+it('shows one loading screen, not the sign-in form, while the app opens an account',async()=>{
+ await act(async()=>root.render(createElement(AccountRoot)));
+ expect(document.querySelector('[role="progressbar"]')).not.toBeNull();
+ await act(async()=>notify({mode:'cluera-staging',state:'checking',loading:true,message:'Opening your workspace…'}));
+ expect(document.body.textContent).toContain('Opening your workspace…');
+ expect(Number(document.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow'))).toBeGreaterThan(30);
+ expect(document.querySelector('[data-login-state]')).toBeNull();
+});
+it('keeps a saved sign-in that cannot be checked yet on a connecting screen with a retry, never the sign-in form',async()=>{
+ dom.window.accountAPI.retry=vi.fn(async()=>({mode:'cluera-staging',state:'unavailable',reconnecting:true}));
+ dom.window.accountAPI.logout=vi.fn(async()=>({mode:'cluera-staging',state:'signed-out'}));
+ await act(async()=>root.render(createElement(AccountRoot)));
+ await act(async()=>notify({mode:'cluera-staging',state:'unavailable',reconnecting:true}));
+ expect(document.body.textContent).toContain('Connecting to your account…');
+ expect(document.body.textContent).toContain('You are still signed in.');
+ expect(document.querySelector('[data-login-state]')).toBeNull();
+ await act(async()=>button('Try again now').click());expect(dom.window.accountAPI.retry).toHaveBeenCalledOnce();
+ await act(async()=>button('Use another account').click());expect(dom.window.accountAPI.logout).toHaveBeenCalledWith(false);
+ expect(document.querySelector('[data-login-state="signed-out"]')).not.toBeNull();
+});
+it('keeps the dashboard open while the signed-in account reconnects',async()=>{
+ await act(async()=>root.render(createElement(AccountRoot)));
+ await act(async()=>notify({mode:'cluera-staging',state:'active',userId:'00000000-0000-4000-8000-000000000001'}));
+ await act(async()=>notify({mode:'cluera-staging',state:'active',userId:'00000000-0000-4000-8000-000000000001',reconnecting:true}));
+ expect(document.querySelector('[data-active-workspace]')).not.toBeNull();
+});
 it('shows a safe initialization failure when no authoritative event has arrived',async()=>{
  await act(async()=>root.render(createElement(AccountRoot)));
  await act(async()=>rejectStatus(new Error('private-ipc-failure')));

@@ -12,7 +12,7 @@ import { LiveTimeRing } from '../components/LiveTimeRing';
 import { ThemeControl } from '../components/ThemeControl';
 import { PrivateModeControl } from '../components/PrivateModeControl';
 import {
-  AudioCapture, isAutomaticMicrophoneAlias, selectAutomaticMicrophone, selectAutomaticSystemAudioSource, type MicrophoneDevice,
+  AudioCapture, isAutomaticMicrophoneAlias, isLoopbackInput, selectAutomaticMicrophone, selectAutomaticSystemAudioSource, type MicrophoneDevice,
 } from '../services/audioCapture';
 import { qaFontResizeDelta, renderedAnswerLineHeight } from '../services/answerScroll';
 import { estimateReadingProgress } from '../services/readingProgress';
@@ -45,6 +45,7 @@ const statusLabels: Record<string, string> = {
 const AUTOMATIC_SCREEN_INSTRUCTION = 'This screenshot is from an interview screen shared by the interviewer. Read and understand the visible text, code, error, diagram, question, terminal output, document, or other task. Infer what the interviewer is asking from the screenshot and current interview conversation. Use relevant session context, resume, job description, and retrieved supporting context when useful. Then generate the best direct interview answer for the candidate without asking for another screenshot instruction.';
 const SCREEN_QUESTION_FALLBACK = 'Answer the question detected from the screenshot';
 type MicrophoneMode = 'auto' | 'manual' | 'off';
+const isMicrophoneRefusal = (error: unknown): boolean => error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
 type AnswerStyleMode = 'shorter' | 'longer' | 'technical' | 'conversational' | 'star';
 
 const ANSWER_STYLES: Array<{ label: string; mode: AnswerStyleMode }> = [
@@ -156,6 +157,9 @@ export function CopilotPage(): JSX.Element {
   const firstScreenChunkReported = useRef(false);
   const microphoneEpoch = useRef(0);
   const audioOutputSignature = useRef('');
+  const microphoneSignature = useRef('');
+  // The account ran out of time during this page's session: no retries, just the way back to the dashboard.
+  const timeOverRef = useRef(false);
   const readingPositions = useRef(new Map<string, number>());
   const liveMenuRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
@@ -323,7 +327,9 @@ export function CopilotPage(): JSX.Element {
   const preStartAnswerMessage = systemAudioStatus === 'error'
     ? 'Audio output needs attention. Use the speaker control to reconnect it.'
     : deviceDetectionInProgress
-      ? 'Detecting microphone and audio output'
+      ? systemAudioStatus === 'active' && candidateDeviceSettled
+        ? 'Devices found. Connecting live transcription…'
+        : 'Detecting microphone and audio output'
       : 'Devices ready. You can start the round now.';
   const sessionTimer = formatSessionTime(sessionElapsedSeconds);
 
@@ -580,6 +586,12 @@ export function CopilotPage(): JSX.Element {
   };
 
   const ensureAutomaticSystemAudioSource = async (): Promise<void> => {
+    try {
+      // The quick choice: the screen that carries Windows' output audio, found without scanning every window.
+      const chosen = await window.electronAPI.selectDefaultSystemAudioSource();
+      retainSystemAudioSource(chosen.id, `Windows output · ${chosen.name}`);
+      return;
+    } catch { /* fall back to choosing from the full list */ }
     const sources = await window.electronAPI.listDesktopCaptureSources();
     const selected = selectAutomaticSystemAudioSource(sources)
       ?? sources.find((source) => source.id === systemSourceId);
@@ -604,6 +616,7 @@ export function CopilotPage(): JSX.Element {
       }
       try {
         await ensureAutomaticSystemAudioSource();
+        if (sessionId !== null && preparedSessionId.current !== sessionId) throw lastError;
         await audio.current.start();
         try { audioOutputSignature.current = await AudioCapture.audioOutputSignature(); } catch { /* Device labels may be permission-gated. */ }
         if (attempt > 0) clearAudioCaptureError();
@@ -658,18 +671,28 @@ export function CopilotPage(): JSX.Element {
         if (microphoneEpoch.current !== epoch) return;
       }
       try {
-        let chosenDeviceId = requestedDeviceId;
+        let selected: { deviceId: string; label: string } | null = null;
+        let quickOpenFailed = false;
         if (mode === 'auto') {
+          // Windows' current default microphone is opened straight away. Listing the inputs first can open a device
+          // twice (a Bluetooth headset takes seconds each time), so the list is read afterwards.
+          let first: { deviceId: string; label: string } | null = null;
+          try { first = await candidateAudio.current.start(); }
+          catch (error) { if (isMicrophoneRefusal(error)) throw error; quickOpenFailed = true; }
+          if (microphoneEpoch.current !== epoch) return;
           const available = await AudioCapture.listMicrophones();
           if (microphoneEpoch.current !== epoch) return;
           setMicrophones(available);
-          const automatic = selectAutomaticMicrophone(available);
-          if (!automatic) throw new Error('No usable physical microphone input was found.');
-          // Let Chromium resolve Windows' current default input rather than
-          // pinning the pseudo "default" endpoint as an exact physical device.
-          chosenDeviceId = automatic.deviceId === 'default' ? '' : automatic.deviceId;
-        }
-        const selected = await candidateAudio.current.start(chosenDeviceId || undefined);
+          if (first && !isLoopbackInput(first.label)) selected = first;
+          else {
+            const automatic = selectAutomaticMicrophone(available);
+            if (!automatic) throw new Error('No usable physical microphone input was found.');
+            // Let Chromium resolve Windows' current default input rather than
+            // pinning the pseudo "default" endpoint as an exact physical device.
+            const chosenDeviceId = automatic.deviceId === 'default' ? '' : automatic.deviceId;
+            selected = await candidateAudio.current.start(chosenDeviceId || undefined);
+          }
+        } else selected = await candidateAudio.current.start(requestedDeviceId || undefined);
         if (microphoneEpoch.current !== epoch) return;
         const selectedLabel = mode === 'auto' ? `System default · ${selected.label}` : selected.label;
         setMicrophoneLabel(selectedLabel);
@@ -677,7 +700,8 @@ export function CopilotPage(): JSX.Element {
         localStorage.setItem('sigmaround.microphone.deviceId', selected.deviceId);
         localStorage.setItem('sigmaround.microphone.label', selectedLabel);
         setMicrophoneStatus('active');
-        if (attempt > 0) clearAudioCaptureError();
+        if (attempt > 0 || quickOpenFailed) clearAudioCaptureError();
+        try { microphoneSignature.current = await AudioCapture.microphoneSignature(); } catch { /* Device labels may be permission-gated. */ }
         return;
       } catch (error) {
         if (microphoneEpoch.current !== epoch) return;
@@ -722,30 +746,38 @@ export function CopilotPage(): JSX.Element {
         setManual('');
         store.clearDeviceCheckTranscript();
         setSystemAudioStatus('starting');
-        await window.electronAPI.setAutoAnswer(autoAnswerEnabled);
-        await window.electronAPI.startInterview(sessionId, SYSTEM_SOURCE, false);
+        // The speakers and the microphone are found while the live connection is being made, not after it: detection no
+        // longer waits for the network, and sound is ready as soon as the connection is.
         preparedSessionId.current = sessionId;
-        markDeviceCheckActive(true);
-        deviceCheckAttempts.current = 0;
-
-        let outputError: unknown;
-        try {
-          await startSystemAudio(sessionId);
-          setSystemAudioStatus('active');
-        } catch (error) {
-          outputError = error;
-          setSystemAudioStatus('error');
-        }
-
+        const output = (async (): Promise<unknown> => {
+          try {
+            await startSystemAudio(sessionId);
+            if (preparedSessionId.current === sessionId) setSystemAudioStatus('active');
+            return null;
+          } catch (error) {
+            if (preparedSessionId.current === sessionId) setSystemAudioStatus('error');
+            return error;
+          }
+        })();
         // Candidate capture is independently optional, so a missing microphone
         // never prevents the output-audio device check (and vice versa).
         void activateCandidateMicrophone(microphoneMode, microphoneDeviceId);
+        await window.electronAPI.setAutoAnswer(autoAnswerEnabled);
+        await window.electronAPI.startInterview(sessionId, SYSTEM_SOURCE, false);
+        markDeviceCheckActive(true);
+        deviceCheckAttempts.current = 0;
+
+        const outputError = await output;
         if (outputError) store.setError(outputError instanceof Error ? outputError.message : 'Could not start the audio-output device check.');
         return true;
       } catch (error) {
         preparedSessionId.current = null;
+        microphoneEpoch.current += 1;
+        void Promise.allSettled([audio.current.stop(), candidateAudio.current.stop()]);
         markDeviceCheckActive(false);
         setSystemAudioStatus('error');
+        setMicrophoneStatus(microphoneMode === 'off' ? 'disabled' : 'idle');
+        if (timeOverRef.current) return false;
         scheduleDeviceCheckRetry(sessionId);
         await window.electronAPI.stopInterview();
         store.setError(error instanceof Error ? error.message : 'Could not prepare audio device checking.');
@@ -935,15 +967,26 @@ export function CopilotPage(): JSX.Element {
     };
   }, [deviceCheckActive]);
 
+  const microphoneStatusRef = useRef(microphoneStatus);
+  microphoneStatusRef.current = microphoneStatus;
   useEffect(() => {
     if (!deviceCheckActive || microphoneMode !== 'auto') return undefined;
+    let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const handleDeviceChange = (): void => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void activateCandidateMicrophone('auto'), 350);
+      timer = setTimeout(() => {
+        // Only a new default microphone (or one that failed) is worth reopening. Opening a Bluetooth headset changes
+        // the device list by itself, and reopening for every change kept detection starting over.
+        void AudioCapture.microphoneSignature().catch(() => null).then((signature) => {
+          if (disposed || (signature !== null && signature === microphoneSignature.current && microphoneStatusRef.current !== 'error')) return;
+          void activateCandidateMicrophone('auto');
+        });
+      }, 350);
     };
     navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
     return () => {
+      disposed = true;
       if (timer) clearTimeout(timer);
       navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
     };
@@ -1143,6 +1186,16 @@ export function CopilotPage(): JSX.Element {
     };
   });
   useEffect(() => window.electronAPI.onEvent('session:interrupted', () => interruptedRef.current()), []);
+
+  // The account's time ran out: the session ends here and the dashboard says why (see TimeUpDialog).
+  const timeOverHandler = useRef<() => void>(() => undefined);
+  useLayoutEffect(() => {
+    timeOverHandler.current = (): void => {
+      timeOverRef.current = true;
+      void endSession('home').finally(() => useAppStore.getState().setError(null));
+    };
+  });
+  useEffect(() => window.electronAPI.onEvent('session:time-over', () => timeOverHandler.current()), []);
 
   // Up and Down scroll the answer when nothing is being typed (the reading area, the box below it, and the question box
   // handle their own). Menus, pickers and the screenshot preview keep the arrow keys for themselves.

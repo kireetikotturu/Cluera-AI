@@ -90,17 +90,22 @@ export async function authorizeCustomer(clients: Clients, token: string, expecte
   return { userId: data.user.id, email: data.user.email, sessionId: claims.session_id,
     trialSecondsGranted: 900, remoteDesktop: false };
 }
-export async function rateLimit(request: Request, config: AccountConfig, clients: Clients, email?: string, purpose: 'authentication' | 'billing-read' = 'authentication'): Promise<void> {
+export type RateLimitPurpose = 'authentication' | 'billing-read' | `native:${string}`;
+export async function rateLimit(request: Request, config: AccountConfig, clients: Clients, email?: string, purpose: RateLimitPurpose = 'authentication'): Promise<void> {
   // Authenticated billing observation must not consume login/write attempts.
   // Callers select this fixed scope only after activeSession and recovery checks.
   // The same durable 15-minute RPC bounds all devices and both billing modes.
+  // The signed-in Windows app's own requests (`native:<kind>`: session and balance checks, saved context, phone
+  // history, sign-out) are counted per kind and apart from sign-in: a live session makes many of them, and sharing
+  // sign-in's small limit refused them mid-session.
   if (purpose === 'billing-read' && !email) throw new AccountError('UNAVAILABLE', 503);
+  const appKind = purpose.startsWith('native:') ? purpose.slice('native:'.length) : null;
   const identifiers = [`ip:${clientIp(request)}`, ...(email ? [`email:${email.toLowerCase()}`] : [])];
   for (const identifier of identifiers) {
-    const namespace=purpose==='billing-read'?'customer-billing-read-v1':'customer-auth-v2';
+    const namespace=appKind?`customer-native-v1:${appKind}`:purpose==='billing-read'?'customer-billing-read-v1':'customer-auth-v2';
     const bucket = createHmac('sha256', config.rateKey).update(`${namespace}:${CLUERA_SUPABASE_URL}:${identifier}`).digest('hex');
     const { data, error, status } = await clients.service.rpc('customer_auth_rate_limit', {
-      p_bucket_hash: bucket, p_maximum: purpose==='billing-read'?(identifier.startsWith('ip:')?120:90):(identifier.startsWith('ip:') ? 60 : 15),
+      p_bucket_hash: bucket, p_maximum: appKind?120:purpose==='billing-read'?(identifier.startsWith('ip:')?120:90):(identifier.startsWith('ip:') ? 60 : 15),
     });
     if (error) throw new SupabaseOperationError('account.rateLimit', error, status);
     if (data !== true) throw new AccountError('RATE_LIMITED', 429);

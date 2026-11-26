@@ -13,6 +13,8 @@ import { AnswerStream } from './services/answerStream';
 import { useSavedDocuments } from './services/contextSelection';
 import { TranscriptOwnership } from './services/transcriptOwnership';
 import { UpdatePage } from './pages/UpdatePage';
+import { LoadingScreen } from './components/LoadingScreen';
+import { TimeUpDialog } from './components/TimeUpDialog';
 import type { UpdateStatus } from '../shared/types';
 import type { AccountView } from '../shared/accounts';
 
@@ -24,6 +26,9 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
     return()=>window.removeEventListener('online',reconnect);
   },[account?.userId]);
   const page = useAppStore((s) => s.page);
+  const timeOver = useAppStore((s) => s.timeOver);
+  // Opening a live session again clears the last one's time-up notice.
+  useEffect(() => { if (page === 'copilot') useAppStore.getState().setTimeOver(false); }, [page]);
   // Event handlers need stable actions, not a subscription to every streamed token.
   const store = useAppStore.getState();
   const theme = useAppStore((s) => s.settings?.theme ?? 'dark');
@@ -181,6 +186,8 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
             `${data.title}: ${data.message}`,
           ),
       ),
+
+      api.onEvent('session:time-over', () => store.setTimeOver(true)),
     ];
 
     return () => {
@@ -325,11 +332,12 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
 
   if (updateStatus?.state === 'required' && !updateStatus.sessionActive) return <UpdatePage account={Boolean(account)} status={updateStatus} onRetry={setUpdateStatus}/>;
 
-  if (!updateStatus) return <div className="startup-error"><h1>Checking updates…</h1><p>Verifying the current release policy.</p></div>;
+  if (!updateStatus) return <LoadingScreen title="Checking for updates…" progress={72}/>;
 
-  if (!workspaceInitialized) return <div className="startup-error"><h1>{workspaceError?'Workspace could not load':'Opening Cluera AI…'}</h1>
-    <p>{workspaceError?'Your saved workspace is retained. Retry loading or restart Cluera.':'Loading your local workspace.'}</p>
-    {workspaceError&&<button className="primary" onClick={()=>setWorkspaceAttempt(value=>value+1)}>Retry workspace</button>}</div>;
+  if (!workspaceInitialized && !workspaceError) return <LoadingScreen title="Loading your dashboard…" progress={90}/>;
+  if (!workspaceInitialized) return <div className="startup-error"><h1>Workspace could not load</h1>
+    <p>Your saved workspace is retained. Retry loading or restart Cluera.</p>
+    <button className="primary" onClick={()=>setWorkspaceAttempt(value=>value+1)}>Retry workspace</button></div>;
 
   /*
    * ============================================================
@@ -369,8 +377,10 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
           </div>
         </div>
         {page !== 'copilot' && <DiagonalResizeHandle />}
+        {account.reconnecting && <p className="reconnect-banner" role="status">Reconnecting to your account…</p>}
       </div>
       {dashboardCollapsed && <FloatingLogo label="Restore Cluera AI dashboard" onRestore={() => void setDashboardCollapse(false)}/>}
+      {timeOver && page !== 'copilot' && !dashboardCollapsed && <TimeUpDialog onClose={() => useAppStore.getState().setTimeOver(false)}/>}
     </>
   );
 }

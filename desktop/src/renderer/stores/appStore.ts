@@ -49,6 +49,9 @@ interface AppState {
   answerCaptureId: string | null;
   telemetry: TelemetrySnapshot | null;
   error: string | null;
+  /** The account's time ran out during a live session; the dashboard explains it until closed. */
+  timeOver: boolean;
+  setTimeOver(timeOver: boolean): void;
   setPage(page: Page): void;
   setSessions(sessions: Session[]): void;
   setActiveSession(id: string | null): void;
@@ -79,7 +82,8 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   page: 'home', sessions: [], activeSessionId: null, providerStatus: null, settings: null,
   interviewerTurnSequence: 0, interviewerSpeaking: false,
-  copilotStatus: 'idle', statusMessage: '', transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1, screenPreview: null, screenContext: null, question: null, answer: '', telemetry: null, error: null,
+  copilotStatus: 'idle', statusMessage: '', transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1, screenPreview: null, screenContext: null, question: null, answer: '', telemetry: null, error: null, timeOver: false,
+  setTimeOver: (timeOver) => set({ timeOver }),
   setPage: (page) => set({ page }), setSessions: (sessions) => set({ sessions }), setActiveSession: (activeSessionId) => set({ activeSessionId }),
   setProviderStatus: (providerStatus) => set({ providerStatus }), setSettings: (settings) => set({ settings }),
   setCopilotStatus: (copilotStatus, statusMessage = '') => set({ copilotStatus, statusMessage }),

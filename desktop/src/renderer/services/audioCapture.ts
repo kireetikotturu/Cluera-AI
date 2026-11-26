@@ -46,11 +46,13 @@ export function selectAutomaticSystemAudioSource(sources: DesktopCaptureSource[]
   ), undefined);
 }
 
+/** An input that records what the computer plays rather than a real microphone. */
+export function isLoopbackInput(label: string): boolean {
+  return /stereo mix|what u hear|loopback|wave out|monitor of|cable output|vb-audio|virtual audio output/.test(label.toLowerCase());
+}
+
 export function selectAutomaticMicrophone(devices: MicrophoneDevice[]): MicrophoneDevice | undefined {
-  const loopbackLike = (device: MicrophoneDevice): boolean => (
-    /stereo mix|what u hear|loopback|wave out|monitor of|cable output|vb-audio|virtual audio output/.test(device.label.toLowerCase())
-  );
-  const usable = devices.filter((device) => !loopbackLike(device));
+  const usable = devices.filter((device) => !isLoopbackInput(device.label));
   const systemDefault = usable.find((device) => device.deviceId === 'default')
     ?? usable.find((device) => /^(?:system\s+)?default(?:\s|[-:])/i.test(device.label.trim()));
   if (systemDefault) return systemDefault;
@@ -110,19 +112,35 @@ export class AudioCapture {
     }
   }
 
-  static async audioOutputSignature(): Promise<string> {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    return devices
-      .filter((device) => device.kind === 'audiooutput')
+  /** Identifies Windows' current default device of one kind (every device of that kind when there is no default entry).
+   * Headsets add and remove other entries while they switch profiles; only a change of the default is worth reopening. */
+  private static async defaultSignature(kind: 'audiooutput' | 'audioinput'): Promise<string> {
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === kind);
+    const current = devices.filter((device) => device.deviceId === 'default');
+    return (current.length ? current : devices)
       .map((device) => `${device.deviceId}\u0000${device.groupId}\u0000${device.label}`)
       .sort()
       .join('\u0001');
   }
 
+  /** Windows loopback records the default output, so this changes only when that output changes. */
+  static async audioOutputSignature(): Promise<string> {
+    return AudioCapture.defaultSignature('audiooutput');
+  }
+
+  static async microphoneSignature(): Promise<string> {
+    return AudioCapture.defaultSignature('audioinput');
+  }
+
   async start(deviceId?: string): Promise<{ deviceId: string; label: string }> {
     await this.stop();
     const epoch = ++this.captureEpoch;
+    // Opening a device can take a while. If this capture is stopped or replaced meanwhile, whatever it opened is
+    // released and nothing is reported: it must never leave a microphone on or stop the capture that replaced it.
+    const replaced = (): boolean => epoch !== this.captureEpoch;
+    const ensureCurrent = (): void => { if (replaced()) throw new DOMException('Audio capture was replaced.', 'AbortError'); };
     try {
+      let stream: MediaStream;
       if (this.source === 'candidate') {
         const microphoneConstraints = (selectedDeviceId?: string): MediaStreamConstraints => ({
           audio: {
@@ -134,15 +152,18 @@ export class AudioCapture {
           video: false,
         });
         try {
-          this.stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints(deviceId));
+          stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints(deviceId));
         } catch (error) {
           const name = error instanceof DOMException ? error.name : '';
           if (!deviceId || (name !== 'NotFoundError' && name !== 'OverconstrainedError')) throw error;
-          this.stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints());
+          ensureCurrent();
+          stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints());
         }
       } else {
-        this.stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+        stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
       }
+      if (replaced()) { stream.getTracks().forEach((track) => track.stop()); ensureCurrent(); }
+      this.stream = stream;
       // Keep the display video track alive even though it is never rendered or stored.
       // Chromium can end the associated Windows loopback audio when that track is stopped.
       if (!this.stream.getAudioTracks().length) throw new Error(this.source === 'candidate'
@@ -153,6 +174,7 @@ export class AudioCapture {
       // development and packaged builds; no blob: script exception is needed.
       const workletUrl = new URL('./pcm-processor.js', document.baseURI).toString();
       await this.context.audioWorklet.addModule(workletUrl);
+      ensureCurrent();
       this.sourceNode = this.context.createMediaStreamSource(this.stream);
       this.processor = new AudioWorkletNode(this.context, 'pcm-processor');
       this.silentGain = this.context.createGain();
@@ -162,6 +184,7 @@ export class AudioCapture {
       };
       this.sourceNode.connect(this.processor).connect(this.silentGain).connect(this.context.destination);
       await this.context.resume();
+      ensureCurrent();
       if (this.context.state !== 'running') throw new Error(this.source === 'candidate'
         ? 'The microphone audio processor could not start.'
         : 'The meeting audio processor could not start.');
@@ -177,6 +200,7 @@ export class AudioCapture {
         label: track?.label || (this.source === 'candidate' ? 'Default microphone' : 'Windows audio output'),
       };
     } catch (error) {
+      if (replaced()) throw error;
       const message = error instanceof Error ? error.message : 'Audio capture failed.';
       window.electronAPI.reportAudioError(`${this.source === 'candidate' ? 'Candidate microphone' : 'Audio output'}: ${message}`);
       await this.stop();
@@ -202,12 +226,17 @@ export class AudioCapture {
 
   private push(samples: Int16Array): void {
     const track = this.stream?.getAudioTracks()[0];
-    // Do not forward a stale, ended, disabled, or hardware-muted candidate
-    // track. This makes Cluera AI's own capture state authoritative while
-    // preserving the completely separate display-loopback system path.
-    if (!track || track.readyState !== 'live' || !track.enabled || (this.source === 'candidate' && track.muted)) {
+    // Do not forward a stale or ended track.
+    if (!track || track.readyState !== 'live') {
       this.pending = new Int16Array(0);
       return;
+    }
+    // A disabled or hardware-muted candidate track is never forwarded: silence goes out instead, so a muted
+    // microphone does not look like a lost connection (the service ends audio that stops arriving). Cluera AI's own
+    // capture state stays authoritative and the separate display-loopback system path is unaffected.
+    if (!track.enabled || (this.source === 'candidate' && track.muted)) {
+      samples = new Int16Array(samples.length);
+      this.pending = new Int16Array(this.pending.length);
     }
     const chunkSamples = 1_280; // 80ms at 16 kHz, recommended by Flux.
     const combined = new Int16Array(this.pending.length + samples.length);

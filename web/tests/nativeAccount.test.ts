@@ -115,6 +115,27 @@ it('exposes safe balance state and requires authenticated ownership for logout s
     expect(signOut).toHaveBeenLastCalledWith(token,allDevices?'global':'local');
   }
 });
+it("counts the signed-in app's requests per kind, apart from sign-in, so a live session cannot use up sign-in", async () => {
+  const hits = new Map<string, number>(), limits: Array<{ p_bucket_hash: string; p_maximum: number }> = [];
+  const usual = rpc.getMockImplementation()!;
+  rpc.mockImplementation(async (name: string, args: { p_bucket_hash: string; p_maximum: number }) => {
+    if (name !== 'customer_auth_rate_limit') return usual(name, args);
+    limits.push(args); const count = (hits.get(args.p_bucket_hash) ?? 0) + 1; hits.set(args.p_bucket_hash, count);
+    return { data: count <= args.p_maximum, error: null, status: 200 };
+  });
+  const asApp = (action: string, body: object = {}) => handleNativeAccount(request(action, body, { authorization: `Bearer ${token}` }), action);
+  for (let i = 0; i < 100; i++) expect((await asApp('session')).status).toBe(200);
+  expect((await asApp('context', { action: 'LIST' })).status).toBe(200);
+  const appBuckets = new Set(limits.map(row => row.p_bucket_hash));
+  expect(appBuckets.size).toBe(2); expect(new Set(limits.map(row => row.p_maximum))).toEqual(new Set([120]));
+  limits.length = 0;
+  expect((await login()).status).toBe(200);
+  expect((await handleNativeAccount(request('refresh', { refreshToken: 'synthetic-native-refresh' }), 'refresh')).status).toBe(200);
+  expect(limits.every(row => !appBuckets.has(row.p_bucket_hash))).toBe(true);
+  expect(new Set(limits.map(row => row.p_maximum))).toEqual(new Set([60, 15]));
+  for (let i = 0; i < 20; i++) await asApp('session');
+  expect((await asApp('session')).status).toBe(429);        // still bounded
+});
 it('does not expose upstream errors or provider secrets and reports transient auth failure as unavailable', async () => {
   auth.signInWithPassword.mockResolvedValueOnce({data:{session:null},error:{status:503,message:'private-upstream-payload'}} as never);
   const response = await login(); expect(response.status).toBe(503); expect(await response.text()).toBe('{"error":"UNAVAILABLE"}');

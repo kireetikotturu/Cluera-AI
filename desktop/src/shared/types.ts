@@ -354,6 +354,8 @@ export interface AppEventMap {
   'answer:send-shortcut': null;
   /** The app ended the live session itself (its connection could not be restored). */
   'session:interrupted': null;
+  /** The account's time ran out: the app ended the live session. */
+  'session:time-over': null;
   'answer:scroll': { direction: -1 | 1 };
   'answer:navigate': { delta: -1 | 1 };
   'window:touch-through': { enabled: boolean };
