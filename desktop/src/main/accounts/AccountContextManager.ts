@@ -1,9 +1,14 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { contextCommand,contextResult,selectedContextExcerpt,type ContextCommand,type ContextDocument,type ContextSnapshot } from '../../shared/accountContext';
 import type { AccountSessionManager } from './AccountSessionManager';
 import { ACCOUNT_ORIGIN } from './AccountApi';
 import { DocumentProcessor } from '../documents/DocumentProcessor';
+import { AnswerError } from './AnswerError';
+
+/** A documents request that failed later than this hung or timed out: trying again would only delay the answer more. */
+const QUICK_FAILURE_MS=5_000;
 
 const unavailable=()=>new Error('Account context is unavailable. Retry the same change when online.');
 class RejectedChange extends Error {constructor(){super('Context was not saved. Check document limits or retry later.');}}
@@ -12,6 +17,8 @@ export class AccountContextManager {
   private pending?:ContextCommand;
   private pendingUncertain=false;
   private busy=false;
+  /** The unconfirmed change being sent again for live answers; later questions wait for the same attempt. */
+  private resending?:Promise<unknown>;
   private version=0;
   private ownerSignal?:AbortSignal;
   private readonly forget=()=>{this.selected.clear();this.pending=undefined;this.pendingUncertain=false;++this.version;};
@@ -84,7 +91,29 @@ export class AccountContextManager {
     // a local cache or next-session prompt. No whole-library fetch or idle polling.
     const current=new Set(documents.map(doc=>doc.id));this.selected=new Set(ids.filter(id=>current.has(id)));
     const result=prompt+selectedContextExcerpt(documents,prompt);
-    if(result.length>120000)throw new Error('Question and selected context exceed the answer limit. Reduce selected context.');
+    if(result.length>120000)throw new AnswerError('Question and selected context exceed the answer limit. Reduce selected context.',true);
     return result;
+  }
+  /** augment() for a live answer. A document change that was never confirmed is sent again first (the same operation, so
+   * it is never applied twice) instead of failing every answer until the app restarts, a momentary failure to load the
+   * documents is tried once more, and a failure says what to do. */
+  async augmentForAnswer(prompt:string,signal:AbortSignal):Promise<string>{
+    this.assertOwner();
+    if(!this.selected.size)return prompt; // nothing from the account goes with this answer
+    if(this.pending&&!this.busy)this.resending=this.retry().catch(()=>undefined).finally(()=>{this.resending=undefined;});
+    await this.resending;signal.throwIfAborted();
+    if(this.busy)throw new AnswerError('Your documents are still being saved. Press Send to ask again in a moment.',true);
+    if(this.pending)throw new AnswerError('Your last document change is not saved yet. Check your connection, then open Settings and tap Try again.',true);
+    const started=performance.now();
+    try{return await this.augment(prompt,signal);}
+    catch(error){
+      if(error instanceof AnswerError||signal.aborted)throw error;
+      if(performance.now()-started<QUICK_FAILURE_MS){
+        await delay(400,undefined,{signal});
+        try{return await this.augment(prompt,signal);}
+        catch(again){if(again instanceof AnswerError||signal.aborted)throw again;}
+      }
+      throw new AnswerError('Your saved documents could not be loaded for this answer. Check your connection, then press Send to ask again.',true);
+    }
   }
 }

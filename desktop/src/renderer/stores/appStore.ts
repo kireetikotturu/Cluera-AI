@@ -18,6 +18,8 @@ export interface LiveQaItem {
   answer: string;
   telemetry: TelemetrySnapshot | null;
   streaming: boolean;
+  /** Ended without completing: it could not be generated, or another question replaced it. */
+  stopped?: 'failed' | 'replaced';
 }
 
 const normalizedTranscript = (text: string): string => text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -75,6 +77,7 @@ interface AppState {
   startAnswer(questionId?: string, captureId?: string): void;
   appendAnswer(token: string): void;
   finishAnswer(answer: string, telemetry: TelemetrySnapshot): void;
+  stopAnswer(questionId: string, failed: boolean): void;
   setError(error: string | null): void;
   resetCopilot(): void;
 }
@@ -204,6 +207,12 @@ export const useAppStore = create<AppState>((set) => ({
     if (itemIndex < 0) return { answer, telemetry };
     const liveQaItems = state.liveQaItems.map((item, index) => index === itemIndex ? { ...item, answer, telemetry, streaming: false } : item);
     return { liveQaItems, answer: state.activeQaIndex === itemIndex ? answer : state.answer, telemetry: state.activeQaIndex === itemIndex ? telemetry : state.telemetry };
-  }), setError: (error) => set({ error }),
+  }),
+  stopAnswer: (questionId, failed) => set((state) => {
+    if (!state.liveQaItems.some((item) => item.questionId === questionId && item.streaming)) return {};
+    return { liveQaItems: state.liveQaItems.map((item) => item.questionId === questionId
+      ? { ...item, streaming: false, stopped: failed ? 'failed' as const : 'replaced' as const } : item) };
+  }),
+  setError: (error) => set({ error }),
   resetCopilot: () => set({ interviewerTurnSequence: 0, interviewerSpeaking: false, copilotStatus: 'idle', statusMessage: '', transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1, screenPreview: null, screenContext: null, question: null, answer: '', activeAnswerId: null, answerCaptureId: null, telemetry: null, error: null }),
 }));

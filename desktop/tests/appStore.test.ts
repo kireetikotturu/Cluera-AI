@@ -58,6 +58,23 @@ describe('current interviewer interaction', () => {
     expect(useAppStore.getState().pendingInterviewerTranscript).toBe('How did you handle its main challenge');
   });
 
+  it('stops showing a failed or replaced answer as being written and keeps what had arrived', () => {
+    const store = useAppStore.getState();
+    store.startAnswer('question-1');
+    store.appendAnswer('Half an answer');
+    store.stopAnswer('question-1', false);
+    store.startAnswer('question-2');
+    store.stopAnswer('question-2', true);
+    store.stopAnswer('unknown', true);
+    expect(useAppStore.getState().liveQaItems).toMatchObject([
+      { questionId: 'question-1', answer: 'Half an answer', streaming: false, stopped: 'replaced' },
+      { questionId: 'question-2', answer: '', streaming: false, stopped: 'failed' },
+    ]);
+    store.startAnswer('question-3'); store.finishAnswer('Done', {} as never); store.stopAnswer('question-3', true);
+    expect(useAppStore.getState().liveQaItems[2]).toMatchObject({ answer: 'Done', streaming: false });
+    expect(useAppStore.getState().liveQaItems[2].stopped).toBeUndefined();
+  });
+
   it('clears transient device-check speech without removing live Q&A navigation', () => {
     const store = useAppStore.getState();
     store.setQuestion(question('How would you secure an API?'));

@@ -5,6 +5,7 @@ import type { AudioSourceDescriptor, TranscriptEvent, TurnEvent } from '../../sh
 import { parseFluxMessage } from '../stt/DeepgramRecognizer';
 import type { SpeechRecognizer } from '../stt/SpeechRecognizer';
 import { openStagingRelay, type RelayCommand, type RelayOutput, type StagingRelayConnection } from './StagingRelayClient';
+import { AnswerError } from './AnswerError';
 
 type Channel = 'interviewer' | 'candidate';
 type Authority = { authorizeWork(): Promise<{ accessToken: string; signal: AbortSignal }>;
@@ -21,6 +22,18 @@ const SILENCE = Buffer.alloc(2_560); // 80 ms of 16 kHz mono silence
 const failure = () => new Error('Account provider session ended. Check your connection and account balance.');
 /** One answer failed on the provider's side; audio and the session are still running. */
 const answerFailure = () => new Error('The AI model could not answer this time. Please ask again, or choose another model in Settings.');
+const unreachable = () => new AnswerError('Cluera could not be reached for this answer. Check your internet connection, then press Send to ask again.');
+const dropped = () => new AnswerError('The connection dropped while this answer was being written. Cluera is reconnecting; press Send to ask again.');
+const tooSlow = () => new AnswerError('This answer took too long and was stopped. Press Send to ask again.');
+/** `work`, or an immediate failure once `signal` aborts. The work itself carries on and its result is then ignored. */
+function unlessAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(failure());
+    if (signal.aborted) abort(); else signal.addEventListener('abort', abort, { once: true });
+    work.then(value => { signal.removeEventListener('abort', abort); resolve(value); },
+      (error: unknown) => { signal.removeEventListener('abort', abort); reject(error); });
+  });
+}
 const image = z.object({ mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']), data: z.string().min(4).max(6666668) }).strict();
 const requestBody = z.object({ contents: z.array(z.object({ role: z.literal('user'),
   parts: z.array(z.union([z.object({ text: z.string().min(1).max(120000) }).strict(),
@@ -51,10 +64,14 @@ export class AccountProviderRuntime {
   private authSignal?: AbortSignal;
   private epoch = 0;
   private sessionRef?: string;
-  private preparing = false;
+  /** The question being prepared (saved documents, connection, spacing) before it is sent. */
+  private preparing?: { signal: AbortSignal };
+  /** Audio channels waiting for the connection, not listening yet. */
+  private openingAudio = 0;
   private recovering = false;
   private recoveries: number[] = [];
-  private lastGeneration = -Infinity;
+  /** The last answer sent, and when the service first replied about it. */
+  private lastAnswer?: { id: string; connection: StagingRelayConnection; sentAt: number; repliedAt?: number };
   private readonly listeners = new Map<Channel, (event: RelayOutput) => void>();
   private readonly interrupted = new Map<Channel, (reconnecting: boolean) => void>();
   /** Channels the current connection is ready for, with when sound was last sent on each. */
@@ -70,7 +87,12 @@ export class AccountProviderRuntime {
     private readonly reconnectDelays: readonly number[] = RECONNECT_DELAYS_MS) {}
 
   private receive = (event: RelayOutput): void => {
-    if(event.type==='answerDone' && event.id===this.cancellation?.id){
+    const sent = this.lastAnswer;
+    if (sent && sent.repliedAt === undefined && (event.type === 'answer' || event.type === 'answerDone' || event.type === 'answerFailed')
+      && event.id === sent.id) sent.repliedAt = performance.now();
+    // The service confirms it stopped the previous answer. An answer that failed just as it was cancelled is over too:
+    // the service sends that failure instead, and no confirmation follows.
+    if((event.type==='answerDone' || event.type==='answerFailed') && event.id===this.cancellation?.id){
       const waiting=this.cancellation;this.cancellation=undefined;clearTimeout(waiting.timer);waiting.resolve(true);return;
     }
     if (event.type === 'answer' && event.id === this.generation?.id) this.generation.chunk(event.text);
@@ -134,7 +156,8 @@ export class AccountProviderRuntime {
     this.releaseChannels();
     this.activity(false);
     if (this.cancellation) { clearTimeout(this.cancellation.timer); this.cancellation.resolve(false); this.cancellation = undefined; }
-    this.generation?.finish(failure()); // only the answer being written is lost
+    // Only the answer being written is lost. While audio is live the connection is restored, so say that.
+    this.generation?.finish(channels.length && !this.authSignal?.aborted ? dropped() : failure());
     if (this.authSignal?.aborted) { this.stop(); this.stopped(); return; }
     // The service also ends a connection when the account's time is used up. That is not a connection problem.
     const outOfTime = this.account.remainingMilliseconds && (channels.length || answering) ? this.outOfTime() : undefined;
@@ -199,7 +222,7 @@ export class AccountProviderRuntime {
     ++this.epoch;
     this.releaseChannels();
     this.recoveries = [];
-    this.lastGeneration = -Infinity;
+    this.lastAnswer = undefined;
     const old = this.connection; this.connection = undefined; this.connecting = undefined;
     this.lifetime.abort(); this.lifetime = new AbortController();
     if(this.cancellation){clearTimeout(this.cancellation.timer);this.cancellation.resolve(false);this.cancellation=undefined;}
@@ -227,30 +250,37 @@ export class AccountProviderRuntime {
     const parts = parsed.contents[0].parts;
     let prompt = parts.filter((part): part is { text: string } => 'text' in part).map(part => part.text).join('\n');
     const images = parts.filter((part): part is { inlineData: z.infer<typeof image> } => 'inlineData' in part);
-    if (!prompt || prompt.length > 120000 || images.length > 1 || this.generation || this.preparing) throw failure();
+    // One answer at a time. A question that was replaced (its signal aborted) no longer counts, even while it is still
+    // winding down: refusing the next one for it failed follow-up questions, mostly while a session was starting.
+    if (!prompt || prompt.length > 120000 || images.length > 1 || this.generation
+      || (this.preparing && !this.preparing.signal.aborted)) throw failure();
+    const turn = this.preparing = { signal };
+    const release = () => { if (this.preparing === turn) this.preparing = undefined; };
     const epoch = this.epoch;
     let connection: StagingRelayConnection;
-    this.preparing = true;
     try {
-      if(this.cancellation && !await this.cancellation.settled)throw failure();
-      if(this.context)prompt=await this.context(prompt,signal);
-      if(signal.aborted||epoch!==this.epoch||prompt.length>120000)throw failure();
-      connection = await this.ensure();
-      // Respect the relay's unchanged generation-rate boundary after a quick
-      // cancellation/completion without reconnecting or interrupting live audio.
-      const wait = 1100 - (performance.now() - this.lastGeneration);
-      if (wait > 0) await delay(wait, undefined, { signal: AbortSignal.any([signal, connection.signal]) });
-    } catch {
-      if (epoch === this.epoch && !this.generation && this.listeners.size === 0) this.stop();
-      throw failure();
+      // The service is still stopping the previous answer. If it does not confirm in time, that connection is dropped
+      // (see finish) and this question, not sent yet, goes on the next one.
+      if (this.cancellation) await unlessAborted(this.cancellation.settled, signal);
+      if (signal.aborted || epoch !== this.epoch) throw failure();
+      if (this.context) prompt = await unlessAborted(this.context(prompt, signal), signal);
+      if (signal.aborted || epoch !== this.epoch || prompt.length > 120000) throw failure();
+      connection = await this.connectForAnswer(signal, epoch);
+      const wait = this.answerSpacing(connection);
+      if (wait > 0) await delay(wait, undefined, { signal: AbortSignal.any([signal, connection.signal]) })
+        .catch((error: unknown) => { throw signal.aborted || epoch !== this.epoch ? error : unreachable(); });
+    } catch (error) {
+      release();
+      if (epoch === this.epoch && !this.connecting && this.idle()) this.stop();
+      throw error instanceof AnswerError && !signal.aborted ? error : failure();
     }
-    finally { this.preparing = false; }
+    release();
     if (signal.aborted || epoch !== this.epoch || this.generation) {
-      if (epoch === this.epoch && !this.generation && this.listeners.size === 0) this.stop();
+      if (epoch === this.epoch && this.idle()) this.stop();
       throw failure();
     }
-    this.lastGeneration = performance.now();
     const id = randomUUID(), encoder = new TextEncoder();
+    this.lastAnswer = { id, connection, sentAt: performance.now() };
     let control!: ReadableStreamDefaultController<Uint8Array>, ended = false, emitted = 0;
     let timeout: ReturnType<typeof setTimeout>;
     const abort = () => finish(failure(), true);
@@ -258,7 +288,7 @@ export class AccountProviderRuntime {
       if (ended) return; ended = true; clearTimeout(timeout); signal.removeEventListener('abort', abort);
       if (this.generation?.id === id) this.generation = undefined;
       if (cancel && !connection.signal.aborted) {
-        if(this.listeners.size===0)this.stop();
+        if(this.listeners.size===0&&!this.openingAudio)this.stop();
         else {
           let resolve!:(value:boolean)=>void;
           const settled=new Promise<boolean>(done=>{resolve=done;});
@@ -270,7 +300,7 @@ export class AccountProviderRuntime {
       }
       if (!consumerCancelled) { if (error) control.error(error); else control.close(); }
       // Even a send failure must release an otherwise idle usage reservation.
-      if(!cancel && this.listeners.size===0)this.stop();
+      if(!cancel && this.idle())this.stop();
     };
     const stream = new ReadableStream<Uint8Array>({
       start(controller) { control = controller; },
@@ -283,7 +313,7 @@ export class AccountProviderRuntime {
       if (emitted > 1500000 || (control.desiredSize ?? 0) < bytes.length) { finish(failure(), true); return; }
       control.enqueue(bytes);
     } };
-    timeout = setTimeout(abort, 100000); timeout.unref?.();
+    timeout = setTimeout(() => finish(tooSlow(), true), 100000); timeout.unref?.();
     signal.addEventListener('abort', abort, { once: true });
     // The Short/Medium/Detailed setting already reaches this point as the request's token limit; pass it on so
     // the model stops at the right length instead of running to the server maximum.
@@ -293,21 +323,50 @@ export class AccountProviderRuntime {
     catch { finish(failure()); }
     return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' } });
   }
+  /** Nothing uses the connection or is about to, so an idle usage reservation can be released. */
+  private idle(): boolean {
+    return !this.generation && !this.preparing && !this.openingAudio && this.listeners.size === 0;
+  }
+  /** The connection for one answer. A question replaced while it is being opened leaves at once; the connection stays
+   * for whoever needs it next (the newer question, the audio) and is released when nobody does. */
+  private async connectForAnswer(signal: AbortSignal, epoch: number): Promise<StagingRelayConnection> {
+    const attempt = this.ensure();
+    try { return await unlessAborted(attempt, signal); }
+    catch (error) {
+      if (signal.aborted) void attempt.then(() => { if (epoch === this.epoch && this.idle()) this.stop(); }, () => undefined);
+      else if (epoch === this.epoch) throw unreachable();
+      throw error;
+    }
+  }
+  /** The service ends the whole session if two answers reach it less than a second apart. 1.1 s between sends is enough
+   * on a steady network. Right after a quick follow-up, also waiting a second from the service's first reply about the
+   * previous answer is certain whatever the network delay; 2 s after sending that is no longer needed. */
+  private answerSpacing(connection: StagingRelayConnection): number {
+    const last = this.lastAnswer;
+    if (!last || last.connection !== connection) return 0;
+    const now = performance.now(), sinceSent = now - last.sentAt;
+    const afterReply = last.repliedAt === undefined ? 0 : Math.min(2000 - sinceSent, 1000 - (now - last.repliedAt));
+    return Math.max(1100 - sinceSent, afterReply);
+  }
   recognizer(source: AudioSourceDescriptor): SpeechRecognizer {
     return new AccountSpeechRecognizer(this, source);
   }
   async openAudio(channel: Channel, receive: (event: RelayOutput) => void, signal: AbortSignal,
     interrupted?: (reconnecting: boolean) => void): Promise<StagingRelayConnection> {
-    const epoch = this.epoch, connection = await this.ensure();
+    const epoch = this.epoch;
+    let connection: StagingRelayConnection;
+    // A question that is replaced or fails while this is opening must not release the connection it is about to use.
+    this.openingAudio++;
+    try { connection = await this.ensure(); } finally { this.openingAudio--; }
     if (epoch !== this.epoch || signal.aborted || this.listeners.has(channel)) {
-      if (epoch === this.epoch && !this.generation && this.listeners.size === 0) this.stop();
+      if (epoch === this.epoch && this.idle()) this.stop();
       throw failure();
     }
     this.listeners.set(channel, receive);
     if (interrupted) this.interrupted.set(channel, interrupted);
     try { connection.send({ type: 'openAudio', channel }); } catch {
       this.listeners.delete(channel); this.interrupted.delete(channel);
-      if (!this.generation && this.listeners.size === 0) this.stop();
+      if (this.idle()) this.stop();
       throw failure();
     }
     return connection;
@@ -319,7 +378,7 @@ export class AccountProviderRuntime {
     if (this.connection && !this.connection.signal.aborted) {
       try { this.connection.send({ type: 'closeAudio', channel }); } catch { this.connection.stop(); }
     }
-    if(this.listeners.size===0&&!this.generation)this.stop();
+    if(this.idle())this.stop();
   }
 }
 

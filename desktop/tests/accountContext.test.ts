@@ -39,6 +39,49 @@ it('unlocks a definite pre-write rejection without retrying it or blocking unrel
   expect((await f.manager.list()).pending).toBe(false);expect(await f.manager.augment('Q',new AbortController().signal)).toBe('Q');
  }
 });
+it('sends an unconfirmed change again, as the same operation, instead of failing every live answer',async()=>{
+ const f=fixture();await f.manager.select([id]);f.request.mockRejectedValueOnce(new Error('Synthetic outage'));
+ const change={action:'SAVE',id,operationId:owner,kind:'RESUME',name:'CV',body:'Safe synthetic text'};
+ await expect(f.manager.change(change)).rejects.toThrow();
+ await expect(f.manager.augment('Q',new AbortController().signal)).rejects.toThrow();
+ expect(await f.manager.augmentForAnswer('SQL question',new AbortController().signal)).toContain('SQL engineering');
+ const saves=f.request.mock.calls.map(call=>JSON.parse(call[1].body)).filter(value=>value.action==='SAVE');
+ expect(saves).toEqual([change,change]);expect((await f.manager.list()).pending).toBe(false);
+});
+it('lets a follow-up question wait for the same resend instead of refusing it',async()=>{
+ const f=fixture();await f.manager.select([id]);f.request.mockRejectedValueOnce(new Error('Synthetic outage'));
+ await expect(f.manager.change({action:'SAVE',id,operationId:owner,kind:'RESUME',name:'CV',body:'Safe synthetic text'})).rejects.toThrow();
+ let finish!:()=>void;const slow=new Promise<void>(resolve=>{finish=resolve;});
+ f.request.mockImplementationOnce(async()=>{await slow;return Response.json({code:'ACTIVE',documents:[{...doc,body:undefined}]});});
+ const replaced=new AbortController(),first=expect(f.manager.augmentForAnswer('SQL',replaced.signal)).rejects.toThrow();
+ replaced.abort();const next=f.manager.augmentForAnswer('SQL question',new AbortController().signal);
+ finish();await first;expect(await next).toContain('SQL engineering');
+ expect(f.request.mock.calls.map(call=>JSON.parse(call[1].body).action).filter(action=>action==='SAVE')).toHaveLength(2);
+});
+it('says what to do while a change cannot be confirmed, and never blocks answers that use no document',async()=>{
+ const f=fixture();await f.manager.select([id]);f.request.mockRejectedValue(new Error('Synthetic outage'));
+ await expect(f.manager.change({action:'DELETE',id,operationId:owner})).rejects.toThrow();
+ await expect(f.manager.augmentForAnswer('Q',new AbortController().signal)).rejects.toMatchObject({name:'AnswerError',final:true,message:expect.stringContaining('Settings')});
+ const empty=fixture();empty.request.mockRejectedValue(new Error('Synthetic outage'));
+ await expect(empty.manager.change({action:'DELETE',id,operationId:owner})).rejects.toThrow();
+ expect(await empty.manager.augmentForAnswer('Q',new AbortController().signal)).toBe('Q');
+});
+it('tries a momentary documents failure once more, then explains it',async()=>{
+ const f=fixture();await f.manager.select([id]);const calls=f.request.mock.calls.length;
+ f.request.mockResolvedValueOnce(new Response(null,{status:503}));
+ expect(await f.manager.augmentForAnswer('SQL question',new AbortController().signal)).toContain('SQL engineering');
+ expect(f.request.mock.calls.length-calls).toBe(2);
+ f.request.mockResolvedValue(new Response(null,{status:429}));
+ await expect(f.manager.augmentForAnswer('Q',new AbortController().signal)).rejects.toThrow('saved documents could not be loaded');
+});
+it('stops waiting at once when the question is replaced, and keeps the answer-limit message',async()=>{
+ const f=fixture();await f.manager.select([id]);f.request.mockResolvedValue(new Response(null,{status:503}));
+ const replaced=new AbortController(),waiting=f.manager.augmentForAnswer('Q',replaced.signal);
+ setTimeout(()=>replaced.abort(),50);await expect(waiting).rejects.toThrow();
+ f.request.mockImplementation(async()=>Response.json({code:'ACTIVE',documents:[doc]}));const calls=f.request.mock.calls.length;
+ await expect(f.manager.augmentForAnswer('SQL '.repeat(30000),new AbortController().signal)).rejects.toThrow('exceed the answer limit');
+ expect(f.request.mock.calls.length-calls).toBe(1);
+});
 it('does not forget an earlier unknown outcome when a subsequent retry is rate-limited before RPC',async()=>{
  const f=fixture();f.request.mockRejectedValueOnce(new Error('Response lost')).mockResolvedValueOnce(new Response(null,{status:429}));
  const input={action:'SAVE',id,operationId:owner,kind:'RESUME',name:'CV',body:'Synthetic context'};

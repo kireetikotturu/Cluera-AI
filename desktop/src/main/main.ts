@@ -267,7 +267,7 @@ if (process.platform === 'win32') {
     const accountPhoneSessions = userId ? new AccountPhoneSessions(account, userId) : undefined;
     let endForNoTime: () => Promise<void> = async () => undefined;
     const accountProviders = new AccountProviderRuntime(account, undefined, () => { void stopAccountWork(); },
-      accountContext ? (prompt, signal) => accountContext.augment(prompt, signal) : undefined,
+      accountContext ? (prompt, signal) => accountContext.augmentForAnswer(prompt, signal) : undefined,
       active=>accountCredits?.activity(active),
       // A lost connection is restored in the background; the live page only needs to know it is happening.
       state => {

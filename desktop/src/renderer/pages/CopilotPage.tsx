@@ -1640,12 +1640,14 @@ export function CopilotPage(): JSX.Element {
                   </div>
                 : generatingAnswer
                   ? <span className="answer-waiting">Generating answer...</span>
-                  : running
-                    ? <span className="answer-waiting">Waiting for an interviewer question...</span>
-                    : <span className={`answer-waiting pre-start-device-message${deviceDetectionInProgress ? ' detecting' : ' ready'}`}>
-                        {preStartAnswerMessage}
-                        {deviceDetectionInProgress && <span className="device-check-dots" aria-hidden="true"><i/><i/><i/></span>}
-                      </span>}
+                  : activeQa?.stopped
+                    ? <span className="answer-waiting">{activeQa.stopped === 'failed' ? 'No answer was generated. Press Send to ask again.' : 'Stopped before an answer was ready.'}</span>
+                    : running
+                      ? <span className="answer-waiting">Waiting for an interviewer question...</span>
+                      : <span className={`answer-waiting pre-start-device-message${deviceDetectionInProgress ? ' detecting' : ' ready'}`}>
+                          {preStartAnswerMessage}
+                          {deviceDetectionInProgress && <span className="device-check-dots" aria-hidden="true"><i/><i/><i/></span>}
+                        </span>}
             </div>
           </div>
           </div>

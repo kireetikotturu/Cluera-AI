@@ -451,6 +451,7 @@ export class InterviewOrchestrator {
     this.emit('answer:started', { questionId: record.id, captureId: input.captureId });
     this.emit('copilot:status', { status: 'answering', message: 'Analyzing screen' });
 
+    let completed = false;
     try {
       telemetry.mark('retrievalStart');
       input.onTiming?.('rag-start');
@@ -505,6 +506,7 @@ export class InterviewOrchestrator {
       const answer = this.repositories.addAnswer(session.id, record.id, full.trim(), input.analyzer.name, snapshot.totalQuestionToAnswerLatency);
       this.repositories.addTurn(session.id, 'copilot', full.trim(), undefined, record.id);
       this.repositories.addEvent(session.id, 'ANSWER_COMPLETED', { ...snapshot, source: 'approved-screen' });
+      completed = true;
       this.emit('answer:completed', { questionId: record.id, answer, telemetry: snapshot });
       this.emit('copilot:status', { status: 'ready', message: 'Answer ready' });
       return screenContext;
@@ -516,6 +518,7 @@ export class InterviewOrchestrator {
       }
       throw error;
     } finally {
+      if (!completed) this.emit('answer:stopped', { questionId: record.id, failed: !abort.signal.aborted });
       input.signal.removeEventListener('abort', abortFromCaller);
       if (this.answerAbort === abort) { this.answerAbort = null; this.answerInterruptible = true; }
     }
@@ -615,6 +618,7 @@ export class InterviewOrchestrator {
     telemetry.mark('llmStart');
     let full = '';
     let first = true;
+    let completed = false;
     try {
       for await (const token of this.model.streamAnswer(context, abort.signal)) {
         if (abort.signal.aborted) return false;
@@ -632,6 +636,7 @@ export class InterviewOrchestrator {
       const answer = this.repositories.addAnswer(this.session.id, record.id, full.trim(), this.model.name, snapshot.totalQuestionToAnswerLatency);
       this.repositories.addTurn(this.session.id, 'copilot', full.trim(), undefined, record.id);
       this.repositories.addEvent(this.session.id, 'ANSWER_COMPLETED', snapshot);
+      completed = true;
       this.emit('answer:completed', { questionId: record.id, answer, telemetry: snapshot });
       this.emit('copilot:status', { status: this.paused ? 'paused' : 'ready', message: this.paused ? 'Listening paused' : 'Answer ready' });
       return true;
@@ -642,6 +647,8 @@ export class InterviewOrchestrator {
       this.emit('app:error', { title: 'Answer generation', message, recoverable: true });
       return false;
     } finally {
+      // Whatever ended it, the page must stop showing this answer as being written.
+      if (!completed) this.emit('answer:stopped', { questionId: record.id, failed: !abort.signal.aborted });
       if (this.answerAbort === abort) {
         this.answerAbort = null;
         this.answerInterruptible = true;

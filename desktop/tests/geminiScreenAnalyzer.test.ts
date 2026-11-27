@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GeminiScreenAnalyzer, ScreenStreamSplitter } from '../src/main/screen/GeminiScreenAnalyzer';
 import type { ScreenAnalysisRequest, ScreenAnalysisStreamEvent } from '../src/main/screen/ScreenAnalyzer';
 import { SPOKEN_ANSWER_STYLE } from '../src/main/llm/spokenAnswerStyle';
+import { AnswerError } from '../src/main/accounts/AnswerError';
 
 const config = { apiKey: 'test', model: 'gemini-2.5-flash-lite', timeoutMs: 1_000 };
 const analysis = {
@@ -51,6 +52,12 @@ describe('GeminiScreenAnalyzer streaming', () => {
     const disabled = new GeminiScreenAnalyzer(config, 'gemini-fallback', async () => false);
     await expect((async () => { for await (const _event of disabled.streamAnalysis(selected, new AbortController().signal)) { /* No events. */ } })()).rejects.toThrow('unavailable in Cluera');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a final reason from the account at once instead of retrying and hiding it', async () => {
+    const managed = vi.fn(async () => { throw new AnswerError('Your saved documents could not be loaded for this answer.', true); });
+    await expect(collect(new GeminiScreenAnalyzer({ ...config, apiKey: '', managed } as never))).rejects.toThrow('saved documents could not be loaded');
+    expect(managed).toHaveBeenCalledOnce();
   });
 
   it('explains a thought-only token exhaustion rather than silently completing', async () => {

@@ -369,6 +369,8 @@ export interface AppEventMap {
   'answer:started': { questionId: string; captureId?: string };
   'answer:token': { questionId: string; token: string };
   'answer:completed': { questionId: string; answer: AnswerRecord; telemetry: TelemetrySnapshot };
+  /** The answer ended without completing: it failed, or it was replaced or stopped. */
+  'answer:stopped': { questionId: string; failed: boolean };
   'app:error': { title: string; message: string; recoverable: boolean };
 }
 

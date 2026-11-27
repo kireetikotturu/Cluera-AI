@@ -7,6 +7,7 @@ import { fastThinkingConfig } from '../llm/geminiThinking';
 import { SPOKEN_ANSWER_STYLE } from '../llm/spokenAnswerStyle';
 import { answerPreferenceRules } from '../../shared/answerPreferences';
 import { assignmentAnswerRules } from '../llm/assignmentPrompt';
+import { AnswerError } from '../accounts/AnswerError';
 import type { ScreenAnalysisRequest, ScreenAnalysisStreamEvent, ScreenAnalyzer } from './ScreenAnalyzer';
 
 const CONTEXT_MARKER = '<<<SIGMAROUND_SCREEN_CONTEXT>>>';
@@ -209,7 +210,8 @@ export class GeminiScreenAnalyzer implements ScreenAnalyzer {
             response = this.config.managed ? await this.config.managed(requestBody, signal)
               : await fetch(endpoint, { method: 'POST', signal, headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.config.apiKey }, body: requestBody });
         } catch (error) {
-          if (signal.aborted) throw error;
+          // A final reason (the saved documents, for example) is shown as it is: another attempt would fail the same way.
+          if (signal.aborted || (error instanceof AnswerError && error.final)) throw error;
           if (attempt === MAX_ATTEMPTS) throw new Error('Gemini screen analysis could not connect after 4 attempts. Wait a moment, then take another screenshot.');
           await waitForRetry(retryDelayMs(undefined, attempt), signal);
           continue;

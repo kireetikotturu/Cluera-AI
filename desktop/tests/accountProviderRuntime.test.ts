@@ -208,3 +208,110 @@ it('fails only the one answer, in plain words, and leaves the live audio session
   f.receive({ type: 'answerFailed', id: 'some-other-answer' }); // a stale/foreign id changes nothing
   expect(f.connection.signal.aborted).toBe(false);
 });
+
+// Follow-up questions, mostly while a session is starting: each of these used to fail with "session ended".
+const generateCommands = (connection: StagingRelayConnection) => vi.mocked(connection.send).mock.calls
+  .map(call => call[0]).flatMap(command => command.type === 'generate' ? [command] : []);
+async function liveAudio(f: ReturnType<typeof fixture>) {
+  const speech = f.runtime.recognizer(interviewer), ready = speech.start();
+  await vi.waitFor(() => expect(f.connection.send).toHaveBeenCalled());
+  f.receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
+}
+it('lets a follow-up replace a question whose connection is still being set up', async () => {
+  const f = fixture(), first = new AbortController(); let finish!: () => void;
+  f.authorizeWork.mockImplementationOnce(async () => { await new Promise<void>(resolve => { finish = resolve; }); return { accessToken: 'synthetic-account-token', signal: f.owner.signal }; });
+  const replaced = expect(f.runtime.generate(body, first.signal)).rejects.toThrow();
+  first.abort();
+  const next = f.runtime.generate(body, new AbortController().signal);
+  await replaced; finish();                       // the replaced one leaves at once, before the connection is ready
+  const response = await next;
+  expect(f.connect).toHaveBeenCalledOnce(); expect(f.connection.stop).not.toHaveBeenCalled();
+  expect(generateCommands(f.connection)).toHaveLength(1);
+  f.receive({ type: 'answerDone', id: generateCommands(f.connection)[0].id }); await response.text();
+});
+it('lets a follow-up replace a question that is still loading the saved documents', async () => {
+  const owner = new AbortController(), lifetime = new AbortController(), send = vi.fn();
+  const connection = { signal: lifetime.signal, send, writeAudio: vi.fn(), stop: vi.fn(() => lifetime.abort()) };
+  const waits: Array<() => void> = [];
+  const context = (prompt: string, signal: AbortSignal) => new Promise<string>((resolve, reject) => {
+    waits.push(() => resolve(prompt)); signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+  });
+  const runtime = new AccountProviderRuntime({ authorizeWork: async () => ({ accessToken: 'synthetic-account-token', signal: owner.signal }) },
+    async () => connection, () => undefined, context); runtimes.push(runtime);
+  const first = new AbortController(), replaced = expect(runtime.generate(body, first.signal)).rejects.toThrow();
+  first.abort();                                  // the same moment the next question is asked
+  const next = runtime.generate(body, new AbortController().signal);
+  await replaced; await vi.waitFor(() => expect(waits).toHaveLength(2)); waits[1]();
+  await next; expect(generateCommands(connection)).toHaveLength(1);
+});
+it('keeps only one question at a time unless the earlier one was replaced', async () => {
+  const f = fixture(); let finish!: () => void;
+  f.authorizeWork.mockImplementationOnce(async () => { await new Promise<void>(resolve => { finish = resolve; }); return { accessToken: 'synthetic-account-token', signal: f.owner.signal }; });
+  const first = f.runtime.generate(body, new AbortController().signal);
+  await expect(f.runtime.generate(body, new AbortController().signal)).rejects.toThrow();
+  finish(); await first; expect(generateCommands(f.connection)).toHaveLength(1);
+});
+it('does not refuse a third question while the service is still confirming a cancellation', async () => {
+  const f = fixture(); await liveAudio(f);
+  const first = new AbortController(), second = new AbortController();
+  const reading = expect((await f.runtime.generate(body, first.signal)).text()).rejects.toThrow();
+  first.abort(); await reading;
+  const replaced = expect(f.runtime.generate(body, second.signal)).rejects.toThrow();
+  second.abort(); await replaced;
+  const third = f.runtime.generate(body, new AbortController().signal);
+  f.receive({ type: 'answerDone', id: generateCommands(f.connection)[0].id });   // the cancellation is confirmed
+  await third; expect(generateCommands(f.connection)).toHaveLength(2); expect(f.connection.stop).not.toHaveBeenCalled();
+}, 10_000);
+it('treats an answer that failed just as it was cancelled as stopped, without dropping the connection', async () => {
+  const f = fixture(); await liveAudio(f);
+  const first = new AbortController();
+  const reading = expect((await f.runtime.generate(body, first.signal)).text()).rejects.toThrow();
+  first.abort(); await reading;
+  const next = f.runtime.generate(body, new AbortController().signal);
+  f.receive({ type: 'answerFailed', id: generateCommands(f.connection)[0].id });
+  await next; expect(generateCommands(f.connection)).toHaveLength(2); expect(f.connection.stop).not.toHaveBeenCalled();
+});
+it('sends the next question on a new connection when a cancellation is never confirmed', async () => {
+  const f = timedFixture(() => 600_000), speech = f.runtime.recognizer(interviewer), ready = speech.start();
+  await vi.waitFor(() => expect(f.connections[0]?.connection.send).toHaveBeenCalled());
+  f.connections[0].receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
+  const first = new AbortController();
+  const reading = expect((await f.runtime.generate(body, first.signal)).text()).rejects.toThrow();
+  first.abort(); await reading;
+  await f.runtime.generate(body, new AbortController().signal);        // waits for the 5 s confirmation limit
+  expect(f.connections[0].connection.stop).toHaveBeenCalled();
+  await vi.waitFor(() => expect(f.notify).toHaveBeenCalledWith('restored'));
+  expect(generateCommands(f.connections[1].connection)).toHaveLength(1);
+}, 15_000);
+it('keeps the audio that is still connecting when a typed question is replaced', async () => {
+  const f = fixture(), first = new AbortController(); let finish!: () => void;
+  f.authorizeWork.mockImplementationOnce(async () => { await new Promise<void>(resolve => { finish = resolve; }); return { accessToken: 'synthetic-account-token', signal: f.owner.signal }; });
+  const replaced = expect(f.runtime.generate(body, first.signal)).rejects.toThrow();
+  const speech = f.runtime.recognizer(interviewer), ready = speech.start();
+  first.abort(); await replaced; finish();
+  await vi.waitFor(() => expect(f.connection.send).toHaveBeenCalledWith({ type: 'openAudio', channel: 'interviewer' }));
+  f.receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
+  expect(f.connection.stop).not.toHaveBeenCalled();
+});
+it('waits a full second after the first reply before a quick follow-up, so a slow network cannot end the session', async () => {
+  const f = fixture(); await liveAudio(f);
+  const first = new AbortController();
+  const reading = expect((await f.runtime.generate(body, first.signal)).text()).rejects.toThrow();
+  await new Promise(resolve => setTimeout(resolve, 400));             // the first reply arrives late
+  const id = generateCommands(f.connection)[0].id;
+  f.receive({ type: 'answer', id, text: 'part' }); const repliedAt = performance.now();
+  first.abort(); await reading; f.receive({ type: 'answerDone', id });
+  await f.runtime.generate(body, new AbortController().signal);
+  expect(performance.now() - repliedAt).toBeGreaterThanOrEqual(990);
+});
+it('says the connection dropped, not that the session ended, when audio is being restored', async () => {
+  const f = timedFixture(() => 600_000), speech = f.runtime.recognizer(interviewer), ready = speech.start();
+  await vi.waitFor(() => expect(f.connections[0]?.connection.send).toHaveBeenCalled());
+  f.connections[0].receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
+  const reading = expect((await f.runtime.generate(body, new AbortController().signal)).text()).rejects.toThrow('The connection dropped');
+  f.connections[0].lifetime.abort(); await reading;
+});
+it('says why a question could not be sent when the service cannot be reached', async () => {
+  const f = fixture(); f.connect.mockRejectedValueOnce(new Error('offline'));
+  await expect(f.runtime.generate(body, new AbortController().signal)).rejects.toThrow('Cluera could not be reached');
+});

@@ -180,6 +180,15 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
       ),
 
       api.onEvent(
+        'answer:stopped',
+        (data) => {
+          // Show whatever had already arrived, then stop showing the answer as being written.
+          if (answerStream.accepts(data.questionId)) { answerStream.flush(); answerStream.dispose(); }
+          store.stopAnswer(data.questionId, data.failed);
+        },
+      ),
+
+      api.onEvent(
         'app:error',
         (data) =>
           store.setError(
