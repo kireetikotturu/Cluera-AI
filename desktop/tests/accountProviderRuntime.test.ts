@@ -293,17 +293,17 @@ it('keeps the audio that is still connecting when a typed question is replaced',
   f.receive({ type: 'audioReady', channel: 'interviewer' }); await ready;
   expect(f.connection.stop).not.toHaveBeenCalled();
 });
-it('waits a full second after the first reply before a quick follow-up, so a slow network cannot end the session', async () => {
+it.each([400, 2_200])('waits a full second after a first reply %i ms late before a follow-up, so a slow network cannot end the session', async late => {
   const f = fixture(); await liveAudio(f);
   const first = new AbortController();
   const reading = expect((await f.runtime.generate(body, first.signal)).text()).rejects.toThrow();
-  await new Promise(resolve => setTimeout(resolve, 400));             // the first reply arrives late
+  await new Promise(resolve => setTimeout(resolve, late));
   const id = generateCommands(f.connection)[0].id;
   f.receive({ type: 'answer', id, text: 'part' }); const repliedAt = performance.now();
   first.abort(); await reading; f.receive({ type: 'answerDone', id });
   await f.runtime.generate(body, new AbortController().signal);
   expect(performance.now() - repliedAt).toBeGreaterThanOrEqual(990);
-});
+}, 10_000);
 it('says the connection dropped, not that the session ended, when audio is being restored', async () => {
   const f = timedFixture(() => 600_000), speech = f.runtime.recognizer(interviewer), ready = speech.start();
   await vi.waitFor(() => expect(f.connections[0]?.connection.send).toHaveBeenCalled());

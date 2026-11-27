@@ -339,14 +339,15 @@ export class AccountProviderRuntime {
     }
   }
   /** The service ends the whole session if two answers reach it less than a second apart. 1.1 s between sends is enough
-   * on a steady network. Right after a quick follow-up, also waiting a second from the service's first reply about the
-   * previous answer is certain whatever the network delay; 2 s after sending that is no longer needed. */
+   * on a steady network, but a slow one can hold the first up longer than the second. So it also waits until a second
+   * after the service's first reply about the previous answer: the reply shows that it arrived, so this holds however
+   * long the network held it up. */
   private answerSpacing(connection: StagingRelayConnection): number {
     const last = this.lastAnswer;
     if (!last || last.connection !== connection) return 0;
-    const now = performance.now(), sinceSent = now - last.sentAt;
-    const afterReply = last.repliedAt === undefined ? 0 : Math.min(2000 - sinceSent, 1000 - (now - last.repliedAt));
-    return Math.max(1100 - sinceSent, afterReply);
+    const now = performance.now();
+    const afterReply = last.repliedAt === undefined ? 0 : 1000 - (now - last.repliedAt);
+    return Math.max(1100 - (now - last.sentAt), afterReply);
   }
   recognizer(source: AudioSourceDescriptor): SpeechRecognizer {
     return new AccountSpeechRecognizer(this, source);
