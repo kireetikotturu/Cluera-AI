@@ -55,13 +55,14 @@ export function AccountLogin({state,onState}:{state:AccountView;onState(state:Ac
         <h1 id="account-login-title">Welcome back</h1>
         <p className="signin-sub">Sign in to your Cluera AI account.</p>
         <button type="button" className="account-google" disabled={locked||google!=='enabled'} aria-describedby={googleNote?'account-google-status':undefined} onClick={()=>void run('Waiting for Google…',()=>window.accountAPI!.google())}><GoogleLogo/>{waitingForGoogle?'Waiting for Google…':'Continue with Google'}</button>
+        {waitingForGoogle&&window.accountAPI?.cancelGoogle&&<button type="button" className="account-google-cancel" onClick={()=>void window.accountAPI!.cancelGoogle!().catch(()=>undefined)}>Cancel Google sign-in</button>}
         {googleNote&&<p id="account-google-status" className="account-auth-note">{googleNote}</p>}
         <div className="account-auth-divider"><span>or use your email</span></div>
         <form onSubmit={event=>{event.preventDefault();void run('Signing in…',()=>window.accountAPI!.login({email,password}));}}>
           <label className="signin-field"><span>Email address</span><input type="email" required maxLength={254} autoComplete="username" value={email} onChange={event=>setEmail(event.target.value)} disabled={locked} placeholder="you@example.com"/></label>
           <label className="signin-field"><span>Password</span><span className="account-password"><input type={visible?'text':'password'} required maxLength={128} autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} disabled={locked}/>
             <button type="button" disabled={locked} aria-label={visible?'Hide password':'Show password'} aria-pressed={visible} onClick={()=>setVisible(value=>!value)}>{visible?<EyeOff size={16}/>:<Eye size={16}/>}</button></span></label>
-          <button className="signin-submit" disabled={locked}>{busy&&!waitingForGoogle?operation:state.state==='checking'?'Checking saved session…':'Sign in'}<ArrowRight size={16}/></button>
+          <button className="signin-submit" disabled={locked}>{busy&&!waitingForGoogle?operation:state.state==='checking'&&!waitingForGoogle?'Checking saved session…':'Sign in'}<ArrowRight size={16}/></button>
         </form>
         <p role="status" className="signin-message">{error||state.message}</p>
         <div className="account-auth-links"><button disabled={locked} onClick={()=>void web('signup')}>Create account</button><button disabled={locked} onClick={()=>void web('reset-password')}>Forgot password?</button></div>

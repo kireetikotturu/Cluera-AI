@@ -1,4 +1,7 @@
-import {emptyCredits,type CreditsView} from '../../shared/accountCredits';
+import {emptyCredits,type AccountCredits,type CreditsView} from '../../shared/accountCredits';
+/** Time ever put on the account: it grows only when time is added, not while it is used. */
+const addedTime=(credits:AccountCredits):number=>credits.availableMilliseconds+credits.reservedMilliseconds+credits.spentMilliseconds;
+const verifiedPayments=(credits:AccountCredits):number=>credits.payments.filter(payment=>payment.state==='VERIFIED').length;
 import {AccountApi,AccountApiError} from './AccountApi';
 import type {AccountSessionManager} from './AccountSessionManager';
 type Authority=Pick<AccountSessionManager,'status'|'reportingCapability'|'rejectReportingAccess'>;
@@ -9,6 +12,7 @@ export class AccountCreditsManager {
  private pending?:Promise<CreditsView>;private request?:AbortController;
  private timer?:ReturnType<typeof setTimeout>;private settle?:ReturnType<typeof setTimeout>;
  private purchase?:ReturnType<typeof setTimeout>;private purchaseUntil=0;
+ private watching?:ReturnType<typeof setTimeout>;private watchRun=0;
  private last=-Infinity;private since=0;
  constructor(private readonly account:Authority,private readonly api=new AccountApi(),
   private readonly changed:(view:CreditsView)=>void=()=>undefined,private readonly clock=()=>performance.now()){}
@@ -20,6 +24,7 @@ export class AccountCreditsManager {
   ++this.epoch;this.request?.abort();this.pending=undefined;clearTimeout(this.timer);clearTimeout(this.settle);
   this.timer=undefined;this.settle=undefined;
   clearTimeout(this.purchase);this.purchase=undefined;this.purchaseUntil=0;
+  this.stopWatching();
   this.user=user;this.last=-Infinity;this.view=emptyCredits();this.publish();
   if(user)void this.refresh();
  }
@@ -38,8 +43,35 @@ export class AccountCreditsManager {
   this.purchase=setTimeout(()=>{this.purchase=undefined;void this.refresh().finally(()=>this.observePurchase());},5000);
   this.purchase.unref?.();
  }
+ /** While the customer pays in the browser, looks for the time the payment adds, so the app can come back by itself.
+  * Reads only: every 10 s for 5 minutes, then every 30 s, for at most 15 minutes (about 50 reads, well within the
+  * server's limit). A new checkout replaces the earlier watch, and a live session ends it. */
+ watchPurchase(added:()=>void,everyMs=10_000,forMs=900_000):void{
+  this.stopWatching();
+  if(this.closed||!this.user)return;
+  const epoch=this.epoch,started=this.clock(),run=this.watchRun;
+  const current=():boolean=>epoch===this.epoch&&run===this.watchRun&&!this.closed;
+  // The starting balance is read now, before any payment can finish: an older one could miss a purchase made elsewhere
+  // and bring the app back while the customer is still paying.
+  let before:AccountCredits|undefined;
+  void this.refresh().then(view=>{if(current()&&view.state==='ready')before??=view.snapshot;});
+  const next=():void=>{
+   this.watching=setTimeout(()=>{void this.refresh().then(view=>{
+    if(!current())return;
+    const now=view.state==='ready'?view.snapshot:undefined;
+    if(now&&before&&(addedTime(now)>addedTime(before)||verifiedPayments(now)>verifiedPayments(before))){this.stopWatching();added();return;}
+    before??=now;
+    if(this.clock()<started+forMs)next();
+   });},this.clock()-started<forMs/3?everyMs:everyMs*3);
+   this.watching.unref?.();
+  };
+  next();
+ }
+ private stopWatching(){++this.watchRun;clearTimeout(this.watching);this.watching=undefined;}
  activity(active:boolean){
   if(this.closed||!this.user||this.view.active===active)return;
+  // Time is being used: the payment watch ends (a live session must never be brought forward or interrupted).
+  if(active)this.stopWatching();
   clearTimeout(this.settle);
   this.settle=undefined;
   this.view={...this.view,active,activeMilliseconds:active?0:this.status().activeMilliseconds};
@@ -79,5 +111,5 @@ export class AccountCreditsManager {
   })().finally(()=>{if(this.pending===pending)this.pending=undefined;});
   this.pending=pending;return pending;
  }
- dispose(){this.closed=true;++this.epoch;this.request?.abort();clearTimeout(this.timer);clearTimeout(this.settle);clearTimeout(this.purchase);this.purchaseUntil=0;this.view=emptyCredits();}
+ dispose(){this.closed=true;++this.epoch;this.request?.abort();clearTimeout(this.timer);clearTimeout(this.settle);clearTimeout(this.purchase);clearTimeout(this.watching);this.purchaseUntil=0;this.view=emptyCredits();}
 }

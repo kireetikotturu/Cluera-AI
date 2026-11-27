@@ -31,6 +31,48 @@ describe('Account credit reporting ownership and scheduling',()=>{
   const calls=f.credits.mock.calls.length;await f.advance(300000);expect(f.credits).toHaveBeenCalledTimes(calls);
   expect(f.manager.status().snapshot?.userId).toBe(other);f.manager.dispose();
  });
+ it('after checkout, reports the payment once its time appears, not time moving from available to used',async()=>{
+  const f=fixture();f.manager.ownerChanged();await f.manager.refresh();const added=vi.fn();f.manager.watchPurchase(added);
+  f.credits.mockResolvedValue({...snapshot,availableMilliseconds:600000,spentMilliseconds:300000});
+  await f.advance(10000);await f.advance(10000);expect(added).not.toHaveBeenCalled();
+  f.credits.mockResolvedValue({...snapshot,availableMilliseconds:11400000,spentMilliseconds:300000});
+  await f.advance(10000);expect(added).toHaveBeenCalledOnce();
+  await f.advance(5000);  // the one trailing read a balance check inside the 5 s cooldown gets
+  const calls=f.credits.mock.calls.length;await f.advance(900000);expect(f.credits).toHaveBeenCalledTimes(calls);
+  expect(added).toHaveBeenCalledOnce();f.manager.dispose();
+ });
+ it('also reports a newly verified payment whose time starts later',async()=>{
+  const f=fixture();f.manager.ownerChanged();await f.manager.refresh();const added=vi.fn();f.manager.watchPurchase(added);
+  f.credits.mockResolvedValue({...snapshot,payments:[{offerCode:'cluera_monthly_40h_v2',state:'VERIFIED' as const,createdAt:snapshot.serverTime}]});
+  await f.advance(10000);expect(added).toHaveBeenCalledOnce();f.manager.dispose();
+ });
+ it('starts from a fresh balance, so time bought elsewhere earlier does not bring the app back mid-payment',async()=>{
+  const f=fixture();f.manager.ownerChanged();await f.manager.refresh();await f.advance(60000);
+  f.credits.mockResolvedValue({...snapshot,availableMilliseconds:11700000});
+  const added=vi.fn();f.manager.watchPurchase(added);await f.advance(10000);await f.advance(10000);
+  expect(added).not.toHaveBeenCalled();
+  f.credits.mockResolvedValue({...snapshot,availableMilliseconds:22500000});await f.advance(10000);
+  expect(added).toHaveBeenCalledOnce();f.manager.dispose();
+ });
+ it('watches a checkout for 15 minutes at a gentle pace, then stops',async()=>{
+  const f=fixture();f.manager.ownerChanged();await f.manager.refresh();const added=vi.fn();f.manager.watchPurchase(added);
+  for(let i=0;i<120;i++)await f.advance(10000);
+  const reads=f.credits.mock.calls.length-1;expect(reads).toBeGreaterThanOrEqual(45);expect(reads).toBeLessThanOrEqual(51);
+  for(let i=0;i<30;i++)await f.advance(10000);expect(f.credits.mock.calls.length-1).toBe(reads);
+  expect(added).not.toHaveBeenCalled();f.manager.dispose();
+ });
+ it('a newer checkout, a live session or another account ends the earlier watch',async()=>{
+  const f=fixture();f.manager.ownerChanged();await f.manager.refresh();
+  const first=vi.fn(),second=vi.fn(),third=vi.fn(),fourth=vi.fn();
+  f.manager.watchPurchase(first);f.manager.watchPurchase(second);
+  f.credits.mockResolvedValue({...snapshot,availableMilliseconds:11700000});await f.advance(10000);
+  expect(first).not.toHaveBeenCalled();expect(second).toHaveBeenCalledOnce();
+  f.manager.watchPurchase(third);f.manager.activity(true);
+  f.credits.mockResolvedValue({...snapshot,availableMilliseconds:23400000});await f.advance(10000);await f.advance(60000);
+  expect(third).not.toHaveBeenCalled();f.manager.activity(false);await f.advance(5001);
+  f.manager.watchPurchase(fourth);f.setState({state:'signed-out',userId:uid});await f.advance(900000);
+  expect(fourth).not.toHaveBeenCalled();f.manager.dispose();
+ });
  it('single-flights refresh bursts without provider operations',async()=>{
   const f=fixture();f.manager.ownerChanged();await Promise.all(Array.from({length:15},()=>f.manager.refresh()));
   expect(f.credits).toHaveBeenCalledTimes(1);expect(f.manager.status().snapshot).toEqual(snapshot);f.manager.dispose();

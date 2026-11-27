@@ -38,6 +38,8 @@ export interface AccountDesktopAPI {
   authOptions(): Promise<AccountAuthOptions>;
   login(input: AccountLogin): Promise<AccountView>;
   google():Promise<AccountView>;
+  /** Stops waiting for the browser sign-in. */
+  cancelGoogle?():Promise<AccountView>;
   retry(): Promise<AccountView>;
   logout(allDevices: boolean): Promise<AccountView>;
   openWeb(action: AccountWebAction): Promise<void>;

@@ -53,6 +53,22 @@ it('enables Google only after capability resolves and keeps it disabled if the r
  await act(async()=>resolve({google:'enabled'}));expect(button('Continue with Google').disabled).toBe(false);
  await act(async()=>button('Continue with Google').click());expect(dom.window.accountAPI.google).toHaveBeenCalledOnce();
 });
+it('offers to cancel while waiting for Google, and cancelling leaves Google ready again',async()=>{
+ let finish!:(view:AccountView)=>void;
+ dom.window.accountAPI.google.mockImplementationOnce(()=>new Promise<AccountView>(resolve=>{finish=resolve;}));
+ dom.window.accountAPI.cancelGoogle=vi.fn(async()=>{const view:AccountView={mode:'cluera-staging',state:'signed-out'};finish(view);return view;});
+ await render();expect(button('Cancel Google sign-in')).toBeUndefined();
+ await act(async()=>button('Continue with Google').click());
+ await render('checking');expect(button('Cancel Google sign-in').disabled).toBe(false);
+ expect(button('Sign in')).toBeDefined();expect(document.body.textContent).not.toContain('Checking saved session…');
+ await act(async()=>button('Cancel Google sign-in').click());
+ expect(dom.window.accountAPI.cancelGoogle).toHaveBeenCalledOnce();
+ await render();expect(button('Cancel Google sign-in')).toBeUndefined();expect(button('Continue with Google').disabled).toBe(false);
+});
+it('shows no Google cancel while main is restoring the session',async()=>{
+ dom.window.accountAPI.cancelGoogle=vi.fn();await render('checking');
+ expect(button('Cancel Google sign-in')).toBeUndefined();
+});
 it.each(['signed-out','suspended','unavailable','checking'])('keeps fixed support contact available when the account is %s',async state=>{
  await render(state);expect(button('Contact support').disabled).toBe(false);
  await act(async()=>button('Contact support').click());

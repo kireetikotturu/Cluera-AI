@@ -372,6 +372,8 @@ export interface AppEventMap {
   /** The answer ended without completing: it failed, or it was replaced or stopped. */
   'answer:stopped': { questionId: string; failed: boolean };
   'app:error': { title: string; message: string; recoverable: boolean };
+  /** The customer continues in their browser ('away'), or the work there is finished ('back'). */
+  'window:handoff': { phase: 'away' | 'back'; purpose: 'sign-in' | 'checkout' | 'account' | 'help' | 'download'; timeAdded?: boolean };
 }
 
 export type AppEventName = keyof AppEventMap;

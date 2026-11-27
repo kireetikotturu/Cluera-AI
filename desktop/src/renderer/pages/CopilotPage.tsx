@@ -177,6 +177,7 @@ export function CopilotPage(): JSX.Element {
       if (disposed) return;
       setDetail(next);
       const enabled = next?.session.autoAnswer ?? false;
+      autoAnswerRef.current = enabled;
       setAutoAnswerEnabled(enabled);
       void window.electronAPI.setAutoAnswer(enabled).catch(() => undefined);
     }).catch((error: unknown) => store.setError(error instanceof Error ? error.message : 'Could not load session preferences.'));
@@ -762,7 +763,8 @@ export function CopilotPage(): JSX.Element {
         // Candidate capture is independently optional, so a missing microphone
         // never prevents the output-audio device check (and vice versa).
         void activateCandidateMicrophone(microphoneMode, microphoneDeviceId);
-        await window.electronAPI.setAutoAnswer(autoAnswerEnabled);
+        // The latest choice: this may run later than the screen that started it, for example a retry or Start.
+        await window.electronAPI.setAutoAnswer(autoAnswerRef.current);
         await window.electronAPI.startInterview(sessionId, SYSTEM_SOURCE, false);
         markDeviceCheckActive(true);
         deviceCheckAttempts.current = 0;
@@ -810,7 +812,8 @@ export function CopilotPage(): JSX.Element {
       setTranscriptDraftActive(false);
       setManual('');
       store.clearDeviceCheckTranscript();
-      await window.electronAPI.setAutoAnswer(autoAnswerEnabled);
+      // Auto Answer may have been switched while Start was still connecting: send the latest choice, not the old one.
+      await window.electronAPI.setAutoAnswer(autoAnswerRef.current);
       await window.electronAPI.setInterviewInteractionEnabled(true);
       setRunning(true);
     } catch (error) {
@@ -917,6 +920,7 @@ export function CopilotPage(): JSX.Element {
     setShowLiveMenu(false);
     try {
       const enabled = await window.electronAPI.setAutoAnswer(next);
+      autoAnswerRef.current = enabled;
       setAutoAnswerEnabled(enabled);
     } catch (error) {
       store.setError(error instanceof Error ? error.message : 'Could not change Auto Answer.');

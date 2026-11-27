@@ -37,6 +37,22 @@ it('serializes refresh requests, persists rotation, and does not poll balance', 
   await first; expect(f.api.refresh).toHaveBeenCalledOnce(); expect(f.api.snapshot).toHaveBeenCalledOnce();
   expect(f.saved()).toMatchObject({ refreshToken: 'rotated-synthetic-refresh' });
 });
+it('cancelling the browser sign-in ends only that attempt and leaves the next one ready', async () => {
+  const f = fixture(); let waiting: AbortSignal | undefined;
+  const pending = f.manager.loginExternal(signal => new Promise((_resolve, reject) => {
+    waiting = signal; signal.addEventListener('abort', () => reject(new AccountApiError(401)));
+  }));
+  expect(f.manager.status().state).toBe('checking');
+  expect(f.manager.cancelExternal()).toMatchObject({ state: 'signed-out' });
+  expect(waiting!.aborted).toBe(true);
+  expect(await pending).toMatchObject({ state: 'signed-out' });
+  expect(f.store.clear).not.toHaveBeenCalled();
+  expect((await f.manager.loginExternal(async signal => { expect(signal.aborted).toBe(false); return tokens; })).state).toBe('active');
+});
+it('cancel does nothing when no browser sign-in is waiting', async () => {
+  const f = fixture(); await f.manager.login(input);
+  expect(f.manager.cancelExternal()).toMatchObject({ state: 'active', userId });
+});
 it('logout aborts active work immediately, clears saved material and requests correct scope', async () => {
   const f = fixture(); await f.manager.login(input); const capability = await f.manager.authorizeWork();
   const ending = f.manager.logout(true); expect(capability.signal.aborted).toBe(true);

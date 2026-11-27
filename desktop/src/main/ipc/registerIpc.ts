@@ -19,6 +19,7 @@ import { defaultWindowZoom, nextZoomFactor, zoomBySteps } from '../windowZoom';
 import type { ModelCatalog } from '../providers/ModelCatalog';
 import type { UpdateManager } from '../updates/UpdateManager';
 import { openSupportDestination } from '../../shared/supportLinks';
+import { announceHandoff } from '../browserHandoff';
 import { ensureFocusableOffTaskbar, keepWindowOffTaskbar as enforceTaskbarInvariant } from '../windowTaskbar';
 
 export function registerIpc(
@@ -233,6 +234,7 @@ export function registerIpc(
   ipcMain.handle(IPC.app.openExternal, async (_event, kind: unknown) => {
     if (kind === 'supportGmail' || kind === 'supportMail') {
       await openSupportDestination(kind, (url) => shell.openExternal(url));
+      announceHandoff(window, { phase: 'away', purpose: 'help' });
       return;
     }
     if (kind !== 'tutorial' && kind !== 'support') throw new Error('Unknown external destination.');
@@ -240,6 +242,7 @@ export function registerIpc(
     const url = new URL(target);
     if (url.protocol !== 'https:') throw new Error('External links must use HTTPS.');
     await shell.openExternal(url.toString());
+    announceHandoff(window, { phase: 'away', purpose: 'help' });
   });
   ipcMain.handle(IPC.app.adjustZoom, (_event, direction: unknown) => {
     if (direction !== 'in' && direction !== 'out') throw new Error('Zoom direction must be in or out.');
@@ -320,7 +323,7 @@ export function registerIpc(
     keepWindowOffTaskbar();
   };
   ipcMain.handle(IPC.app.sessionMode, (_event, active: boolean) => setSessionMode(active));
-  ipcMain.handle(IPC.app.liveCollapse, (_event, collapsed: boolean) => {
+  const setLiveCollapse = (collapsed: boolean): void => {
     keepWindowOffTaskbar();
     const next = Boolean(collapsed);
     if (next === liveCollapsed) {
@@ -389,7 +392,8 @@ export function registerIpc(
     expandedLiveAlwaysOnTop = null;
     expandedLiveHasShadow = null;
     keepWindowOffTaskbar();
-  });
+  };
+  ipcMain.handle(IPC.app.liveCollapse, (_event, collapsed: boolean) => setLiveCollapse(collapsed));
   ipcMain.on(IPC.app.moveLiveCollapse, (event, phase: string, screenX?: number, screenY?: number) => {
     if (!liveCollapsed || event.sender !== window.webContents) return;
     if (phase === 'end') { collapsedDragOrigin = null; return; }
@@ -805,6 +809,8 @@ export function registerIpc(
   });
   /** Removes everything registered above. The live work must already be stopped. */
   const dispose = (): void => {
+    // Another workspace must never open inside the collapsed launcher-sized window.
+    if (liveCollapsed && !window.isDestroyed()) setLiveCollapse(false);
     releaseOnClosed();
     window.removeListener('closed', releaseOnClosed);
     window.removeListener('close', preventClose);

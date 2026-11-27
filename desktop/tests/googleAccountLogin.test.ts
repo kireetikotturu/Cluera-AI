@@ -89,6 +89,32 @@ it('a browser callback completes desktop login through the real API parser with 
   expect(request).toHaveBeenCalledTimes(3);
  }finally{manager.dispose();}
 });
+it('reports the return before finishing sign-in, with a page that may close its own tab and nothing else',async()=>{
+ const order:string[]=[];
+ const exchange=vi.fn(async()=>{order.push('exchange');return{accessToken:'synthetic-access',refreshToken:'synthetic-refresh',userId:'synthetic-user',validForMilliseconds:3600000};});
+ await googleAccountLogin(async target=>{
+  const callback=new URL(new URL(target).searchParams.get('redirect_to')!);callback.searchParams.set('code','synthetic-code');
+  const response=await fetch(callback);
+  const policy=response.headers.get('content-security-policy')!,page=await response.text();
+  const script=page.match(/<script>([^<]*)<\/script>/)![1];
+  expect(policy).toContain("default-src 'none'");expect(policy).toContain("frame-ancestors 'none'");
+  expect(policy).toContain(`script-src 'sha256-${createHash('sha256').update(script).digest('base64')}'`);
+  expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+  expect(page.match(/<script/g)).toHaveLength(1);expect(script).toContain('window.close()');
+  expect(page).toContain('Return to Cluera AI');expect(page).toContain('You can close this tab.');expect(page).not.toContain('synthetic-code');
+ },new AbortController().signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never,()=>order.push('returned'));
+ expect(order).toEqual(['returned','exchange']);
+});
+it('never reports a return for a refused or cancelled attempt',async()=>{
+ const returned=vi.fn(),exchange=vi.fn();
+ await expect(googleAccountLogin(async target=>{
+  const callback=new URL(new URL(target).searchParams.get('redirect_to')!);callback.searchParams.set('error','access_denied');
+  expect((await fetch(callback)).status).toBe(400);
+ },new AbortController().signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never,returned)).rejects.toThrow();
+ const owner=new AbortController();
+ await expect(googleAccountLogin(async()=>{owner.abort();},owner.signal,{authOptions:async()=>({google:'enabled'}),oauthExchange:exchange} as never,returned)).rejects.toThrow();
+ expect(returned).not.toHaveBeenCalled();expect(exchange).not.toHaveBeenCalled();
+});
 it.each(['disabled','unavailable'])('does not launch a browser or exchange tokens when Google is %s',async google=>{
  const open=vi.fn(),exchange=vi.fn();
  await expect(googleAccountLogin(open,new AbortController().signal,{authOptions:async()=>({google}),oauthExchange:exchange} as never)).rejects.toThrow('Account service is unavailable.');

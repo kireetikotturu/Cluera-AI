@@ -96,6 +96,7 @@ const accountApi: AccountDesktopAPI = {
   },
   login: input => ipcRenderer.invoke('account:login', input),
   google: () => ipcRenderer.invoke('account:google'),
+  cancelGoogle: () => ipcRenderer.invoke('account:google-cancel'),
   retry: () => ipcRenderer.invoke('account:retry'),
   logout: allDevices => ipcRenderer.invoke('account:logout', allDevices),
   openWeb: action => ipcRenderer.invoke('account:open-web', action),

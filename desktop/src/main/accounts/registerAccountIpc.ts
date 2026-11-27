@@ -12,6 +12,7 @@ import {contextKind} from '../../shared/accountContext';
 import {DOCUMENT_EXTENSIONS} from '../documents/DocumentProcessor';
 import type {AccountCreditsManager} from './AccountCreditsManager';
 import type {AccountPhoneSessions} from './AccountPhoneSessions';
+import {announceHandoff} from '../browserHandoff';
 
 /** Separate account boundary: no generic relay, token, URL or filesystem IPC. Returns how to remove its handlers.
  * `restart` opens the workspace of the account that is now signed in (in the same running app). */
@@ -42,7 +43,21 @@ export function registerAccountIpc(window: BrowserWindow, account?: AccountSessi
     return complete(await owner.login(parsed.data));
   });
   ipcMain.handle('account:retry', async event => { trusted(event); return complete(await requireAccount().restore()); });
-  ipcMain.handle('account:google',async event=>{trusted(event);return complete(await requireAccount().loginExternal(signal=>googleAccountLogin(url=>shell.openExternal(url),signal)));});
+  let googleRunning=false;
+  ipcMain.handle('account:google',async event=>{
+    trusted(event);const owner=requireAccount();
+    // The app steps aside while the customer is on Google's pages, and comes back as soon as Google sends them back
+    // (or the attempt ends any other way).
+    let away=false,returned=false;
+    const comeBack=():void=>{returned=true;if(away){away=false;announceHandoff(window,{phase:'back',purpose:'sign-in'});}};
+    googleRunning=true;
+    try{return complete(await owner.loginExternal(signal=>googleAccountLogin(async url=>{
+      await shell.openExternal(url);
+      if(!returned&&!signal.aborted){away=true;announceHandoff(window,{phase:'away',purpose:'sign-in'});}
+    },signal,undefined,comeBack)));}
+    finally{googleRunning=false;comeBack();}
+  });
+  ipcMain.handle('account:google-cancel',event=>{trusted(event);const owner=requireAccount();return safeView(googleRunning?owner.cancelExternal():owner.status());});
   ipcMain.handle('account:logout', async (event, allDevices: unknown) => {
     trusted(event); const owner = requireAccount();
     if (typeof allDevices !== 'boolean') throw new Error('Invalid sign-out request.');
@@ -58,8 +73,16 @@ export function registerAccountIpc(window: BrowserWindow, account?: AccountSessi
       // UUID is a non-secret owner hint, never authentication. Browser must
       // independently sign in and match; tokens are never transferred.
       await shell.openExternal(`${ACCOUNT_ORIGIN}/account/checkout?desktopAccount=${state.userId}`);
-      if(requireAccount().status().userId===state.userId&&requireAccount().status().state==='active')options?.credits?.checkoutOpened();
-    }else await shell.openExternal(`${ACCOUNT_ORIGIN}/account${action==='signup'?'#signup':action==='reset-password'?'#forgot-password':''}`);
+      if(requireAccount().status().userId===state.userId&&requireAccount().status().state==='active'){
+        options?.credits?.checkoutOpened();
+        // Once the payment's time appears on the account, the app comes back by itself.
+        options?.credits?.watchPurchase?.(()=>announceHandoff(window,{phase:'back',purpose:'checkout',timeAdded:true}));
+      }
+      announceHandoff(window,{phase:'away',purpose:'checkout'});
+    }else{
+      await shell.openExternal(`${ACCOUNT_ORIGIN}/account${action==='signup'?'#signup':action==='reset-password'?'#forgot-password':''}`);
+      announceHandoff(window,{phase:'away',purpose:'account'});
+    }
   });
   if (!account || !options) return dispose;
   const requireAccess = (checkUpdatePolicy=true) => {
@@ -88,6 +111,6 @@ export function registerAccountIpc(window: BrowserWindow, account?: AccountSessi
   ipcMain.handle(IPC.updates.check, event => { trusted(event); return options.updates.check(); });
   ipcMain.handle(IPC.updates.install, async event => { trusted(event); requireAccess(false); await account.authorizeWork(); return options.updates.install(); });
   ipcMain.handle(IPC.updates.cancel, event => { trusted(event); options.updates.cancelInstall(); });
-  ipcMain.handle(IPC.updates.openDownload, async event => { trusted(event); await shell.openExternal(options.updates.officialDownloadPage()); });
+  ipcMain.handle(IPC.updates.openDownload, async event => { trusted(event); await shell.openExternal(options.updates.officialDownloadPage()); announceHandoff(window,{phase:'away',purpose:'download'}); });
   return dispose;
 }

@@ -18,6 +18,8 @@
 .signin-sub { margin: 5px 0 16px; text-align: center; font-size: 12.5px; color: var(--muted); }
 .account-login .account-google { width: 100%; height: 38px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #d9dbe3; border-radius: 9px; background: #fff; color: #1f1f1f; font: 600 13px/1 'DM Sans', system-ui, sans-serif; cursor: pointer; }
 .account-login .account-google:hover:not(:disabled) { background: #f1f2f6; }
+.account-login .account-google-cancel { align-self: center; margin-top: 8px; border: 0; padding: 2px 6px; background: transparent; color: #b9a8ff; font-size: 12px; cursor: pointer; }
+.account-login .account-google-cancel:hover { text-decoration: underline; }
 .google-g { width: 17px; height: 17px; flex: none; }
 .account-auth-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; color: var(--faint); font-size: 11px; }
 .account-auth-divider::before, .account-auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
@@ -73,6 +75,12 @@
 .time-up-primary { border: 0; background: var(--action-fill); color: var(--accent-ink); }
 .time-up-secondary { border: 1px solid var(--line-strong); background: transparent; color: var(--text); }
 .time-up-dialog .time-up-error { margin-top: 12px; color: var(--danger); }
+
+/* Working in the browser: only the floating logo. Pop-ups still open on the hidden screen must not dim the little window. */
+.handoff-launcher { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; background: transparent; color: inherit; outline: none; }
+.handoff-launcher::backdrop { background: transparent; }
+:root[data-live-collapsed='true'] .handoff-screen dialog::backdrop { background: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.handoff-notice { position: fixed; left: 50%; bottom: 52px; transform: translateX(-50%); z-index: 70; max-width: calc(100% - 28px); margin: 0; padding: 8px 14px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--panel); color: var(--text); font-size: 12px; text-align: center; box-shadow: var(--soft-shadow); pointer-events: none; }
 
 /* The saved sign-in is being renewed after a connection problem; nothing was signed out. */
 .reconnect-banner { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 60; margin: 0; padding: 7px 14px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--panel); color: var(--text); font-size: 11.5px; white-space: nowrap; box-shadow: var(--soft-shadow); pointer-events: none; }

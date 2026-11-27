@@ -84,6 +84,19 @@ describe('switching account workspaces without restarting the app', () => {
     second.disposeAccount(); second.dispose();
   });
 
+  it('never leaves a launcher-sized window behind when the workspace switches while collapsed', () => {
+    const window = Object.assign(fakeWindow(), {
+      getBounds: () => ({ x: 432, y: 6, width: 1056, height: 972 }), setBounds: vi.fn(), getMaximumSize: () => [0, 0], getMinimumSize: () => [420, 360],
+      setMaximumSize: vi.fn(), setMinimumSize: vi.fn(), isAlwaysOnTop: () => true, hasShadow: () => true, setHasShadow: vi.fn(), setBackgroundColor: vi.fn(),
+    });
+    const ipc = register(window, userA);
+    electron.handlers.get(IPC.app.liveCollapse)!({ sender: window.webContents }, true);
+    expect(window.setBounds).toHaveBeenLastCalledWith(expect.objectContaining({ width: 44, height: 44 }), false);
+    ipc.disposeAccount(); ipc.dispose();
+    expect(window.setBounds).toHaveBeenLastCalledWith(expect.objectContaining({ width: 1056, height: 972 }), false);
+    expect(window.setMaximumSize).toHaveBeenLastCalledWith(0, 0);
+  });
+
   it('picks the primary screen for output audio without listing windows or taking pictures, and captures it as chosen', async () => {
     const window = fakeWindow(); const ipc = register(window, userA);
     electron.getSources.mockResolvedValue([{ id: 'screen:1:0', name: 'Screen 1', display_id: '1' }, { id: 'screen:2:0', name: 'Screen 2', display_id: '2' }]);

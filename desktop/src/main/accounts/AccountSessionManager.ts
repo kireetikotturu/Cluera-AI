@@ -168,6 +168,12 @@ export class AccountSessionManager {
     this.publish({mode:'cluera-staging',state:'checking'});
     return this.run(async epoch=>{const started=this.clock();return this.accept(await acquire(this.owner.signal),epoch,started);});
   }
+  /** The customer stopped waiting for the browser sign-in: that attempt ends; nothing saved changes. */
+  cancelExternal(): AccountView {
+    if (this.view.state !== 'checking' || !this.pending) return this.status();
+    ++this.epoch; this.owner.abort(); this.pending = undefined;
+    return this.publish({ mode: 'cluera-staging', state: 'signed-out' });
+  }
   /** Main-only capability. Never register this return value on IPC. */
   async reportingCapability():Promise<{accessToken:string;signal:AbortSignal}> {
     if(this.pending)await this.pending;

@@ -3,6 +3,7 @@ import type { AccountView } from '../../shared/accounts';
 import App from '../App';
 import { useAppStore } from '../stores/appStore';
 import { AccountLogin } from './AccountLogin';
+import { BrowserHandoff } from './BrowserHandoff';
 import { LoadingScreen } from './LoadingScreen';
 
 /** Safe state subscription only; no token storage, polling or direct Auth calls. */
@@ -23,16 +24,19 @@ export function AccountRoot(): JSX.Element {
     });
     return () => { alive = false; remove(); };
   }, []);
-  if (!account) return <LoadingScreen title="Opening Cluera AI…" progress={12}/>;
-  if (account.mode !== 'cluera-staging') return <main className="startup-error"><h1>Cluera identity unavailable</h1><p>Please restart Cluera AI. If this keeps happening, contact support.</p></main>;
-  if (account.state === 'active') return <App key={account.userId} account={account}/>;
-  if (account.loading) {
-    const openingWorkspace = account.message?.includes('workspace') ?? false;
-    return <LoadingScreen title={account.message ?? 'Opening your workspace…'} progress={openingWorkspace ? 55 : 30}/>;
-  }
-  // A saved sign-in that cannot be checked yet (no network, a service problem) is not signed out: it is tried again.
-  if (account.reconnecting) return <ReconnectingAccount onState={setAccount}/>;
-  return <AccountLogin state={account} onState={setAccount}/>;
+  const screen = (): JSX.Element => {
+    if (!account) return <LoadingScreen title="Opening Cluera AI…" progress={12}/>;
+    if (account.mode !== 'cluera-staging') return <main className="startup-error"><h1>Cluera identity unavailable</h1><p>Please restart Cluera AI. If this keeps happening, contact support.</p></main>;
+    if (account.state === 'active') return <App key={account.userId} account={account}/>;
+    if (account.loading) {
+      const openingWorkspace = account.message?.includes('workspace') ?? false;
+      return <LoadingScreen title={account.message ?? 'Opening your workspace…'} progress={openingWorkspace ? 55 : 30}/>;
+    }
+    // A saved sign-in that cannot be checked yet (no network, a service problem) is not signed out: it is tried again.
+    if (account.reconnecting) return <ReconnectingAccount onState={setAccount}/>;
+    return <AccountLogin state={account} onState={setAccount}/>;
+  };
+  return <BrowserHandoff owner={account?.state === 'active' ? account.userId ?? 'active' : 'signed-out'}>{screen()}</BrowserHandoff>;
 }
 
 function ReconnectingAccount({ onState }: { onState(state: AccountView): void }): JSX.Element {

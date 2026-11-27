@@ -552,7 +552,7 @@ export class InterviewOrchestrator {
         this.repositories.addTurn(this.session.id, 'interviewer', question, this.source ?? undefined);
         return;
       }
-      await this.processQuestion(question);
+      await this.processQuestion(question, question, false, false, true, true);
     } catch (error) {
       this.emit('copilot:status', { status: 'recovering', message: 'Could not generate the answer' });
       this.emit('app:error', { title: 'Answer generation', message: error instanceof Error ? error.message : 'Answer generation failed.', recoverable: true });
@@ -568,7 +568,7 @@ export class InterviewOrchestrator {
     this.turnGate.reset();
   }
 
-  private async processQuestion(questionForModel: string, displayQuestion = questionForModel, force = false, alreadySaved = false, interruptible = true): Promise<boolean> {
+  private async processQuestion(questionForModel: string, displayQuestion = questionForModel, force = false, alreadySaved = false, interruptible = true, speakerFinished = false): Promise<boolean> {
     const perceivedStart = performance.now();
     // Pausing controls live audio/transcript processing only. A forced manual
     // question must remain usable while paused and during a Resume IPC race.
@@ -581,7 +581,7 @@ export class InterviewOrchestrator {
     if (!force && this.answerAbort && !this.answerInterruptible) return false;
     const telemetry = new Telemetry();
     telemetry.mark('questionStart'); telemetry.mark('intentStart');
-    let intent = this.intentDetector.detect(displayQuestion);
+    let intent = this.intentDetector.detect(displayQuestion, { speakerFinished });
     telemetry.mark('intentEnd');
     // Test questions are often not phrased as questions ("Find the output of this code"): answer them all.
     if (this.session.kind === 'assignment' && !intent.isAnswerNeeded && intent.intent === 'NO_ANSWER_NEEDED') intent = { ...intent, isAnswerNeeded: true, intent: 'GENERAL_QUESTION', confidence: 0.8 };

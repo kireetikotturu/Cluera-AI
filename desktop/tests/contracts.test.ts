@@ -263,7 +263,8 @@ describe('desktop and provider contracts', () => {
     expect(source).toContain('<span className="menu-toggle-state">{autoAnswerEnabled ? \'ON\' : \'OFF\'}</span>');
     expect(source).toContain('setAutoAnswerEnabled(enabled)');
     expect(source).toContain('next?.session.autoAnswer ?? false');
-    expect(source).toContain('await window.electronAPI.setAutoAnswer(autoAnswerEnabled)');
+    // Start and the device check send the latest choice, even when the toggle changed while they were connecting.
+    expect(source.match(/await window\.electronAPI\.setAutoAnswer\(autoAnswerRef\.current\)/g)).toHaveLength(2);
     expect(source).toContain('await window.electronAPI.startInterview(sessionId, SYSTEM_SOURCE, false)');
     expect(source).toContain('const timer = window.setTimeout(() => { void prepareDeviceCheck(); }, 0)');
     expect(source).toContain('return () => window.clearTimeout(timer)');
