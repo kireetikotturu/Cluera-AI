@@ -27,6 +27,8 @@ type CheckoutConstructor = new (options: Record<string, unknown>) => CheckoutIns
 const razorpay = () => (window as Window & { Razorpay?: CheckoutConstructor }).Razorpay;
 
 const SDK_URL = 'https://checkout.razorpay.com/v1/checkout.js';
+/** Checkout opened by the Windows app comes with its account: tell that customer they are done in the browser. */
+const verifiedNotice = (fromApp: boolean) => `Payment verified. Your available time and billing history are up to date.${fromApp ? ' You can close this tab; your new time is in Cluera AI on your computer.' : ''}`;
 // Pauses between automatic retries (a flaky connection usually recovers within a second or two).
 const SDK_RETRY_PAUSE_MS = process.env.NODE_ENV === 'test' ? [0, 0] : [800, 1600];
 /** One download attempt of the Razorpay window code. A slow network gets 20 seconds and a
@@ -214,7 +216,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
         : status.pending?.legacy ? 'An older payment attempt is still being checked. Contact Cluera support if this does not clear.'
         : status.code === 'PENDING' || binding.current ? exitNotice.current ?? (callbackObserved.current ? 'Payment received. We are confirming it and will add your hours automatically, usually within 2 minutes.' : 'You have an unfinished payment. Continue it, or cancel it to start a new one.')
           : status.code === 'DISABLED' ? 'Purchases are not currently available for this account.'
-            : completed.current ? 'Payment verified. Your available time and billing history are up to date.'
+            : completed.current ? verifiedNotice(desktopOwner.current !== null)
               : cancelNotice.current ?? `Review your plan, then continue to secure Razorpay ${mode==='test'?'Test ':''}checkout.`);
     } catch {
       if (current()) { setResumeRevisionId(null);setEligible(false); const notice = !enabledRef.current
@@ -482,7 +484,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     const expected=verifiedCallback.current;
     if(!expected||!balanceCurrent.current||history.userId!==owner.current||binding.current||uncertain.current||pendingObserved.current)return;
     if(history.payments.some(payment=>payment.state==='VERIFIED'&&payment.paymentId===expected.paymentId&&payment.revision.revisionId===expected.revisionId&&payment.revision.amountPaise===expected.amountPaise)){
-      completed.current=true;setMessage('Payment verified. Your available time and billing history are up to date.');
+      completed.current=true;setMessage(verifiedNotice(desktopOwner.current!==null));
     }
   };
   const rows = catalog.length ? catalog : null;

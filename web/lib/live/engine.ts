@@ -380,8 +380,8 @@ export class LiveEngine {
       photo: photo && turn.photo ? { ...photo, preview: turn.photo, note: turn.question === PHOTO_QUESTION ? '' : turn.question } : undefined });
   }
 
-  private intentFor(text: string, force: boolean): QuestionIntent {
-    let intent = this.detector.detect(text);
+  private intentFor(text: string, force: boolean, speakerFinished = false): QuestionIntent {
+    let intent = this.detector.detect(text, { speakerFinished });
     if (this.setup.kind === 'assignment' && !intent.isAnswerNeeded && intent.intent === 'NO_ANSWER_NEEDED') {
       intent = { ...intent, isAnswerNeeded: true, intent: 'GENERAL_QUESTION', confidence: 0.8 };
     }
@@ -410,7 +410,8 @@ export class LiveEngine {
       return false;
     }
     this.lastQuestion = display;
-    const intent = this.intentFor(display, options.force);
+    // A spoken question sent by itself was collected until the speaker stayed quiet.
+    const intent = this.intentFor(display, options.force, options.source === 'voice' && !options.force);
     if (!intent.isComplete) { this.update({ message: 'Waiting for the rest of the question' }); return false; }
     if (!intent.isAnswerNeeded) { this.update({ message: 'No answer needed', heard: '' }); return false; }
     const request = ++this.requestSequence;
