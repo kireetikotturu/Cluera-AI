@@ -17,7 +17,7 @@ export const RECONNECT_DELAYS_MS = [300, 1_200, 3_000, 6_000, 10_000] as const;
 export const MAX_RECONNECTS = 6;
 export const RECONNECT_WINDOW_MS = 120_000;
 const RECOVERY_SPACING = [1, 4, 10, 20, 30, 40] as const;
-/** The relay allows one new answer per second; a new request waits for this long after the last one. */
+/** The relay allows one new answer per second; a new request waits at least this long after the last one was sent. */
 const GENERATION_SPACING_MS = 1_100;
 const CANCEL_ACK_MS = 5_000;
 const AUDIO_READY_MS = 30_000;
@@ -96,7 +96,8 @@ export class LiveEngine {
   private recoveries: number[] = [];
   private generation: Generation | undefined;
   private requestSequence = 0;
-  private lastGenerateAt = -Infinity;
+  /** The last request for an answer: its connection, when it was sent, and when the relay first replied about it. */
+  private lastRequest: { id: string; link: RelayLink; sentAt: number; repliedAt?: number } | undefined;
   private lastQuestion = '';
   private deferred: { text: string; at: number } | undefined;
   private lastTranscript = '';
@@ -272,6 +273,9 @@ export class LiveEngine {
 
   // ── Messages from the relay ──────────────────────────────────────────────────────────────────────────────────────
   private onEvent(event: Exclude<RelayIncoming, { type: 'ready' | 'sessionEnded' }>): void {
+    // Any reply about an answer counts, also the confirmation that a cancelled one has stopped.
+    const sent = this.lastRequest;
+    if (sent && 'id' in event && event.id === sent.id) sent.repliedAt ??= this.now();
     switch (event.type) {
       case 'audioReady':
         this.audioReady = true; clearTimeout(this.readyTimer);
@@ -431,7 +435,7 @@ export class LiveEngine {
     const epoch = this.epoch;
     const abandoned = (): boolean => epoch !== this.epoch || request !== this.requestSequence;
     if (this.generation) await this.cancelCurrent('replaced');
-    const wait = GENERATION_SPACING_MS - (this.now() - this.lastGenerateAt);
+    const wait = this.requestSpacing();
     if (wait > 0) await new Promise<void>(resolve => setTimeout(resolve, wait));
     if (abandoned()) { this.discardTurn(turn.id); return; }
     const link = this.link;
@@ -444,7 +448,7 @@ export class LiveEngine {
     this.generation = { turnId: turn.id, cancelled: false, interruptible, relayDone: false, settle, settled };
     this.streamTurn = turn.id;
     this.stream.start(turn.id);
-    this.lastGenerateAt = this.now();
+    this.lastRequest = { id: turn.id, link, sentAt: this.now() };
     this.update({ message: 'Writing answer…' });
     try {
       link.send({ type: 'generate', id: turn.id, prompt, ...(this.setup.modelId ? { modelId: this.setup.modelId } : {}),
@@ -453,6 +457,22 @@ export class LiveEngine {
       this.generation = undefined; settle();
       this.finishTurn(turn.id, 'failed', 'The live connection is getting ready. Tap Retry in a moment.');
     }
+  }
+
+  /**
+   * How long the next request must wait. The relay ends the whole session if two reach it less than a second apart.
+   * 1.1 s between sends is enough on a steady network, but a slow one can hold the first up longer than the second.
+   * So it also waits until a second after the relay's first reply about the last request: the reply shows that it
+   * arrived, so this holds however long the network held it up. The same rule as the Windows app. The relay counts
+   * each connection by itself.
+   */
+  private requestSpacing(): number {
+    const last = this.lastRequest;
+    // With no connection right now, still wait: the reconnection may finish in the meantime.
+    if (!last || (this.link && this.link !== last.link)) return 0;
+    const now = this.now();
+    const afterReply = last.repliedAt === undefined ? 0 : 1_000 - (now - last.repliedAt);
+    return Math.max(GENERATION_SPACING_MS - (now - last.sentAt), afterReply);
   }
 
   private appendAnswer(text: string): void {

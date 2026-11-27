@@ -165,6 +165,72 @@ describe('the phone live session', () => {
     expect(socket.commands('generate')).toHaveLength(2);
   });
 
+  // The relay ends the whole session if two questions reach it less than a second apart. A slow network can hold the
+  // first one up on the way, so only the relay's reply shows that it has arrived.
+  it('waits a second after the relay first replies before it sends a quick follow-up', async () => {
+    const socket = await begin();
+    void engine.ask('Explain the difference between a list and a set.');
+    const first = socket.commands('generate')[0];
+    await flush(700); // the first reply is late
+    socket.push({ type: 'answer', id: first.id, text: 'A list keeps order.' });
+    void engine.ask('And what about a map?');
+    await flush(100);
+    socket.push({ type: 'answerDone', id: first.id }); // the relay confirms that it stopped
+    await flush(899); // 999 ms after the first reply
+    expect(socket.commands('generate')).toHaveLength(1);
+    await flush(1);
+    expect(socket.commands('generate')).toHaveLength(2);
+  });
+
+  it('counts a confirmed cancellation or a failed answer as that first reply', async () => {
+    const socket = await begin();
+    void engine.ask('Explain the difference between a list and a set.');
+    await flush(100);
+    void engine.ask('And what about a map?'); // the relay has said nothing about the first one yet
+    await flush(600);
+    socket.push({ type: 'answerDone', id: socket.commands('generate')[0].id });
+    await flush(999);
+    expect(socket.commands('generate')).toHaveLength(1);
+    await flush(1);
+    expect(socket.commands('generate')).toHaveLength(2);
+
+    await flush(700);
+    const second = socket.commands('generate')[1];
+    socket.push({ type: 'answerFailed', id: second.id });
+    void engine.retry(second.id);
+    await flush(999);
+    expect(socket.commands('generate')).toHaveLength(2);
+    await flush(1);
+    expect(socket.commands('generate')).toHaveLength(3);
+  });
+
+  it('still waits a second after a very late first reply, because the network held the question that long', async () => {
+    const socket = await begin();
+    void engine.ask('What is a deadlock?');
+    await flush(2_500);
+    socket.push({ type: 'answerFailed', id: socket.commands('generate')[0].id });
+    void engine.ask('What is a livelock?');
+    await flush(999);
+    expect(socket.commands('generate')).toHaveLength(1);
+    await flush(1);
+    expect(socket.commands('generate')).toHaveLength(2);
+  });
+
+  it('does not wait on a new connection, because the relay times each connection by itself', async () => {
+    const socket = await begin();
+    void engine.ask('What is recursion?');
+    socket.die();
+    await flush(400);
+    const next = sockets.at(-1)!;
+    next.accept(); next.push({ type: 'ready', protocol: 1 });
+    await flush(0);
+    next.push({ type: 'audioReady', channel: 'interviewer' });
+    await flush(0);
+    void engine.ask('What is iteration?');
+    await flush(0);
+    expect(next.commands('generate')).toHaveLength(1);
+  });
+
   it('marks an answer as failed when the relay says the model could not answer, and retry asks again', async () => {
     const socket = await begin();
     void engine.ask('What is a deadlock?');
