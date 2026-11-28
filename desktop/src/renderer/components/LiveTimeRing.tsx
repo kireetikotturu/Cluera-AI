@@ -26,15 +26,16 @@ export function LiveTimeRing(): JSX.Element | null {
 
   const snapshot = view.snapshot;
   if (!snapshot) return <span className="live-time-ring pending" title="Syncing your time" aria-label="Syncing your time left"><i/></span>;
-  // Admin-given unlimited access: a gold ring with the infinity mark in place of the time left.
+  const paint = <defs><linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1"><stop offset="0" className="ring-stop-a"/><stop offset=".5" className="ring-stop-b"/><stop offset="1" className="ring-stop-c"/></linearGradient></defs>;
+  // Admin-given unlimited access: a deep disc with an electric ring and the infinity mark in place of the time left.
   if (snapshot.unlimited) {
     const label = `Unlimited time. ${unlimitedUntil(snapshot.unlimited.endsAt)}`;
     return <span className="live-time-ring unlimited" role="img" aria-label={label} title={label}>
-      <svg viewBox="0 0 36 36" aria-hidden="true">
-        <defs><linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffe7a3"/><stop offset=".55" stopColor="#f5bd45"/><stop offset="1" stopColor="#d9951c"/></linearGradient></defs>
-        <circle className="ring-unlimited" cx="18" cy="18" r="15" stroke={`url(#${gradient})`}/>
+      <svg className="ring-frame" viewBox="0 0 36 36" aria-hidden="true">
+        {paint}
+        <circle className="ring-unlimited" cx="18" cy="18" r="16" stroke={`url(#${gradient})`}/>
       </svg>
-      <InfinityIcon size={20} gold/>
+      <InfinityIcon size={20} electric/>
     </span>;
   }
   // Unspent time = free time plus the slice currently held for this run, minus what has run since the last sync.
@@ -44,13 +45,15 @@ export function LiveTimeRing(): JSX.Element | null {
   const fraction = Math.min(1, left / capacity);
   const minutes = Math.floor(left / MINUTE);
   const level = minutes <= 3 ? 'critical' : minutes <= 10 ? 'low' : 'ok';
-  const radius = 15, circumference = 2 * Math.PI * radius;
+  const radius = 16, circumference = 2 * Math.PI * radius;
   const hours = Math.floor(minutes / 60);
   const label = `${hours ? `${hours} hour${hours === 1 ? '' : 's'} ` : ''}${minutes % 60} minute${minutes % 60 === 1 ? '' : 's'} left`;
-  return <span className={`live-time-ring ${level}`} role="img" aria-label={label} title={label}>
+  // Three-figure hours use smaller figures so they stay inside the ring.
+  return <span className={`live-time-ring ${level}${hours >= 100 ? ' wide' : ''}`} role="img" aria-label={label} title={label}>
     <svg viewBox="0 0 36 36" aria-hidden="true">
+      {paint}
       <circle className="ring-track" cx="18" cy="18" r={radius}/>
-      <circle className="ring-value" cx="18" cy="18" r={radius} strokeDasharray={circumference} strokeDashoffset={circumference * (1 - fraction)} transform="rotate(-90 18 18)"/>
+      <circle className="ring-value" cx="18" cy="18" r={radius} stroke={`url(#${gradient})`} strokeDasharray={circumference} strokeDashoffset={circumference * (1 - fraction)} transform="rotate(-90 18 18)"/>
     </svg>
     <b>{hours ? <>{hours}<small>h</small></> : <>{minutes}<small>m</small></>}</b>
     {hours ? <em>{String(minutes % 60).padStart(2, '0')}m</em> : null}

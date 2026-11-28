@@ -1,5 +1,5 @@
 import {
-  AudioLines, Check, ChevronDown, ChevronLeft, ChevronRight, Clipboard, Edit3,
+  Check, ChevronDown, ChevronLeft, ChevronRight, Clipboard, Edit3,
   LogOut, MessageCircle, MoreHorizontal, Move, Play, Settings2, SlidersHorizontal, Sparkles,
   Square, Star, SunMedium, WandSparkles, X, Crop, Camera, Mic, Minimize2, Send,
   ZoomIn, ZoomOut,
@@ -9,6 +9,7 @@ import type { AudioSourceDescriptor, DesktopCaptureSource, ScreenCapturePreview,
 import { FormattedAnswer } from '../components/FormattedAnswer';
 import { FloatingLogo } from '../components/FloatingLogo';
 import { LiveTimeRing } from '../components/LiveTimeRing';
+import { VoiceIndicator } from '../components/VoiceIndicator';
 import { ThemeControl } from '../components/ThemeControl';
 import { PrivateModeControl } from '../components/PrivateModeControl';
 import {
@@ -1522,8 +1523,8 @@ export function CopilotPage(): JSX.Element {
         >{running ? <Square size={14}/> : <Play size={15}/>}</button>
         <button disabled={store.activeQaIndex <= 0} aria-label="Previous answer" title="Previous answer · Alt+A" onClick={() => store.selectQa(store.activeQaIndex - 1)}><ChevronLeft size={16}/></button>
         <button disabled={store.activeQaIndex < 0 || store.activeQaIndex >= store.liveQaItems.length - 1} aria-label="Next answer" title="Next answer · Alt+D" onClick={() => store.selectQa(store.activeQaIndex + 1)}><ChevronRight size={16}/></button>
-        <button className={`rail-status ${systemAudioStatus}`} aria-label="Reconnect audio output" title={`Audio output: ${systemSourceName} (${systemAudioStatus}). Click to follow the current Windows output.`} onClick={() => void reconnectSystemAudio()}><AudioLines size={15}/><i/></button>
-        <button className={`rail-status ${microphoneStatus}`} aria-label="Change microphone" title={`Microphone: ${microphoneLabel} (${microphoneStatus}). Click to change.`} onClick={() => void chooseMicrophone()}><Mic size={15}/><i/></button>
+        <button className={`rail-status ${systemAudioStatus}`} aria-label="Reconnect audio output" title={`Audio output: ${systemSourceName} (${systemAudioStatus}). Click to follow the current Windows output.`} onClick={() => void reconnectSystemAudio()}><VoiceIndicator source="system" status={systemAudioStatus} live={running}/><i/></button>
+        <button className={`rail-status ${microphoneStatus}`} aria-label="Change microphone" title={`Microphone: ${microphoneLabel} (${microphoneStatus}). Click to change.`} onClick={() => void chooseMicrophone()}><VoiceIndicator source="candidate" status={microphoneStatus} live={running}/><i/></button>
         <button disabled={capturingShot || analyzingScreen} aria-label="Take screenshot" aria-keyshortcuts="Alt+C" title="Capture and automatically answer the current screen (Alt+C)" onClick={quickShot}><Camera size={15}/></button>
         <button ref={moreButtonRef} className={showLiveMenu ? 'active' : ''} aria-label="More controls" title="More controls" onClick={() => { setShowAnswerStyle(false); setShowLiveMenu((open) => !open); }}><MoreHorizontal size={16}/></button>
         <span className="rail-spacer"/>

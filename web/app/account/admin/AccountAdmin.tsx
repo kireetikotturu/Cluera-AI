@@ -185,7 +185,7 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
    <form key={`unlimited-${subject}`} className="admin-model-form admin-unlimited-form" onSubmit={event=>{event.preventDefault();const values=new FormData(event.currentTarget);
      if(access&&!window.confirm('Replace the current unlimited access with this new one?'))return;
      mutate('GRANT_UNLIMITED',{duration:String(values.get('duration'))},String(values.get('reason')));}}>
-    <h3><InfinityIcon gold size={20}/> Unlimited access</h3>
+    <h3><InfinityIcon electric size={26}/> Unlimited access</h3>
     {access?<p className="admin-note"><UnlimitedBadge/> now · {unlimitedUntil(access.endsAt)}</p>:null}
     <label>Unlimited for<select name="duration" defaultValue="MONTH" disabled={busy}><option value="DAY">1 day (24 hours)</option><option value="WEEK">1 week</option><option value="MONTH">1 month</option><option value="QUARTER">3 months</option><option value="YEAR">1 year</option><option value="FOREVER">Forever (no end date)</option></select></label>
     <label>Reason (saved in history)<input name="reason" required minLength={10} maxLength={500} disabled={busy} placeholder="e.g. Partner account"/></label>

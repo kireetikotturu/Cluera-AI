@@ -13,16 +13,22 @@ export function unlimitedUntil(endsAt: string | null, now = Date.now()): string 
   return `Until ${end.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}${soon ? `, ${end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : ''}`;
 }
 
-export function InfinityIcon({ size = 18, gold = false }: { size?: number; gold?: boolean }) {
+/** One smooth figure-eight in a single stroke, so light can run all the way round it (the same shape as the app). */
+const INFINITY_PATH = 'M12 12C9.8 9.1 8 7.7 5.9 7.7C3.5 7.7 1.9 9.6 1.9 12C1.9 14.4 3.5 16.3 5.9 16.3C8 16.3 9.8 14.9 12 12C14.2 9.1 16 7.7 18.1 7.7C20.5 7.7 22.1 9.6 22.1 12C22.1 14.4 20.5 16.3 18.1 16.3C16 16.3 14.2 14.9 12 12Z';
+
+/** The infinity mark, `size` wide. `electric` paints it lavender to sky to teal with a spark running along it. */
+export function InfinityIcon({ size = 20, electric = false }: { size?: number; electric?: boolean }) {
   const id = useId();
-  return <svg className="infinity-icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    {gold ? <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffe7a3" /><stop offset=".55" stopColor="#f5bd45" /><stop offset="1" stopColor="#d9951c" /></linearGradient></defs> : null}
-    <path d="M12 12c-2.2-3-4-4.4-6.1-4.4C3.4 7.6 2 9.6 2 12s1.4 4.4 3.9 4.4C8 16.4 9.8 15 12 12s4-4.4 6.1-4.4C20.6 7.6 22 9.6 22 12s-1.4 4.4-3.9 4.4C16 16.4 14.2 15 12 12Z"
-      fill="none" stroke={gold ? `url(#${id})` : 'currentColor'} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+  return <svg className="infinity-icon" width={size} height={Math.round(size * 14 / 24)} viewBox="0 5 24 14" aria-hidden="true" focusable="false">
+    {electric ? <defs><linearGradient id={id} gradientUnits="userSpaceOnUse" x1="2" y1="9" x2="22" y2="15">
+      <stop offset="0" stopColor="#c4b5fd" /><stop offset=".38" stopColor="#8b7bff" /><stop offset=".7" stopColor="#38bdf8" /><stop offset="1" stopColor="#5eead4" />
+    </linearGradient></defs> : null}
+    <path d={INFINITY_PATH} fill="none" stroke={electric ? `url(#${id})` : 'currentColor'} strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round" />
+    {electric ? <path className="infinity-spark" d={INFINITY_PATH} pathLength={100} fill="none" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /> : null}
   </svg>;
 }
 
 /** The premium "Unlimited" mark shown wherever hours left would be. */
 export function UnlimitedBadge({ large = false }: { large?: boolean }) {
-  return <span className={`unlimited-badge${large ? ' large' : ''}`}><InfinityIcon size={large ? 24 : 16} />Unlimited</span>;
+  return <span className={`unlimited-badge${large ? ' large' : ''}`}><InfinityIcon size={large ? 28 : 18} electric />Unlimited</span>;
 }

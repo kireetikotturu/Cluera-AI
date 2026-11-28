@@ -49,7 +49,7 @@ button.admin-stat:hover{transform:translateY(-3px);border-color:#8b7cff77}
 .admin-model-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:0 0 22px;padding:20px;border:1px solid #8b7cff44;border-radius:16px;background:rgba(124,108,255,.06)}
 .admin-model-form h3,.admin-model-form .admin-note,.admin-model-form>button{grid-column:1/-1}
 .admin-model-form>button{justify-self:start}
-.admin-unlimited-form{border-color:rgba(246,193,75,.38);background:rgba(246,193,75,.05)}
+.admin-unlimited-form{border-color:rgba(129,140,248,.42);background:linear-gradient(135deg,rgba(139,123,255,.09),rgba(34,211,238,.04))}
 .admin-unlimited-form h3{display:flex;align-items:center;gap:8px;margin:0}
 .admin-model-form label,.admin-model-edit label{display:grid;gap:6px;font-size:13px;color:#c9cbe0}
 .admin-check{display:flex!important;align-items:center;gap:8px}
