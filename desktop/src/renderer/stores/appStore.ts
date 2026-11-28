@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   AppSettings, CopilotStatus, ProviderStatus, QuestionIntent, ScreenCapturePreview, ScreenContext, Session, TelemetrySnapshot, TranscriptEvent,
 } from '../../shared/types';
+import { afterWords, EMPTY_TALK, hearInterviewer, hearMe, takeOver, type TalkMemory } from '../services/liveTalk';
 
 export type Page = 'home' | 'create' | 'copilot' | 'history' | 'settings' | 'files';
 
@@ -40,6 +41,8 @@ interface AppState {
   candidateReadingTranscript: string;
   activeTranscript: string;
   activeTranscriptRole: 'interviewer' | 'candidate' | null;
+  /** What the live input box needs to show only the current speaker's words. */
+  talk: TalkMemory;
   interviewerMessages: InterviewerChatMessage[];
   liveQaItems: LiveQaItem[];
   activeQaIndex: number;
@@ -60,8 +63,11 @@ interface AppState {
   setProviderStatus(status: ProviderStatus): void;
   setSettings(settings: AppSettings): void;
   setCopilotStatus(status: CopilotStatus, message?: string): void;
-  setTranscript(event: TranscriptEvent, claimActive?: boolean): void;
+  /** `echo`: the microphone heard the interviewer from the speakers, so it never reaches the input box. */
+  setTranscript(event: TranscriptEvent, claimActive?: boolean, echo?: boolean): void;
   claimTranscript(event: TranscriptEvent): void;
+  /** The box was sent, cleared or restarted: the next words begin a new talk. */
+  releaseTalk(): void;
   clearTranscript(): void;
   clearDeviceCheckTranscript(): void;
   clearCandidateTranscript(): void;
@@ -85,24 +91,34 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   page: 'home', sessions: [], activeSessionId: null, providerStatus: null, settings: null,
   interviewerTurnSequence: 0, interviewerSpeaking: false,
-  copilotStatus: 'idle', statusMessage: '', transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1, screenPreview: null, screenContext: null, question: null, answer: '', telemetry: null, error: null, timeOver: false,
+  copilotStatus: 'idle', statusMessage: '', transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, talk: EMPTY_TALK, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1, screenPreview: null, screenContext: null, question: null, answer: '', telemetry: null, error: null, timeOver: false,
   setTimeOver: (timeOver) => set({ timeOver }),
   setPage: (page) => set({ page }), setSessions: (sessions) => set({ sessions }), setActiveSession: (activeSessionId) => set({ activeSessionId }),
   setProviderStatus: (providerStatus) => set({ providerStatus }), setSettings: (settings) => set({ settings }),
   setCopilotStatus: (copilotStatus, statusMessage = '') => set({ copilotStatus, statusMessage }),
-  setTranscript: (event, claimActive = true) => set((state) => {
+  setTranscript: (event, claimActive = true, echo = false) => set((state) => {
     if (event.sourceRole === 'local_candidate') {
       const spoken = event.text.trim();
       const candidateReadingTranscript = event.isFinal && spoken
         ? `${state.candidateReadingTranscript} ${spoken}`.trim().slice(-20_000)
         : state.candidateReadingTranscript;
+      const heard = echo || !spoken ? null : hearMe(state.talk, spoken, event.isFinal);
+      let talk = heard?.memory ?? state.talk;
+      const claim = claimActive && heard !== null;
+      if (claim) talk = takeOver(talk, heard.show);
       return {
         candidateTranscript: event.text,
         candidateReadingTranscript,
-        ...(claimActive ? { activeTranscript: event.text, activeTranscriptRole: 'candidate' as const } : {}),
+        talk,
+        ...(claim ? { activeTranscript: heard.show, activeTranscriptRole: 'candidate' as const } : {}),
       };
     }
     const text = event.text.trim();
+    const box = text ? hearInterviewer(state.talk, text, state.activeTranscriptRole === 'candidate') : null;
+    const talk = box?.memory ?? state.talk;
+    // Nothing new for the box (only words it has moved past): leave what it shows.
+    const claim = claimActive && (box === null || box.show !== '')
+      ? { activeTranscript: box?.show ?? event.text, activeTranscriptRole: 'interviewer' as const } : {};
     const latest = state.interviewerMessages.at(-1);
     const isRepeatedFinal = event.isFinal && latest
       && normalizedTranscript(latest.text) === normalizedTranscript(text)
@@ -112,31 +128,40 @@ export const useAppStore = create<AppState>((set) => ({
       interviewerTurnSequence: state.interviewerTurnSequence + (text && !state.interviewerSpeaking && !isRepeatedFinal ? 1 : 0),
       interviewerSpeaking: Boolean(text) && !event.isFinal,
     };
-    if (!event.isFinal || !text) return { ...speaking, transcript: text, pendingInterviewerTranscript: text, ...(claimActive ? { activeTranscript: text, activeTranscriptRole: 'interviewer' as const } : {}) };
+    if (!event.isFinal || !text) return { ...speaking, transcript: text, pendingInterviewerTranscript: text, talk, ...claim };
     return {
       ...speaking,
       transcript: text,
       pendingInterviewerTranscript: text,
-      ...(claimActive ? { activeTranscript: text, activeTranscriptRole: 'interviewer' as const } : {}),
+      talk,
+      ...claim,
       interviewerMessages: isRepeatedFinal
         ? state.interviewerMessages
         : [...state.interviewerMessages, { id: `${event.timestamp}-${state.interviewerMessages.length}`, text, timestamp: event.timestamp, handled: false }].slice(-50),
     };
   }),
-  claimTranscript: (event) => set({
-    activeTranscript: event.text,
-    activeTranscriptRole: event.sourceRole === 'local_candidate' ? 'candidate' : 'interviewer',
+  claimTranscript: (event) => set((state) => {
+    if (event.sourceRole !== 'local_candidate') return { activeTranscript: event.text, activeTranscriptRole: 'interviewer' as const };
+    // A finished sentence is already part of the customer's talk; an unfinished one is added to what they said before.
+    const show = event.isFinal && state.talk.mine ? state.talk.mine : hearMe(state.talk, event.text, false).show;
+    return {
+      talk: takeOver(state.talk, show),
+      activeTranscript: show,
+      activeTranscriptRole: 'candidate' as const,
+    };
   }),
-  clearTranscript: () => set({ interviewerSpeaking: false, transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1 }),
-  clearDeviceCheckTranscript: () => set({ interviewerSpeaking: false, transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, interviewerMessages: [] }),
+  releaseTalk: () => set({ talk: EMPTY_TALK }),
+  clearTranscript: () => set({ interviewerSpeaking: false, transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, talk: EMPTY_TALK, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1 }),
+  clearDeviceCheckTranscript: () => set({ interviewerSpeaking: false, transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, talk: EMPTY_TALK, interviewerMessages: [] }),
   clearCandidateTranscript: () => set((state) => ({
     candidateTranscript: '',
     candidateReadingTranscript: '',
+    talk: { ...state.talk, mine: '' },
     ...(state.activeTranscriptRole === 'candidate' ? { activeTranscript: '', activeTranscriptRole: null } : {}),
   })),
   clearInterviewerMessages: () => set({ interviewerMessages: [], transcript: '', pendingInterviewerTranscript: '' }),
   // Clear pressed on the live input: drop the unsent spoken text everywhere so it cannot be shown or sent again.
-  discardLiveInput: () => set({ interviewerSpeaking: false, transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', activeTranscript: '', activeTranscriptRole: null }),
+  discardLiveInput: () => set({ interviewerSpeaking: false, transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', activeTranscript: '', activeTranscriptRole: null, talk: EMPTY_TALK }),
   finishInterviewerInteraction: () => set({ pendingInterviewerTranscript: '' }),
   markInterviewerMessageHandled: (text) => set((state) => {
     const target = normalizedTranscript(text);
@@ -167,8 +192,11 @@ export const useAppStore = create<AppState>((set) => ({
       const handlesPending = Boolean(pending && target && (
         pending === target || pending.endsWith(target) || target.endsWith(pending)
       ));
+      // A question holding the words the box had moved past was sent: the interviewer's text starts afresh after it.
+      const sentPassed = Boolean(state.talk.interviewerPassed) && afterWords(question.question, state.talk.interviewerPassed) !== null;
       return {
         question,
+        talk: sentPassed ? { ...state.talk, interviewerPassed: '' } : state.talk,
         pendingInterviewerTranscript: handlesPending ? '' : state.pendingInterviewerTranscript,
         interviewerMessages: state.interviewerMessages.map((message) => (
           normalizedTranscript(message.text) === target ? { ...message, handled: true } : message
@@ -214,5 +242,5 @@ export const useAppStore = create<AppState>((set) => ({
       ? { ...item, streaming: false, stopped: failed ? 'failed' as const : 'replaced' as const } : item) };
   }),
   setError: (error) => set({ error }),
-  resetCopilot: () => set({ interviewerTurnSequence: 0, interviewerSpeaking: false, copilotStatus: 'idle', statusMessage: '', transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1, screenPreview: null, screenContext: null, question: null, answer: '', activeAnswerId: null, answerCaptureId: null, telemetry: null, error: null }),
+  resetCopilot: () => set({ interviewerTurnSequence: 0, interviewerSpeaking: false, copilotStatus: 'idle', statusMessage: '', transcript: '', pendingInterviewerTranscript: '', candidateTranscript: '', candidateReadingTranscript: '', activeTranscript: '', activeTranscriptRole: null, talk: EMPTY_TALK, interviewerMessages: [], liveQaItems: [], activeQaIndex: -1, screenPreview: null, screenContext: null, question: null, answer: '', activeAnswerId: null, answerCaptureId: null, telemetry: null, error: null }),
 }));

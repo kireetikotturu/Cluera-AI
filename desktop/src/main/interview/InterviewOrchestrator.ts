@@ -23,6 +23,8 @@ const CANDIDATE_SOURCE: AudioSourceDescriptor = {
 };
 /** While the interviewer's speakers were heard this recently, the microphone is assumed to be hearing them too. */
 const MICROPHONE_ECHO_GUARD_MS = 2_500;
+/** The same words finishing this soon after the customer sent them are not a new question. */
+const SENT_AGAIN_MS = 10_000;
 const normalizeQuestionText = (text: string): string => text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const SCREEN_QUESTION_FALLBACK = 'Answer the question detected from the screenshot';
 
@@ -69,6 +71,8 @@ export class InterviewOrchestrator {
   private autoAnswerEnabled = false;
   private interactionEnabled = true;
   private pendingInterviewerTranscript = '';
+  /** The last question the customer sent themselves, so Auto Answer does not ask the very same words again. */
+  private sentByCustomer: { text: string; at: number } | null = null;
   private source: AudioSourceDescriptor | null = null;
   private screenContext: ScreenContext | undefined;
   private screenContextSessionId: string | undefined;
@@ -186,6 +190,7 @@ export class InterviewOrchestrator {
   setInteractionEnabled(enabled: boolean): boolean {
     this.interactionEnabled = Boolean(enabled);
     this.pendingInterviewerTranscript = '';
+    this.sentByCustomer = null;
     this.lastQuestion = '';
     this.activeQuestionText = '';
     this.latestQuestionId = undefined;
@@ -391,8 +396,10 @@ export class InterviewOrchestrator {
       && Boolean(this.pendingInterviewerTranscript.trim())
       && normalizeQuestionText(this.pendingInterviewerTranscript) === normalizedInput;
     if (input.origin) this.pendingInterviewerTranscript = '';
+    if (input.origin && isPlainManualAnswer && !this.autoAnswerEnabled) this.closeSentTurns(normalizedInput);
     // The customer sent a question themselves: do not also send the one still being collected.
     this.assembler.discard();
+    if (isPlainManualAnswer) this.sentByCustomer = { text: normalizedInput, at: Date.now() };
     const suffix = {
       default: '', shorter: ' Keep the answer much shorter.', longer: ' Expand the answer with useful detail.',
       technical: ' Make the answer more technical.', conversational: ' Make the answer more conversational.', star: ' Use STAR structure.',
@@ -547,6 +554,8 @@ export class InterviewOrchestrator {
     const question = text.trim();
     if (!question || !this.session || !this.interactionEnabled || this.paused || !this.autoAnswerEnabled) return;
     this.turnGate.reset();
+    // The customer pressed Enter before the speech service finished the sentence: it is already being answered.
+    if (this.sentByCustomer && Date.now() - this.sentByCustomer.at < SENT_AGAIN_MS && normalizeQuestionText(question) === this.sentByCustomer.text) return;
     try {
       if (question.split(/\s+/).length < 2) {
         this.repositories.addTurn(this.session.id, 'interviewer', question, this.source ?? undefined);
@@ -557,6 +566,25 @@ export class InterviewOrchestrator {
       this.emit('copilot:status', { status: 'recovering', message: 'Could not generate the answer' });
       this.emit('app:error', { title: 'Answer generation', message: error instanceof Error ? error.message : 'Answer generation failed.', recoverable: true });
     }
+  }
+
+  /**
+   * With Auto Answer off, the customer can send the interviewer's words before the speech service ends the sentence.
+   * Those words must not be collected again (they would show up in front of the next question), only what is said
+   * after them. The page is told the sentence it was showing is over.
+   */
+  private closeSentTurns(sent: string): void {
+    const filters = this.session?.kind === 'assignment' ? [this.interviewerFilter, this.candidateFilter] : [this.interviewerFilter];
+    let closed = false;
+    for (const filter of filters) {
+      const open = normalizeQuestionText(filter.unfinished);
+      if (!open || !` ${sent} `.includes(` ${open} `)) continue;
+      filter.discard();
+      closed = true;
+    }
+    const source = this.source;
+    if (closed && source) this.emit('transcript:final', { text: '', isFinal: true, sourceId: source.id, sourceKind: source.kind,
+      sourceRole: 'remote_interviewer', canTriggerAnswers: source.canTriggerAnswers, confidence: 1, timestamp: Date.now() });
   }
 
   /** The customer pressed Clear: forget what was captured so far so it is never shown or sent again. */

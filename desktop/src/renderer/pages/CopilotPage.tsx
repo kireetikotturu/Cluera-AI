@@ -9,7 +9,7 @@ import type { AudioSourceDescriptor, DesktopCaptureSource, ScreenCapturePreview,
 import { FormattedAnswer } from '../components/FormattedAnswer';
 import { FloatingLogo } from '../components/FloatingLogo';
 import { LiveTimeRing } from '../components/LiveTimeRing';
-import { VoiceIndicator } from '../components/VoiceIndicator';
+import { MicIndicator, SpeakerIndicator } from '../components/VoiceIndicator';
 import { ThemeControl } from '../components/ThemeControl';
 import { PrivateModeControl } from '../components/PrivateModeControl';
 import {
@@ -19,6 +19,7 @@ import { qaFontResizeDelta, renderedAnswerLineHeight } from '../services/answerS
 import { estimateReadingProgress } from '../services/readingProgress';
 import { EyeContactScroll, ReadingFocus, type ReadingState } from '../services/eyeContactScroll';
 import { ManualQuestionOwnership } from '../services/manualQuestionOwnership';
+import { isNewSpeech, latestWords } from '../services/liveTalk';
 import { qaNavigationDelta } from '../services/qaNavigationShortcuts';
 import { useAppStore } from '../stores/appStore';
 
@@ -132,7 +133,13 @@ export function CopilotPage(): JSX.Element {
   const questionEditorRef = useRef<HTMLTextAreaElement>(null);
   const questionOwnership = useRef(new ManualQuestionOwnership());
   const transcriptFocusInteractionActiveRef = useRef(false);
-  const questionFocusEpoch = useRef(0);
+  const composerFocusEpoch = useRef(0);
+  /** The interviewer turn the window was last brought forward for. */
+  const activatedTurn = useRef(-1);
+  /** The customer clicked into or edited the top question box: the box below leaves the keyboard there. */
+  const questionEditorUsed = useRef(false);
+  /** What was last sent or cleared from the box below, so a late copy of it does not refill it. */
+  const handledSpeech = useRef<{ text: string; at: number } | null>(null);
   const transcriptDraftBaseline = useRef('');
   const transcriptDraftReleaseArmed = useRef(false);
   const transcriptDraftEditedRef = useRef(false);
@@ -153,7 +160,6 @@ export function CopilotPage(): JSX.Element {
     deviceCheckAttempts.current = 0;
   };
   const unmountCleanupTimer = useRef<number | null>(null);
-  const autoFocusingTranscript = useRef(false);
   const activeScreenCaptureId = useRef<string | null>(null);
   const firstScreenChunkReported = useRef(false);
   const microphoneEpoch = useRef(0);
@@ -355,6 +361,8 @@ export function CopilotPage(): JSX.Element {
   }, [running]);
   const transcriptInputValue = transcriptDraftActive ? manual : activeTranscriptText;
   const transcriptAnswerText = transcriptDraftActive ? manual.trim() : activeTranscriptText;
+  /** The customer's own words in the box (typed or edited), rather than live speech. */
+  const typedDraft = transcriptDraftActive && transcriptDraftEditedRef.current && Boolean(manual.trim());
 
   const focusQuestionEditorAtEnd = (moveCaret = true): void => {
     const editor = questionEditorRef.current;
@@ -374,39 +382,12 @@ export function CopilotPage(): JSX.Element {
   useLayoutEffect(() => {
     if (autoAnswerEnabled) {
       questionOwnership.current.reset();
-      questionFocusEpoch.current += 1;
       return;
     }
-    if (collapsed) {
-      questionFocusEpoch.current += 1;
-      return;
-    }
-    const editor = questionEditorRef.current;
-    if (!editor) return;
+    if (collapsed || !questionEditorRef.current) return;
+    // This box follows the interviewer; the keyboard stays with the box below, which Enter sends. Click here to edit.
     const interactionActive = Boolean(currentInterviewerInteraction);
-    const { startsNewTurn: startsNewInteraction, acceptTranscript } = questionOwnership.current.observe(
-      store.interviewerTurnSequence, interactionActive,
-    );
-
-    // Reclaim keyboard focus once when a new manual-answer interaction starts.
-    // Repeating native focus calls for every partial word steals focus from the
-    // browser/file picker and can create a large queue of redundant IPC work.
-    const transcriptNeedsFocus = startsNewInteraction;
-    if (transcriptNeedsFocus) {
-      const focusEpoch = ++questionFocusEpoch.current;
-      const focusEditor = async (): Promise<void> => {
-        focusQuestionEditorAtEnd(true);
-        for (const delayMs of [0, 80]) {
-          if (delayMs) await new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
-          if (questionFocusEpoch.current !== focusEpoch) return;
-          try { await window.electronAPI.focusLiveTranscript(true); } catch { /* The remaining local retries are safe. */ }
-          if (questionFocusEpoch.current !== focusEpoch) return;
-          focusQuestionEditorAtEnd(true);
-          if (document.hasFocus() && document.activeElement === questionEditorRef.current) return;
-        }
-      };
-      void focusEditor();
-    }
+    const { acceptTranscript } = questionOwnership.current.observe(store.interviewerTurnSequence, interactionActive);
 
     const nextText = hasDisplayedQuestion ? displayedQuestion : '';
     if (acceptTranscript && questionDraft !== nextText) setQuestionDraft(nextText);
@@ -425,7 +406,9 @@ export function CopilotPage(): JSX.Element {
 
   useEffect(() => {
     if (!transcriptDraftActive || !transcriptDraftReleaseArmed.current) return;
-    if (activeTranscriptText && activeTranscriptText !== transcriptDraftBaseline.current) {
+    // Only new words bring live speech back into a sent or cleared box, never a late copy of what left it.
+    if (activeTranscriptText && activeTranscriptText !== transcriptDraftBaseline.current
+      && isNewSpeech(activeTranscriptText, handledSpeech.current, Date.now())) {
       transcriptDraftReleaseArmed.current = false;
       transcriptDraftEditedRef.current = false;
       setTranscriptDraftActive(false);
@@ -433,40 +416,62 @@ export function CopilotPage(): JSX.Element {
     }
   }, [activeTranscriptText, transcriptDraftActive]);
 
+  /** Another text field the customer is using keeps the keyboard. */
+  const typingElsewhere = (): boolean => {
+    const focused = document.activeElement;
+    if (!(focused instanceof HTMLElement) || focused === manualInputRef.current) return false;
+    if (focused === questionEditorRef.current) return questionEditorUsed.current;
+    return focused.matches('input, textarea, select, [contenteditable="true"]');
+  };
+
+  // The box below is the chat box with Auto Answer on or off: it holds the keyboard while words arrive, so Enter
+  // sends exactly what it shows.
   useLayoutEffect(() => {
     const input = manualInputRef.current;
     if (!input || transcriptDraftActive) return;
     input.scrollLeft = input.scrollWidth;
-    if (!transcriptInputValue) return;
-    // Manual answering mode is display-only until the user explicitly clicks
-    // the composer. Continue showing and horizontally following transcript
-    // updates, but never steal focus from the meeting application.
-    if (!autoAnswerEnabled) return;
+    if (!transcriptInputValue || collapsed) return;
     const interviewerInteractionActive = activeTranscriptRole === 'interviewer'
       && Boolean(currentInterviewerInteraction);
-    const shouldActivateWindow = interviewerInteractionActive
-      && !transcriptFocusInteractionActiveRef.current;
+    // Bring Cluera AI forward once for each new interviewer question, so Enter works without a click first: every
+    // new spoken turn with Auto Answer off, every new question being put together with it on.
+    const shouldActivateWindow = interviewerInteractionActive && (autoAnswerEnabled
+      ? !transcriptFocusInteractionActiveRef.current
+      : activatedTurn.current !== store.interviewerTurnSequence);
     transcriptFocusInteractionActiveRef.current = interviewerInteractionActive;
     if (activeTranscriptRole === 'interviewer' && !shouldActivateWindow) return;
-    let cancelled = false;
+    if (typingElsewhere() || showLiveMenu || showAnswerStyle || showSources || showMicrophones || store.screenPreview) return;
+    const placeCursor = (): void => {
+      input.focus({ preventScroll: true });
+      input.setSelectionRange(input.value.length, input.value.length);
+    };
+    if (!shouldActivateWindow) {
+      // The customer's own speech: take the cursor without pulling the window forward.
+      if (document.activeElement !== input) placeCursor();
+      return;
+    }
+    activatedTurn.current = store.interviewerTurnSequence;
+    // Words keep arriving while Windows hands over the keyboard, so only a newer request replaces this one.
+    const focusEpoch = ++composerFocusEpoch.current;
     const focusInput = async (): Promise<void> => {
       // document.activeElement can still be this input while another desktop
       // application owns keyboard focus. Activate Cluera AI first for incoming
       // interviewer speech so Enter works immediately without an extra click.
-      if (shouldActivateWindow) {
-        try { await window.electronAPI.focusLiveTranscript(); } catch { /* The local focus below remains a safe fallback. */ }
-      } else if (document.activeElement === input) {
-        return;
+      for (const delayMs of [0, 80]) {
+        if (delayMs) await new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
+        if (composerFocusEpoch.current !== focusEpoch) return;
+        try {
+          // With Auto Answer off, Windows is asked to hand over the keyboard, as it always was; with it on, it is not.
+          if (autoAnswerEnabled) await window.electronAPI.focusLiveTranscript();
+          else await window.electronAPI.focusLiveTranscript(true);
+        } catch { /* The local focus below remains a safe fallback. */ }
+        if (composerFocusEpoch.current !== focusEpoch || typingElsewhere()) return;
+        placeCursor();
+        if (document.hasFocus() && document.activeElement === manualInputRef.current) return;
       }
-      if (cancelled) return;
-      autoFocusingTranscript.current = true;
-      input.focus({ preventScroll: true });
-      input.setSelectionRange(input.value.length, input.value.length);
-      autoFocusingTranscript.current = false;
     };
     void focusInput();
-    return () => { cancelled = true; };
-  }, [transcriptInputValue, transcriptDraftActive, store.activeTranscriptRole, autoAnswerEnabled, currentInterviewerInteraction]);
+  }, [transcriptInputValue, transcriptDraftActive, store.activeTranscriptRole, autoAnswerEnabled, currentInterviewerInteraction, collapsed]);
   const readingProgress = useMemo(() => {
     if (collapsed || !activeQa) return estimateReadingProgress('', '');
     if (readingPositions.current.size > 50) {
@@ -744,6 +749,7 @@ export function CopilotPage(): JSX.Element {
         }
         transcriptDraftReleaseArmed.current = false;
         transcriptDraftEditedRef.current = false;
+        handledSpeech.current = null;
         setTranscriptDraftActive(false);
         setManual('');
         store.clearDeviceCheckTranscript();
@@ -810,6 +816,7 @@ export function CopilotPage(): JSX.Element {
       // interview context without reconnecting either live audio stream.
       transcriptDraftReleaseArmed.current = false;
       transcriptDraftEditedRef.current = false;
+      handledSpeech.current = null;
       setTranscriptDraftActive(false);
       setManual('');
       store.clearDeviceCheckTranscript();
@@ -836,6 +843,7 @@ export function CopilotPage(): JSX.Element {
     await window.electronAPI.setInterviewInteractionEnabled(false);
     transcriptDraftReleaseArmed.current = false;
     transcriptDraftEditedRef.current = false;
+    handledSpeech.current = null;
     setTranscriptDraftActive(false);
     setManual('');
     store.clearDeviceCheckTranscript();
@@ -923,6 +931,8 @@ export function CopilotPage(): JSX.Element {
       const enabled = await window.electronAPI.setAutoAnswer(next);
       autoAnswerRef.current = enabled;
       setAutoAnswerEnabled(enabled);
+      // The app starts collecting the interviewer's words afresh when the mode changes.
+      useAppStore.getState().releaseTalk();
     } catch (error) {
       store.setError(error instanceof Error ? error.message : 'Could not change Auto Answer.');
     }
@@ -999,8 +1009,10 @@ export function CopilotPage(): JSX.Element {
 
   const ask = async (questionText = manual): Promise<void> => {
     const visibleQuestion = questionText;
-    const question = visibleQuestion.trim();
+    // A very long unsent transcript keeps its most recent words (questions have a length limit).
+    const question = latestWords(visibleQuestion.trim());
     if (!running || !activeId || !question || analyzingScreen) return;
+    if (question.length < 2) return;
     const origin = transcriptDraftEditedRef.current ? 'typed' : 'transcript';
     const submission = ++transcriptSubmission.current;
     const requestEpoch = ++answerRequestEpoch.current;
@@ -1011,10 +1023,12 @@ export function CopilotPage(): JSX.Element {
     // Behave like a chat composer: release the submitted text immediately so
     // the field is ready for the next live transcript or typed question.
     transcriptDraftBaseline.current = transcriptAtSend;
+    handledSpeech.current = { text: visibleQuestion, at: Date.now() };
     transcriptDraftReleaseArmed.current = true;
     transcriptDraftEditedRef.current = false;
     setManual('');
     setTranscriptDraftActive(true);
+    useAppStore.getState().releaseTalk();
     requestAnimationFrame(() => manualInputRef.current?.focus({ preventScroll: true }));
 
     const restoreRejectedQuestion = (): void => {
@@ -1023,8 +1037,10 @@ export function CopilotPage(): JSX.Element {
         const currentInput = manualInputRef.current?.value ?? '';
         const currentTranscript = useAppStore.getState().activeTranscript.trim();
         if (currentInput || currentTranscript !== transcriptAtSend) return;
-        transcriptDraftReleaseArmed.current = false;
-        transcriptDraftEditedRef.current = true;
+        // Typed text stays until it is sent or cleared; spoken text gives way to the next new speech.
+        transcriptDraftReleaseArmed.current = origin !== 'typed';
+        transcriptDraftEditedRef.current = origin === 'typed';
+        handledSpeech.current = null;
         setManual(visibleQuestion);
         setTranscriptDraftActive(true);
         requestAnimationFrame(() => {
@@ -1057,7 +1073,7 @@ export function CopilotPage(): JSX.Element {
     const visibleText = autoAnswerEnabled
       ? displayedQuestion
       : questionEditorRef.current?.value ?? questionDraft;
-    const question = visibleText.trim();
+    const question = latestWords(visibleText.trim());
     if (!running || !activeId || !question || analyzingScreen || topQuestionSending.current) return;
     topQuestionSending.current = true;
     const origin = !autoAnswerEnabled && questionOwnership.current.edited ? 'typed' : 'transcript';
@@ -1523,8 +1539,8 @@ export function CopilotPage(): JSX.Element {
         >{running ? <Square size={14}/> : <Play size={15}/>}</button>
         <button disabled={store.activeQaIndex <= 0} aria-label="Previous answer" title="Previous answer · Alt+A" onClick={() => store.selectQa(store.activeQaIndex - 1)}><ChevronLeft size={16}/></button>
         <button disabled={store.activeQaIndex < 0 || store.activeQaIndex >= store.liveQaItems.length - 1} aria-label="Next answer" title="Next answer · Alt+D" onClick={() => store.selectQa(store.activeQaIndex + 1)}><ChevronRight size={16}/></button>
-        <button className={`rail-status ${systemAudioStatus}`} aria-label="Reconnect audio output" title={`Audio output: ${systemSourceName} (${systemAudioStatus}). Click to follow the current Windows output.`} onClick={() => void reconnectSystemAudio()}><VoiceIndicator source="system" status={systemAudioStatus} live={running}/><i/></button>
-        <button className={`rail-status ${microphoneStatus}`} aria-label="Change microphone" title={`Microphone: ${microphoneLabel} (${microphoneStatus}). Click to change.`} onClick={() => void chooseMicrophone()}><VoiceIndicator source="candidate" status={microphoneStatus} live={running}/><i/></button>
+        <button className={`rail-audio rail-speaker ${systemAudioStatus}`} aria-label="Reconnect audio output" title={`Audio output: ${systemSourceName} (${systemAudioStatus}). Click to follow the current Windows output.`} onClick={() => void reconnectSystemAudio()}><SpeakerIndicator status={systemAudioStatus} live={running} talking={store.interviewerSpeaking}/></button>
+        <button className={`rail-audio rail-mic ${microphoneStatus}`} aria-label="Change microphone" title={`Microphone: ${microphoneLabel} (${microphoneStatus}). Click to change.`} onClick={() => void chooseMicrophone()}><MicIndicator status={microphoneStatus}/></button>
         <button disabled={capturingShot || analyzingScreen} aria-label="Take screenshot" aria-keyshortcuts="Alt+C" title="Capture and automatically answer the current screen (Alt+C)" onClick={quickShot}><Camera size={15}/></button>
         <button ref={moreButtonRef} className={showLiveMenu ? 'active' : ''} aria-label="More controls" title="More controls" onClick={() => { setShowAnswerStyle(false); setShowLiveMenu((open) => !open); }}><MoreHorizontal size={16}/></button>
         <span className="rail-spacer"/>
@@ -1609,14 +1625,16 @@ export function CopilotPage(): JSX.Element {
                     ref={questionEditorRef}
                     className="question-text-editor"
                     rows={1}
-                    autoFocus
                     aria-label="Edit current question"
                     placeholder="Interviewer's question will appear here..."
                     spellCheck
                     value={questionDraft}
+                    onPointerDown={() => { questionEditorUsed.current = true; composerFocusEpoch.current += 1; }}
+                    onBlur={() => { questionEditorUsed.current = false; }}
                     onChange={(event) => {
                       questionOwnership.current.edit(useAppStore.getState().interviewerTurnSequence);
-                      questionFocusEpoch.current += 1;
+                      questionEditorUsed.current = true;
+                      composerFocusEpoch.current += 1;
                       setQuestionDraft(event.target.value);
                       readingController.current?.focusQuestion();
                     }}
@@ -1694,43 +1712,44 @@ export function CopilotPage(): JSX.Element {
 
       <form className="live-transcript-composer" ref={transcriptComposerRef} onSubmit={(event) => {
       event.preventDefault();
-      if (autoAnswerEnabled && running) void ask(manualInputRef.current?.value ?? transcriptInputValue);
+      // The same chat box with Auto Answer on or off: Enter or Send asks exactly what it shows.
+      if (running) void ask(manualInputRef.current?.value ?? transcriptInputValue);
     }}>
-      <span className={`speaker-chip ${activeTranscriptRole ?? 'waiting'}`}>{activeTranscriptText ? activeSpeaker : 'Live'}</span>
+      <span className={`speaker-chip ${typedDraft ? 'typed' : transcriptInputValue ? activeTranscriptRole ?? 'waiting' : 'waiting'}`}>{typedDraft ? 'Typed' : transcriptInputValue ? activeSpeaker : 'Live'}</span>
       <div className="transcript-input-shell">
         <input
           ref={manualInputRef}
           type="text"
+          aria-label="Question for the AI"
           value={transcriptInputValue}
-          onFocus={() => {
-            // Focusing for selection/copy is not an edit. Continue following live
-            // speech until an actual input change creates a manual draft.
-            if (!autoFocusingTranscript.current && transcriptDraftActive) transcriptDraftReleaseArmed.current = false;
-          }}
-          onBlur={() => {
-            if (!transcriptDraftActive) return;
-            // Speech received while the user was editing is part of the baseline,
-            // not permission to overwrite the draft. Only a later transcript can
-            // return this field to live-following mode.
-            transcriptDraftBaseline.current = activeTranscriptText;
-            transcriptDraftReleaseArmed.current = true;
-          }}
+          // Focusing for selection/copy is not an edit: only a real change makes the customer's own draft.
           onChange={(event) => {
+            const value = event.target.value;
             if (!transcriptDraftActive) transcriptDraftBaseline.current = activeTranscriptText;
-            transcriptDraftReleaseArmed.current = false;
-            transcriptDraftEditedRef.current = true;
+            if (value) {
+              // Typed text stays until it is sent or cleared; speech never overwrites it.
+              transcriptDraftReleaseArmed.current = false;
+              transcriptDraftEditedRef.current = true;
+            } else {
+              // Deleted: follow the speech again from the next new words.
+              transcriptDraftBaseline.current = activeTranscriptText;
+              handledSpeech.current = { text: activeTranscriptText, at: Date.now() };
+              transcriptDraftReleaseArmed.current = true;
+              transcriptDraftEditedRef.current = false;
+            }
             setTranscriptDraftActive(true);
-            setManual(event.target.value);
+            setManual(value);
           }}
           onKeyDown={scrollAnswerFromInput}
-          placeholder={deviceCheckActive ? running ? 'Listening… or type a missed question' : 'Device check listening… Start enables AI' : 'Preparing microphone and audio output…'}
+          placeholder={deviceCheckActive ? running ? 'Listening… or type a question, then Enter' : 'Device check listening… Start enables AI' : 'Preparing microphone and audio output…'}
         />
         <button type="button" className="transcript-clear" aria-label="Clear transcript input" title="Clear" disabled={!transcriptInputValue} onMouseDown={(event) => event.preventDefault()} onClick={() => {
           transcriptDraftBaseline.current = activeTranscriptText;
           // Armed on purpose: the cleared words are gone for good, so the next new words of the live speech flow
           // back into this box. Typing disarms it again, so a draft the customer writes is never overwritten.
+          handledSpeech.current = { text: `${transcriptInputValue} ${activeTranscriptText}`, at: Date.now() };
           transcriptDraftReleaseArmed.current = true;
-          transcriptDraftEditedRef.current = true;
+          transcriptDraftEditedRef.current = false;
           setTranscriptDraftActive(true);
           setManual('');
           manualInputRef.current?.focus();
@@ -1738,9 +1757,9 @@ export function CopilotPage(): JSX.Element {
           void Promise.resolve(window.electronAPI.discardTranscriptInput?.()).catch(() => undefined);
           useAppStore.getState().discardLiveInput();
         }}>Clear</button>
-        {autoAnswerEnabled && <button type="submit" className="transcript-answer" aria-label="Send current question" title="Send current question" disabled={!running || !transcriptAnswerText || analyzingScreen} onMouseDown={(event) => event.preventDefault()}>
+        <button type="submit" className="transcript-answer" aria-label="Send current question" title="Send current question (Enter)" disabled={!running || !transcriptAnswerText || analyzingScreen} onMouseDown={(event) => event.preventDefault()}>
           Send
-        </button>}
+        </button>
       </div>
     </form>
 

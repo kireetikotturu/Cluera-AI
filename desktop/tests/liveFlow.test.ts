@@ -162,6 +162,26 @@ describe('live interview flow with Auto Answer', () => {
     expect(questions()).toEqual(['What is a closure?']);
   });
 
+  it('answers once when the customer presses Enter just before the speech service ends the sentence', async () => {
+    const { recognizer, orchestrator, session, questions, model } = await setup(true);
+    recognizer.speak('What is a monad');
+    await orchestrator.answer({ sessionId: session.id, question: 'What is a monad', origin: 'transcript' });
+    recognizer.endTurn('What is a monad?');             // the same words, now finished
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(questions()).toEqual(['What is a monad']);
+    expect(model.seen).toHaveLength(1);
+  });
+
+  it('still answers when the interviewer carries on after the customer pressed Enter', async () => {
+    const { recognizer, orchestrator, session, questions } = await setup(true);
+    recognizer.speak('What is a monad');
+    await orchestrator.answer({ sessionId: session.id, question: 'What is a monad', origin: 'transcript' });
+    recognizer.endTurn('What is a monad in functional programming?');
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(questions()).toHaveLength(2);
+    expect(questions()).toContain('What is a monad in functional programming?');
+  });
+
   it('stops waiting when Auto Answer is switched off', async () => {
     const { recognizer, orchestrator, questions } = await setup(true);
     recognizer.speak('What is dependency injection?');
@@ -202,6 +222,46 @@ describe('live interview flow with Auto Answer off', () => {
     // Sending (Alt+S or the Send button) answers the whole collected question once.
     expect(await orchestrator.answer({ sessionId: session.id, question: 'Can you explain how dependency injection works?', origin: 'transcript' })).toBe(true);
     expect(repositories.getDetail(session.id)!.questions).toHaveLength(1);
+  });
+
+  async function manualSetup() {
+    const recognizer = new FakeRecognizer();
+    const events: Array<{ name: AppEventName; payload: unknown }> = [];
+    const emit = <K extends AppEventName>(name: K, payload: AppEventMap[K]): void => { events.push({ name, payload }); };
+    const session = repositories.saveSession(input);
+    const orchestrator = new InterviewOrchestrator(config, repositories, new IntentDetector(), new TurnGate(),
+      new ContextBuilder(repositories, new LocalRetriever(repositories, config.retrieval)), new CapturingModel(), emit, { recognizer: () => recognizer, stop: () => undefined });
+    await orchestrator.start(session.id, interviewer);
+    const shown = (): string[] => events.filter((event) => event.name === 'transcript:partial' || event.name === 'transcript:final').map((event) => (event.payload as TranscriptEvent).text);
+    return { recognizer, orchestrator, session, shown };
+  }
+
+  it('does not collect sent words again when the interviewer finishes the sentence after the customer sent it', async () => {
+    const { recognizer, orchestrator, session, shown } = await manualSetup();
+    recognizer.speak('How do promises work');
+    await orchestrator.answer({ sessionId: session.id, question: 'How do promises work', origin: 'transcript' });
+    expect(shown().at(-1)).toBe('');                    // the page is told that sentence is over
+    const before = shown().length;
+    recognizer.endTurn('How do promises work?');
+    expect(shown()).toHaveLength(before);
+    recognizer.speak('Tell me about the event loop?');
+    expect(shown().at(-1)).toBe('Tell me about the event loop?');
+  });
+
+  it('shows what the interviewer adds after the customer sent, when the same sentence carries on', async () => {
+    const { recognizer, orchestrator, session, shown } = await manualSetup();
+    recognizer.speak('How do promises work');
+    await orchestrator.answer({ sessionId: session.id, question: 'How do promises work', origin: 'transcript' });
+    recognizer.more('How do promises work in the browser');
+    expect(shown().at(-1)).toBe('in the browser');
+  });
+
+  it('leaves the interviewer\'s sentence alone when the customer sends something else meanwhile', async () => {
+    const { recognizer, orchestrator, session, shown } = await manualSetup();
+    recognizer.speak('Tell me about');
+    await orchestrator.answer({ sessionId: session.id, question: 'What is REST?', origin: 'typed' });
+    recognizer.more('Tell me about your last project');
+    expect(shown().at(-1)).toBe('Tell me about your last project');
   });
 
   it('forgets cleared words in the question box too', async () => {

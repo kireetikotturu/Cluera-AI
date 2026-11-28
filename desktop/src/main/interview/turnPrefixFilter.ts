@@ -33,6 +33,9 @@ export class TurnPrefixFilter {
     return dropWords(text, this.cleared.length);
   }
 
+  /** What is shown of a turn that has not ended yet; empty between turns. */
+  get unfinished(): string { return this.cleared.length ? dropWords(this.latest, this.cleared.length) : this.latest; }
+
   /** The customer cleared everything captured so far in this turn. */
   discard(): void { this.cleared = words(this.latest); }
 

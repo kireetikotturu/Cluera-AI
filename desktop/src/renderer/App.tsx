@@ -76,8 +76,9 @@ export default function App({ account }: { account: AccountView }): JSX.Element 
     };
 
     const handleTranscript = (data: Parameters<typeof store.setTranscript>[0]): void => {
+      const echo = transcriptOwnership.isEcho(data);
       const claimNow = transcriptOwnership.shouldClaim(data);
-      store.setTranscript(data, claimNow);
+      store.setTranscript(data, claimNow, echo);
 
       if (data.sourceRole === 'remote_interviewer' && data.text.trim()) {
         clearCandidateHandoff();

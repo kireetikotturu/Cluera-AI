@@ -255,8 +255,10 @@ describe('desktop and provider contracts', () => {
     expect(source).toContain('if (!running || !activeId || !question || analyzingScreen) return');
     expect(source).not.toContain('value={transcriptInputValue}\n        disabled={!running}');
     expect(source).toContain('<form className="live-transcript-composer" ref={transcriptComposerRef} onSubmit=');
-    expect(source).toContain('if (autoAnswerEnabled && running) void ask(manualInputRef.current?.value ?? transcriptInputValue)');
-    expect(source).toContain('{autoAnswerEnabled && <button type="submit" className="transcript-answer"');
+    // The box below is a chat box with Auto Answer on or off: Enter and Send work in both.
+    expect(source).toContain('if (running) void ask(manualInputRef.current?.value ?? transcriptInputValue)');
+    expect(source).toContain('<button type="submit" className="transcript-answer"');
+    expect(source).not.toContain('{autoAnswerEnabled && <button type="submit" className="transcript-answer"');
     expect(source).toContain('disabled={!running || !transcriptAnswerText || analyzingScreen}');
     expect(source).not.toContain('togglePause');
     expect(source).toContain('className={`menu-toggle-track${autoAnswerEnabled ? \' on\' : \'\'}`}');
@@ -279,8 +281,8 @@ describe('desktop and provider contracts', () => {
     expect(source).not.toContain('screenInstruction');
     expect(source).not.toContain("'Device check · AI disabled'");
     expect(source).not.toContain("detail?.session.title ?? 'Interview session'");
-    expect(source).toContain('if (!autoAnswerEnabled) return;');
-    expect(source).toContain('[transcriptInputValue, transcriptDraftActive, store.activeTranscriptRole, autoAnswerEnabled, currentInterviewerInteraction]');
+    expect(source).not.toContain('if (!autoAnswerEnabled) return;');
+    expect(source).toContain('[transcriptInputValue, transcriptDraftActive, store.activeTranscriptRole, autoAnswerEnabled, currentInterviewerInteraction, collapsed]');
     expect(source).toContain("const origin = transcriptDraftEditedRef.current ? 'typed' : 'transcript'");
     expect(preload).toContain("autoAnswer: 'interview:auto-answer'");
     expect(preload).toContain("interaction: 'interview:interaction'");
@@ -587,7 +589,7 @@ describe('desktop and provider contracts', () => {
     expect(page).toContain('<form className="live-transcript-composer" ref={transcriptComposerRef} onSubmit=');
     expect(page).toContain('className="transcript-input-shell"');
     expect(page).toContain('type="submit" className="transcript-answer"');
-    expect(page).toContain('{autoAnswerEnabled && <button type="submit" className="transcript-answer"');
+    expect(page).not.toContain('{autoAnswerEnabled && <button type="submit" className="transcript-answer"');
     expect(page).toContain('aria-label="Send current question"');
     expect(page).toContain('aria-label="Clear transcript input"');
     expect(page).toContain('setTranscriptDraftActive(true);');
@@ -637,16 +639,17 @@ describe('desktop and provider contracts', () => {
     expect(page).toContain('const shouldActivateWindow = interviewerInteractionActive');
     expect(page).toContain('await window.electronAPI.focusLiveTranscript()');
     expect(page).toContain('await window.electronAPI.focusLiveTranscript(true)');
-    expect(page).toContain('const transcriptNeedsFocus = startsNewInteraction');
-    expect(page).toContain('const focusEpoch = ++questionFocusEpoch.current');
+    // The box below keeps the keyboard in both modes; the top question box never grabs it.
+    expect(page).toContain('const focusEpoch = ++composerFocusEpoch.current');
+    expect(page).toContain('typingElsewhere()');
     expect(page).toContain('for (const delayMs of [0, 80])');
-    expect(page).toContain('document.hasFocus() && document.activeElement === questionEditorRef.current');
+    expect(page).toContain('document.hasFocus() && document.activeElement === manualInputRef.current');
     expect(page).toContain('readingController.current.update(state)');
     expect(page).toContain('submitting: answerRequestPending');
     expect(page).toContain('enabled: autoScrollEnabled');
     expect(page).not.toContain('alignAnswerStart');
     expect(page).toContain('className="qa-content"');
-    expect(page).toContain('autoFocus');
+    expect(page).not.toMatch(/^\s*autoFocus\s*$/m);
     expect(ipc).toContain('IPC.app.focusLiveTranscript');
     expect(ipc).toContain('ensureFocusableOffTaskbar(window)');
     expect(ipc).not.toContain('window.setFocusable(true)');

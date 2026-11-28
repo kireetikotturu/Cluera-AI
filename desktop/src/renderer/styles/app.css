@@ -1379,35 +1379,36 @@ button.chat-message-text:hover { background: rgba(var(--neutral-rgb), 0.1); }
   animation: start-ready-pulse 1.8s ease-in-out infinite;
 }
 .live-rail-scroll .rail-spacer { flex: 1 0 5px; min-height: 5px; }
-.rail-status i {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--danger);
-}
-.rail-status.starting i { background: var(--warning); animation: pulse 1s ease-in-out infinite; }
-.rail-status.active i { background: var(--success); box-shadow: 0 0 0 2px rgba(var(--success-rgb), 0.12); }
-.rail-status.disabled i { display: none; }
-/* Live audio on the rail: a sweep when a device is found, then waves while sound is heard on it. The speaker
-   (the interviewer) is lavender to indigo, your microphone cyan to teal. Waves animate only while heard. */
-.voice { --voice-a: #c4b5fd; --voice-b: #818cf8; --voice-level: 0; position: absolute; inset: 0; border-radius: inherit; display: grid; place-items: center; pointer-events: none; }
-.voice-candidate { --voice-a: #67e8f9; --voice-b: #2dd4bf; }
-:root[data-color-scheme='light'] .voice { --voice-a: #7c3aed; --voice-b: #4f46e5; }
-:root[data-color-scheme='light'] .voice-candidate { --voice-a: #0e7490; --voice-b: #0f766e; }
+/* The rail's two audio buttons show their state with the picture itself (no status dots): faint while looking,
+   the speaker lavender and the microphone green once found, red when something is wrong. */
+.live-side-rail { --speaker-ready: #c4b5fd; --mic-ready: #3ddc97; }
+:root[data-color-scheme='light'] .live-side-rail { --speaker-ready: #6d28d9; --mic-ready: #047857; }
+.live-rail-scroll > button.rail-audio { color: var(--faint); background: rgba(var(--neutral-rgb), 0.06); }
+.live-rail-scroll > button.rail-audio:hover { filter: brightness(1.2); }
+.live-rail-scroll > button.rail-speaker.active { color: var(--speaker-ready); background: rgba(139, 124, 255, 0.11); }
+.live-rail-scroll > button.rail-mic.active { color: var(--mic-ready); background: rgba(52, 211, 153, 0.11); box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.32); }
+.live-rail-scroll > button.rail-audio.error { color: var(--danger); background: rgba(var(--danger-rgb), 0.1); box-shadow: inset 0 0 0 1px rgba(var(--danger-rgb), 0.38); }
+/* Speaker: while the interviewer speaks, dancing bars, a softly blinking light and a ring (violet to electric blue).
+   Microphone: one green sweep when found, then calm. Animations run only while something happens. */
+.voice { --voice-a: #c4b5fd; --voice-b: #38bdf8; --voice-level: 0; position: absolute; inset: 0; border-radius: inherit; display: grid; place-items: center; pointer-events: none; }
+.voice-microphone { --voice-a: #86efac; --voice-b: #10b981; }
+:root[data-color-scheme='light'] .voice { --voice-a: #7c3aed; --voice-b: #0284c7; }
+:root[data-color-scheme='light'] .voice-microphone { --voice-a: #10b981; --voice-b: #047857; }
 .voice-stop-a { stop-color: var(--voice-a); }
 .voice-stop-b { stop-color: var(--voice-b); }
 .voice::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.2px; background: linear-gradient(135deg, var(--voice-a), var(--voice-b)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; opacity: 0; transition: opacity .25s ease; }
-.voice[data-speaking='true']::before { opacity: calc(.5 + var(--voice-level) * .5); }
-.voice-glow { position: absolute; inset: 1px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--voice-b) 55%, transparent) 0%, transparent 70%); opacity: 0; transform: scale(.65); transition: opacity .25s ease, transform .12s ease-out; }
-.voice[data-speaking='true'] .voice-glow { opacity: calc(.4 + var(--voice-level) * .55); transform: scale(calc(.85 + var(--voice-level) * .3)); }
-:root[data-color-scheme='light'] .voice-glow { background: radial-gradient(circle, color-mix(in srgb, var(--voice-b) 26%, transparent) 0%, transparent 70%); }
+.voice[data-speaking='true']::before { opacity: calc(.6 + var(--voice-level) * .4); }
 .voice-edge { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; }
 .voice-edge rect { stroke-width: 1.6; stroke-linecap: round; }
 .voice-found { stroke-dasharray: 100; animation: voice-found 1.3s cubic-bezier(.35, .6, .3, 1) both; }
 .voice-search { stroke-dasharray: 28 72; animation: voice-search 1.1s linear infinite; }
+.voice-glow { position: absolute; inset: 0; border-radius: inherit; opacity: 0; transition: opacity .25s ease; }
+.voice[data-speaking='true'] .voice-glow { opacity: calc(.6 + var(--voice-level) * .4); }
+.voice-blink { position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(circle, color-mix(in srgb, var(--voice-b) 62%, transparent) 0%, color-mix(in srgb, var(--voice-a) 24%, transparent) 48%, transparent 74%); }
+:root[data-color-scheme='light'] .voice-blink { background: radial-gradient(circle, color-mix(in srgb, var(--voice-b) 28%, transparent) 0%, transparent 70%); }
+.voice[data-speaking='true'] .voice-blink { animation: voice-blink .9s ease-in-out infinite; }
+.voice-sonar { position: absolute; inset: 2px; border: 1.2px solid var(--voice-a); border-radius: 9px; opacity: 0; }
+.voice[data-speaking='true'] .voice-sonar { animation: voice-sonar 1.35s cubic-bezier(.2, .65, .35, 1) infinite; }
 .voice-wave { position: relative; overflow: visible; fill: none; stroke-width: 2; stroke-linecap: round; }
 .voice-wave-idle { stroke: currentColor; transition: opacity .2s ease; }
 .voice-wave-live { opacity: 0; transform-origin: 12px 12px; transform: scaleY(calc(.72 + var(--voice-level) * .38)); transition: opacity .2s ease, transform .12s ease-out; }
@@ -1420,16 +1421,13 @@ button.chat-message-text:hover { background: rgba(var(--neutral-rgb), 0.1); }
 .voice[data-speaking='true'] .voice-wave-live path:nth-child(4) { animation-duration: .6s; animation-delay: -.47s; }
 .voice[data-speaking='true'] .voice-wave-live path:nth-child(5) { animation-duration: .49s; animation-delay: -.17s; }
 .voice[data-speaking='true'] .voice-wave-live path:nth-child(6) { animation-duration: .7s; animation-delay: -.39s; }
-.voice-ripple { position: absolute; inset: 5px; border: 1.2px solid var(--voice-a); border-radius: 50%; opacity: 0; }
-.voice[data-speaking='true'] .voice-ripple { animation: voice-ripple 1.25s cubic-bezier(.2, .6, .35, 1) infinite; }
-.voice[data-speaking='true'] .voice-ripple.second { animation-delay: .62s; }
-.voice-mic { position: relative; transition: color .2s ease, transform .12s ease-out; }
-.voice[data-speaking='true'] .voice-mic { color: var(--voice-a); transform: scale(calc(1 + var(--voice-level) * .14)); }
+.voice-mic { position: relative; }
 @keyframes voice-found { 0% { stroke-dashoffset: 100; opacity: 1; } 55% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
 @keyframes voice-search { to { stroke-dashoffset: -100; } }
 @keyframes voice-bar { from { transform: scaleY(.45); } to { transform: scaleY(1.18); } }
-@keyframes voice-ripple { 0% { transform: scale(.62); opacity: .95; } 100% { transform: scale(1.42); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .voice *, .voice::before { animation: none !important; transition: none !important; } .voice-found, .voice-search, .voice-ripple { display: none; } }
+@keyframes voice-blink { 0%, 100% { opacity: .28; transform: scale(.84); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes voice-sonar { 0% { transform: scale(.74); opacity: .95; } 100% { transform: scale(1.12); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .voice *, .voice::before { animation: none !important; transition: none !important; } .voice-found, .voice-search, .voice-sonar { display: none; } }
 .live-side-rail .live-menu {
   top: min(190px, 38vh);
   right: auto;
@@ -1478,6 +1476,7 @@ button.chat-message-text:hover { background: rgba(var(--neutral-rgb), 0.1); }
   letter-spacing: .35px;
 }
 .speaker-chip.candidate { color: var(--accent-text); background: rgba(var(--accent-rgb), 0.09); }
+.speaker-chip.typed { color: var(--text); background: rgba(var(--neutral-rgb), 0.1); }
 .speaker-chip.waiting { color: var(--faint); background: rgba(var(--neutral-rgb), 0.05); }
 .live-transcript-composer input {
   width: 100%;

@@ -1,5 +1,5 @@
 import type { DesktopCaptureSource } from '../../shared/types';
-import { heardAudio, silenceVoice } from './voiceActivity';
+import { heardSpeaker, silenceSpeaker } from './voiceActivity';
 
 function downsample(input: Float32Array, fromRate: number, toRate = 16_000): Int16Array {
   if (fromRate === toRate) return Int16Array.from(input, (sample) => Math.max(-1, Math.min(1, sample)) * 0x7fff);
@@ -211,7 +211,7 @@ export class AudioCapture {
 
   async stop(): Promise<void> {
     this.captureEpoch += 1;
-    silenceVoice(this.source);
+    if (this.source === 'system') silenceSpeaker();
     if (this.processor) this.processor.port.onmessage = null;
     this.sourceNode?.disconnect();
     this.processor?.disconnect();
@@ -231,7 +231,7 @@ export class AudioCapture {
     // Do not forward a stale or ended track.
     if (!track || track.readyState !== 'live') {
       this.pending = new Int16Array(0);
-      silenceVoice(this.source);
+      if (this.source === 'system') silenceSpeaker();
       return;
     }
     // A disabled or hardware-muted candidate track is never forwarded: silence goes out instead, so a muted
@@ -252,6 +252,7 @@ export class AudioCapture {
       offset += chunkSamples;
     }
     this.pending = combined.slice(offset);
-    heardAudio(this.source, samples); // Only for the side rail's waves, after the audio is on its way.
+    // Only for the speaker button's waves, after the audio is on its way.
+    if (this.source === 'system') heardSpeaker(samples);
   }
 }
