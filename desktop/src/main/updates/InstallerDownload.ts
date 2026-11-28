@@ -7,6 +7,11 @@ import { updateTransport } from './UpdateTransport';
 
 export const MAX_INSTALLER_BYTES = 512 * 1024 * 1024;
 
+/** Why the installer could not be used, so the app can say what happened instead of blaming the connection. */
+export class InstallerError extends Error {
+  constructor(message: string, readonly reason: 'unavailable' | 'mismatch', readonly httpStatus?: number) { super(message); }
+}
+
 /** Only this updater's generated children; never touch customer history or credentials. */
 export async function cleanupInstallerDownloads(directory: string): Promise<void> {
   const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
@@ -33,7 +38,7 @@ export async function verifyInstallerFile(file: string, release: ReleaseClaims):
     hash.update(chunk as Buffer);
   }
   if (!size || (release.fileSizeBytes !== undefined && size !== release.fileSizeBytes)
-    || hash.digest('hex') !== release.sha256) throw new Error('Installer SHA-256 or size verification failed.');
+    || hash.digest('hex') !== release.sha256) throw new InstallerError('Installer SHA-256 or size verification failed.', 'mismatch');
 }
 
 /** Streams directly to an exclusive file; never buffers the installer in memory. */
@@ -73,11 +78,13 @@ export async function downloadInstaller(release: ReleaseClaims, options: {
       if (!location || redirects >= 5) throw new Error('Installer redirect limit exceeded.');
       url = new URL(location, url).toString();
     }
-    if (!response.ok || response.status !== 200 || !response.body) throw new Error('Installer download failed.');
+    if (!response.ok || response.status !== 200 || !response.body) {
+      throw new InstallerError('Installer download failed.', 'unavailable', response.status === 200 ? undefined : response.status);
+    }
     const length = response.headers.get('content-length');
     const total = length === null ? undefined : Number(length);
     if (total !== undefined && (!Number.isSafeInteger(total) || total <= 0 || total > MAX_INSTALLER_BYTES
-      || (release.fileSizeBytes !== undefined && release.fileSizeBytes !== total))) throw new Error('Installer size is invalid.');
+      || (release.fileSizeBytes !== undefined && release.fileSizeBytes !== total))) throw new InstallerError('Installer size is invalid.', 'mismatch');
     const handle = await open(file, 'wx', 0o600);
     const reader = response.body.getReader();
     let bytes = 0;
@@ -90,7 +97,7 @@ export async function downloadInstaller(release: ReleaseClaims, options: {
         touch();
         bytes += value.byteLength;
         if (bytes > MAX_INSTALLER_BYTES || (release.fileSizeBytes !== undefined && bytes > release.fileSizeBytes)) {
-          throw new Error('Installer exceeds the approved size.');
+          throw new InstallerError('Installer exceeds the approved size.', 'mismatch');
         }
         await handle.writeFile(value);
         if (Date.now() - lastProgress >= 500) { options.onProgress(bytes, release.fileSizeBytes ?? total); lastProgress = Date.now(); }

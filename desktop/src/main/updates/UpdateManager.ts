@@ -3,7 +3,7 @@ import { ACCOUNT_DISTRIBUTION } from '../../shared/accountDistribution';
 import type { UpdateStatus } from '../../shared/types';
 import { SecureJsonStore } from '../security/SecureJsonStore';
 import { compareVersions, verifyReleaseManifest, type ReleaseClaims } from './ReleaseManifest';
-import { cleanupInstallerDownloads, downloadInstaller, verifyInstallerFile } from './InstallerDownload';
+import { cleanupInstallerDownloads, downloadInstaller, InstallerError, verifyInstallerFile } from './InstallerDownload';
 import { updateTransport } from './UpdateTransport';
 
 interface CachedManifest { version: 1; signedManifest: string }
@@ -32,6 +32,26 @@ export interface UpdateManagerOptions {
 }
 
 const unavailable: UpdateStatus = { state: 'unavailable', message: 'Update information is temporarily unavailable.' };
+
+/** The part of "Update now" that was running when it failed. */
+type InstallStep = 'approval' | 'download' | 'recheck' | 'safety' | 'launch';
+
+/** What to tell the customer: the real reason, never "check your connection" when the server refused the file. */
+function installFailureMessage(step: InstallStep, error: unknown): string {
+  const known = error instanceof InstallerError ? error : undefined;
+  const message = error instanceof Error ? error.message : '';
+  if (message === NO_NEWER_RELEASE) return 'There is no newer approved version to install right now. Nothing was installed.';
+  if (message === RELEASE_CHANGED) return 'The approved update changed during the download. Check for updates, then try again. Nothing was installed.';
+  if (step === 'approval') return 'Cluera AI could not confirm the update. Check your internet connection and try again. Nothing was installed.';
+  if (known?.httpStatus) return `The update file could not be downloaded (the download server answered ${known.httpStatus}). Nothing was installed. Try again later; if it keeps happening, contact Cluera support.`;
+  if (known?.reason === 'mismatch') return 'The downloaded file did not match the approved version, so nothing was installed. Please try again.';
+  if (step === 'download') return 'The update download stopped before it finished. Check your internet connection and try again. Nothing was installed.';
+  if (step === 'recheck') return 'Cluera AI could not check the update again after downloading. Check your internet connection and try again. Nothing was installed.';
+  if (step === 'launch') return 'Windows could not start the installer, so nothing was installed. Try again, or download the new version from www.clueraai.in.';
+  return 'The update could not be checked safely, so nothing was installed. Please try again.';
+}
+const NO_NEWER_RELEASE = 'No newer approved release is available.';
+const RELEASE_CHANGED = 'Release approval changed. Check for updates again.';
 
 export class UpdateManager {
   private current: UpdateStatus = unavailable;
@@ -114,24 +134,28 @@ export class UpdateManager {
     const abort = new AbortController();
     this.installAbort = abort;
     let artifact: Awaited<ReturnType<typeof downloadInstaller>> | undefined;
+    let step: InstallStep = 'approval';
     try {
       await this.inFlight;
       await this.fetchAndVerify(true, abort.signal);
       const release = this.currentRelease!;
-      if (!release || compareVersions(this.options.appVersion, release.version) >= 0) throw new Error('No newer approved release is available.');
+      if (!release || compareVersions(this.options.appVersion, release.version) >= 0) throw new Error(NO_NEWER_RELEASE);
       abort.signal.throwIfAborted();
       this.installPhase = 'downloading';
+      step = 'download';
       artifact = await downloadInstaller(release, { directory: path.join(this.options.userDataPath, 'updates'),
         origins: this.options.trustedInstallerOrigins, redirectOrigins: this.options.redirectOrigins ?? [],
         fetcher: this.fetcher, signal: abort.signal,
         onProgress: (bytes, total) => { this.downloadedBytes = bytes; this.totalBytes = total; } });
       this.installPhase = 'verifying';
+      step = 'recheck';
       // Recheck approval after a potentially long download. Cached policy never authorizes execution.
       await this.fetchAndVerify(true, abort.signal);
       const latest = this.currentRelease!;
       if (latest.releaseId !== release.releaseId || latest.sha256 !== release.sha256
-        || latest.downloadUrl !== release.downloadUrl || latest.version !== release.version) throw new Error('Release approval changed. Check for updates again.');
+        || latest.downloadUrl !== release.downloadUrl || latest.version !== release.version) throw new Error(RELEASE_CHANGED);
       // Current channel is unsigned TEST only; commercial publisher acceptance is separate.
+      step = 'safety';
       abort.signal.throwIfAborted();
       await this.options.installer.stopProviderWork();
       await verifyInstallerFile(artifact.file, release);
@@ -143,14 +167,14 @@ export class UpdateManager {
       }
       abort.signal.throwIfAborted();
       this.installPhase = 'launching';
+      step = 'launch';
       this.installAbort = null;
       await this.options.installer.launch(artifact.file);
       this.options.installer.quit();
-    } catch {
+    } catch (error) {
       await artifact?.dispose().catch(() => undefined);
       this.installPhase = 'idle';
-      this.installError = abort.signal.aborted ? 'Update cancelled.'
-        : 'Update could not be verified or started. Nothing was installed. Check your connection and approved release, then retry.';
+      this.installError = abort.signal.aborted ? 'Update cancelled.' : installFailureMessage(step, error);
     } finally { this.installAbort = null; }
     return this.getStatus();
   }

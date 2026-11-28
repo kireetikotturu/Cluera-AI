@@ -224,6 +224,27 @@ describe('explicit update installation and session exclusion', () => {
     if (failure !== 'launch') expect(installer.launch).not.toHaveBeenCalled();
     expect(installer.quit).not.toHaveBeenCalled();
   });
+  it.each<[string, () => Response, RegExp]>([
+    ['the file host refuses it (a private repository)', () => new Response('Not Found', { status: 404 }), /download server answered 404/],
+    ['the connection drops', () => { throw new TypeError('fetch failed'); }, /download stopped before it finished/],
+    ['the file is not the approved one', () => new Response(Buffer.from('bad')), /did not match the approved version/],
+  ])('says what happened when %s', async (_case, download, message) => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => String(input) === url ? download() : Response.json({ signedManifest: token() }));
+    const { updates, installer } = manager(fetcher);
+    const error = (await updates.install()).installError!;
+    expect(error).toMatch(message); expect(error).toMatch(/nothing was installed/i);
+    expect(installer.launch).not.toHaveBeenCalled(); expect(installer.quit).not.toHaveBeenCalled();
+  });
+  it('says when Cluera could not confirm the update, or Windows could not start the installer', async () => {
+    const offline = manager(vi.fn(async () => { throw new TypeError('fetch failed'); }));
+    expect((await offline.updates.install()).installError).toMatch(/could not confirm the update/);
+    const fetcher = vi.fn(async (input: string | URL | Request) => String(input) === url
+      ? new Response(bytes) : Response.json({ signedManifest: token() }));
+    const blocked = manager(fetcher);
+    blocked.installer.launch.mockRejectedValue(new Error('blocked'));
+    expect((await blocked.updates.install()).installError).toMatch(/Windows could not start the installer/);
+    expect(blocked.installer.quit).not.toHaveBeenCalled();
+  });
   it('shows up to date on 404 but retains a signed required policy through a later 404', async () => {
     const fetcher = vi.fn(async () => new Response(null, { status: 404 }));
     const { updates } = manager(fetcher);
