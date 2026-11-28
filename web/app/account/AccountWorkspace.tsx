@@ -2,10 +2,13 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {usageDuration} from '../../lib/usage/display';
 import {AdminRoleLink} from './AdminRoleNavigation';
+import {UnlimitedBadge,unlimitedUntil} from './Unlimited';
+import type {UnlimitedAccess} from '../../../desktop/src/shared/accountCredits';
 import styles from '../cluera-commerce.module.css';
 interface Workspace {
  displayName:string;
  balance:{availableMilliseconds:number;reservedMilliseconds:number;spentMilliseconds:number};
+ unlimited?:UnlimitedAccess;
  balances:Partial<Record<'TRIAL'|'RECURRING'|'PACK',number>>;
  plans:Array<{tier:string;state:string;endsAt:string|null;remainingMilliseconds:number|null;paymentState:string;cancelFuture:boolean;graceUntil:string|null}>;
  sessions:Array<{startedAt:string;state:string}>;
@@ -75,7 +78,8 @@ export function AccountWorkspace(){
    <div className="acct-hero-top"><h3>Your Cluera account</h3>
     <button type="button" className="acct-ghost" disabled={locked} onClick={()=>void refresh()}><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Refresh balance and account</button></div>
    <dl className="acct-stats">
-    <div className="acct-stat acct-stat-main"><dt>Remaining time</dt><dd>{minutes(data.balance.availableMilliseconds)}</dd><small>Shared across all your devices</small></div>
+    {data.unlimited?<div className="acct-stat acct-stat-main"><dt>Remaining time</dt><dd><UnlimitedBadge large/></dd><small>{unlimitedUntil(data.unlimited.endsAt)} · shared across all your devices{data.unlimited.savedMilliseconds>0?` · your other ${minutes(data.unlimited.savedMilliseconds)} stays saved`:''}</small></div>
+     :<div className="acct-stat acct-stat-main"><dt>Remaining time</dt><dd>{minutes(data.balance.availableMilliseconds)}</dd><small>Shared across all your devices</small></div>}
     {data.balance.reservedMilliseconds>0?<div className="acct-stat"><dt>Reserved for active sessions</dt><dd>{minutes(data.balance.reservedMilliseconds)}</dd></div>:null}
     <div className="acct-stat"><dt>Used</dt><dd>{minutes(data.balance.spentMilliseconds)}</dd></div>
    </dl>

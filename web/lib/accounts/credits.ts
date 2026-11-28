@@ -14,6 +14,7 @@ import {clueraBillingStatus} from '../payments/cluera/checkout';
 import {clueraCheckoutAllowed} from '../payments/cluera/config';
 import {billingUiEnvironment} from '../payments/cluera/billingUi';
 import {liveBillingProfile,liveBillingRpc} from '../payments/cluera/modeProfile';
+import {unlimitedAccess} from './unlimited';
 const ms=z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const schema=z.object({userId:z.uuid(),serverTime:z.iso.datetime({offset:true}),displayName:z.string().max(80),
  availableMilliseconds:ms,reservedMilliseconds:ms,spentMilliseconds:ms,
@@ -86,7 +87,9 @@ export async function creditsRequest(request:Request):Promise<Response>{
   const expected=new URL(request.url).searchParams.get('desktopAccount');
   if(expected!==null&&expected!==account.userId)return cookies.apply(json({error:'FORBIDDEN',code:'ACCOUNT_MISMATCH'},403));
   await rateLimit(request,config,clients,account.email,'billing-read');
-  return cookies.apply(json(await readCredits((name,args)=>clients.service.rpc(name,args),account)));
+  const rpc=(name:string,args:Record<string,unknown>)=>clients.service.rpc(name,args);
+  const credits=await readCredits(rpc,account),unlimited=await unlimitedAccess(rpc,account.userId,credits.availableMilliseconds);
+  return cookies.apply(json(unlimited===undefined?credits:{...credits,unlimited}));
  }catch(error){
   if(error instanceof AccountError&&error.status===401)cookies?.clearSession();
   const response=error instanceof AccountError?json({error:error.code},error.status):apiError(error);

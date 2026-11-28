@@ -127,13 +127,15 @@ it("counts the signed-in app's requests per kind, apart from sign-in, so a live 
   for (let i = 0; i < 100; i++) expect((await asApp('session')).status).toBe(200);
   expect((await asApp('context', { action: 'LIST' })).status).toBe(200);
   const appBuckets = new Set(limits.map(row => row.p_bucket_hash));
-  expect(appBuckets.size).toBe(2); expect(new Set(limits.map(row => row.p_maximum))).toEqual(new Set([120]));
+  // Counted per network address with a roomy ceiling: several devices or people can share one Wi-Fi.
+  expect(appBuckets.size).toBe(2); expect(new Set(limits.map(row => row.p_maximum))).toEqual(new Set([1200]));
+  const sessionBucket = [...hits].find(([, count]) => count === 100)![0];
   limits.length = 0;
   expect((await login()).status).toBe(200);
   expect((await handleNativeAccount(request('refresh', { refreshToken: 'synthetic-native-refresh' }), 'refresh')).status).toBe(200);
   expect(limits.every(row => !appBuckets.has(row.p_bucket_hash))).toBe(true);
   expect(new Set(limits.map(row => row.p_maximum))).toEqual(new Set([60, 15]));
-  for (let i = 0; i < 20; i++) await asApp('session');
+  hits.set(sessionBucket, 1199); expect((await asApp('session')).status).toBe(200);   // the 1200th in 15 minutes
   expect((await asApp('session')).status).toBe(429);        // still bounded
 });
 it('does not expose upstream errors or provider secrets and reports transient auth failure as unavailable', async () => {

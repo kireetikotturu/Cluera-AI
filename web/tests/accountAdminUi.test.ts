@@ -208,3 +208,30 @@ it('refreshes release rows and unlocks parent controls after confirmed applicati
  expect(fetcher.mock.calls.some(([url,init])=>url.includes('releases=1')&&init?.method!=='POST')).toBe(true);
  expect(host.querySelector('#account-admin-users fieldset')?.disabled).toBe(false);expect(host.textContent).toContain('Audited release change confirmed');
 });
+
+it('gives, replaces and removes unlimited access, and never offers to block the admin\'s own account',async()=>{
+ const listed=[{userId:a,email:'a@example.invalid',state:'ACTIVE',unlimited:{endsAt:null}},{userId:b,email:'b@example.invalid',state:'ACTIVE',unlimited:null}];
+ const grant=(id:string,kind:string,counted:boolean)=>({id,kind,state:'ACTIVE',grantedMilliseconds:3600000,spentMilliseconds:0,testGrant:false,counted});
+ const fetcher=vi.fn(async(url:string,init?:RequestInit)=>init?.method==='POST'?Response.json({code:'APPLIED'})
+  :Response.json({users:url.includes(a)?[listed[0]]:url.includes(b)?[listed[1]]:listed,grants:url.includes(a)?[grant('g1','UNLIMITED',true),grant('g2','PACK',false)]:[],models:[],audit:[],adminUserId:b}));
+ vi.stubGlobal('fetch',fetcher);const confirm=vi.fn(()=>true);vi.stubGlobal('confirm',confirm);window.confirm=confirm;
+ await render();expect(host.querySelectorAll('.account-admin-users .unlimited-badge')).toHaveLength(1);
+ await act(async()=>button('a@example.invalid').click());
+ const form=host.querySelector('.admin-unlimited-form') as HTMLFormElement;
+ expect(form.textContent).toContain('No end date');expect(button('Replace unlimited access')).toBeTruthy();
+ // Unlimited is not listed as removable minutes, and a test payment says it does not count.
+ expect(host.querySelectorAll('.admin-grant')).toHaveLength(1);expect(host.querySelector('.admin-grant')!.textContent).toContain('does not count');
+ (form.elements.namedItem('duration') as HTMLSelectElement).value='QUARTER';
+ (form.elements.namedItem('reason') as HTMLInputElement).value='Synthetic partner access';
+ await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(confirm).toHaveBeenCalledOnce();
+ const posts=()=>fetcher.mock.calls.filter(([,init])=>init?.method==='POST').map(([,init])=>JSON.parse(String(init!.body)));
+ expect(posts()[0]).toMatchObject({action:'GRANT_UNLIMITED',subjectId:a,input:{duration:'QUARTER'}});
+ const remove=[...host.querySelectorAll('form')].find(item=>item.querySelector('button')?.textContent==='Remove unlimited access')!;
+ (remove.elements.namedItem('reason') as HTMLInputElement).value='Synthetic end of access';
+ await act(async()=>remove.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ expect(posts()[1]).toMatchObject({action:'REVOKE_UNLIMITED',subjectId:a,input:{}});
+ await act(async()=>button('Show recent').click());await act(async()=>button('b@example.invalid').click());
+ expect(host.textContent).toContain('This is your own Admin account, so it cannot be blocked.');
+ expect(button('Block account')).toBeUndefined();expect(button('Give unlimited access')).toBeTruthy();
+});

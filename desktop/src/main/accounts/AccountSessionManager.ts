@@ -194,13 +194,14 @@ export class AccountSessionManager {
     ++this.epoch;this.invalidate();this.pending=undefined;
     this.publish({mode:'cluera-staging',state:'suspended',message:new AccountApiError(403).message});
   }
-  /** Time left on the account, including time held for running work; undefined when it cannot be read now. */
+  /** Time free to use now; undefined when it cannot be read now. Time already held by running work is not counted:
+   * when another device holds the last of it, this one is told the time is used up instead of retrying. */
   async remainingMilliseconds(): Promise<number | undefined> {
     try {
       if (this.pending) await this.pending;
       if (this.view.state !== 'active' || !this.usable()) return undefined;
       const snapshot = await this.api.snapshot(this.tokens!.accessToken);
-      return snapshot.usage.availableMilliseconds + snapshot.usage.reservedMilliseconds;
+      return snapshot.usage.availableMilliseconds;
     } catch { return undefined; }
   }
   /** Main-only capability. Never register this return value on IPC. */

@@ -11,7 +11,11 @@ export interface AccountCredits {
   plans: { tier: string; state: string; paymentState: string; endsAt: string|null; cancelFuture: boolean }[];
   payments: { offerCode: string; state: 'CREATING'|'BOUND'|'UNCERTAIN'|'REJECTED'|'VERIFIED'|'REFUNDED'; createdAt: string }[];
   checkoutAvailable: boolean;
+  /** Admin-given unlimited access; null or missing when the account has none. */
+  unlimited?: UnlimitedAccess;
 }
+/** Unlimited access ends at `endsAt` (null: no end). Other time is kept for afterwards. */
+export type UnlimitedAccess = { endsAt: string | null; savedMilliseconds: number } | null;
 export interface CreditsView {
   state: 'empty'|'ready'|'unavailable'; refreshing: boolean;
   snapshot?: AccountCredits; lastSync?: string;

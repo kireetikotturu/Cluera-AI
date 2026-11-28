@@ -21,6 +21,7 @@ type AccountAction = 'login'|'refresh'|'session'|'logout'|'oauth-exchange'|'cred
 const authOptionsSchema: z.ZodType<AccountAuthOptions> = z.object({ google: z.enum(['enabled','disabled','unavailable']) }).strict();
 const creditsSchema:z.ZodType<AccountCredits>=z.object({userId:z.string().uuid(),serverTime:z.string().datetime({offset:true}),displayName:z.string().max(80),
  availableMilliseconds:millis,reservedMilliseconds:millis,spentMilliseconds:millis,checkoutAvailable:z.boolean(),
+ unlimited:z.object({endsAt:z.string().datetime({offset:true}).nullable(),savedMilliseconds:millis}).strict().nullable().optional(),
  buckets:z.array(z.object({kind:z.enum(['TRIAL','RECURRING','PACK','TEST','MANUAL']),grantedMilliseconds:millis,spentMilliseconds:millis,
   reservedMilliseconds:millis,availableMilliseconds:millis}).strict()).max(5),
  plans:z.array(z.object({tier:z.enum(['PRO','ENTERPRISE']),state:z.enum(['ACTIVE','QUEUED','PAUSED','ENDED','REFUNDED']),
@@ -54,7 +55,9 @@ export class AccountApi {
       if (signal?.aborted) throw new AccountApiError(503);
       const pending = this.request(`${ACCOUNT_ORIGIN}/api/account/${action === 'auth-options' ? action : `native/${action}`}`, {
         method: action === 'session' || action === 'credits' || action === 'auth-options' ? 'GET' : 'POST', redirect: 'error', cache: 'no-store', credentials: 'omit',
-        signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(access ? { Authorization: `Bearer ${access}` } : {}) },
+        signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(access ? { Authorization: `Bearer ${access}` } : {}),
+          // This app understands unlimited access; without this the server answers as it does to earlier versions.
+          ...(action === 'credits' ? { 'X-Cluera-Features': 'unlimited' } : {}) },
         ...(input ? { body: JSON.stringify(input) } : {}),
       });
       void pending.then(response => { if (controller.signal.aborted) discard(response.body); }, () => undefined);

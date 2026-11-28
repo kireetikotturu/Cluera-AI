@@ -1,4 +1,5 @@
 import type { AccessGrant, LiveSetup, LiveSnapshot, LiveTurn } from './types';
+import type { UnlimitedAccess } from '../../../desktop/src/shared/accountCredits';
 
 export type ApiFailure = 'signin' | 'rate' | 'unavailable' | 'invalid';
 export class LiveApiError extends Error {
@@ -45,14 +46,14 @@ export const deleteSession = async (id: string): Promise<void> => { await live({
 export const saveSession = async (payload: object): Promise<void> => { await live(payload, 20_000); };
 
 /** The account's time left and its saved résumé, job description and notes, in one read. */
-export async function getHome(): Promise<{ availableMilliseconds: number; documents: AccountDocument[] }> {
+export async function getHome(): Promise<{ availableMilliseconds: number; unlimited: UnlimitedAccess; documents: AccountDocument[] }> {
   let response: Response;
   try { response = await fetch('/api/account/workspace', { cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(15_000) }); }
   catch { throw new LiveApiError('unavailable'); }
   if (!response.ok) throw new LiveApiError(response.status === 401 || response.status === 403 ? 'signin' : 'unavailable');
   try {
-    const { workspace } = await response.json() as { workspace: { balance: { availableMilliseconds: number }; documents: AccountDocument[] } };
-    return { availableMilliseconds: workspace.balance.availableMilliseconds, documents: workspace.documents };
+    const { workspace } = await response.json() as { workspace: { balance: { availableMilliseconds: number }; unlimited?: UnlimitedAccess; documents: AccountDocument[] } };
+    return { availableMilliseconds: workspace.balance.availableMilliseconds, unlimited: workspace.unlimited ?? null, documents: workspace.documents };
   } catch { throw new LiveApiError('unavailable'); }
 }
 

@@ -14,11 +14,13 @@ import {AiCosts} from './AiCosts';
 import {AdminData} from './AdminData';
 import {adminReadError} from '../../../lib/accounts/adminReadErrors';
 import {useAdminAccessRecheck} from '../AdminRoleNavigation';
+import {InfinityIcon,UnlimitedBadge,unlimitedUntil,type UnlimitedAccess} from '../Unlimited';
 import '../account-ui.css';
 import './admin-navigation.css';
 type Factor={id:string;status:string};
 interface State {needsMfa?:boolean;factors?:Factor[];testEntitlementsEnabled?:boolean;
- users?:Array<{userId:string;email:string;emailVerified?:boolean;state:string;createdAt?:string}>;grants?:Array<{id:string;kind:string;state:string;grantedMilliseconds:number;spentMilliseconds:number;reservedMilliseconds?:number;testGrant:boolean;adminAdjustment?:boolean}>;
+ adminUserId?:string;
+ users?:Array<{userId:string;email:string;emailVerified?:boolean;state:string;createdAt?:string;unlimited?:UnlimitedAccess}>;grants?:Array<{id:string;kind:string;state:string;grantedMilliseconds:number;spentMilliseconds:number;reservedMilliseconds?:number;testGrant:boolean;adminAdjustment?:boolean;counted?:boolean}>;
  balances?:Partial<Record<'TRIAL'|'RECURRING'|'PACK',number>>;trial?:{registered:boolean;remainingMilliseconds:number}|null;
  plans?:Array<{tier:string;state:string;paymentState:string;endsAt:string|null;cancelFuture:boolean;remainingMilliseconds:number|null;graceUntil:string|null}>;
  sessions?:Array<{id:string;startedAt:string;state:string}>;billing?:Array<{id:string;offerCode:string;state:string;createdAt:string;transactionId:string|null}>;
@@ -134,7 +136,7 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
     <button type="button" className="admin-stat" onClick={()=>setTab('plans')}><strong>Plans &amp; pricing</strong><span>Add, edit, turn on/off or remove the time packs customers buy.</span></button>
     <button type="button" className="admin-stat" onClick={()=>setTab('ai')}><strong>{state.models?.filter(m=>m.enabled).length??0} AI models on</strong><span>Gemini, ChatGPT, Claude and Deepgram models and keys.</span></button>
     <button type="button" className="admin-stat" onClick={()=>setTab('costs')}><strong>AI costs</strong><span>What the AI costs you: by model, customer and session.</span></button>
-    <button type="button" className="admin-stat" onClick={()=>setTab('customers')}><strong>{state.users?.length??0} recent customers</strong><span>Find an account, add or remove time, suspend.</span></button>
+    <button type="button" className="admin-stat" onClick={()=>setTab('customers')}><strong>{state.users?.length??0} recent customers</strong><span>Add or remove time, give unlimited access, block accounts.</span></button>
     <button type="button" className="admin-stat" onClick={()=>setTab('data')}><strong>Data</strong><span>Résumés customers used in sessions.</span></button>
     <button type="button" className="admin-stat" onClick={()=>setTab('payments')}><strong>Payments</strong><span>See recent purchases and unfinished checkouts.</span></button>
    </div>
@@ -158,12 +160,13 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
   <div hidden={tab!=='customers'}><section id="account-admin-users" className="account-admin-section" aria-labelledby="account-admin-users-heading"><div className="account-admin-section-heading"><div><p className="account-ui-kicker">CUSTOMERS</p><h2 id="account-admin-users-heading">Customers</h2></div><button disabled={busy||Boolean(pendingMutation)||releaseLocked} onClick={()=>select('')}>Show recent</button></div>
   <UsageOverviewPanel report={usage.overview} error={usage.error} loading={usage.loading} updatedAt={usage.updatedAt} onRefresh={usage.refresh} onSelect={select} selected={subject} disabled={locked}/>
   <form className="admin-search" onSubmit={event=>{event.preventDefault();if(!running.current&&!pendingOperation.current)void load('',query);}}><label>Email or account ID<input value={query} onChange={event=>setQuery(event.target.value)} maxLength={254} disabled={locked} placeholder="name@example.com"/></label><button className="button" disabled={locked}>Search</button></form>
-  <ul className="account-admin-users">{state.users?.map(user=><li key={user.userId} className={subject===user.userId?'selected':''}><button disabled={busy||Boolean(pendingMutation)||releaseLocked} onClick={()=>select(user.userId)}>{user.email}</button><span className={user.state==='ACTIVE'?'tag-on':'tag-off'}>{user.state==='ACTIVE'?'Active':'Blocked'}</span>{user.emailVerified?<span>Verified</span>:null}</li>)}</ul>
+  <ul className="account-admin-users">{state.users?.map(user=><li key={user.userId} className={subject===user.userId?'selected':''}><button disabled={busy||Boolean(pendingMutation)||releaseLocked} onClick={()=>select(user.userId)}>{user.email}</button><span className={user.state==='ACTIVE'?'tag-on':'tag-off'}>{user.state==='ACTIVE'?'Active':'Blocked'}</span>{user.unlimited?<UnlimitedBadge/>:null}{user.emailVerified?<span>Verified</span>:null}</li>)}</ul>
   {!state.users?.length?<p className="account-admin-empty">No customers found. Try their exact email address.</p>:null}
   {!subject&&state.users?.length===50&&state.users[49].createdAt?<button disabled={locked} onClick={()=>void load('',query,{createdAt:state.users![49].createdAt!,userId:state.users![49].userId})}>Next page</button>:null}
   <fieldset disabled={locked} style={{border:0,padding:0,margin:0}}>
   {subject?<div className="account-admin-detail"><h3>{state.users?.find(u=>u.userId===subject)?.email??'Customer'}</h3><p className="admin-note">Account ID: {subject}</p>
    <div className="admin-stat-grid compact">
+    {(()=>{const access=state.users?.find(u=>u.userId===subject)?.unlimited;return access?<div className="admin-stat"><strong><UnlimitedBadge large/></strong><span>{unlimitedUntil(access.endsAt)}</span></div>:null;})()}
     <div className="admin-stat"><strong>{usageDuration(state.trial?.remainingMilliseconds??state.balances?.TRIAL??0)}</strong><span>Free trial left</span></div>
     <div className="admin-stat"><strong>{usageDuration(state.balances?.PACK??0)}</strong><span>Purchased / added time</span></div>
     <div className="admin-stat"><strong>{usageDuration(state.balances?.RECURRING??0)}</strong><span>Monthly plan time</span></div>
@@ -172,21 +175,38 @@ export function AccountAdmin({liveBillingAdmin=false}:{liveBillingAdmin?:boolean
    {state.plans?.length?<><h4>Monthly plans</h4>{state.plans.map((plan,i)=><p key={i}>{plan.tier} · {plan.state}{plan.endsAt?` · ends ${new Date(plan.endsAt).toLocaleDateString()}`:''}{plan.cancelFuture?' · cancelling':''}</p>)}</>:null}
    {state.billing?.length?<><h4>Purchases</h4>{state.billing.map(item=><p key={item.id}>{item.offerCode} · {item.state} · {new Date(item.createdAt).toLocaleString()}</p>)}</>:null}
    <h4>Change this account</h4>
-   {(()=>{const blocked=(state.users?.find(u=>u.userId===subject)?.state??'ACTIVE')!=='ACTIVE';return <>
+   {(()=>{const account=state.users?.find(u=>u.userId===subject),blocked=(account?.state??'ACTIVE')!=='ACTIVE',access=account?.unlimited;return <>
    <form key={`time-${subject}`} className="admin-model-form" onSubmit={event=>{event.preventDefault();const values=new FormData(event.currentTarget);const kind=String(values.get('action'));mutate(kind,{minutes:Number(values.get('minutes'))},String(values.get('reason')));}}>
     <label>Time<select name="action" disabled={busy}><option value="ADD_MINUTES">Add minutes (never expire)</option><option value="REDUCE_MINUTES">Reduce time (take minutes away)</option>{state.testEntitlementsEnabled?<option value="GRANT_TEST">Add test minutes (7 days)</option>:null}</select></label>
     <label>Minutes<input name="minutes" type="number" min={1} max={60000} defaultValue={60} disabled={busy}/></label>
     <label>Reason (saved in history)<input name="reason" required minLength={10} maxLength={500} disabled={busy} placeholder="e.g. Goodwill for a failed session"/></label><button className="button" disabled={busy}>Apply</button>
     <p className="admin-note">Reducing takes from bought or added time that is still unused, largest first. The free 15-minute trial cannot be reduced; block the account instead.</p>
    </form>
-   <form key={`access-${subject}`} className="admin-model-form" onSubmit={event=>{event.preventDefault();const reason=String(new FormData(event.currentTarget).get('reason'));
+   <form key={`unlimited-${subject}`} className="admin-model-form admin-unlimited-form" onSubmit={event=>{event.preventDefault();const values=new FormData(event.currentTarget);
+     if(access&&!window.confirm('Replace the current unlimited access with this new one?'))return;
+     mutate('GRANT_UNLIMITED',{duration:String(values.get('duration'))},String(values.get('reason')));}}>
+    <h3><InfinityIcon gold size={20}/> Unlimited access</h3>
+    {access?<p className="admin-note"><UnlimitedBadge/> now · {unlimitedUntil(access.endsAt)}</p>:null}
+    <label>Unlimited for<select name="duration" defaultValue="MONTH" disabled={busy}><option value="DAY">1 day (24 hours)</option><option value="WEEK">1 week</option><option value="MONTH">1 month</option><option value="QUARTER">3 months</option><option value="YEAR">1 year</option><option value="FOREVER">Forever (no end date)</option></select></label>
+    <label>Reason (saved in history)<input name="reason" required minLength={10} maxLength={500} disabled={busy} placeholder="e.g. Partner account"/></label>
+    <button className="button" disabled={busy}>{access?'Replace unlimited access':'Give unlimited access'}</button>
+    <p className="admin-note">Only Admin can give this; it is never sold. While it runs there is no time limit, and their bought and added time stays saved for afterwards.</p>
+   </form>
+   {access?<form key={`unlimited-off-${subject}`} className="admin-model-form" onSubmit={event=>{event.preventDefault();const reason=String(new FormData(event.currentTarget).get('reason'));
+     if(!window.confirm('Remove unlimited access now? A running session moves to their other time, or ends if there is none.'))return;
+     mutate('REVOKE_UNLIMITED',{},reason);}}>
+    <label>Remove unlimited access<input name="reason" required minLength={10} maxLength={500} disabled={busy} placeholder="Why are you removing it?"/></label>
+    <button className="button danger" disabled={busy}>Remove unlimited access</button>
+   </form>:null}
+   {subject===state.adminUserId?<p className="admin-note">This is your own Admin account, so it cannot be blocked.</p>
+   :<form key={`access-${subject}`} className="admin-model-form" onSubmit={event=>{event.preventDefault();const reason=String(new FormData(event.currentTarget).get('reason'));
      if(!blocked&&!window.confirm('Block this account? Any running session ends now and they cannot sign in or start sessions until you unblock them.'))return;
      mutate(blocked?'REACTIVATE':'SUSPEND',{},reason);}}>
     <label>{blocked?'Unblock this account':'Block (ban) this account'}<input name="reason" required minLength={10} maxLength={500} disabled={busy} placeholder={blocked?'Why are you unblocking them?':'Why are you blocking them?'}/></label>
     <button className={blocked?'button':'button danger'} disabled={busy}>{blocked?'Unblock account':'Block account'}</button>
-    <p className="admin-note">{blocked?'This account is blocked: it cannot sign in or use Cluera.':'Blocking ends any running session at once and stops sign-in and new sessions. Their time and history stay as they are.'}</p>
-   </form></>;})()}
-  {state.grants?.some(grant=>grant.kind!=='TRIAL'&&['ACTIVE','PAUSED'].includes(grant.state))?<h4>Remove unused time</h4>:null}{state.grants?.map(grant=>grant.kind!=='TRIAL'&&['ACTIVE','PAUSED'].includes(grant.state)?<div key={grant.id} className="admin-grant"><p>{grant.adminAdjustment?'Added by Admin':grant.testGrant?'Test minutes':grant.kind==='PACK'?'Purchased pack':'Monthly plan'} · {usageDuration(grant.grantedMilliseconds-grant.spentMilliseconds-(grant.reservedMilliseconds??0))} unused of {usageDuration(grant.grantedMilliseconds)}</p>
+    <p className="admin-note">{blocked?'This account is blocked: it cannot sign in or use Cluera.':'Blocking ends any running session on every device within seconds and stops sign-in and new sessions. Their time and history stay as they are.'}</p>
+   </form>}</>;})()}
+  {state.grants?.some(grant=>!['TRIAL','UNLIMITED'].includes(grant.kind)&&['ACTIVE','PAUSED'].includes(grant.state))?<h4>Remove unused time</h4>:null}{state.grants?.map(grant=>!['TRIAL','UNLIMITED'].includes(grant.kind)&&['ACTIVE','PAUSED'].includes(grant.state)?<div key={grant.id} className="admin-grant"><p>{grant.adminAdjustment?'Added by Admin':grant.testGrant?'Test minutes':grant.kind==='PACK'?'Purchased pack':'Monthly plan'}{grant.counted===false?' (test payment: does not count with live payments)':''} · {usageDuration(grant.grantedMilliseconds-grant.spentMilliseconds-(grant.reservedMilliseconds??0))} unused of {usageDuration(grant.grantedMilliseconds)}</p>
    <form onSubmit={event=>{event.preventDefault();const v=new FormData(event.currentTarget);mutate('REMOVE_MINUTES',{grantId:grant.id,minutes:Number(v.get('minutes'))},String(v.get('reason')));}}><label>Minutes<input name="minutes" type="number" required min={1} max={60000}/></label><label>Reason<input name="reason" required minLength={10} maxLength={500}/></label><button>Remove</button></form>
    {grant.testGrant&&grant.state==='ACTIVE'?<form onSubmit={event=>{event.preventDefault();mutate('REVOKE_TEST',{grantId:grant.id},String(new FormData(event.currentTarget).get('reason')));}}><label>Reason<input name="reason" minLength={10} maxLength={500} required disabled={busy}/></label><button disabled={busy}>Remove test minutes</button></form>:null}</div>:null)}</div>:null}
   </fieldset></section></div>

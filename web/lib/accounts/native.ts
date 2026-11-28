@@ -7,6 +7,7 @@ import { usageService } from '../usage/service';
 import { accountContextCommand } from './context';
 import { phoneSessionAction } from './phoneSessions';
 import { readCredits } from './credits';
+import { unlimitedAccess } from './unlimited';
 import {CLUERA_AUTH_STORAGE_KEY,CLUERA_SUPABASE_URL} from '../supabase/target';
 
 /** Explicit native-main API, separate from browser HttpOnly-cookie BFF. Never
@@ -66,7 +67,14 @@ export async function handleNativeAccount(request: Request, action: string): Pro
       return json({ ok: true });
     }
     const account = await authorizeCustomer(clients, token);
-    if(action==='credits')return json(await readCredits((name,args)=>clients.service.rpc(name,args),account));
+    if(action==='credits'){
+      const rpc=(name:string,args:Record<string,unknown>)=>clients.service.rpc(name,args);
+      const credits=await readCredits(rpc,account);
+      // Only an app that asks gets the extra field: earlier versions refuse unknown fields.
+      const asks=(request.headers.get('x-cluera-features')??'').split(',').some(feature=>feature.trim()==='unlimited');
+      const unlimited=asks?await unlimitedAccess(rpc,account.userId,credits.availableMilliseconds):undefined;
+      return json(unlimited===undefined?credits:{...credits,unlimited});
+    }
     if(action==='phone-sessions'){
       // The Windows app only shows the history of sessions run on a phone; saving and deleting stay on the website.
       const input=await readJsonBody(request,2048);

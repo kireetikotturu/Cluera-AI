@@ -157,10 +157,10 @@ describe('account checks that must not sign anyone out', () => {
     await vi.waitFor(() => expect(f.api.refresh).toHaveBeenCalledOnce());
     expect(f.manager.status().state).toBe('active'); expect(work.signal.aborted).toBe(false); expect(f.saved()).not.toBeNull();
   });
-  it('reads the time left, including time held for running work', async () => {
+  it('reads the time free to use: another device holding the last slice means the time is used up here', async () => {
     const f = await signedIn();
-    f.api.snapshot.mockResolvedValueOnce({ ...snapshot, usage: { ...snapshot.usage, availableMilliseconds: 0, reservedMilliseconds: 800 } });
-    expect(await f.manager.remainingMilliseconds()).toBe(800);
+    f.api.snapshot.mockResolvedValueOnce({ ...snapshot, usage: { ...snapshot.usage, availableMilliseconds: 0, reservedMilliseconds: 30_000 } });
+    expect(await f.manager.remainingMilliseconds()).toBe(0);
     f.api.snapshot.mockRejectedValueOnce(new AccountApiError(503));
     expect(await f.manager.remainingMilliseconds()).toBeUndefined(); expect(f.manager.status().state).toBe('active');
   });

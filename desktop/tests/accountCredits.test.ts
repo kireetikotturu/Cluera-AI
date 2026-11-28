@@ -114,6 +114,15 @@ describe('Account credit reporting ownership and scheduling',()=>{
   expect(request.mock.calls[0][1]).toMatchObject({method:'GET',credentials:'omit',redirect:'error',cache:'no-store'});
   request.mockResolvedValueOnce(Response.json({...snapshot,secret:'synthetic-forbidden'}));await expect(api.credits('access',new AbortController().signal)).rejects.toMatchObject({status:503});
  });
+ it('asks the server for unlimited access, and still accepts replies without it',async()=>{
+  const unlimited={endsAt:'2026-12-28T10:00:00.123456+00:00',savedMilliseconds:900000};
+  const request=vi.fn(async(_input:RequestInfo|URL,_options?:RequestInit)=>Response.json({...snapshot,unlimited}));const api=new AccountApi(request as any,()=>undefined);
+  expect((await api.credits('synthetic-access-token',new AbortController().signal)).unlimited).toEqual(unlimited);
+  expect(request.mock.calls[0][1]!.headers).toMatchObject({'X-Cluera-Features':'unlimited'});
+  for(const body of [snapshot,{...snapshot,unlimited:null}]){request.mockResolvedValueOnce(Response.json(body));await expect(api.credits('access',new AbortController().signal)).resolves.toEqual(body);}
+  request.mockResolvedValueOnce(Response.json({...snapshot,unlimited:{endsAt:null,savedMilliseconds:1,extra:true}}));
+  await expect(api.credits('access',new AbortController().signal)).rejects.toMatchObject({status:503});
+ });
  it.each(['cluera_pack_3h_v2','cluera_monthly_40h_v2','cluera_monthly_100h_v2','cluera_monthly_200h_v2'])('accepts only the additive Cluera financial offer enum %s',async offerCode=>{
   const value={...snapshot,payments:[{offerCode,state:'VERIFIED' as const,createdAt:snapshot.serverTime}]};
   const api=new AccountApi(vi.fn(async()=>Response.json(value)) as any,()=>undefined);

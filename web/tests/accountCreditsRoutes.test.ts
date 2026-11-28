@@ -39,6 +39,17 @@ it('native requires live auth, binds owned identity and forbids browser credenti
  expect(await r.json()).toEqual({...value,checkoutAvailable:false});
  expect(rpc).toHaveBeenCalledWith('customer_credits_read',{p_user:uid,p_session:sid});expect(rpc.mock.calls.some(c=>c[0]==='customer_usage_command')).toBe(false);
 });
+it('adds unlimited access only for an app that asks for it, with the other time kept for afterwards',async()=>{
+ const original=rpc.getMockImplementation()!;
+ rpc.mockImplementation(async(name:string)=>name==='customer_credits_read'?{data:{...value,availableMilliseconds:900000+35996400000},error:null}
+  :name==='cluera_unlimited_status'?{data:{endsAt:null,startedAt:'2026-11-28T00:00:00.123456+00:00',compatibleMilliseconds:35996400000},error:null}:original(name));
+ const older=await (await handleNativeAccount(native({authorization:`Bearer ${token}`}),'credits')).json();
+ expect(older).not.toHaveProperty('unlimited');expect(rpc.mock.calls.some(call=>call[0]==='cluera_unlimited_status')).toBe(false);
+ const current=await (await handleNativeAccount(native({authorization:`Bearer ${token}`,'x-cluera-features':'unlimited'}),'credits')).json();
+ expect(current.unlimited).toEqual({endsAt:null,savedMilliseconds:900000});
+ expect(rpc).toHaveBeenCalledWith('cluera_unlimited_status',{p_user:uid});
+ expect((await (await creditsRequest(browser())).json()).unlimited).toEqual({endsAt:null,savedMilliseconds:900000});
+});
 it('browser handoff requires independent cookie auth and exact desktop owner match',async()=>{
  expect((await creditsRequest(native())).status).toBe(401);
  const mismatch=await creditsRequest(browser(`?desktopAccount=${sid}`));expect(mismatch.status).toBe(403);

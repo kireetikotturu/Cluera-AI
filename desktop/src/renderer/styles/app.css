@@ -2815,6 +2815,14 @@ button, input, select, textarea, .setting-rows label { font-weight: 500; }
 .live-time-ring em { position: absolute; z-index: 1; bottom: 6px; font-size: 6px; font-style: normal; color: var(--faint); line-height: 1; }
 .live-time-ring:has(em) b { transform: translateY(-3px); }
 .live-time-ring.pending i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(var(--neutral-rgb), 0.2); border-top-color: #8f7dff; animation: live-ring-spin 1s linear infinite; }
+/* Admin-given unlimited access: a gold ring and infinity mark where the time left is shown. */
+.live-time-ring.unlimited { filter: drop-shadow(0 0 5px rgba(246, 193, 75, .45)); }
+.live-time-ring .ring-unlimited { fill: none; stroke-width: 3; }
+.live-time-ring svg.infinity-icon { position: relative; inset: auto; z-index: 1; width: 20px; height: 20px; }
+.unlimited-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 1.2; letter-spacing: .01em; white-space: nowrap; vertical-align: middle; color: #2c1d02; background: linear-gradient(135deg, #ffeab0 0%, #f6c34d 55%, #dc9f27 100%); box-shadow: 0 3px 12px rgba(246, 193, 75, .3), inset 0 1px 0 rgba(255, 255, 255, .55); }
+.unlimited-badge .infinity-icon { flex: none; }
+.unlimited-badge.large { gap: 8px; padding: 6px 16px 6px 12px; font-size: 19px; letter-spacing: -.2px; }
+.unlimited-note { margin: 4px 0 0; font-size: 10.5px; line-height: 1.5; color: var(--muted); }
 @keyframes live-ring-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .live-time-ring .ring-value { transition: none; } .live-time-ring.pending i { animation: none; } }
 /* Safety: nothing but the logo may ever show in the collapsed launcher. */

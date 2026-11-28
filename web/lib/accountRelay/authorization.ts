@@ -31,7 +31,8 @@ export async function authorizeRelay(token: string, config: RelayConfig, env = p
   if (account.error || account.data?.code !== 'ACTIVE' || account.data.userId !== who.userId) return reject();
   const bucket = createHmac('sha256', Buffer.from(config.rateKey, 'base64'))
     .update(`account-relay-v2:${config.database}:${who.userId}`).digest('hex');
-  const rate = await client.rpc('customer_auth_rate_limit', { p_bucket_hash: bucket, p_maximum: 30 });
+  // Live connections per account in 15 minutes, shared by all its devices (each session and reconnect is one).
+  const rate = await client.rpc('customer_auth_rate_limit', { p_bucket_hash: bucket, p_maximum: 60 });
   if (rate.error || rate.data !== true) return reject();
   const remainingTokenMs = Math.min(3600000, claims.exp * 1000 - Date.now());
   if (remainingTokenMs < 1000) return reject();

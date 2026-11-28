@@ -3,6 +3,7 @@ import {act,createElement} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,expect,it,vi} from 'vitest';
 import {AccountCreditsSection} from '../src/renderer/components/AccountCreditsSection';
+import {LiveTimeRing} from '../src/renderer/components/LiveTimeRing';
 import {emptyCredits,type CreditsView} from '../src/shared/accountCredits';
 // Reuse the existing web test DOM dependency; no shipped dependency is added.
 const require=createRequire(import.meta.url);
@@ -28,4 +29,21 @@ it('fences a late manual refresh and clears displayed credits when account owner
  expect(dom.window.document.body.textContent).not.toContain('1h 0m');
  await act(async()=>deferred.shift()!(snapshot('account-B')));
  expect(dom.window.document.body.textContent).toContain('1h 0m');
+});
+it('shows the gold Unlimited mark instead of hours, with its end and the time saved for later',async()=>{
+ dom=new JSDOM('<div id="root"></div>');
+ vi.stubGlobal('window',dom.window);vi.stubGlobal('document',dom.window.document);vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
+ const base={userId:'account-A',displayName:'',serverTime:new Date().toISOString(),availableMilliseconds:35_996_400_000+5_400_000,reservedMilliseconds:0,spentMilliseconds:0,buckets:[],plans:[],payments:[],checkoutAvailable:false};
+ const view:CreditsView={...emptyCredits(),state:'ready',snapshot:{...base,unlimited:{endsAt:null,savedMilliseconds:5_400_000}}};
+ dom.window.accountAPI={credits:{refresh:vi.fn(async()=>view),onChange:()=>()=>{}},openWeb:async()=>{}};
+ root=createRoot(dom.window.document.getElementById('root'));
+ await act(async()=>root!.render(createElement(AccountCreditsSection,{userId:'account-A',settings:true})));
+ const text=dom.window.document.body.textContent;
+ expect(dom.window.document.querySelector('.st-time-main .unlimited-badge')?.textContent).toBe('Unlimited');
+ expect(text).toContain('No end date. Your other 1h 30m stays saved for afterwards.');
+ expect(text).not.toContain('9999h');
+ await act(async()=>root!.render(createElement(LiveTimeRing)));
+ const ring=dom.window.document.querySelector('.live-time-ring.unlimited')!;
+ expect(ring.getAttribute('aria-label')).toBe('Unlimited time. No end date');
+ expect(ring.querySelector('.infinity-icon')).not.toBeNull();expect(ring.textContent).toBe('');
 });

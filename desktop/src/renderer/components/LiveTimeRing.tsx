@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { emptyCredits, type CreditsView } from '../../shared/accountCredits';
+import { InfinityIcon, unlimitedUntil } from './UnlimitedMark';
 
 const MINUTE = 60_000;
 
@@ -8,6 +9,7 @@ const MINUTE = 60_000;
 export function LiveTimeRing(): JSX.Element | null {
   const [view, setView] = useState<CreditsView>(emptyCredits());
   const [now, setNow] = useState(() => Date.now());
+  const gradient = useId();
   useEffect(() => {
     const api = window.accountAPI?.credits;
     if (!api) return undefined;
@@ -24,6 +26,17 @@ export function LiveTimeRing(): JSX.Element | null {
 
   const snapshot = view.snapshot;
   if (!snapshot) return <span className="live-time-ring pending" title="Syncing your time" aria-label="Syncing your time left"><i/></span>;
+  // Admin-given unlimited access: a gold ring with the infinity mark in place of the time left.
+  if (snapshot.unlimited) {
+    const label = `Unlimited time. ${unlimitedUntil(snapshot.unlimited.endsAt)}`;
+    return <span className="live-time-ring unlimited" role="img" aria-label={label} title={label}>
+      <svg viewBox="0 0 36 36" aria-hidden="true">
+        <defs><linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffe7a3"/><stop offset=".55" stopColor="#f5bd45"/><stop offset="1" stopColor="#d9951c"/></linearGradient></defs>
+        <circle className="ring-unlimited" cx="18" cy="18" r="15" stroke={`url(#${gradient})`}/>
+      </svg>
+      <InfinityIcon size={20} gold/>
+    </span>;
+  }
   // Unspent time = free time plus the slice currently held for this run, minus what has run since the last sync.
   const sinceSync = view.active && view.lastSync ? Math.max(0, now - Date.parse(view.lastSync)) : 0;
   const left = Math.max(0, snapshot.availableMilliseconds + snapshot.reservedMilliseconds - sinceSync);

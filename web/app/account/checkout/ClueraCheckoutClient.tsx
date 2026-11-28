@@ -8,13 +8,14 @@ import {checkoutDenial, checkoutDenialMessage, checkoutFailureMessage, type Chec
 import type {ClueraBillingHistory as BillingHistory} from '../../../lib/payments/cluera/historyContracts';
 import { z } from 'zod';
 import { usageDuration } from '../../../lib/usage/display';
+import { UnlimitedBadge, unlimitedUntil } from '../Unlimited';
 import {selectionFromSearch,checkoutSelectionHref,checkoutSelectionName,type CheckoutSelection} from '../../../lib/cluera/checkoutJourney';
 import { clueraBoundCheckoutForMode, clueraCatalogResponse, clueraCheckoutStatus,
   clueraAllowance, clueraPrice, type ClueraPublicRevision, type ClueraBoundCheckout,
 } from '../../../lib/payments/cluera/publicCatalog';
 
 const creditsSchema = z.object({ userId: z.uuid(), displayName: z.string().max(80).optional(),
-  availableMilliseconds: z.number().int().nonnegative(), payments: z.array(z.object({
+  availableMilliseconds: z.number().int().nonnegative(), unlimited: z.object({ endsAt: z.string().nullable(), savedMilliseconds: z.number() }).nullable().optional(), payments: z.array(z.object({
     offerCode: z.string().max(80), state: z.enum(['CREATING', 'BOUND', 'UNCERTAIN', 'REJECTED', 'VERIFIED', 'REFUNDED']),
     createdAt: z.iso.datetime({ offset: true }),
   })).max(10),
@@ -504,7 +505,7 @@ export default function ClueraCheckoutClient({ enabled, offers = [], historyEnab
     {selection?<aside className="cluera-plan-handoff" aria-label="Selected Cluera plan"><p>Selected plan: <strong>{checkoutSelectionName(selection)}</strong></p>
       <p>Review the price and terms. Nothing is charged until you complete payment.</p></aside>:null}
     <div className={styles.accountSummary}>
-      {credits ? <dl><div><dt>Signed in as</dt><dd>{credits.displayName?.trim() || 'verified customer'}</dd></div><div className={styles.balance}><dt>Available time</dt><dd>{usageDuration(credits.availableMilliseconds)}</dd><p>Shared across your devices</p></div></dl>
+      {credits ? <dl><div><dt>Signed in as</dt><dd>{credits.displayName?.trim() || 'verified customer'}</dd></div><div className={styles.balance}><dt>Available time</dt><dd>{credits.unlimited?<UnlimitedBadge large/>:usageDuration(credits.availableMilliseconds)}</dd><p>{credits.unlimited?`${unlimitedUntil(credits.unlimited.endsAt)} · bought time stays saved`:'Shared across your devices'}</p></div></dl>
         : <a className={styles.signIn} href={selection?checkoutSelectionHref(selection,true):'/account#login'}>Sign in to Cluera AI</a>}
       <button className={styles.refresh} type="button" disabled={busy||cooldown>0} onClick={() => {needsReconcile.current=true;void refresh();}}>Refresh billing status</button>
       {enabled && (resumeRevisionId || cancellable) && remaining===null ? <div className={styles.resumePanel}><div><strong>You have an unfinished payment</strong>

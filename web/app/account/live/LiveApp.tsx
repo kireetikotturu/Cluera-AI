@@ -9,6 +9,8 @@ import {
 } from '../../../lib/live/liveApi';
 import type { LiveSetup, LiveTurn, SocketLike } from '../../../lib/live/types';
 import { usageDuration } from '../../../lib/usage/display';
+import { UnlimitedBadge, unlimitedUntil } from '../Unlimited';
+import type { UnlimitedAccess } from '../../../../desktop/src/shared/accountCredits';
 import { loadPrefs, saveLastSetup } from './prefs';
 import { LIVE_PATH, LIVE_SIGN_IN_PATH, LIVE_WELCOME_QUERY } from '../../../lib/live/intent';
 import { createMeter } from './meter';
@@ -21,7 +23,7 @@ import './live.css';
 import './live-screen.css';
 
 type View = { name: 'home' } | { name: 'setup' } | { name: 'live' } | { name: 'detail'; id: string };
-type Loaded = { documents: AccountDocument[]; availableMilliseconds: number; models: ModelOption[]; defaults: SessionDefaults };
+type Loaded = { documents: AccountDocument[]; availableMilliseconds: number; unlimited: UnlimitedAccess; models: ModelOption[]; defaults: SessionDefaults };
 
 /** The live screen fills the phone: the site's header goes away and the browser's own bars too, where the phone allows it. */
 function enterFullScreen(): void {
@@ -136,7 +138,7 @@ export function LiveApp() {
     const denied = [home, catalog].some(result => result.status === 'rejected' && result.reason instanceof LiveApiError && result.reason.kind === 'signin');
     if (denied) { setState('signed-out'); return; }
     if (home.status === 'rejected' || catalog.status === 'rejected') { setState('unavailable'); return; }
-    setLoaded({ documents: home.value.documents, availableMilliseconds: home.value.availableMilliseconds, models: catalog.value.models, defaults: catalog.value.sessionDefaults });
+    setLoaded({ documents: home.value.documents, availableMilliseconds: home.value.availableMilliseconds, unlimited: home.value.unlimited, models: catalog.value.models, defaults: catalog.value.sessionDefaults });
     if (history.status === 'fulfilled') setSessions(history.value);
     setState('ready');
   }, []);
@@ -144,7 +146,7 @@ export function LiveApp() {
 
   const reloadDocuments = useCallback(async (): Promise<AccountDocument[]> => {
     const home = await getHome();
-    setLoaded(current => (current ? { ...current, documents: home.documents, availableMilliseconds: home.availableMilliseconds } : current));
+    setLoaded(current => (current ? { ...current, documents: home.documents, availableMilliseconds: home.availableMilliseconds, unlimited: home.unlimited } : current));
     return home.documents;
   }, []);
 
@@ -213,9 +215,9 @@ export function LiveApp() {
         : <div className="lv-stack">
           <div className="lv-head"><h1>Live session</h1></div>
           {welcome ? <div className="lv-welcome" role="status"><b>Welcome to Cluera</b>
-            <span>{loaded.availableMilliseconds > 0 ? `${usageDuration(loaded.availableMilliseconds)} ready to use. Your first 15 minutes are free.` : 'Your account is ready.'}</span></div> : null}
+            <span>{loaded.unlimited ? 'Unlimited time is ready to use.' : loaded.availableMilliseconds > 0 ? `${usageDuration(loaded.availableMilliseconds)} ready to use. Your first 15 minutes are free.` : 'Your account is ready.'}</span></div> : null}
           <p className="lv-sub" style={{ margin: 0 }}>Answers to your interview or test questions, on this phone. The microphone listens to the room and answers by itself.</p>
-          <div className="lv-balance"><div><small>Time left</small><b>{usageDuration(loaded.availableMilliseconds)}</b></div>
+          <div className="lv-balance"><div><small>Time left</small><b>{loaded.unlimited ? <UnlimitedBadge large /> : usageDuration(loaded.availableMilliseconds)}</b>{loaded.unlimited ? <small>{unlimitedUntil(loaded.unlimited.endsAt)}</small> : null}</div>
             <Link className="lv-btn ghost small" href="/account/checkout?offer=cluera_pack_3h_v2">Buy time</Link></div>
           {loaded.availableMilliseconds <= 0 ? <p className="lv-note">You have no time left. Buy time to start a session.</p> : null}
           <button type="button" className="lv-btn block" disabled={loaded.availableMilliseconds <= 0} onClick={() => { setStartError(''); setView({ name: 'setup' }); }}><Icon name="plus" />New session</button>

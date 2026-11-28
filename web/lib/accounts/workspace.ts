@@ -7,6 +7,7 @@ import { apiError, json, readJsonBody } from '../http';
 import { SupabaseOperationError } from '../supabase/diagnostics';
 import { STAGING_DATABASE, STAGING_SITE } from '../accountRelay/config';
 import {accountContextCommand} from './context';
+import {unlimitedAccess} from './unlimited';
 
 export function stagingAccountConfig() {
   const config = accountConfig();
@@ -40,6 +41,7 @@ export async function workspaceRequest(request:Request):Promise<Response> {
     });
     if(error)throw new SupabaseOperationError('account.workspace',error,status);
     if(data?.code!=='ACTIVE')throw new AccountError(data?.code==='UNAUTHENTICATED'?'UNAUTHENTICATED':'FORBIDDEN',data?.code==='UNAUTHENTICATED'?401:403);
-    return cookies.apply(json({workspace:data}));
+    const unlimited=await unlimitedAccess((name,args)=>clients.service.rpc(name,args),account.userId,Number(data.balance?.availableMilliseconds??0));
+    return cookies.apply(json({workspace:unlimited===undefined?data:{...data,unlimited}}));
   } catch(error){return error instanceof AccountError?json({error:error.code},error.status):apiError(error);}
 }

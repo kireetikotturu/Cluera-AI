@@ -19,7 +19,9 @@ import {deleteResume,openResume,resumeDelete,resumeListQuery,resumeOpen,shapeRes
 import {sessionDefaultsInput} from './sessionDefaults';
 
 const model=accountModelPolicy;
-const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','SESSION_DEFAULTS','ADD_MINUTES','REMOVE_MINUTES','REDUCE_MINUTES','CATALOG','RESUME_DELETE','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
+/** How long Admin-given unlimited access lasts. Never sold: only Admin can give it. */
+const unlimitedGrant=z.object({duration:z.enum(['DAY','WEEK','MONTH','QUARTER','YEAR','FOREVER'])}).strict();
+const mutation=z.object({action:z.enum(['SUSPEND','REACTIVATE','GRANT_UNLIMITED','REVOKE_UNLIMITED','GRANT_TEST','REVOKE_TEST','MODEL','MODEL_DELETE','SESSION_DEFAULTS','ADD_MINUTES','REMOVE_MINUTES','REDUCE_MINUTES','CATALOG','RESUME_DELETE','RELEASE_DRAFT','RELEASE_PUBLISH','RELEASE_WITHDRAW']),operationId:z.uuid(),
  subjectId:z.uuid().nullable(),reason:z.string().trim().min(10).max(500),input:z.unknown()}).strict();
 /** Staging BFF administration. Live session + explicit allowlist + AAL2 are
  * independently checked by SQL; customer metadata never defines authority. */
@@ -117,7 +119,7 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
     return {...policy,tier:offer.tier,priceId:offer.priceId,amount:offer.amount,currency:offer.currency,seconds:offer.seconds,interval:offer.interval};
    });
    return cookies.apply(json({...data,catalog,providers:[{provider:'gemini',state:'EXTERNAL_MANAGED',rotationAvailable:false},{provider:'deepgram',state:'EXTERNAL_MANAGED',rotationAvailable:false}],
-    testEntitlementsEnabled:process.env.SIGMAROUND_ACCOUNT_TEST_ENTITLEMENTS_ENABLED==='true'}));
+    testEntitlementsEnabled:process.env.SIGMAROUND_ACCOUNT_TEST_ENTITLEMENTS_ENABLED==='true',adminUserId:account.userId}));
   }
   if(request.method!=='POST')return cookies.apply(json({error:'Not found.'},404));
   // Opening résumés is reading: it uses the read allowance, not the one that guards sign-in and changes.
@@ -199,7 +201,8 @@ export async function accountAdminRequest(request:Request):Promise<Response>{
    if(input.action==='GRANT_TEST'){
     if(process.env.SIGMAROUND_ACCOUNT_TEST_ENTITLEMENTS_ENABLED!=='true')throw new AccountError('FORBIDDEN',403);
     values={...z.object({minutes:z.number().int().min(1).max(6000)}).strict().parse(input.input),environment:'account-staging'};
-   }else if(input.action==='ADD_MINUTES')values=z.object({minutes:z.number().int().min(1).max(60000)}).strict().parse(input.input);
+   }else if(input.action==='GRANT_UNLIMITED')values=unlimitedGrant.parse(input.input);
+   else if(input.action==='ADD_MINUTES')values=z.object({minutes:z.number().int().min(1).max(60000)}).strict().parse(input.input);
    else if(input.action==='REDUCE_MINUTES')values=z.object({minutes:z.number().int().min(1).max(60000)}).strict().parse(input.input);
    else if(input.action==='REMOVE_MINUTES')values=z.object({minutes:z.number().int().min(1).max(60000),grantId:z.uuid()}).strict().parse(input.input);
    else if(input.action==='REVOKE_TEST')values=z.object({grantId:z.uuid()}).strict().parse(input.input);

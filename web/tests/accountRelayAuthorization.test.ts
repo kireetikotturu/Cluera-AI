@@ -27,7 +27,7 @@ describe('native account relay authorization', () => {
     expect(fake.rpc.mock.calls[0]).toEqual(['customer_authorize', { p_user_id: user, p_session_id: session }]);
     expect(fake.rpc.mock.calls[1][0]).toBe('customer_auth_rate_limit');
     expect(fake.rpc.mock.calls[1][1].p_bucket_hash).toMatch(/^[a-f0-9]{64}$/);
-    expect(fake.rpc.mock.calls[1][1].p_maximum).toBe(30);
+    expect(fake.rpc.mock.calls[1][1].p_maximum).toBe(60);
     expect(Object.keys(result).sort()).toEqual(['createRun', 'remainingTokenMs']);
     expect(fake.rpc).toHaveBeenCalledTimes(2); // no trial spending on authentication
     expect(fake.createClient.mock.calls[0][2].auth).toMatchObject({ persistSession: false, autoRefreshToken: false });
